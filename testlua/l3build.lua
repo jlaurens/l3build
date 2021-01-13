@@ -30,9 +30,14 @@ release_date = "2020-06-04"
 -- File operations are aided by the LuaFileSystem module
 local lfs = require("lfs")
 
+-- Table for the top building material
+local B = {}
+
+-- Table for the methods
+local M = {}
+
 -- Local access to functions
 
-local assert           = assert
 local ipairs           = ipairs
 local insert           = table.insert
 local lookup           = kpse.lookup
@@ -40,8 +45,6 @@ local match            = string.match
 local gsub             = string.gsub
 local next             = next
 local print            = print
-local select           = select
-local tonumber         = tonumber
 local exit             = os.exit
 
 -- l3build library loader
@@ -50,10 +53,26 @@ local l_path = match(lookup("l3build.lua"),"(.*[/])")
 local function l_require(s)
   require(lookup("l3build-"..s..".lua", { path = l_path } ) )
 end
+
+-- Table for the tools
+local T = l_require("file-functions")
+
 -- define global functions and friends in that order.
-l_require("arguments")
+-- Table for the command line options
+local O = l_require("arguments")
+
 l_require("help")
-l_require("file-functions")
+
+-- This has to come after stdmain(),
+-- and that has to come after the functions are defined
+if options.target == "help" then
+  help()
+  exit(0)
+elseif options.target == "version" then
+  version()
+  exit(0)
+end
+
 l_require("typesetting")
 l_require("aux")
 l_require("clean")
@@ -67,19 +86,6 @@ l_require("tagging")
 l_require("upload")
 l_require("stdmain")
 
--- This has to come after stdmain(),
--- and that has to come after the functions are defined
-if options.target == "help" then
-  help()
-  exit(0)
-elseif options.target == "version" then
-  version()
-  exit(0)
-end
-
--- Allow main function to be disabled 'higher up'
-main = main or stdmain
-
 -- Load configuration file if running as a script
 if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   if fileexists("build.lua") then
@@ -92,22 +98,8 @@ end
 
 -- Load standard settings for variables:
 -- comes after any user versions
-l_require("variables")
-
--- Ensure that directories are 'space safe'
-maindir       = escapepath(maindir)
-docfiledir    = escapepath(docfiledir)
-sourcefiledir = escapepath(sourcefiledir)
-supportdir    = escapepath(supportdir)
-testfiledir   = escapepath(testfiledir)
-testsuppdir   = escapepath(testsuppdir)
-builddir      = escapepath(builddir)
-distribdir    = escapepath(distribdir)
-localdir      = escapepath(localdir)
-resultdir     = escapepath(resultdir)
-testdir       = escapepath(testdir)
-typesetdir    = escapepath(typesetdir)
-unpackdir     = escapepath(unpackdir)
+-- Table for the variables
+local V = l_require("variables")
 
 -- Tidy up the epoch setting
 -- Force an epoch if set at the command line
@@ -191,4 +183,7 @@ if #checkconfigs == 1 and
 end
 
 -- Call the main function
+-- Allow main function to be disabled 'higher up'
+main = main or stdmain
+
 main(options.target, options.names)

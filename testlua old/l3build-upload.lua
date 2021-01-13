@@ -34,8 +34,6 @@ local popen = io.popen
 local read  = io.read
 local write = io.write
 
-local os_type = os.type
-
 local len   = string.len
 local lower = string.lower
 local match = string.match
@@ -70,7 +68,7 @@ local curl_debug = curl_debug or false -- to disable posting
 -- For now, this is undocumented.
 
 local ctanupload = ctanupload or "ask"
-if options["dry-run"] then
+if L3.options["dry-run"] then
   ctanupload = false
 end
 -- if ctanupload is nil or false, only validation is attempted
@@ -89,16 +87,16 @@ function upload(tagnames)
   uploadconfig.pkg = uploadconfig.pkg or ctanpkg or nil
 
   -- Get data from command line if appropriate
-  if options.file then
-    local f = open(options.file,"r")
+  if L3.options.file then
+    local f = open(L3.options.file,"r")
     uploadconfig.announcement = assert(f:read('*a'))
     close(f)
   end
-  uploadconfig.announcement = options.message or uploadconfig.announcement or file_contents(uploadconfig.announcement_file)
-  uploadconfig.email = options.email or uploadconfig.email
+  uploadconfig.announcement = L3.options.message or uploadconfig.announcement or file_contents(uploadconfig.announcement_file)
+  uploadconfig.email = L3.options.email or uploadconfig.email
 
 
-  uploadconfig.note =   uploadconfig.note  or file_contents(uploadconfig.note_file)
+  uploadconfig.note = uploadconfig.note  or file_contents(uploadconfig.note_file)
 
   local tagnames = tagnames or { }
   uploadconfig.version = tagnames[1] or uploadconfig.version
@@ -117,7 +115,7 @@ function upload(tagnames)
     error("Missing zip file '" .. tostring(uploadfile) .. "'")
   end
 
-  ctan_post = construct_ctan_post(uploadfile,options.debug)
+  ctan_post = construct_ctan_post(uploadfile,L3.options.debug)
 
 
 -- curl file version
@@ -130,7 +128,7 @@ function upload(tagnames)
   ctan_pos = urlexe .. " --config " .. curloptfile
   
 
-if options.debug then
+if L3.options.debug then
     ctan_post = ctan_post ..  ' https://httpbin.org/post'
     fp_return = shell(ctan_post)
     print('\n\nCURL COMMAND:')
@@ -250,7 +248,7 @@ function construct_ctan_post(uploadfile,debug)
 
   -- finish constructing the curl command:
   local qq = '"'
-  if os_type == "windows" then
+  if os.type == "windows" then
     qq = '\"'
   end
 -- commandline   ctan_post = ctan_post .. ' --form ' .. qq .. 'file=@' .. tostring(uploadfile) .. ';filename=' .. tostring(uploadfile) .. qq

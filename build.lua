@@ -35,7 +35,7 @@ Linux, macOS, and Windows systems. The package offers:
 * A unit testing system for (La)TeX code;
 * A system for typesetting package documentation; and
 * An automated process for creating CTAN releases.
-  ]]
+]]
 }
 
 -- Detail how to set the version automatically
@@ -44,12 +44,12 @@ function update_tag(file,content,tagname,tagdate)
   local url = "https://github.com/latex3/l3build/compare/"
   if string.match(file, "%.1$") then
     return string.gsub(content,
-      '%.TH l3build 1 "' .. iso .. '"\n',
-      '.TH l3build 1 "' .. tagname .. '"\n')
+      '%.TH l3build 1 "' .. iso     .. '"$',
+       '.TH l3build 1 "' .. tagname .. '"')
   elseif string.match(file, "%.dtx$") then
     return string.gsub(content,
-      "\n%% \\date{Released " .. iso .. "}\n",
-      "\n%% \\date{Released " .. tagname .. "}\n")
+      "^%% \\date{Released " .. iso     .. "}$",
+       "%% \\date{Released " .. tagname .. "}")
   elseif string.match(file, "%.md$") then
     if string.match(file,"CHANGELOG.md") then
       local previous = string.match(content,"compare/(" .. iso .. ")%.%.%.HEAD")
@@ -63,12 +63,12 @@ function update_tag(file,content,tagname,tagdate)
           .. "..." .. tagname)
     end
     return string.gsub(content,
-      "\nRelease " .. iso     .. "\n",
-      "\nRelease " .. tagname .. "\n")
+      "^Release " .. iso     .. "$",
+       "Release " .. tagname)
   elseif string.match(file, "%.lua$") then
     return string.gsub(content,
-      '\nrelease_date = "' .. iso     .. '"\n',
-      '\nrelease_date = "' .. tagname .. '"\n')
+      '^release_date = "' .. iso     .. '"$',
+       'release_date = "' .. tagname .. '"')
   end
   return content
 end

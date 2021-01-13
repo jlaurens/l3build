@@ -22,57 +22,40 @@ for those people who are interested.
 
 --]]
 
-local match = string.match
+L3.require('options')
 
-local pairs = pairs
-local print = print
-
-local lookup = kpse.lookup
+local FF = L3.require('file-functions')
+local V = L3.require('variables')
 
 --
 -- Auxiliary functions which are used by more than one main function
 --
-
-function normalise_epoch()
-  -- If given as an ISO date, turn into an epoch number
-  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
-  if y then
-    epoch =
-      os_time({year = y, month = m, day = d, hour = 0, sec = 0, isdst = nil}) -
-      os_time({year = 1970, month = 1, day = 1, hour = 0, sec = 0, isdst = nil})
-  elseif match(epoch, "^%d+$") then
-    epoch = tonumber(epoch)
-  else
-    epoch = 0
-  end
-end
-
-function setepoch()
+L3.setepoch = function (self)
   return
-    os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch
-      .. os_concat ..
-    os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
-      .. os_concat ..
-    os_setenv .. " FORCE_SOURCE_DATE=1"
-      .. os_concat
+    FF.os_setenv .. " SOURCE_DATE_EPOCH=" .. V.epoch
+      .. FF.os_concat ..
+    FF.os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
+      .. FF.os_concat ..
+    FF.os_setenv .. " FORCE_SOURCE_DATE=1"
+      .. FF.os_concat
 end
 
 local function getscriptname()
-  if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
-    return lookup("l3build.lua")
+  if arg[0]:match("l3build(.lua)?$") then
+    return L3.lookup("l3build.lua")
   else
     return arg[0]
   end
 end
 
 -- Do some subtarget for all modules in a bundle
-function call(dirs, target, opts)
+L3.call = function (self, dirs, target)
   -- Turn the option table into a string
-  local opts = opts or options
+  local opts = self.options
   local s = ""
   for k,v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases
-      local t = option_list[k] or { }
+      local t = self.option_list[k] or { }
       local arg = ""
       if t.type == "string" then
         arg = arg .. "=" .. v
@@ -101,7 +84,7 @@ function call(dirs, target, opts)
       text = " with configuration " .. opts.config[1]
     end
     print("Running l3build with target \"" .. target .. "\"" .. text )
-    local errorlevel = run(
+    local errorlevel = FF.run(
       i,
       "texlua " .. scriptname .. " " .. target .. s
     )
@@ -117,7 +100,7 @@ function depinstall(deps)
   local errorlevel
   for _,i in ipairs(deps) do
     print("Installing dependency: " .. i)
-    errorlevel = run(i, "texlua " .. getscriptname() .. " unpack -q")
+    errorlevel = FF.run(i, "texlua " .. getscriptname() .. " unpack -q")
     if errorlevel ~= 0 then
       return errorlevel
     end

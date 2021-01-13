@@ -22,7 +22,7 @@ for those people who are interested.
 
 --]]
 
-local execute          = os.execute
+local FF = L3.require('file-functions')
 
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
@@ -36,7 +36,7 @@ function unpack(sources, sourcedirs)
     return errorlevel
   end
   for _,i in ipairs(installfiles) do
-    errorlevel = cp(i, unpackdir, localdir)
+    errorlevel = FF.cp(i, unpackdir, localdir)
     if errorlevel ~= 0 then
       return errorlevel
     end
@@ -47,18 +47,18 @@ end
 -- Split off from the main unpack so it can be used on a bundle and not
 -- leave only one modules files
 bundleunpack = bundleunpack or function(sourcedirs, sources)
-  local errorlevel = mkdir(localdir)
+  local errorlevel = FF.mkdir(localdir)
   if errorlevel ~=0 then
     return errorlevel
   end
-  errorlevel = cleandir(unpackdir)
+  errorlevel = FF.cleandir(unpackdir)
   if errorlevel ~=0 then
     return errorlevel
   end
   for _,i in ipairs(sourcedirs or {sourcefiledir}) do
     for _,j in ipairs(sources or {sourcefiles}) do
       for _,k in ipairs(j) do
-        errorlevel = cp(k, i, unpackdir)
+        errorlevel = FF.cp(k, i, unpackdir)
         if errorlevel ~=0 then
           return errorlevel
         end
@@ -66,25 +66,25 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     end
   end
   for _,i in ipairs(unpacksuppfiles) do
-    errorlevel = cp(i, supportdir, localdir)
+    errorlevel = FF.cp(i, supportdir, localdir)
     if errorlevel ~=0 then
       return errorlevel
     end
   end
   for _,i in ipairs(unpackfiles) do
-    for j,_ in pairs(tree(unpackdir, i)) do
-      local path, name = splitpath(j)
-      local localdir = abspath(localdir)
+    for j,_ in pairs(FF.tree(unpackdir, i)) do
+      local path, name = FF.splitpath(j)
+      local localdir = FF.abspath(localdir)
       local success = io.popen(
-        "cd " .. unpackdir .. "/" .. path .. os_concat ..
-        os_setenv .. " TEXINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat  ..
-        os_setenv .. " LUAINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat ..
+        "cd " .. unpackdir .. "/" .. path .. FF.os_concat ..
+        FF.os_setenv .. " TEXINPUTS=." .. FF.os_pathsep
+          .. localdir .. (unpacksearch and FF.os_pathsep or "") ..
+        FF.os_concat  ..
+        FF.os_setenv .. " LUAINPUTS=." .. FF.os_pathsep
+          .. localdir .. (unpacksearch and FF.os_pathsep or "") ..
+        FF.os_concat ..
         unpackexe .. " " .. unpackopts .. " " .. name
-          .. (options.quiet and (" > " .. os_null) or ""),
+          .. (L3.options.quiet and (" > " .. FF.os_null) or ""),
         "w"
       ):write(string.rep("y\n", 300)):close()
       if not success then

@@ -22,9 +22,10 @@ for those people who are interested.
 
 --]]
 
-local pairs   = pairs
+local FF = L3.require('file-functions')
+
 local open    = io.open
-local os_date = os.date
+local FF.os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
@@ -37,41 +38,41 @@ function tag_hook(tagname,tagdate)
 end
 
 local function update_file_tag(file,tagname,tagdate)
-  local filename = basename(file)
+  local filename = FF.basename(file)
   print("Tagging  ".. filename)
   local f = assert(open(file,"rb"))
   local content = f:read("*all")
   f:close()
   -- Deal with Unix/Windows line endings
-  content = gsub(content .. (match(content,"\n$") and "" or "\n"),
-    "\r\n", "\n")
+  content = (content .. (content:match("\n$") and "" or "\n"))
+    :gsub("\r\n", "\n")
   local updated_content = update_tag(filename,content,tagname,tagdate)
   if content == updated_content then
     return 0
   else
-    local path = dirname(file)
-    ren(path,filename,filename .. ".bak")
+    local path = FF.dirname(file)
+    FF.ren(path,filename,filename .. ".bak")
     local f = assert(open(file,"w"))
     -- Convert line ends back if required during write
     -- Watch for the second return value!
-    f:write((gsub(updated_content,"\n",os_newline)))
+    f:write((updated_content:gsub("\n",FF.os_newline)))
     f:close()
-    rm(path,filename .. ".bak")
+    FF.rm(path,filename .. ".bak")
   end
   return 0
 end
 
 function tag(tagnames)
-  local tagdate = options.date or os_date("%Y-%m-%d")
+  local tagdate = L3.options.date or FF.os_date("%Y-%m-%d")
   local tagname = nil
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = remove_duplicates({currentdir, sourcefiledir, docfiledir})
+  local dirs = FF.remove_duplicates({currentdir, sourcefiledir, docfiledir})
   local errorlevel = 0
   for _,dir in pairs(dirs) do
     for _,filetype in pairs(tagfiles) do
-      for file,_ in pairs(tree(dir,filetype)) do
+      for file,_ in pairs(FF.tree(dir,filetype)) do
         errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
         if errorlevel ~= 0 then
           return errorlevel
