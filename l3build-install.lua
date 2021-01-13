@@ -37,24 +37,24 @@ local insert = table.insert
 
 local function gethome()
   set_program("latex")
-  return abspath(Opts.texmfhome or var_value("TEXMFHOME"))
+  return FS.abspath(Opts.texmfhome or var_value("TEXMFHOME"))
 end
 
 function uninstall()
   local function zapdir(dir)
     local installdir = gethome() .. "/" .. dir
     if Opts["dry-run"] then
-      local files = filelist(installdir)
+      local files = FS.filelist(installdir)
       if next(files) then
         print("\n" .. "For removal from " .. installdir .. ":")
-        for _,file in pairs(filelist(installdir)) do
+        for _,file in pairs(FS.filelist(installdir)) do
           print("- " .. file)
         end
       end
       return 0
     else
-      if direxists(installdir) then
-        return rmdir(installdir)
+      if FS.direxists(installdir) then
+        return FS.rmdir(installdir)
       end
     end
     return 0
@@ -68,15 +68,15 @@ function uninstall()
   -- Any script man files need special handling
   local manfiles = { }
   for _,glob in pairs(scriptmanfiles) do
-    for file,_ in pairs(tree(docfiledir,glob)) do
+    for file,_ in pairs(FS.tree(docfiledir,glob)) do
       -- Man files should have a single-digit extension: the type
       local installdir = gethome() .. "/doc/man/man"  .. match(file,".$")
-      if fileexists(installdir .. "/" .. file) then
+      if FS.fileexists(installdir .. "/" .. file) then
         if Opts["dry-run"] then
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
-           select(2,splitpath(file)))
+           select(2,FS.splitpath(file)))
         else
-          errorlevel = errorlevel + rm(installdir,file)
+          errorlevel = errorlevel + FS.rm(installdir,file)
         end
       end
     end
@@ -97,7 +97,7 @@ function uninstall()
   if errorlevel ~= 0 then return errorlevel end
   -- Finally, clean up special locations
   for _,location in ipairs(tdslocations) do
-    local path,glob = splitpath(location)
+    local path,glob = FS.splitpath(location)
     errorlevel = zapdir(path)
     if errorlevel ~= 0 then return errorlevel end
   end
@@ -127,9 +127,9 @@ function install_files(target,full,dry_run)
     -- Generate a file list and include the directory
     for _,glob_table in pairs(files) do
       for _,glob in pairs(glob_table) do
-        for file,_ in pairs(tree(source,glob)) do
+        for file,_ in pairs(FS.tree(source,glob)) do
           -- Just want the name
-          local path,filename = splitpath(file)
+          local path,filename = FS.splitpath(file)
           local sourcepath = "/"
           if path == "." then
             sourcepaths[filename] = source
@@ -140,8 +140,8 @@ function install_files(target,full,dry_run)
           end
           local matched = false
           for _,location in ipairs(tdslocations) do
-            local path,glob = splitpath(location)
-            local pattern = glob_to_pattern(glob)
+            local path,glob = FS.splitpath(location)
+            local pattern = FS.glob_to_pattern(glob)
             if match(filename,pattern) then
               insert(paths,path)
               insert(filenames,path .. sourcepath .. filename)
@@ -164,7 +164,7 @@ function install_files(target,full,dry_run)
         for _,path in pairs(paths) do
           local dir = target .. "/" .. path
           if not cleanpaths[dir] then
-            errorlevel = cleandir(dir)
+            errorlevel = FS.cleandir(dir)
             if errorlevel ~= 0 then return errorlevel end
           end
           cleanpaths[dir] = true
@@ -174,7 +174,7 @@ function install_files(target,full,dry_run)
         if dry_run then
           print("- " .. file)
         else
-          local path,file = splitpath(file)
+          local path,file = FS.splitpath(file)
           insert(installmap,
             {file = file, source = sourcepaths[file], dest = target .. "/" .. path})
         end
@@ -195,13 +195,13 @@ function install_files(target,full,dry_run)
       local excludelist = { }
       for _,glob_table in pairs(exclude) do
         for _,glob in pairs(glob_table) do
-          for file,_ in pairs(tree(dir,glob)) do
+          for file,_ in pairs(FS.tree(dir,glob)) do
             excludelist[file] = true
           end
         end
       end
       for _,glob in pairs(include) do
-        for file,_ in pairs(tree(dir,glob)) do
+        for file,_ in pairs(FS.tree(dir,glob)) do
           if not excludelist[file] then
             insert(includelist, file)
           end
@@ -246,8 +246,8 @@ function install_files(target,full,dry_run)
     if not dry_run then
       if ctanreadme ~= "" and not match(lower(ctanreadme),"^readme%.%w+") then
         local installdir = target .. "/doc/" .. moduledir
-        if fileexists(installdir .. "/" .. ctanreadme) then
-          ren(installdir,ctanreadme,"README." .. match(ctanreadme,"%.(%w+)$"))
+        if FS.fileexists(installdir .. "/" .. ctanreadme) then
+          FS.ren(installdir,ctanreadme,"README." .. match(ctanreadme,"%.(%w+)$"))
         end
       end
     end
@@ -255,15 +255,15 @@ function install_files(target,full,dry_run)
     -- Any script man files need special handling
     local manfiles = { }
     for _,glob in pairs(scriptmanfiles) do
-      for file,_ in pairs(tree(docfiledir,glob)) do
+      for file,_ in pairs(FS.tree(docfiledir,glob)) do
         if dry_run then
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
-            select(2,splitpath(file)))
+            select(2,FS.splitpath(file)))
         else
           -- Man files should have a single-digit extension: the type
           local installdir = target .. "/doc/man/man"  .. match(file,".$")
-          errorlevel = errorlevel + mkdir(installdir)
-          errorlevel = errorlevel + cp(file,docfiledir,installdir)
+          errorlevel = errorlevel + FS.mkdir(installdir)
+          errorlevel = errorlevel + FS.cp(file,docfiledir,installdir)
         end
       end
     end
@@ -283,10 +283,10 @@ function install_files(target,full,dry_run)
 
   if errorlevel ~= 0 then return errorlevel end
 
-  -- Files are all copied in one shot: this ensures that cleandir()
+  -- Files are all copied in one shot: this ensures that FS.cleandir()
   -- can't be an issue even if there are complex set-ups
   for _,v in ipairs(installmap) do
-    errorlevel = cp(v.file,v.source,v.dest)
+    errorlevel = FS.cp(v.file,v.source,v.dest)
     if errorlevel ~= 0  then return errorlevel end
   end 
   

@@ -55,7 +55,9 @@ Opts = A.argparse(arg)
 
 H = build_require("help")
 
-build_require("file-functions")
+OS = build_require("os")
+FS = build_require("file-functions")
+
 build_require("typesetting")
 build_require("aux")
 build_require("clean")
@@ -83,9 +85,13 @@ end
 main = main or stdmain
 
 -- Load configuration file if running as a script
+-- start by exposing globals
+OS.expose()
+FS.expose()
+
 if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   -- Look for some configuration details
-  if fileexists("build.lua") then
+  if FS.fileexists("build.lua") then
     dofile("build.lua")
   else
     print("Error: Cannot find configuration build.lua")
@@ -98,19 +104,19 @@ end
 build_require("variables")
 
 -- Ensure that directories are 'space safe'
-maindir       = escapepath(maindir)
-docfiledir    = escapepath(docfiledir)
-sourcefiledir = escapepath(sourcefiledir)
-supportdir    = escapepath(supportdir)
-testfiledir   = escapepath(testfiledir)
-testsuppdir   = escapepath(testsuppdir)
-builddir      = escapepath(builddir)
-distribdir    = escapepath(distribdir)
-localdir      = escapepath(localdir)
-resultdir     = escapepath(resultdir)
-testdir       = escapepath(testdir)
-typesetdir    = escapepath(typesetdir)
-unpackdir     = escapepath(unpackdir)
+maindir       = FS.escape_path(maindir)
+docfiledir    = FS.escape_path(docfiledir)
+sourcefiledir = FS.escape_path(sourcefiledir)
+supportdir    = FS.escape_path(supportdir)
+testfiledir   = FS.escape_path(testfiledir)
+testsuppdir   = FS.escape_path(testsuppdir)
+builddir      = FS.escape_path(builddir)
+distribdir    = FS.escape_path(distribdir)
+localdir      = FS.escape_path(localdir)
+resultdir     = FS.escape_path(resultdir)
+testdir       = FS.escape_path(testdir)
+typesetdir    = FS.escape_path(typesetdir)
+unpackdir     = FS.escape_path(unpackdir)
 
 -- Tidy up the epoch setting
 -- Force an epoch if set at the command line
@@ -161,7 +167,7 @@ if Opts.target == "check" then
           resultdir = resultdir .. "-" .. config
           testdir = testdir .. "-" .. config
         end
-        for _,i in ipairs(filelist(testdir,"*" .. os_diffext)) do
+        for _,i in ipairs(FS.filelist(testdir,"*" .. OS.diffext)) do
           print("  - " .. testdir .. "/" .. i)
         end
         print("")
@@ -177,7 +183,7 @@ if #checkconfigs == 1 and
    checkconfigs[1] ~= "build" and
    (Opts.target == "check" or Opts.target == "save" or Opts.target == "clean") then
    local config = "./" .. gsub(checkconfigs[1],".lua$","") .. ".lua"
-   if fileexists(config) then
+   if FS.fileexists(config) then
      local savedtestfiledir = testfiledir
      dofile(config)
      testdir = testdir .. "-" .. checkconfigs[1]

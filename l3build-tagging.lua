@@ -37,7 +37,7 @@ function tag_hook(tagname,tagdate)
 end
 
 local function update_file_tag(file,tagname,tagdate)
-  local filename = basename(file)
+  local filename = FS.basename(file)
   print("Tagging  ".. filename)
   local f = assert(open(file,"rb"))
   local content = f:read("*all")
@@ -49,14 +49,14 @@ local function update_file_tag(file,tagname,tagdate)
   if content == updated_content then
     return 0
   else
-    local path = dirname(file)
-    ren(path,filename,filename .. ".bak")
+    local path = FS.dirname(file)
+    FS.ren(path,filename,filename .. ".bak")
     local f = assert(open(file,"w"))
     -- Convert line ends back if required during write
     -- Watch for the second return value!
-    f:write((gsub(updated_content,"\n",os_newline)))
+    f:write((gsub(updated_content,"\n",OS.newline)))
     f:close()
-    rm(path,filename .. ".bak")
+    FS.rm(path,filename .. ".bak")
   end
   return 0
 end
@@ -67,11 +67,11 @@ function tag(tagnames)
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = remove_duplicates({currentdir, sourcefiledir, docfiledir})
+  local dirs = FS.remove_duplicates({currentdir, sourcefiledir, docfiledir})
   local errorlevel = 0
   for _,dir in pairs(dirs) do
     for _,filetype in pairs(tagfiles) do
-      for file,_ in pairs(tree(dir,filetype)) do
+      for file,_ in pairs(FS.tree(dir,filetype)) do
         errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
         if errorlevel ~= 0 then
           return errorlevel

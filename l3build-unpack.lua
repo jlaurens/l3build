@@ -36,7 +36,7 @@ function unpack(sources, sourcedirs)
     return errorlevel
   end
   for _,i in ipairs(installfiles) do
-    errorlevel = cp(i, unpackdir, localdir)
+    errorlevel = FS.cp(i, unpackdir, localdir)
     if errorlevel ~= 0 then
       return errorlevel
     end
@@ -47,18 +47,18 @@ end
 -- Split off from the main unpack so it can be used on a bundle and not
 -- leave only one modules files
 bundleunpack = bundleunpack or function(sourcedirs, sources)
-  local errorlevel = mkdir(localdir)
+  local errorlevel = FS.mkdir(localdir)
   if errorlevel ~=0 then
     return errorlevel
   end
-  errorlevel = cleandir(unpackdir)
+  errorlevel = FS.cleandir(unpackdir)
   if errorlevel ~=0 then
     return errorlevel
   end
   for _,i in ipairs(sourcedirs or {sourcefiledir}) do
     for _,j in ipairs(sources or {sourcefiles}) do
       for _,k in ipairs(j) do
-        errorlevel = cp(k, i, unpackdir)
+        errorlevel = FS.cp(k, i, unpackdir)
         if errorlevel ~=0 then
           return errorlevel
         end
@@ -66,25 +66,25 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     end
   end
   for _,i in ipairs(unpacksuppfiles) do
-    errorlevel = cp(i, supportdir, localdir)
+    errorlevel = FS.cp(i, supportdir, localdir)
     if errorlevel ~=0 then
       return errorlevel
     end
   end
   for _,i in ipairs(unpackfiles) do
-    for j,_ in pairs(tree(unpackdir, i)) do
-      local path, name = splitpath(j)
-      local localdir = abspath(localdir)
+    for j,_ in pairs(FS.tree(unpackdir, i)) do
+      local path, name = FS.splitpath(j)
+      local localdir = FS.abspath(localdir)
       local success = io.popen(
-        "cd " .. unpackdir .. "/" .. path .. os_concat ..
-        os_setenv .. " TEXINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat  ..
-        os_setenv .. " LUAINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat ..
+        "cd " .. unpackdir .. "/" .. path .. OS.concat ..
+        OS.setenv .. " TEXINPUTS=." .. OS.pathsep
+          .. localdir .. (unpacksearch and OS.pathsep or "") ..
+        OS.concat  ..
+        OS.setenv .. " LUAINPUTS=." .. OS.pathsep
+          .. localdir .. (unpacksearch and OS.pathsep or "") ..
+        OS.concat ..
         unpackexe .. " " .. unpackopts .. " " .. name
-          .. (Opts.quiet and (" > " .. os_null) or ""),
+          .. (Opts.quiet and (" > " .. OS.null) or ""),
         "w"
       ):write(string.rep("y\n", 300)):close()
       if not success then

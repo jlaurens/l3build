@@ -56,32 +56,32 @@ local remove           = os.remove
 -- for saving the test files
 function checkinit()
   if not Opts.dirty then
-    cleandir(testdir)
-    cleandir(resultdir)
+    FS.cleandir(testdir)
+    FS.cleandir(resultdir)
   end
   depinstall(checkdeps)
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for _,i in ipairs(filelist(localdir)) do
-    cp(i, localdir, testdir)
+  for _,i in ipairs(FS.filelist(localdir)) do
+    FS.cp(i, localdir, testdir)
   end
   bundleunpack({sourcefiledir, testfiledir})
   for _,i in ipairs(installfiles) do
-    cp(i, unpackdir, testdir)
+    FS.cp(i, unpackdir, testdir)
   end
   for _,i in ipairs(checkfiles) do
-    cp(i, unpackdir, testdir)
+    FS.cp(i, unpackdir, testdir)
   end
-  if direxists(testsuppdir) then
-    for _,i in ipairs(filelist(testsuppdir)) do
-      cp(i, testsuppdir, testdir)
+  if FS.direxists(testsuppdir) then
+    for _,i in ipairs(FS.filelist(testsuppdir)) do
+      FS.cp(i, testsuppdir, testdir)
     end
   end
   for _,i in ipairs(checksuppfiles) do
-    cp(i, supportdir, testdir)
+    FS.cp(i, supportdir, testdir)
   end
-  execute(os_ascii .. ">" .. testdir .. "/ascii.tcx")
+  execute(OS.ascii .. ">" .. testdir .. "/ascii.tcx")
   return checkinit_hook()
 end
 
@@ -292,20 +292,20 @@ local function normalize_log(content,engine,errlevels)
     elseif not prestart and not skipping then
       line, lastline, drop_fd = normalize(line, lastline,drop_fd)
       if not match(line, "^ *$") and not killcheck(line) then
-        new_content = new_content .. line .. os_newline
+        new_content = new_content .. line .. OS.newline
       end
     end
   end
   if recordstatus then
-    new_content = new_content .. '***************' .. os_newline
+    new_content = new_content .. '***************' .. OS.newline
     for i = 1, checkruns do
       if (errlevels[i]==nil) then
         new_content = new_content ..
-          'Compilation ' .. i .. ' of test file skipped ' .. os_newline
+          'Compilation ' .. i .. ' of test file skipped ' .. OS.newline
       else
         new_content = new_content ..
           'Compilation ' .. i .. ' of test file completed with exit status ' ..
-          errlevels[i] .. os_newline
+          errlevels[i] .. OS.newline
       end
     end
   end
@@ -430,7 +430,7 @@ local function normalize_lua_log(content,luatex)
           lastline = gsub(lastline, " %(penalty 50%)$", "")
           -- A normal (TeX90) discretionary:
           -- add with the line break reintroduced
-          return lastline .. os_newline .. line, ""
+          return lastline .. OS.newline .. line, ""
         end
       end
     end
@@ -446,7 +446,7 @@ local function normalize_lua_log(content,luatex)
         elseif dropping then
           return "", ""
         else
-          return lastline .. os_newline .. line, ""
+          return lastline .. OS.newline .. line, ""
         end
       end
     end
@@ -492,7 +492,7 @@ local function normalize_lua_log(content,luatex)
       elseif match(line, "^%}%}%}$") then
         return lastline .. line, ""
       else
-        return lastline .. os_newline .. line, ""
+        return lastline .. OS.newline .. line, ""
       end
     -- Return all of the text for a wrapped (multi)line
     elseif len(lastline) > maxprintline then
@@ -508,7 +508,7 @@ local function normalize_lua_log(content,luatex)
   for line in gmatch(content, "([^\n]*)\n") do
     line, lastline, dropping = normalize(line, lastline, dropping)
     if not match(line, "^ *$") then
-      new_content = new_content .. line .. os_newline
+      new_content = new_content .. line .. OS.newline
     end
   end
   return new_content
@@ -524,9 +524,9 @@ local function normalize_pdf(content)
       if match(line,"endstream") then
         stream = false
         if binary then
-          new_content = new_content .. "[BINARY STREAM]" .. os_newline
+          new_content = new_content .. "[BINARY STREAM]" .. OS.newline
         else
-           new_content = new_content .. stream_content .. line .. os_newline
+           new_content = new_content .. stream_content .. line .. OS.newline
         end
         binary = false
       else
@@ -537,18 +537,18 @@ local function normalize_pdf(content)
           end
         end
         if not binary and not match(line, "^ *$") then
-          stream_content = stream_content .. line .. os_newline
+          stream_content = stream_content .. line .. OS.newline
         end
       end
     elseif match(line,"^stream$") then
       binary = false
       stream = true
-      stream_content = "stream" .. os_newline
+      stream_content = "stream" .. OS.newline
     elseif not match(line, "^ *$") and
       not match(line,"^%%%%Invocation") and 
       not match(line,"^%%%%%+") then
       line = gsub(line,"%/ID( ?)%[<[^>]+><[^>]+>]","/ID%1[<ID-STRING><ID-STRING>]")
-      new_content = new_content .. line .. os_newline
+      new_content = new_content .. line .. OS.newline
     end
   end
   return new_content
@@ -584,7 +584,7 @@ function runcheck(name, hide)
   for _,engine in pairs(checkengines) do
     setup_check(name,engine)
     local errlevel = 0
-    if fileexists(testfiledir .. "/" .. name .. pvtext) then
+    if FS.fileexists(testfiledir .. "/" .. name .. pvtext) then
       errlevel = check_and_diff(pvtext,engine,compare_pdf,true)
     else
       errlevel = check_and_diff(lvtext,engine,compare_tlg)
@@ -602,17 +602,17 @@ end
 
 function setup_check(name, engine)
   local testname = name .. "." .. engine
-  local tlgfile = locate(
+  local tlgfile = FS.locate(
     {testfiledir, unpackdir},
     {testname .. tlgext, name .. tlgext}
   )
-  local tpffile = locate(
+  local tpffile = FS.locate(
     {testfiledir, unpackdir},
     {testname .. tpfext, name .. tpfext}
   )
   -- Attempt to generate missing reference file from expectation
   if not (tlgfile or tpffile) then
-    if not locate({unpackdir, testfiledir}, {name .. lveext}) then
+    if not FS.locate({unpackdir, testfiledir}, {name .. lveext}) then
       print(
         "Error: failed to find " .. tlgext .. ", " .. tpfext .. " or "
           .. lveext .. " file for " .. name .. "!"
@@ -620,12 +620,12 @@ function setup_check(name, engine)
       exit(1)
     end
     runtest(name, engine, true, lveext)
-    ren(testdir, testname .. logext, testname .. tlgext)
+    FS.ren(testdir, testname .. logext, testname .. tlgext)
   else
     -- Install comparison files found
     for _,v in pairs({tlgfile, tpffile}) do
       if v then
-        cp(
+        FS.cp(
           match(v, ".*/(.*)"),
           match(v, "(.*)/.*"),
           testdir
@@ -637,14 +637,14 @@ end
 
 function compare_pdf(name,engine,cleanup)
   local testname = name .. "." .. engine
-  local difffile = testdir .. "/" .. testname .. pdfext .. os_diffext
+  local difffile = testdir .. "/" .. testname .. pdfext .. OS.diffext
   local pdffile  = testdir .. "/" .. testname .. pdfext
-  local tpffile  = locate({testdir}, {testname .. tpfext, name .. tpfext})
+  local tpffile  = FS.locate({testdir}, {testname .. tpfext, name .. tpfext})
   if not tpffile then
     return 1
   end
-  local errorlevel = execute(os_diffexe .. " "
-    .. normalize_path(tpffile .. " " .. pdffile .. " > " .. difffile))
+  local errorlevel = execute(OS.diffexe .. " "
+    .. FS.normalize_path(tpffile .. " " .. pdffile .. " > " .. difffile))
   if errorlevel == 0 or cleanup then
     remove(difffile)
   end
@@ -654,9 +654,9 @@ end
 function compare_tlg(name,engine,cleanup)
   local errorlevel
   local testname = name .. "." .. engine
-  local difffile = testdir .. "/" .. testname .. os_diffext
+  local difffile = testdir .. "/" .. testname .. OS.diffext
   local logfile  = testdir .. "/" .. testname .. logext
-  local tlgfile  = locate({testdir}, {testname .. tlgext, name .. tlgext})
+  local tlgfile  = FS.locate({testdir}, {testname .. tlgext, name .. tlgext})
   if not tlgfile then
     return 1
   end
@@ -673,15 +673,15 @@ function compare_tlg(name,engine,cleanup)
     local luatlgfile = testdir .. "/" .. testname .. tlgext
     rewrite(tlgfile,luatlgfile,normalize_lua_log)
     rewrite(logfile,lualogfile,normalize_lua_log,true)
-    errorlevel = execute(os_diffexe .. " "
-      .. normalize_path(luatlgfile .. " " .. lualogfile .. " > " .. difffile))
+    errorlevel = execute(OS.diffexe .. " "
+      .. FS.normalize_path(luatlgfile .. " " .. lualogfile .. " > " .. difffile))
     if cleanup then
       remove(lualogfile)
       remove(luatlgfile)
     end
   else
-    errorlevel = execute(os_diffexe .. " "
-      .. normalize_path(tlgfile .. " " .. logfile .. " > " .. difffile))
+    errorlevel = execute(OS.diffexe .. " "
+      .. FS.normalize_path(tlgfile .. " " .. logfile .. " > " .. difffile))
   end
   if errorlevel == 0 or cleanup then
     remove(difffile)
@@ -693,7 +693,7 @@ end
 -- both creating and verifying
 function runtest(name, engine, hide, ext, pdfmode, breakout)
   local lvtfile = name .. (ext or lvtext)
-  cp(lvtfile, fileexists(testfiledir .. "/" .. lvtfile)
+  FS.cp(lvtfile, FS.fileexists(testfiledir .. "/" .. lvtfile)
     and testfiledir or unpackdir, testdir)
   local checkopts = checkopts
   local engine = engine or stdengine
@@ -738,47 +738,47 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
   end
   -- Clean out any dynamic files
   for _,filetype in pairs(dynamicfiles) do
-    rm(testdir,filetype)
+    FS.rm(testdir,filetype)
   end
   -- Ensure there is no stray .log file
-  rm(testdir,name .. logext)
+  FS.rm(testdir,name .. logext)
   local errlevels = {}
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
-    localtexmf = os_pathsep .. abspath(texmfdir) .. "//"
+  if texmfdir and texmfdir ~= "" and FS.direxists(texmfdir) then
+    localtexmf = OS.pathsep .. FS.abspath(texmfdir) .. "//"
   end
   for i = 1, checkruns do
-    errlevels[i] = run(
+    errlevels[i] = OS.run(
       testdir,
       -- No use of localdir here as the files get copied to testdir:
       -- avoids any paths in the logs
-      os_setenv .. " TEXINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or "")
-        .. os_concat ..
-      os_setenv .. " LUAINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or "")
-        .. os_concat ..
+      OS.setenv .. " TEXINPUTS=." .. localtexmf
+        .. (checksearch and OS.pathsep or "")
+        .. OS.concat ..
+      OS.setenv .. " LUAINPUTS=." .. localtexmf
+        .. (checksearch and OS.pathsep or "")
+        .. OS.concat ..
       -- Avoid spurious output from (u)pTeX
-      os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0"
-        .. os_concat ..
+      OS.setenv .. " GUESS_INPUT_KANJI_ENCODING=0"
+        .. OS.concat ..
       -- Allow for local texmf files
-      os_setenv .. " TEXMFCNF=." .. os_pathsep
-        .. os_concat ..
+      OS.setenv .. " TEXMFCNF=." .. OS.pathsep
+        .. OS.concat ..
       (forcecheckepoch and setepoch() or "") ..
       -- Ensure lines are of a known length
-      os_setenv .. " max_print_line=" .. maxprintline
-        .. os_concat ..
+      OS.setenv .. " max_print_line=" .. maxprintline
+        .. OS.concat ..
       binary .. format
         .. " " .. asciiopt .. " " .. checkopts
         .. setup(lvtfile)
-        .. (hide and (" > " .. os_null) or "")
-        .. os_concat ..
-      runtest_tasks(jobname(lvtfile),i)
+        .. (hide and (" > " .. OS.null) or "")
+        .. OS.concat ..
+      runtest_tasks(FS.jobname(lvtfile),i)
     )
     -- Break the loop if the result is stable
     if breakout and i < checkruns then
       if pdfmode then
-        if fileexists(testdir .. "/" .. name .. dviext) then
+        if FS.fileexists(testdir .. "/" .. name .. dviext) then
           dvitopdf(name, testdir, engine, hide)
         end
         rewrite(pdffile,npffile,normalize_pdf)
@@ -793,19 +793,19 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
       end
     end
   end
-  if pdfmode and fileexists(testdir .. "/" .. name .. dviext) then
+  if pdfmode and FS.fileexists(testdir .. "/" .. name .. dviext) then
     dvitopdf(name, testdir, engine, hide)
   end
   if pdfmode then
-    cp(name .. pdfext,testdir,resultdir)
-    ren(resultdir,name .. pdfext,name .. "." .. engine .. pdfext)
+    FS.cp(name .. pdfext,testdir,resultdir)
+    FS.ren(resultdir,name .. pdfext,name .. "." .. engine .. pdfext)
     rewrite(pdffile,npffile,normalize_pdf)
   else
     rewrite(logfile,newfile,normalize_log,engine,errlevels)
   end
   -- Store secondary files for this engine
   for _,filetype in pairs(auxfiles) do
-    for _,file in pairs(filelist(testdir, filetype)) do
+    for _,file in pairs(FS.filelist(testdir, filetype)) do
       if match(file,"^" .. name .. ".[^.]+$") then
         local ext = match(file, "%.[^.]+$")
         if ext ~= lvtext and
@@ -813,10 +813,10 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
            ext ~= lveext and
            ext ~= logext then
            local newname = gsub(file,"(%.[^.]+)$","." .. engine .. "%1")
-           if fileexists(testdir,newname) then
-             rm(testdir,newname)
+           if FS.fileexists(testdir,newname) then
+             FS.rm(testdir,newname)
            end
-           ren(testdir,file,newname)
+           FS.ren(testdir,file,newname)
         end
       end
     end
@@ -831,13 +831,13 @@ end
 
 -- Look for a test: could be in the testfiledir or the unpackdir
 function testexists(test)
-  return(locate({testfiledir, unpackdir},
+  return(FS.locate({testfiledir, unpackdir},
     {test .. lvtext, test .. pvtext}))
 end
 
 function check(names)
   local errorlevel = 0
-  if testfiledir ~= "" and direxists(testfiledir) then
+  if testfiledir ~= "" and FS.direxists(testfiledir) then
     if not Opts.rerun then
       checkinit()
     end
@@ -850,30 +850,30 @@ function check(names)
     if not next(names) then
       local excludenames = { }
       for _,glob in pairs(excludetests) do
-        for _,name in pairs(filelist(testfiledir, glob .. lvtext)) do
-          excludenames[jobname(name)] = true
+        for _,name in pairs(FS.filelist(testfiledir, glob .. lvtext)) do
+          excludenames[FS.jobname(name)] = true
         end
-        for _,name in pairs(filelist(unpackdir, glob .. lvtext)) do
-          excludenames[jobname(name)] = true
+        for _,name in pairs(FS.filelist(unpackdir, glob .. lvtext)) do
+          excludenames[FS.jobname(name)] = true
         end
-        for _,name in pairs(filelist(testfiledir, glob .. pvtext)) do
-          excludenames[jobname(name)] = true
+        for _,name in pairs(FS.filelist(testfiledir, glob .. pvtext)) do
+          excludenames[FS.jobname(name)] = true
         end
       end
       local function addname(name)
-        if not excludenames[jobname(name)] then
-          insert(names,jobname(name))
+        if not excludenames[FS.jobname(name)] then
+          insert(names,FS.jobname(name))
         end
       end
       for _,glob in pairs(includetests) do
-        for _,name in pairs(filelist(testfiledir, glob .. lvtext)) do
+        for _,name in pairs(FS.filelist(testfiledir, glob .. lvtext)) do
           addname(name)
         end
-        for _,name in pairs(filelist(testfiledir, glob .. pvtext)) do
+        for _,name in pairs(FS.filelist(testfiledir, glob .. pvtext)) do
           addname(name)
         end
-        for _,name in pairs(filelist(unpackdir, glob .. lvtext)) do
-          if fileexists(testfiledir .. "/" .. name) then
+        for _,name in pairs(FS.filelist(unpackdir, glob .. lvtext)) do
+          if FS.fileexists(testfiledir .. "/" .. name) then
             print("Duplicate test file: " .. i)
             return 1
           end
@@ -950,7 +950,7 @@ end
 -- A short auxiliary to print the list of differences for check
 function checkdiff()
   print("\n  Check failed with difference files")
-  for _,i in ipairs(filelist(testdir, "*" .. os_diffext)) do
+  for _,i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
     print("  - " .. testdir .. "/" .. i)
   end
   print("")
@@ -958,7 +958,7 @@ end
 
 function showfailedlog(name)
   print("\nCheck failed with log file")
-  for _,i in ipairs(filelist(testdir, name..".log")) do
+  for _,i in ipairs(FS.filelist(testdir, name..".log")) do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")
@@ -972,7 +972,7 @@ end
 
 function showfaileddiff()
   print("\nCheck failed with difference file")
-  for _,i in ipairs(filelist(testdir, "*" .. os_diffext)) do
+  for _,i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")
@@ -1000,9 +1000,9 @@ function save(names)
           local gen_file = name .. "." .. engine .. gen_ext
           print("Creating and copying " .. out_file)
           runtest(name,engine,false,test_ext,pdfmode)
-          ren(testdir,gen_file,out_file)
-          cp(out_file,testdir,testfiledir)
-          if fileexists(unpackdir .. "/" .. out_file) then
+          FS.ren(testdir,gen_file,out_file)
+          FS.cp(out_file,testdir,testfiledir)
+          if FS.fileexists(unpackdir .. "/" .. out_file) then
             print("Saved " .. out_ext
               .. " file overrides unpacked version of the same name")
             return 1
@@ -1010,14 +1010,14 @@ function save(names)
           return 0
         end
         local errorlevel
-        if fileexists(testfiledir .. "/" .. name .. lvtext) then
+        if FS.fileexists(testfiledir .. "/" .. name .. lvtext) then
           errorlevel = save_test(lvtext,logext,tlgext)
         else
           errorlevel = save_test(pvtext,pdfext,tpfext,true)
         end
         if errorlevel ~=0 then return errorlevel end
       end
-    elseif locate({unpackdir, testfiledir}, {name .. lveext}) then
+    elseif FS.locate({unpackdir, testfiledir}, {name .. lveext}) then
       print("Saved " .. tlgext .. " file overrides a "
         .. lveext .. " file of the same name")
       return 1

@@ -34,7 +34,7 @@ local popen = io.popen
 local read  = io.read
 local write = io.write
 
-local os_type = os.type
+local OS.type = os.type
 
 local len   = string.len
 local lower = string.lower
@@ -250,7 +250,7 @@ function construct_ctan_post(uploadfile,debug)
 
   -- finish constructing the curl command:
   local qq = '"'
-  if os_type == "windows" then
+  if OS.type == "windows" then
     qq = '\"'
   end
 -- commandline   ctan_post = ctan_post .. ' --form ' .. qq .. 'file=@' .. tostring(uploadfile) .. ';filename=' .. tostring(uploadfile) .. qq

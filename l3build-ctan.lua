@@ -30,20 +30,20 @@ local match = string.match
 
 -- Copy files to the main CTAN release directory
 function copyctan()
-  mkdir(ctandir .. "/" .. ctanpkg)
+  FS.mkdir(ctandir .. "/" .. ctanpkg)
   local function copyfiles(files,source)
     if source == currentdir or flatten then
       for _,filetype in pairs(files) do
-        cp(filetype,source,ctandir .. "/" .. ctanpkg)
+        FS.cp(filetype,source,ctandir .. "/" .. ctanpkg)
       end
     else
       for _,filetype in pairs(files) do
-        for file,_ in pairs(tree(source,filetype)) do
-          local path = splitpath(file)
+        for file,_ in pairs(FS.tree(source,filetype)) do
+          local path = FS.splitpath(file)
           local ctantarget = ctandir .. "/" .. ctanpkg .. "/"
             .. source .. "/" .. path
-          mkdir(ctantarget)
-          cp(file,source,ctantarget)
+          FS.mkdir(ctantarget)
+          FS.cp(file,source,ctantarget)
         end
       end
     end
@@ -54,7 +54,7 @@ function copyctan()
   end
   copyfiles(sourcefiles,sourcefiledir)
   for _,file in pairs(textfiles) do
-    cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
+    FS.cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
   end
 end
 
@@ -81,7 +81,7 @@ function ctan()
     local binfiles = tab_to_str(binaryfiles)
     local exclude = tab_to_str(excludefiles)
     -- First, zip up all of the text files
-    run(
+    OS.run(
       dir,
       zipexe .. " " .. zipopts .. " -ll ".. zipname .. " " .. "."
         .. (
@@ -90,7 +90,7 @@ function ctan()
         )
     )
     -- Then add the binary ones
-    run(
+    OS.run(
       dir,
       zipexe .. " " .. zipopts .. " -g ".. zipname .. " " .. ". -i" ..
         binfiles .. (exclude and (" -x" .. exclude) or "")
@@ -108,10 +108,10 @@ function ctan()
     errorlevel = call(modules, "bundlecheck")
   end
   if errorlevel == 0 then
-    rmdir(ctandir)
-    mkdir(ctandir .. "/" .. ctanpkg)
-    rmdir(tdsdir)
-    mkdir(tdsdir)
+    FS.rmdir(ctandir)
+    FS.mkdir(ctandir .. "/" .. ctanpkg)
+    FS.rmdir(tdsdir)
+    FS.mkdir(tdsdir)
     if standalone then
       errorlevel = install_files(tdsdir,true)
       if errorlevel ~=0 then return errorlevel end
@@ -128,8 +128,8 @@ function ctan()
   if errorlevel == 0 then
     for _,i in ipairs(textfiles) do
       for _,j in pairs({unpackdir, textfiledir}) do
-        cp(i, j, ctandir .. "/" .. ctanpkg)
-        cp(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
+        FS.cp(i, j, ctandir .. "/" .. ctanpkg)
+        FS.cp(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
       end
     end
     -- Rename README if necessary
@@ -137,18 +137,18 @@ function ctan()
       local newfile = "README." .. match(ctanreadme,"%.(%w+)$")
       for _,dir in pairs({ctandir .. "/" .. ctanpkg,
         tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle}) do
-        if fileexists(dir .. "/" .. ctanreadme) then
-          rm(dir,newfile)
-          ren(dir,ctanreadme,newfile)
+        if FS.fileexists(dir .. "/" .. ctanreadme) then
+          FS.rm(dir,newfile)
+          FS.ren(dir,ctanreadme,newfile)
         end
       end
     end
     dirzip(tdsdir, ctanpkg .. ".tds")
     if packtdszip then
-      cp(ctanpkg .. ".tds.zip", tdsdir, ctandir)
+      FS.cp(ctanpkg .. ".tds.zip", tdsdir, ctandir)
     end
     dirzip(ctandir, ctanzip)
-    cp(ctanzip .. ".zip", ctandir, currentdir)
+    FS.cp(ctanzip .. ".zip", ctandir, currentdir)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

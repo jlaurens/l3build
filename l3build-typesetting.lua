@@ -33,46 +33,46 @@ local print  = print
 local gsub  = string.gsub
 local match = string.match
 
-local os_type = os.type
+local OS.type = os.type
 
 function dvitopdf(name, dir, engine, hide)
-  run(
+  OS.run(
     dir,
     (forcecheckepoch and setepoch() or "") ..
     "dvips " .. name .. dviext
-      .. (hide and (" > " .. os_null) or "")
-      .. os_concat ..
+      .. (hide and (" > " .. OS.null) or "")
+      .. OS.concat ..
    "ps2pdf " .. ps2pdfopt .. name .. psext
-      .. (hide and (" > " .. os_null) or "")
+      .. (hide and (" > " .. OS.null) or "")
   )
 end
 
 -- An auxiliary used to set up the environmental variables
 function runcmd(cmd,dir,vars)
   local dir = dir or "."
-  local dir = abspath(dir)
+  local dir = FS.abspath(dir)
   local vars = vars or {}
   -- Allow for local texmf files
-  local env = os_setenv .. " TEXMFCNF=." .. os_pathsep
+  local env = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
-    localtexmf = os_pathsep .. abspath(texmfdir) .. "//"
+  if texmfdir and texmfdir ~= "" and FS.direxists(texmfdir) then
+    localtexmf = OS.pathsep .. FS.abspath(texmfdir) .. "//"
   end
-  local envpaths = "." .. localtexmf .. os_pathsep
-    .. abspath(localdir) .. os_pathsep
-    .. dir .. (typesetsearch and os_pathsep or "")
+  local envpaths = "." .. localtexmf .. OS.pathsep
+    .. FS.abspath(localdir) .. OS.pathsep
+    .. dir .. (typesetsearch and OS.pathsep or "")
   -- Deal with spaces in paths
-  if os_type == "windows" and match(envpaths," ") then
+  if OS.type == "windows" and match(envpaths," ") then
     envpaths = gsub(envpaths,'"','')
   end
   for _,var in pairs(vars) do
-    env = env .. os_concat .. os_setenv .. " " .. var .. "=" .. envpaths
+    env = env .. OS.concat .. OS.setenv .. " " .. var .. "=" .. envpaths
   end
-  return run(dir,(forcedocepoch and setepoch() or "") .. env .. os_concat .. cmd)
+  return OS.run(dir,(forcedocepoch and setepoch() or "") .. env .. OS.concat .. cmd)
 end
 
 function biber(name,dir)
-  if fileexists(dir .. "/" .. name .. ".bcf") then
+  if FS.fileexists(dir .. "/" .. name .. ".bcf") then
     return
       runcmd(biberexe .. " " .. biberopts .. " " .. name,dir,{"BIBINPUTS"})
   end
@@ -81,21 +81,21 @@ end
 
 function bibtex(name,dir)
   local dir = dir or "."
-  if fileexists(dir .. "/" .. name .. ".aux") then
+  if FS.fileexists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
     local grep
-    if os_type == "windows" then
+    if OS.type == "windows" then
       grep = "\\\\"
     else
      grep = "\\\\\\\\"
     end
-    if run(dir,
-        os_grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
-          .. os_null
-      ) + run(dir,
-        os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
-          .. os_null
+    if OS.run(dir,
+        OS.grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
+          .. OS.null
+      ) + OS.run(dir,
+        OS.grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
+          .. OS.null
       ) == 0 then
       return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name,dir,
         {"BIBINPUTS","BSTINPUTS"})
@@ -106,7 +106,7 @@ end
 
 function makeindex(name,dir,inext,outext,logext,style)
   local dir = dir or "."
-  if fileexists(dir .. "/" .. name .. inext) then
+  if FS.fileexists(dir .. "/" .. name .. inext) then
     if style == "" then style = nil end
     return runcmd(makeindexexe .. " " .. makeindexopts
       .. " -o " .. name .. outext
@@ -128,7 +128,7 @@ end
 
 local function typesetpdf(file,dir)
   local dir = dir or "."
-  local name = jobname(file)
+  local name = FS.jobname(file)
   print("Typesetting " .. name)
   local fn = typeset
   local cmd = typesetexe .. " " .. typesetopts
@@ -142,8 +142,8 @@ local function typesetpdf(file,dir)
     return errorlevel
   end
   pdfname = name .. pdfext
-  rm(docfiledir,pdfname)
-  return cp(pdfname,dir,docfiledir)
+  FS.rm(docfiledir,pdfname)
+  return FS.cp(pdfname,dir,docfiledir)
 end
 
 typeset = typeset or function(file,dir,exe)
@@ -152,7 +152,7 @@ typeset = typeset or function(file,dir,exe)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  local name = jobname(file)
+  local name = FS.jobname(file)
   errorlevel = biber(name,dir) + bibtex(name,dir)
   if errorlevel ~= 0 then
     return errorlevel
@@ -174,19 +174,19 @@ end
 
 local function docinit()
   -- Set up
-  cleandir(typesetdir)
+  FS.cleandir(typesetdir)
   for _,filetype in pairs(
       {bibfiles, docfiles, typesetfiles, typesetdemofiles}
     ) do
     for _,file in pairs(filetype) do
-      cp(file, docfiledir, typesetdir)
+      FS.cp(file, docfiledir, typesetdir)
     end
   end
   for _,file in pairs(sourcefiles) do
-    cp(file, sourcefiledir, typesetdir)
+    FS.cp(file, sourcefiledir, typesetdir)
   end
   for _,file in pairs(typesetsuppfiles) do
-    cp(file, supportdir, typesetdir)
+    FS.cp(file, supportdir, typesetdir)
   end
   depinstall(typesetdeps)
   unpack({sourcefiles, typesetsourcefiles}, {sourcefiledir, docfiledir})
@@ -209,9 +209,9 @@ function doc(files)
   for _,typesetfiles in ipairs({typesetdemofiles,typesetfiles}) do
     for _,glob in pairs(typesetfiles) do
       for _,dir in ipairs({typesetdir,unpackdir}) do
-        for _,file in pairs(tree(dir,glob)) do
-          local path,srcname = splitpath(file)
-          local name = jobname(srcname)
+        for _,file in pairs(FS.tree(dir,glob)) do
+          local path,srcname = FS.splitpath(file)
+          local name = FS.jobname(srcname)
           if not done[name] then
             local typeset = true
             -- Allow for command line selection of files

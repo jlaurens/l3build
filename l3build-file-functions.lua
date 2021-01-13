@@ -27,7 +27,7 @@ local print            = print
 
 local open             = io.open
 
-local attributes       = lfs.attributes
+local attributes       = lfs.attributes -- lfs is a global variable
 local currentdir       = lfs.currentdir
 local chdir            = lfs.chdir
 local lfs_dir          = lfs.dir
@@ -36,11 +36,6 @@ local execute          = os.execute
 local exit             = os.exit
 local getenv           = os.getenv
 local remove           = os.remove
-local os_time          = os.time
-local os_type          = os.type
-
-local luatex_revision  = status.luatex_revision
-local luatex_version   = status.luatex_version
 
 local match            = string.match
 local sub              = string.sub
@@ -49,7 +44,9 @@ local gsub             = string.gsub
 
 local insert           = table.insert
 
--- Convert a file glob into a pattern for use by e.g. string.gub
+local FS = {}
+
+-- Convert a file glob into a pattern for use by e.g. string.gsub
 -- Based on https://github.com/davidm/lua-glob-pattern
 -- Simplified substantially: "[...]" syntax not supported as is not
 -- required by the file patterns used by the team. Also note style
@@ -80,15 +77,16 @@ local insert           = table.insert
   (end license)
 
 --]]
-function glob_to_pattern(glob)
+
+function FS.glob_to_pattern(glob)
 
   local pattern = "^" -- pattern being built
   local i = 0 -- index in glob
   local char -- char at index i in glob
 
   -- escape pattern char
-  local function escape(char)
-    return match(char, "^%w$") and char or "%" .. char
+  local function escape(_char)
+    return match(_char, "^%w$") and _char or "%" .. _char
   end
 
   -- Convert tokens.
@@ -120,68 +118,31 @@ function glob_to_pattern(glob)
   return pattern
 end
 
--- Detect the operating system in use
--- Support items are defined here for cases where a single string can cover
--- both Windows and Unix cases: more complex situations are handled inside
--- the support functions
-os_concat  = ";"
-os_null    = "/dev/null"
-os_pathsep = ":"
-os_setenv  = "export"
-os_yes     = "printf 'y\\n%.0s' {1..300}"
-
-os_ascii   = "echo \"\""
-os_cmpexe  = getenv("cmpexe") or "cmp"
-os_cmpext  = getenv("cmpext") or ".cmp"
-os_diffext = getenv("diffext") or ".diff"
-os_diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr"
-os_grepexe = "grep"
-os_newline = "\n"
-
-if os_type == "windows" then
-  os_ascii   = "@echo."
-  os_cmpexe  = getenv("cmpexe") or "fc /b"
-  os_cmpext  = getenv("cmpext") or ".cmp"
-  os_concat  = "&"
-  os_diffext = getenv("diffext") or ".fc"
-  os_diffexe = getenv("diffexe") or "fc /n"
-  os_grepexe = "findstr /r"
-  os_newline = "\n"
-  if tonumber(luatex_version) < 100 or
-     (tonumber(luatex_version) == 100
-       and tonumber(luatex_revision) < 4) then
-    os_newline = "\r\n"
-  end
-  os_null    = "nul"
-  os_pathsep = ";"
-  os_setenv  = "set"
-  os_yes     = "for /l %I in (1,1,300) do @echo y"
-end
-
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(path)
   return gsub(path, "/", "\\")
 end
 
-function normalize_path(path)
-  if os_type == "windows" then
+function FS.normalize_path(path)
+  if OS.type == "windows" then
     return unix_to_win(path)
   end
   return path
 end
 
 -- Return an absolute path from a relative one
-function abspath(path)
+function FS.abspath(path)
   local oldpwd = currentdir()
   chdir(path)
   local result = currentdir()
   chdir(oldpwd)
-  return escapepath(gsub(result, "\\", "/"))
+  return FS.escape_path(gsub(result, "\\", "/"))
 end
 
-function escapepath(path)
-  if os_type == "windows" then
-    local path,count = gsub(path,'"','')
+function FS.escape_path(path)
+  if OS.type == "windows" then
+    local count
+    path, count = gsub(path,'"','')
     if count % 2 ~= 0 then
       print("Unbalanced quotes in path")
       exit(0)
@@ -199,20 +160,20 @@ function escapepath(path)
 end
 
 -- For cleaning out a directory, which also ensures that it exists
-function cleandir(dir)
-  local errorlevel = mkdir(dir)
+function FS.cleandir(dir)
+  local errorlevel = FS.mkdir(dir)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  return rm(dir, "**")
+  return FS.rm(dir, "**")
 end
 
 -- Copy files 'quietly'
-function cp(glob, source, dest)
+FS.cp = function (glob, source, dest)
   local errorlevel
-  for i,_ in pairs(tree(source, glob)) do
+  for i,_ in pairs(FS.tree(source, glob)) do
     local source = source .. "/" .. i
-    if os_type == "windows" then
+    if OS.type == "windows" then
       if attributes(source)["mode"] == "directory" then
         errorlevel = execute(
           'xcopy /y /e /i "' .. unix_to_win(source) .. '" "'
@@ -235,9 +196,9 @@ function cp(glob, source, dest)
 end
 
 -- OS-dependent test for a directory
-function direxists(dir)
+FS.direxists = function (dir)
   local errorlevel
-  if os_type == "windows" then
+  if OS.type == "windows" then
     errorlevel =
       execute("if not exist \"" .. unix_to_win(dir) .. "\" exit 1")
   else
@@ -249,7 +210,7 @@ function direxists(dir)
   return true
 end
 
-function fileexists(file)
+FS.fileexists = function (file)
   local f = open(file, "r")
   if f ~= nil then
     f:close()
@@ -261,13 +222,13 @@ end
 
 -- Generate a table containing all file names of the given glob or all files
 -- if absent
-function filelist(path, glob)
+FS.filelist = function (path, glob)
   local files = { }
   local pattern
   if glob then
-    pattern = glob_to_pattern(glob)
+    pattern = FS.glob_to_pattern(glob)
   end
-  if direxists(path) then
+  if FS.direxists(path) then
     for entry in lfs_dir(path) do
       if pattern then
         if match(entry, pattern) then
@@ -286,9 +247,9 @@ end
 -- Does what filelist does, but can also glob subdirectories. In the returned
 -- table, the keys are paths relative to the given starting path, the values
 -- are their counterparts relative to the current working directory.
-function tree(path, glob)
-  local function cropdots(path)
-    return gsub(gsub(path, "^%./", ""), "/%./", "/")
+FS.tree = function (path, glob)
+  local function cropdots(p)
+    return gsub(gsub(p, "^%./", ""), "/%./", "/")
   end
   local function always_true()
     return true
@@ -299,12 +260,10 @@ function tree(path, glob)
   local dirs = {["."] = cropdots(path)}
   for pattern, criterion in gmatch(cropdots(glob), "([^/]+)(/?)") do
     local criterion = criterion == "/" and is_dir or always_true
-    function fill(path, dir, table)
-      for _, file in ipairs(filelist(dir, pattern)) do
-        local fullpath = path .. "/" .. file
-        if file ~= "." and file ~= ".." and
-          fullpath ~= builddir
-        then
+    local function fill(p, dir, table)
+      for _, file in ipairs(FS.filelist(dir, pattern)) do
+        local fullpath = p .. "/" .. file
+        if file ~= "." and file ~= ".." and fullpath ~= builddir then
           local fulldir = dir .. "/" .. file
           if criterion(fulldir) then
             table[fullpath] = fulldir
@@ -313,6 +272,7 @@ function tree(path, glob)
       end
     end
     local newdirs = {}
+    local dir
     if pattern == "**" then
       while true do
         path, dir = next(dirs)
@@ -324,8 +284,8 @@ function tree(path, glob)
         fill(path, dir, dirs)
       end
     else
-      for path, dir in pairs(dirs) do
-        fill(path, dir, newdirs)
+      for p, d in pairs(dirs) do
+        fill(p, d, newdirs)
       end
     end
     dirs = newdirs
@@ -333,8 +293,9 @@ function tree(path, glob)
   return dirs
 end
 
-function remove_duplicates(a)
-  -- Return array with duplicate entries removed from input array `a`.
+-- Return array with duplicate entries removed from input array `a`.
+-- This may not belong here
+FS.remove_duplicates = function (a)
 
   local uniq = {}
   local hash = {}
@@ -349,11 +310,11 @@ function remove_duplicates(a)
   return uniq
 end
 
-function mkdir(dir)
-  if os_type == "windows" then
+function FS.mkdir(dir)
+  if OS.type == "windows" then
     -- Windows (with the extensions) will automatically make directory trees
     -- but issues a warning if the dir already exists: avoid by including a test
-    local dir = unix_to_win(dir)
+    dir = unix_to_win(dir)
     return execute(
       "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
     )
@@ -363,51 +324,46 @@ function mkdir(dir)
 end
 
 -- Rename
-function ren(dir, source, dest)
-  local dir = dir .. "/"
-  if os_type == "windows" then
-    local source = gsub(source, "^%.+/", "")
-    local dest = gsub(dest, "^%.+/", "")
+function FS.ren(dir, source, dest)
+  dir = dir .. "/"
+  if OS.type == "windows" then
+    source = gsub(source, "^%.+/", "")
+    dest = gsub(dest, "^%.+/", "")
     return execute("ren " .. unix_to_win(dir) .. source .. " " .. dest)
   else
     return execute("mv " .. dir .. source .. " " .. dir .. dest)
   end
 end
 
+-- Remove file
+local function rmfile(source, file)
+  remove(source .. "/" .. file)
+  -- os.remove doesn't give a sensible errorlevel
+  return 0
+end
+
 -- Remove file(s) based on a glob
-function rm(source, glob)
-  for i,_ in pairs(tree(source, glob)) do
+function FS.rm(source, glob)
+  for i,_ in pairs(FS.tree(source, glob)) do
     rmfile(source,i)
   end
   -- os.remove doesn't give a sensible errorlevel
   return 0
 end
 
--- Remove file
-function rmfile(source, file)
-  remove(source .. "/" .. file)
-  -- os.remove doesn't give a sensible errorlevel
-  return 0
-end
-
 -- Remove a directory tree
-function rmdir(dir)
+FS.rmdir = function (dir)
   -- First, make sure it exists to avoid any errors
-  mkdir(dir)
-  if os_type == "windows" then
+  FS.mkdir(dir)
+  if OS.type == "windows" then
     return execute("rmdir /s /q " .. unix_to_win(dir))
   else
     return execute("rm -r " .. dir)
   end
 end
 
--- Run a command in a given directory
-function run(dir, cmd)
-  return execute("cd " .. dir .. os_concat .. cmd)
-end
-
 -- Split a path into file and directory component
-function splitpath(file)
+FS.splitpath = function (file)
   local path, name = match(file, "^(.*)/([^/]*)$")
   if path then
     return path, name
@@ -417,28 +373,53 @@ function splitpath(file)
 end
 
 -- Arguably clearer names
-function basename(file)
-  return(select(2, splitpath(file)))
+FS.basename = function (file)
+  return(select(2, FS.splitpath(file)))
 end
 
-function dirname(file)
-  return(select(1, splitpath(file)))
+FS.dirname = function (file)
+  return(select(1, FS.splitpath(file)))
 end
 
 -- Strip the extension from a file name (if present)
-function jobname(file)
-  local name = match(basename(file), "^(.*)%.")
+FS.jobname = function (file)
+  local name = match(FS.basename(file), "^(.*)%.")
   return name or file
 end
 
 -- Look for files, directory by directory, and return the first existing
-function locate(dirs, names)
+function FS.locate(dirs, names)
   for _,i in ipairs(dirs) do
     for _,j in ipairs(names) do
       local path = i .. "/" .. j
-      if fileexists(path) then
+      if FS.fileexists(path) then
         return path
       end
     end
   end
 end
+
+-- Expose as global only what is documented.
+FS.expose = function ()
+  for k, v in pairs({
+    glob_to_pattern = "glob_to_pattern",
+    abspath = "abspath",
+    dirname = "dirname",
+    basename = "basename",
+    cleandir = "cleandir",
+    cp = "cp",
+    direxists = "direxists",
+    fileexists = "fileexists",
+    filelist = "filelist",
+    jobname = "jobname",
+    mkdir = "mkdir",
+    ren = "ren",
+    rm = "rm",
+    splitpath = "splitpath",
+    normalize_path = "normalize_path",
+  }) do
+    _ENV[k] = FS[v]
+  end
+end
+
+return FS

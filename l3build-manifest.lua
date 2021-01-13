@@ -37,12 +37,12 @@ manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for _,f in ipairs(filelist(ctandir.."/"..ctanpkg,"*.*")) do
+  for _,f in ipairs(FS.filelist(ctandir.."/"..ctanpkg,"*.*")) do
     ctanfiles[f] = true
   end
   tdsfiles = {}
   for _,subdir in ipairs({"/doc/","/source/","/tex/"}) do
-    for _,f in ipairs(filelist(tdsdir..subdir..moduledir,"*.*")) do
+    for _,f in ipairs(FS.filelist(tdsdir..subdir..moduledir,"*.*")) do
       tdsfiles[f] = true
     end
   end
@@ -74,7 +74,7 @@ manifest_build_list = function(entry)
     -- build list of excluded files
     for _,glob_list in ipairs(entry.exclude) do
       for _,this_glob in ipairs(glob_list) do
-        for _,this_file in ipairs(filelist(maindir,this_glob)) do
+        for _,this_file in ipairs(FS.filelist(maindir,this_glob)) do
           entry.excludes[this_file] = true
         end
       end
@@ -84,7 +84,7 @@ manifest_build_list = function(entry)
     for _,glob_list in ipairs(entry.files) do
       for _,this_glob in ipairs(glob_list) do
 
-        local these_files = filelist(entry.dir,this_glob)
+        local these_files = FS.filelist(entry.dir,this_glob)
         these_files = manifest_sort_within_match(these_files)
 
         for _,this_file in ipairs(these_files) do

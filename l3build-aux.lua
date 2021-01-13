@@ -49,12 +49,12 @@ end
 
 function setepoch()
   return
-    os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch
-      .. os_concat ..
-    os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
-      .. os_concat ..
-    os_setenv .. " FORCE_SOURCE_DATE=1"
-      .. os_concat
+    OS.setenv .. " SOURCE_DATE_EPOCH=" .. epoch
+      .. OS.concat ..
+    OS.setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
+      .. OS.concat ..
+    OS.setenv .. " FORCE_SOURCE_DATE=1"
+      .. OS.concat
 end
 
 local function getscriptname()
@@ -101,7 +101,7 @@ function call(dirs, target, opts)
       text = " with configuration " .. opts["config"][1]
     end
     print("Running l3build with target \"" .. target .. "\"" .. text )
-    local errorlevel = run(
+    local errorlevel = OS.run(
       i,
       "texlua " .. scriptname .. " " .. target .. s
     )
@@ -117,7 +117,7 @@ function depinstall(deps)
   local errorlevel
   for _,i in ipairs(deps) do
     print("Installing dependency: " .. i)
-    errorlevel = run(i, "texlua " .. getscriptname() .. " unpack -q")
+    errorlevel = OS.run(i, "texlua " .. getscriptname() .. " unpack -q")
     if errorlevel ~= 0 then
       return errorlevel
     end
