@@ -38,8 +38,8 @@ function normalise_epoch()
   local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
   if y then
     epoch =
-      os_time({year = y, month = m, day = d, hour = 0, sec = 0, isdst = nil}) -
-      os_time({year = 1970, month = 1, day = 1, hour = 0, sec = 0, isdst = nil})
+      os.time({year = y, month = m, day = d, hour = 0, sec = 0, isdst = nil}) -
+      os.time({year = 1970, month = 1, day = 1, hour = 0, sec = 0, isdst = nil})
   elseif match(epoch, "^%d+$") then
     epoch = tonumber(epoch)
   else
