@@ -205,7 +205,7 @@ The following group lists the files included in the CTAN package.
     },
     {
        name    = "CTAN files",
-       dir     = ctandir.."/"..module,
+       dir     = Vars.ctandir.."/"..module,
        files   = {"*.*"},
        exclude = {".",".."},
        flag    = false,
@@ -250,7 +250,7 @@ It is automatically generated with `texlua build.lua manifest`.
 
 end
 
-manifest_write_subheading = manifest_write_subheading or function(filehandle,heading,description)
+manifest_write_subheading = manifest_write_subheading or function(filehandle, heading, description)
 
   filehandle:write("\n\n## " .. heading .. "\n\n")
 
@@ -260,7 +260,7 @@ manifest_write_subheading = manifest_write_subheading or function(filehandle,hea
 
 end
 
-manifest_write_group_heading = manifest_write_group_heading or function (filehandle,heading,description)
+manifest_write_group_heading = manifest_write_group_heading or function (filehandle, heading, description)
 
   filehandle:write("\n### " .. heading .. "\n\n")
 
@@ -270,7 +270,7 @@ manifest_write_group_heading = manifest_write_group_heading or function (filehan
 
 end
 
-manifest_write_group_file = manifest_write_group_file or function(filehandle,filename,param)
+manifest_write_group_file = manifest_write_group_file or function(filehandle, filename, param)
   --[[
         filehandle        : write file object
         filename          : the count of the filename to be written
@@ -296,7 +296,7 @@ manifest_write_group_file = manifest_write_group_file or function(filehandle,fil
 
 end
 
-manifest_write_group_file_descr = manifest_write_group_file_descr or function(filehandle,filename,descr,param)
+manifest_write_group_file_descr = manifest_write_group_file_descr or function(filehandle, filename, descr, param)
   --[[
         filehandle        : write file object
         filename          : the name of the file to write
@@ -340,7 +340,7 @@ manifest_extract_filedesc = function(filehandle)
   local all_file = filehandle:read("*all")
   local matchstr = "\\section{(.-)}"
 
-  filedesc = string.match(all_file,matchstr)
+  filedesc = string.match(all_file, matchstr)
 
   return filedesc
 end
@@ -356,7 +356,7 @@ manifest_extract_filedesc = function(filehandle)
     this_line = filehandle:read("*line")
   end
 
-  filedesc = string.match(this_line,matchstr)
+  filedesc = string.match(this_line, matchstr)
 
   return filedesc
 end

@@ -28,7 +28,7 @@ local print            = print
 local open             = io.open
 
 local attributes       = lfs.attributes -- lfs is a global variable
-local currentdir       = lfs.currentdir
+local Vars.currentdir       = lfs.Vars.currentdir
 local chdir            = lfs.chdir
 local lfs_dir          = lfs.dir
 
@@ -85,8 +85,8 @@ function FS.glob_to_pattern(glob)
   local char -- char at index i in glob
 
   -- escape pattern char
-  local function escape(_char)
-    return match(_char, "^%w$") and _char or "%" .. _char
+  local function escape(chr)
+    return match(chr, "^%w$") and chr or "%" .. chr
   end
 
   -- Convert tokens.
@@ -132,31 +132,11 @@ end
 
 -- Return an absolute path from a relative one
 function FS.abspath(path)
-  local oldpwd = currentdir()
+  local oldpwd = Vars.currentdir()
   chdir(path)
-  local result = currentdir()
+  local result = Vars.currentdir()
   chdir(oldpwd)
   return FS.escape_path(gsub(result, "\\", "/"))
-end
-
-function FS.escape_path(path)
-  if OS.type == "windows" then
-    local count
-    path, count = gsub(path,'"','')
-    if count % 2 ~= 0 then
-      print("Unbalanced quotes in path")
-      exit(0)
-    else
-      if match(path," ") then
-        return '"' .. path .. '"'
-      end
-      return path
-    end
-  else
-    path = gsub(path,"\\ ","[PATH-SPACE]")
-    path = gsub(path," ","\\ ")
-    return gsub(path,"%[PATH-SPACE%]","\\ ")
-  end
 end
 
 -- For cleaning out a directory, which also ensures that it exists
@@ -223,7 +203,7 @@ end
 -- Generate a table containing all file names of the given glob or all files
 -- if absent
 FS.filelist = function (path, glob)
-  local files = { }
+  local files = {}
   local pattern
   if glob then
     pattern = FS.glob_to_pattern(glob)
@@ -242,6 +222,106 @@ FS.filelist = function (path, glob)
     end
   end
   return files
+end
+
+function FS.mkdir(dir)
+  if OS.type == "windows" then
+    -- Windows (with the extensions) will automatically make directory trees
+    -- but issues a warning if the dir already exists: avoid by including a test
+    dir = unix_to_win(dir)
+    return execute(
+      "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
+    )
+  else
+    return execute("mkdir -p " .. dir)
+  end
+end
+
+-- Rename
+function FS.ren(dir, source, dest)
+  dir = dir .. "/"
+  if OS.type == "windows" then
+    source = gsub(source, "^%.+/", "")
+    dest = gsub(dest, "^%.+/", "")
+    return execute("ren " .. unix_to_win(dir) .. source .. " " .. dest)
+  else
+    return execute("mv " .. dir .. source .. " " .. dir .. dest)
+  end
+end
+
+-- Remove file
+local function rmfile(source, file)
+  remove(source .. "/" .. file)
+  -- os.remove doesn't give a sensible errorlevel
+  return 0
+end
+
+-- Remove file(s) based on a glob
+function FS.rm(source, glob)
+  for i,_ in pairs(FS.tree(source, glob)) do
+    rmfile(source, i)
+  end
+  -- os.remove doesn't give a sensible errorlevel
+  return 0
+end
+
+-- Remove a directory tree
+FS.rmdir = function (dir)
+  -- First, make sure it exists to avoid any errors
+  FS.mkdir(dir)
+  if OS.type == "windows" then
+    return execute("rmdir /s /q " .. unix_to_win(dir))
+  else
+    return execute("rm -r " .. dir)
+  end
+end
+
+-- Split a path into file and directory component
+FS.splitpath = function (file)
+  local path, name = match(file, "^(.*)/([^/]*)$")
+  if path then
+    return path, name
+  else
+    return ".", file
+  end
+end
+
+-- Arguably clearer names
+FS.basename = function (file)
+  return(select(2, FS.splitpath(file)))
+end
+
+FS.dirname = function (file)
+  return(select(1, FS.splitpath(file)))
+end
+
+-- Strip the extension from a file name (if present)
+FS.jobname = function (file)
+  local name = match(FS.basename(file), "^(.*)%.")
+  return name or file
+end
+
+-- Expose as global only what is documented.
+FS.expose = function ()
+  for k, v in pairs({
+    glob_to_pattern = "glob_to_pattern",
+    normalize_path = "normalize_path",
+    abspath = "abspath",
+    cleandir = "cleandir",
+    cp = "cp",
+    direxists = "direxists",
+    fileexists = "fileexists",
+    filelist = "filelist",
+    mkdir = "mkdir",
+    ren = "ren",
+    rm = "rm",
+    splitpath = "splitpath",
+    basename = "basename",
+    dirname = "dirname",
+    jobname = "jobname",
+  }) do
+    _ENV[k] = FS[v]
+  end
 end
 
 -- Does what filelist does, but can also glob subdirectories. In the returned
@@ -310,81 +390,24 @@ FS.remove_duplicates = function (a)
   return uniq
 end
 
-function FS.mkdir(dir)
+function FS.escape_path(path)
   if OS.type == "windows" then
-    -- Windows (with the extensions) will automatically make directory trees
-    -- but issues a warning if the dir already exists: avoid by including a test
-    dir = unix_to_win(dir)
-    return execute(
-      "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
-    )
+    local count
+    path, count = gsub(path,'"','')
+    if count % 2 ~= 0 then
+      print("Unbalanced quotes in path")
+      exit(0)
+    else
+      if match(path," ") then
+        return '"' .. path .. '"'
+      end
+      return path
+    end
   else
-    return execute("mkdir -p " .. dir)
+    path = gsub(path,"\\ ","[PATH-SPACE]")
+    path = gsub(path," ","\\ ")
+    return gsub(path,"%[PATH-SPACE%]","\\ ")
   end
-end
-
--- Rename
-function FS.ren(dir, source, dest)
-  dir = dir .. "/"
-  if OS.type == "windows" then
-    source = gsub(source, "^%.+/", "")
-    dest = gsub(dest, "^%.+/", "")
-    return execute("ren " .. unix_to_win(dir) .. source .. " " .. dest)
-  else
-    return execute("mv " .. dir .. source .. " " .. dir .. dest)
-  end
-end
-
--- Remove file
-local function rmfile(source, file)
-  remove(source .. "/" .. file)
-  -- os.remove doesn't give a sensible errorlevel
-  return 0
-end
-
--- Remove file(s) based on a glob
-function FS.rm(source, glob)
-  for i,_ in pairs(FS.tree(source, glob)) do
-    rmfile(source,i)
-  end
-  -- os.remove doesn't give a sensible errorlevel
-  return 0
-end
-
--- Remove a directory tree
-FS.rmdir = function (dir)
-  -- First, make sure it exists to avoid any errors
-  FS.mkdir(dir)
-  if OS.type == "windows" then
-    return execute("rmdir /s /q " .. unix_to_win(dir))
-  else
-    return execute("rm -r " .. dir)
-  end
-end
-
--- Split a path into file and directory component
-FS.splitpath = function (file)
-  local path, name = match(file, "^(.*)/([^/]*)$")
-  if path then
-    return path, name
-  else
-    return ".", file
-  end
-end
-
--- Arguably clearer names
-FS.basename = function (file)
-  return(select(2, FS.splitpath(file)))
-end
-
-FS.dirname = function (file)
-  return(select(1, FS.splitpath(file)))
-end
-
--- Strip the extension from a file name (if present)
-FS.jobname = function (file)
-  local name = match(FS.basename(file), "^(.*)%.")
-  return name or file
 end
 
 -- Look for files, directory by directory, and return the first existing
@@ -396,29 +419,6 @@ function FS.locate(dirs, names)
         return path
       end
     end
-  end
-end
-
--- Expose as global only what is documented.
-FS.expose = function ()
-  for k, v in pairs({
-    glob_to_pattern = "glob_to_pattern",
-    abspath = "abspath",
-    dirname = "dirname",
-    basename = "basename",
-    cleandir = "cleandir",
-    cp = "cp",
-    direxists = "direxists",
-    fileexists = "fileexists",
-    filelist = "filelist",
-    jobname = "jobname",
-    mkdir = "mkdir",
-    ren = "ren",
-    rm = "rm",
-    splitpath = "splitpath",
-    normalize_path = "normalize_path",
-  }) do
-    _ENV[k] = FS[v]
   end
 end
 

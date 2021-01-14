@@ -260,7 +260,7 @@ A.argparse = function (arg)
           result[optname] = optarg
         else
           local opts = result[optname] or {}
-          for hit in gmatch(optarg, "([^,%s]+)") do
+          for hit in gmatch(optarg, "([^, %s]+)") do
             insert(opts, hit)
           end
           result[optname] = opts

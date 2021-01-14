@@ -27,11 +27,7 @@ for those people who are interested.
 -- Version information
 release_date = "2020-06-04"
 
--- File operations are aided by the LuaFileSystem module
--- Next might be unnecessary on modern `texlua`
-local lfs = require("lfs")
-
--- Local access to functions
+-- Local safe guard
 
 local ipairs           = ipairs
 local insert           = table.insert
@@ -41,6 +37,15 @@ local gsub             = string.gsub
 local print            = print
 local exit             = os.exit
 
+-- global tables
+
+OS = {} -- os related
+FS = {} -- file system related
+Vars = {}
+Args = {}
+CTAN = {}
+Main = {}
+
 -- l3build setup and functions
 kpse.set_program_name("kpsewhich")
 local build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
@@ -49,17 +54,17 @@ local function build_require(s)
 end
 
 -- Minimal code to do basic checks
-A = build_require("arguments")
--- global options
-Opts = A.argparse(arg)
 
-H = build_require("help")
+build_require("arguments")
+Opts = Args.argparse(arg)
 
-OS = build_require("os")
-FS = build_require("file-functions")
+build_require("os")
+build_require("file-functions")
+build_require("variables")
 
 build_require("typesetting")
 build_require("aux")
+
 build_require("clean")
 build_require("check")
 build_require("ctan")
@@ -74,15 +79,14 @@ build_require("stdmain")
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
 if Opts.target == "help" then
-  H.help(arg[0], target_list)
+  Help.help(arg[0], target_list)
   exit(0)
 elseif Opts.target == "version" then
-  H.version()
+  Help.version()
   exit(0)
 end
 
 -- Allow main function to be disabled 'higher up'
-main = main or stdmain
 
 -- Load configuration file if running as a script
 -- start by exposing globals
@@ -99,24 +103,6 @@ if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   end
 end
 
--- Load standard settings for variables:
--- comes after any user versions
-build_require("variables")
-
--- Ensure that directories are 'space safe'
-maindir       = FS.escape_path(maindir)
-docfiledir    = FS.escape_path(docfiledir)
-sourcefiledir = FS.escape_path(sourcefiledir)
-supportdir    = FS.escape_path(supportdir)
-testfiledir   = FS.escape_path(testfiledir)
-testsuppdir   = FS.escape_path(testsuppdir)
-builddir      = FS.escape_path(builddir)
-distribdir    = FS.escape_path(distribdir)
-localdir      = FS.escape_path(localdir)
-resultdir     = FS.escape_path(resultdir)
-testdir       = FS.escape_path(testdir)
-typesetdir    = FS.escape_path(typesetdir)
-unpackdir     = FS.escape_path(unpackdir)
 
 -- Tidy up the epoch setting
 -- Force an epoch if set at the command line
@@ -146,7 +132,7 @@ end
 if Opts.target == "check" then
   if #checkconfigs > 1 then
     local errorlevel = 0
-    local failed = { }
+    local failed = {}
     for i = 1, #checkconfigs do
       Opts.config = {checkconfigs[i]}
       errorlevel = call({"."}, "check", Opts) -- remove the 3rd argument
@@ -154,7 +140,7 @@ if Opts.target == "check" then
         if Opts["halt-on-error"] then
           exit(1)
         else
-          insert(failed,checkconfigs[i])
+          insert(failed, checkconfigs[i])
         end
       end
     end

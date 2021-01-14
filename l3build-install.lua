@@ -59,24 +59,24 @@ function uninstall()
     end
     return 0
   end
-  local function uninstall_files(dir,subdir)
+  local function uninstall_files(dir, subdir)
     subdir = subdir or moduledir
     dir = dir .. "/" .. subdir
     return zapdir(dir)
   end
   local errorlevel = 0
   -- Any script man files need special handling
-  local manfiles = { }
+  local manfiles = {}
   for _,glob in pairs(scriptmanfiles) do
-    for file,_ in pairs(FS.tree(docfiledir,glob)) do
+    for file,_ in pairs(FS.tree(docfiledir, glob)) do
       -- Man files should have a single-digit extension: the type
       local installdir = gethome() .. "/doc/man/man"  .. match(file,".$")
       if FS.fileexists(installdir .. "/" .. file) then
         if Opts["dry-run"] then
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
-           select(2,FS.splitpath(file)))
+           select(2, FS.splitpath(file)))
         else
-          errorlevel = errorlevel + FS.rm(installdir,file)
+          errorlevel = errorlevel + FS.rm(installdir, file)
         end
       end
     end
@@ -104,15 +104,15 @@ function uninstall()
   return 0
 end
 
-function install_files(target,full,dry_run)
+function install_files(target, full, dry_run)
 
   -- Needed so paths are only cleaned out once
-  local cleanpaths = { }
+  local cleanpaths = {}
   -- Collect up all file data before copying:
   -- ensures no files are lost during clean-up
-  local installmap = { }
+  local installmap = {}
 
-  local function create_install_map(source,dir,files,subdir)
+  local function create_install_map(source, dir, files, subdir)
     subdir = subdir or moduledir
     -- For material associated with secondary tools (BibTeX, MakeIndex)
     -- the structure needed is slightly different from those items going
@@ -121,13 +121,13 @@ function install_files(target,full,dry_run)
       subdir = "latex"
     end
     dir = dir .. (subdir and ("/" .. subdir) or "")
-    local filenames = { }
-    local sourcepaths = { }
-    local paths = { }
+    local filenames = {}
+    local sourcepaths = {}
+    local paths = {}
     -- Generate a file list and include the directory
     for _,glob_table in pairs(files) do
       for _,glob in pairs(glob_table) do
-        for file,_ in pairs(FS.tree(source,glob)) do
+        for file,_ in pairs(FS.tree(source, glob)) do
           -- Just want the name
           local path,filename = FS.splitpath(file)
           local sourcepath = "/"
@@ -142,16 +142,16 @@ function install_files(target,full,dry_run)
           for _,location in ipairs(tdslocations) do
             local path,glob = FS.splitpath(location)
             local pattern = FS.glob_to_pattern(glob)
-            if match(filename,pattern) then
-              insert(paths,path)
-              insert(filenames,path .. sourcepath .. filename)
+            if match(filename, pattern) then
+              insert(paths, path)
+              insert(filenames, path .. sourcepath .. filename)
               matched = true
               break
             end
           end
           if not matched then
-            insert(paths,dir)
-            insert(filenames,dir .. sourcepath .. filename)
+            insert(paths, dir)
+            insert(filenames, dir .. sourcepath .. filename)
           end
         end
       end
@@ -187,21 +187,21 @@ function install_files(target,full,dry_run)
   if errorlevel ~= 0 then return errorlevel end
 
     -- Creates a 'controlled' list of files
-    local function excludelist(dir,include,exclude)
-      include = include or { }
-      exclude = exclude or { }
-      dir = dir or currentdir
-      local includelist = { }
-      local excludelist = { }
+    local function excludelist(dir, include, exclude)
+      include = include or {}
+      exclude = exclude or {}
+      dir = dir or Vars.currentdir
+      local includelist = {}
+      local excludelist = {}
       for _,glob_table in pairs(exclude) do
         for _,glob in pairs(glob_table) do
-          for file,_ in pairs(FS.tree(dir,glob)) do
+          for file,_ in pairs(FS.tree(dir, glob)) do
             excludelist[file] = true
           end
         end
       end
       for _,glob in pairs(include) do
-        for file,_ in pairs(FS.tree(dir,glob)) do
+        for file,_ in pairs(FS.tree(dir, glob)) do
           if not excludelist[file] then
             insert(includelist, file)
           end
@@ -210,7 +210,7 @@ function install_files(target,full,dry_run)
       return includelist
     end
 
-  local installlist = excludelist(unpackdir,installfiles,{scriptfiles})
+  local installlist = excludelist(unpackdir, installfiles, {scriptfiles})
 
   if full then
     errorlevel = doc()
@@ -219,17 +219,17 @@ function install_files(target,full,dry_run)
     -- part of the main typesetting list
     local typesetfiles = typesetfiles
     for _,glob in pairs(typesetdemofiles) do
-      insert(typesetfiles,glob)
+      insert(typesetfiles, glob)
     end
 
     -- Find PDF files
-    pdffiles = { }
+    pdffiles = {}
     for _,glob in pairs(typesetfiles) do
       insert(pdffiles,(gsub(glob,"%.%w+$",".pdf")))
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = excludelist(docfiledir,typesetfiles,{sourcefiles})
+    typesetlist = excludelist(docfiledir, typesetfiles, {sourcefiles})
     sourcelist = excludelist(sourcefiledir,sourcefiles,
       {bstfiles,installfiles,makeindexfiles,scriptfiles})
  
@@ -247,23 +247,23 @@ function install_files(target,full,dry_run)
       if ctanreadme ~= "" and not match(lower(ctanreadme),"^readme%.%w+") then
         local installdir = target .. "/doc/" .. moduledir
         if FS.fileexists(installdir .. "/" .. ctanreadme) then
-          FS.ren(installdir,ctanreadme,"README." .. match(ctanreadme,"%.(%w+)$"))
+          FS.ren(installdir,ctanreadme,"README." .. match(ctanreadme, "%.(%w+)$"))
         end
       end
     end
 
     -- Any script man files need special handling
-    local manfiles = { }
+    local manfiles = {}
     for _,glob in pairs(scriptmanfiles) do
-      for file,_ in pairs(FS.tree(docfiledir,glob)) do
+      for file,_ in pairs(FS.tree(docfiledir, glob)) do
         if dry_run then
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
-            select(2,FS.splitpath(file)))
+            select(2, FS.splitpath(file)))
         else
           -- Man files should have a single-digit extension: the type
           local installdir = target .. "/doc/man/man"  .. match(file,".$")
           errorlevel = errorlevel + FS.mkdir(installdir)
-          errorlevel = errorlevel + FS.cp(file,docfiledir,installdir)
+          errorlevel = errorlevel + FS.cp(file, docfiledir, installdir)
         end
       end
     end
@@ -286,7 +286,7 @@ function install_files(target,full,dry_run)
   -- Files are all copied in one shot: this ensures that FS.cleandir()
   -- can't be an issue even if there are complex set-ups
   for _,v in ipairs(installmap) do
-    errorlevel = FS.cp(v.file,v.source,v.dest)
+    errorlevel = FS.cp(v.file, v.source, v.dest)
     if errorlevel ~= 0  then return errorlevel end
   end 
   

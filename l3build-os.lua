@@ -22,17 +22,16 @@ for those people who are interested.
 
 --]]
 
-local getenv           = os.getenv
-local execute          = os.execute
+local getenv   = os.getenv
+local execute  = os.execute
 
-local luatex_revision  = status.luatex_revision
-local luatex_version   = status.luatex_version
+local Status   = status
 
 -- Detect the operating system in use
 -- Support items are defined here for cases where a single string can cover
 -- both Windows and Unix cases: more complex situations are handled inside
 -- the support functions
-local OS = {}
+local OS = OS or {}
 
 OS.type = os.type
 
@@ -59,15 +58,15 @@ if OS.type == "windows" then
   OS.diffexe = getenv("diffexe") or "fc /n"
   OS.grepexe = "findstr /r"
   OS.newline = "\n"
-  if tonumber(luatex_version) < 100 or
-     (tonumber(luatex_version) == 100
-       and tonumber(luatex_revision) < 4) then
+  if tonumber(Status.luatex_version) < 100 or
+     (tonumber(Status.luatex_version) == 100
+       and tonumber(Status.luatex_revision) < 4) then
     OS.newline = "\r\n"
   end
   OS.null    = "nul"
   OS.pathsep = ";"
   OS.setenv  = "set"
-  OS.yes     = "for /l %I in (1,1,300) do @echo y"
+  OS.yes     = "for /l %I in (1, 1, 300) do @echo y"
 end
 
 -- Run a command in a given directory

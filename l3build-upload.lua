@@ -86,7 +86,7 @@ function upload(tagnames)
   local uploadconfig = uploadconfig
 
   -- try a sensible default for the package name:
-  uploadconfig.pkg = uploadconfig.pkg or ctanpkg or nil
+  uploadconfig.pkg = uploadconfig.pkg or Vars.ctanpkg or nil
 
   -- Get data from command line if appropriate
   if Opts.file then
@@ -100,7 +100,7 @@ function upload(tagnames)
 
   uploadconfig.note =   uploadconfig.note  or file_contents(uploadconfig.note_file)
 
-  local tagnames = tagnames or { }
+  local tagnames = tagnames or {}
   uploadconfig.version = tagnames[1] or uploadconfig.version
 
   local override_update_check = false
@@ -117,7 +117,7 @@ function upload(tagnames)
     error("Missing zip file '" .. tostring(uploadfile) .. "'")
   end
 
-  ctan_post = construct_ctan_post(uploadfile,Opts.debug)
+  ctan_post = construct_ctan_post(uploadfile, Opts.debug)
 
 
 -- curl file version
@@ -180,7 +180,7 @@ end
       io.stdout:write("> ")
       io.stdout:flush()
       answer=read()
-      if(lower(answer,1,1)=="y") then
+      if(lower(answer, 1, 1)=="y") then
         ctanupload=true
       end
     end
@@ -219,7 +219,7 @@ function shell(s)
   return t
 end
 
-function construct_ctan_post(uploadfile,debug)
+function construct_ctan_post(uploadfile, debug)
 
   -- start building the curl command:
 -- commandline  ctan_post = curlexe .. " "
@@ -260,18 +260,18 @@ function construct_ctan_post(uploadfile,debug)
 
 end
 
-function ctan_field(fname,fvalue,max,desc,mandatory,multi)
+function ctan_field(fname, fvalue, max, desc, mandatory, multi)
   if (type(fvalue)=="table" and multi==true) then
     for i, v in pairs(fvalue) do
-      ctan_single_field(fname,v,max,desc,mandatory and i==1)
+      ctan_single_field(fname, v, max, desc, mandatory and i==1)
     end
   else
-    ctan_single_field(fname,fvalue,max,desc,mandatory)
+    ctan_single_field(fname, fvalue, max, desc, mandatory)
   end
 end
 
 
-function ctan_single_field(fname,fvalue,max,desc,mandatory)
+function ctan_single_field(fname, fvalue, max, desc, mandatory)
   local fvalueprint = fvalue
   if fvalue == nil then fvalueprint = '??' end
   print('ctan-upload | ' .. fname .. ': ' ..tostring(fvalueprint))

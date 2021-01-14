@@ -48,7 +48,7 @@ function dvitopdf(name, dir, engine, hide)
 end
 
 -- An auxiliary used to set up the environmental variables
-function runcmd(cmd,dir,vars)
+function runcmd(cmd, dir, vars)
   local dir = dir or "."
   local dir = FS.abspath(dir)
   local vars = vars or {}
@@ -68,10 +68,10 @@ function runcmd(cmd,dir,vars)
   for _,var in pairs(vars) do
     env = env .. OS.concat .. OS.setenv .. " " .. var .. "=" .. envpaths
   end
-  return OS.run(dir,(forcedocepoch and setepoch() or "") .. env .. OS.concat .. cmd)
+  return OS.run(dir, (forcedocepoch and setepoch() or "") .. env .. OS.concat .. cmd)
 end
 
-function biber(name,dir)
+function biber(name, dir)
   if FS.fileexists(dir .. "/" .. name .. ".bcf") then
     return
       runcmd(biberexe .. " " .. biberopts .. " " .. name,dir,{"BIBINPUTS"})
@@ -79,7 +79,7 @@ function biber(name,dir)
   return 0
 end
 
-function bibtex(name,dir)
+function bibtex(name, dir)
   local dir = dir or "."
   if FS.fileexists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
@@ -104,7 +104,7 @@ function bibtex(name,dir)
   return 0
 end
 
-function makeindex(name,dir,inext,outext,logext,style)
+function makeindex(name, dir, inext, outext, logext, style)
   local dir = dir or "."
   if FS.fileexists(dir .. "/" .. name .. inext) then
     if style == "" then style = nil end
@@ -118,7 +118,7 @@ function makeindex(name,dir,inext,outext,logext,style)
   return 0
 end
 
-function tex(file,dir,cmd)
+function tex(file, dir, cmd)
   local dir = dir or "."
   local cmd = cmd or typesetexe .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
@@ -126,7 +126,7 @@ function tex(file,dir,cmd)
     dir,{"TEXINPUTS","LUAINPUTS"})
 end
 
-local function typesetpdf(file,dir)
+local function typesetpdf(file, dir)
   local dir = dir or "."
   local name = FS.jobname(file)
   print("Typesetting " .. name)
@@ -136,24 +136,24 @@ local function typesetpdf(file,dir)
     fn = specialtypesetting[file].func or fn
     cmd = specialtypesetting[file].cmd or cmd
   end
-  local errorlevel = fn(file,dir,cmd)
+  local errorlevel = fn(file, dir, cmd)
   if errorlevel ~= 0 then
     print(" ! Compilation failed")
     return errorlevel
   end
   pdfname = name .. pdfext
-  FS.rm(docfiledir,pdfname)
-  return FS.cp(pdfname,dir,docfiledir)
+  FS.rm(docfiledir, pdfname)
+  return FS.cp(pdfname, dir, docfiledir)
 end
 
-typeset = typeset or function(file,dir,exe)
+typeset = typeset or function(file, dir, exe)
   dir = dir or "."
-  local errorlevel = tex(file,dir,exe)
+  local errorlevel = tex(file, dir, exe)
   if errorlevel ~= 0 then
     return errorlevel
   end
   local name = FS.jobname(file)
-  errorlevel = biber(name,dir) + bibtex(name,dir)
+  errorlevel = biber(name, dir) + bibtex(name, dir)
   if errorlevel ~= 0 then
     return errorlevel
   end
@@ -161,7 +161,7 @@ typeset = typeset or function(file,dir,exe)
     errorlevel =
       makeindex(name,dir,".glo",".gls",".glg",glossarystyle) +
       makeindex(name,dir,".idx",".ind",".ilg",indexstyle)    +
-      tex(file,dir,exe)
+      tex(file, dir, exe)
     if errorlevel ~= 0 then break end
   end
   return errorlevel
@@ -206,10 +206,10 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for _,typesetfiles in ipairs({typesetdemofiles,typesetfiles}) do
+  for _,typesetfiles in ipairs({typesetdemofiles, typesetfiles}) do
     for _,glob in pairs(typesetfiles) do
-      for _,dir in ipairs({typesetdir,unpackdir}) do
-        for _,file in pairs(FS.tree(dir,glob)) do
+      for _,dir in ipairs({typesetdir, unpackdir}) do
+        for _,file in pairs(FS.tree(dir, glob)) do
           local path,srcname = FS.splitpath(file)
           local name = FS.jobname(srcname)
           if not done[name] then
@@ -226,7 +226,7 @@ function doc(files)
             end
             -- Now know if we should typeset this source
             if typeset then
-              local errorlevel = typesetpdf(srcname,path)
+              local errorlevel = typesetpdf(srcname, path)
               if errorlevel ~= 0 then
                 return errorlevel
               else

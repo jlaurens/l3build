@@ -37,7 +37,7 @@ manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for _,f in ipairs(FS.filelist(ctandir.."/"..ctanpkg,"*.*")) do
+  for _,f in ipairs(FS.filelist(Vars.ctandir.."/"..Vars.ctanpkg,"*.*")) do
     ctanfiles[f] = true
   end
   tdsfiles = {}
@@ -74,7 +74,7 @@ manifest_build_list = function(entry)
     -- build list of excluded files
     for _,glob_list in ipairs(entry.exclude) do
       for _,this_glob in ipairs(glob_list) do
-        for _,this_file in ipairs(FS.filelist(maindir,this_glob)) do
+        for _,this_file in ipairs(FS.filelist(maindir, this_glob)) do
           entry.excludes[this_file] = true
         end
       end
@@ -84,11 +84,11 @@ manifest_build_list = function(entry)
     for _,glob_list in ipairs(entry.files) do
       for _,this_glob in ipairs(glob_list) do
 
-        local these_files = FS.filelist(entry.dir,this_glob)
+        local these_files = FS.filelist(entry.dir, this_glob)
         these_files = manifest_sort_within_match(these_files)
 
         for _,this_file in ipairs(these_files) do
-          entry = manifest_build_file(entry,this_file)
+          entry = manifest_build_file(entry, this_file)
         end
 
         entry.files_ordered = manifest_sort_within_group(entry.files_ordered)
@@ -152,10 +152,10 @@ manifest_build_init = function(entry)
 end
 
 
-manifest_build_file = function(entry,this_file)
+manifest_build_file = function(entry, this_file)
 
   if entry.rename then
-    this_file = this_file:gsub(entry.rename[1],entry.rename[2])
+    this_file = this_file:gsub(entry.rename[1], entry.rename[2])
   end
 
   if not entry.excludes[this_file] then
@@ -165,20 +165,20 @@ manifest_build_file = function(entry,this_file)
 
       entry.matches[this_file] = true -- store the file name
       entry.files_ordered[entry.N] = this_file -- store the file order
-      entry.Nchar_file = math.max(entry.Nchar_file,this_file:len())
+      entry.Nchar_file = math.max(entry.Nchar_file, this_file:len())
 
     end
 
     if not(entry.skipfiledescription) then
 
       local ff = assert(io.open(entry.dir .. "/" .. this_file, "r"))
-      this_descr  = manifest_extract_filedesc(ff,this_file)
+      this_descr  = manifest_extract_filedesc(ff, this_file)
       ff:close()
 
       if this_descr and this_descr ~= "" then
         entry.descr[this_file] = this_descr
         entry.ND = entry.ND+1
-        entry.Nchar_descr = math.max(entry.Nchar_descr,this_descr:len())
+        entry.Nchar_descr = math.max(entry.Nchar_descr, this_descr:len())
       end
 
     end
@@ -200,9 +200,9 @@ manifest_write = function(manifest_entries)
 
   for ii,vv in ipairs(manifest_entries) do
     if manifest_entries[ii].subheading then
-      manifest_write_subheading(f,manifest_entries[ii].subheading,manifest_entries[ii].description)
+      manifest_write_subheading(f, manifest_entries[ii].subheading, manifest_entries[ii].description)
     elseif manifest_entries[ii].N > 0 then
-      manifest_write_group(f,manifest_entries[ii])
+      manifest_write_group(f, manifest_entries[ii])
     end
   end
 
@@ -211,9 +211,9 @@ manifest_write = function(manifest_entries)
 end
 
 
-manifest_write_group = function(f,entry)
+manifest_write_group = function(f, entry)
 
-  manifest_write_group_heading(f,entry.name,entry.description)
+  manifest_write_group_heading(f, entry.name, entry.description)
 
   if entry.ND > 0 then
 
@@ -250,7 +250,7 @@ manifest_write_group = function(f,entry)
 				manifest_write_group_file_descr(f,"---","---",p)
       end
 
-      manifest_write_group_file_descr(f,file,descr,param)
+      manifest_write_group_file_descr(f, file, descr, param)
     end
 
   else
@@ -271,7 +271,7 @@ manifest_write_group = function(f,entry)
 	  			param.flag = "‡"
 	  		end
 			end
-      manifest_write_group_file(f,file,param)
+      manifest_write_group_file(f, file, param)
     end
 
   end

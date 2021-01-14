@@ -8,7 +8,7 @@ bundle = ""
 
 -- Non-standard settings
 checkconfigs = {"build", "config-pdf", "config-plain"}
-checkdeps    = { }
+checkdeps    = {}
 checkengines = {"pdftex", "xetex", "luatex", "ptex", "uptex"}
 cleanfiles   = {"*.pdf", "*.tex", "*.zip"}
 installfiles = {"regression-test.tex"}
@@ -17,7 +17,7 @@ scriptfiles  = {"l3build*.lua"}
 scriptmanfiles = {"l3build.1"}
 sourcefiles  = {"*.dtx", "l3build*.lua", "*.ins"}
 typesetcmds  = "\\AtBeginDocument{\\DisableImplementation}"
-unpackdeps   = { }
+unpackdeps   = {}
 tagfiles     = {"l3build.1", "l3build.dtx", "*.md", "l3build.lua"}
 
 uploadconfig = {
@@ -39,7 +39,7 @@ Linux, macOS, and Windows systems. The package offers:
 }
 
 -- Detail how to set the version automatically
-function update_tag(file,content,tagname,tagdate)
+function update_tag(file, content, tagname, tagdate)
   local iso = "%d%d%d%d%-%d%d%-%d%d"
   local url = "https://github.com/latex3/l3build/compare/"
   if string.match(file, "%.1$") then
@@ -51,8 +51,8 @@ function update_tag(file,content,tagname,tagdate)
       "\n%% \\date{Released " .. iso .. "}\n",
       "\n%% \\date{Released " .. tagname .. "}\n")
   elseif string.match(file, "%.md$") then
-    if string.match(file,"CHANGELOG.md") then
-      local previous = string.match(content,"compare/(" .. iso .. ")%.%.%.HEAD")
+    if string.match(file, "CHANGELOG.md") then
+      local previous = string.match(content, "compare/(" .. iso .. ")%.%.%.HEAD")
       if tagname == previous then return content end
       content = string.gsub(content,
         "## %[Unreleased%]",

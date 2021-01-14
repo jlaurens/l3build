@@ -37,20 +37,20 @@ function clean()
 
   if errorlevel ~= 0 then return errorlevel end
 
-  local clean_list = { }
-  for _,dir in pairs(FS.remove_duplicates({maindir,sourcefiledir,docfiledir})) do
+  local clean_list = {}
+  for _,dir in pairs(FS.remove_duplicates({maindir, sourcefiledir, docfiledir})) do
     for _,glob in pairs(cleanfiles) do
-      for file,_ in pairs(FS.tree(dir,glob)) do
+      for file,_ in pairs(FS.tree(dir, glob)) do
         clean_list[file] = true
       end
     end
     for _,glob in pairs(sourcefiles) do
-      for file,_ in pairs(FS.tree(dir,glob)) do
+      for file,_ in pairs(FS.tree(dir, glob)) do
         clean_list[file] = nil
       end
     end
     for file,_ in pairs(clean_list) do
-      errorlevel = FS.rm(dir,file)
+      errorlevel = FS.rm(dir, file)
       if errorlevel ~= 0 then return errorlevel end
     end
   end
@@ -61,11 +61,11 @@ end
 function bundleclean()
   local errorlevel = call(modules, "clean")
   for _,i in ipairs(cleanfiles) do
-    errorlevel = FS.rm(currentdir, i) + errorlevel
+    errorlevel = FS.rm(Vars.currentdir, i) + errorlevel
   end
   return (
     errorlevel     +
-    FS.rmdir(ctandir) +
+    FS.rmdir(Vars.ctandir) +
     FS.rmdir(tdsdir)
   )
 end

@@ -28,15 +28,15 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
-update_tag = update_tag or function(filename,content,tagname,tagdate)
+update_tag = update_tag or function(filename, content, tagname, tagdate)
   return content
 end
 
-function tag_hook(tagname,tagdate)
+function tag_hook(tagname, tagdate)
   return 0
 end
 
-local function update_file_tag(file,tagname,tagdate)
+local function update_file_tag(file, tagname, tagdate)
   local filename = FS.basename(file)
   print("Tagging  ".. filename)
   local f = assert(open(file,"rb"))
@@ -45,7 +45,7 @@ local function update_file_tag(file,tagname,tagdate)
   -- Deal with Unix/Windows line endings
   content = gsub(content .. (match(content,"\n$") and "" or "\n"),
     "\r\n", "\n")
-  local updated_content = update_tag(filename,content,tagname,tagdate)
+  local updated_content = update_tag(filename, content, tagname, tagdate)
   if content == updated_content then
     return 0
   else
@@ -67,11 +67,11 @@ function tag(tagnames)
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = FS.remove_duplicates({currentdir, sourcefiledir, docfiledir})
+  local dirs = FS.remove_duplicates({Vars.currentdir, sourcefiledir, docfiledir})
   local errorlevel = 0
   for _,dir in pairs(dirs) do
     for _,filetype in pairs(tagfiles) do
-      for file,_ in pairs(FS.tree(dir,filetype)) do
+      for file,_ in pairs(FS.tree(dir, filetype)) do
         errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
         if errorlevel ~= 0 then
           return errorlevel
@@ -79,6 +79,6 @@ function tag(tagnames)
       end
     end
   end
-  return tag_hook(tagname,tagdate)
+  return tag_hook(tagname, tagdate)
 end
 
