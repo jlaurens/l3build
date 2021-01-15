@@ -25,21 +25,22 @@ for those people who are interested.
 -- local safe guards
 
 local exit   = os.exit
-local insert = table.insert
-local lfs = assert(#lfs) and lfs
+local lfs = Require(lfs)
 
 -- Global tables
 
-local Opts = assert(#Opts) and Opts
-local Vars = assert(#Vars) and Vars
-local CTAN = assert(#CTAN) and CTAN
+local OS = Require(OS)
+local Args = Require(Args)
+local Opts = Require(Opts)
+local V = Require(Vars)
+local CTAN = Require(CTAN)
 
-local Main = Main or {}
+local Main = Provide(Main)
 
 -- List all modules
 local function listmodules()
   local modules = {}
-  local exclmodules = Vars.exclmodules
+  local exclmodules = V.exclmodules
   for entry in lfs.dir(".") do
     if entry ~= "." and entry ~= ".." then
       local attr = lfs.attributes(entry)
@@ -54,107 +55,92 @@ local function listmodules()
   return modules
 end
 
-Main.target_list =
-  {
-    -- Some hidden targets
-    bundlecheck =
-      {
-        func = check,
-        pre  = function()
-            if Opts.names then
-              print("Bundle checks should not list test names")
-              Main.help()
-              exit(1)
-            end
-            return 0
-          end
-      },
-    bundlectan =
-      {
-        func = bundlectan
-      },
-    bundleunpack =
-      {
-        func = bundleunpack,
-        pre  = function() return(depinstall(unpackdeps)) end
-      },
-    -- Public targets
-    check =
-      {
-        bundle_target = true,
-        desc = "Run all automated tests",
-        func = check,
-      },
-    clean =
-      {
-        bundle_func = bundleclean,
-        desc = "Clean out directory tree",
-        func = clean
-      },
-    ctan =
-      {
-        bundle_func = ctan,
-        desc = "Create CTAN-ready archive",
-        func = ctan
-      },
-    doc =
-      {
-        desc = "Typesets all documentation files",
-        func = doc
-      },
-    install =
-      {
-        desc = "Installs files into the local texmf tree",
-        func = install
-      },
-    manifest =
-      {
-        desc = "Creates a manifest file",
-        func = manifest
-      },
-    save =
-      {
-        desc = "Saves test validation log",
-        func = save
-      },
-    tag =
-      {
-        bundle_func = function(names)
-            local modules = modules or listmodules()
-            local errorlevel = call(modules,"tag")
-            -- Deal with any files in the bundle dir itself
-            if errorlevel == 0 then
-              errorlevel = tag(names)
-            end
-            return errorlevel
-          end,
-        desc = "Updates release tags in files",
-        func = tag,
-        pre  = function(names)
-           if names and #names > 1 then
-             print("Too many tags specified; exactly one required")
-             exit(1)
-           end
-           return 0
-         end
-      },
-    uninstall =
-      {
-        desc = "Uninstalls files from the local texmf tree",
-        func = uninstall
-      },
-    unpack=
-      {
-        bundle_target = true,
-        desc = "Unpacks the source files into the build tree",
-        func = unpack
-      },
-    upload =
-      {
-        desc = "Send archive to CTAN for public release",
-        func = upload
-      },
-  }
+Main.target_list = {
+  -- Some hidden targets
+  bundlecheck = {
+    func = check,
+    pre  = function()
+      if Opts.names then
+        print("Bundle checks should not list test names")
+        Main.help()
+        exit(1)
+      end
+      return 0
+    end
+  },
+  bundlectan = {
+    func = CTAN.bundlectan
+  },
+  bundleunpack = {
+    func = bundleunpack,
+    pre  = function() return(depinstall(unpackdeps)) end
+  },
+  -- Public targets
+  check = {
+    bundle_target = true,
+    desc = "Run all automated tests",
+    func = check,
+  },
+  clean = {
+    bundle_func = bundleclean,
+    desc = "Clean out directory tree",
+    func = clean
+  },
+  ctan = {
+    bundle_func = CTAN.ctan,
+    desc = "Create CTAN-ready archive",
+    func = CTAN.ctan
+  },
+  doc = {
+    desc = "Typesets all documentation files",
+    func = doc
+  },
+  install = {
+    desc = "Installs files into the local texmf tree",
+    func = install
+  },
+  manifest = {
+    desc = "Creates a manifest file",
+    func = manifest
+  },
+  save = {
+    desc = "Saves test validation log",
+    func = save
+  },
+  tag = {
+    bundle_func = function(names)
+      local modules = V.modules or listmodules()
+      local errorlevel = OS.call(modules, "tag")
+      -- Deal with any files in the bundle dir itself
+      if errorlevel == 0 then
+        errorlevel = tag(names)
+      end
+      return errorlevel
+    end,
+    desc = "Updates release tags in files",
+    func = tag,
+    pre  = function(names)
+      if names and #names > 1 then
+        print("Too many tags specified; exactly one required")
+        exit(1)
+      end
+      return 0
+    end
+  },
+  uninstall = {
+    desc = "Uninstalls files from the local texmf tree",
+    func = uninstall
+  },
+  unpack = {
+    bundle_target = true,
+    desc = "Unpacks the source files into the build tree",
+    func = unpack
+  },
+  upload = {
+    desc = "Send archive to CTAN for public release",
+    func = upload
+  },
+}
 
 --
 -- The overall main function
@@ -168,24 +154,24 @@ function Main.stdmain(target, names)
   end
   local errorlevel = 0
   if module == "" then
-    Vars.modules = Vars.modules or listmodules()
-    if target_list[target].bundle_func then
-      errorlevel = target_list[target].bundle_func(names)
+    V.modules = V.modules or listmodules()
+    if Main.target_list[target].bundle_func then
+      errorlevel = Main.target_list[target].bundle_func(names)
     else
       -- Detect all of the modules
-      if target_list[target].bundle_target then
+      if Main.target_list[target].bundle_target then
         target = "bundle" .. target
       end
-      errorlevel = call(Vars.modules, target)
+      errorlevel = call(V.modules, target)
     end
   else
-    if target_list[target].pre then
-     errorlevel = target_list[target].pre(names)
+    if Main.target_list[target].pre then
+     errorlevel = Main.target_list[target].pre(names)
      if errorlevel ~= 0 then
        exit(1)
      end
     end
-    errorlevel = target_list[target].func(names)
+    errorlevel = Main.target_list[target].func(names)
   end
   -- All done, finish up
   if errorlevel ~= 0 then
@@ -195,14 +181,11 @@ function Main.stdmain(target, names)
   end
 end
 
-local insert = table.insert
 local match  = string.match
 local rep    = string.rep
 local sort   = table.sort
 
-local H = {}
-
-H.version = function ()
+Main.version = function ()
   print([[
 l3build: A testing and building system for LaTeX
 
@@ -211,7 +194,7 @@ Copyright (C) 2014-2020 The LaTeX3 Project
 ]])
 end
 
-Main.help = function (arg0, target_list)
+Main.help = function (arg0)
   local function setup_list(list)
     local longest = 0
     for k, _ in pairs(list) do
@@ -229,15 +212,15 @@ Main.help = function (arg0, target_list)
   end
 
   local scriptname = "l3build"
-  if not (match(arg0, "l3build%.lua$") or match(arg0,"l3build$")) then
+  if not (arg0:match("l3build%.lua$") or arg0:match("l3build$")) then
     scriptname = arg0
   end
   print("usage: " .. scriptname .. [[ <target> [<options>] [<names>]
 ]])
   print("Valid targets are:")
-  local longest, t = setup_list(target_list)
-  for _,k in ipairs(t) do
-    local target = target_list[k]
+  local longest, t = setup_list(Main.target_list)
+  for _, k in ipairs(t) do
+    local target = Main.target_list[k]
     local filler = rep(" ", longest - #k + 1)
     if target["desc"] then
       print("   " .. k .. filler .. target["desc"])
@@ -245,9 +228,9 @@ Main.help = function (arg0, target_list)
   end
   print("")
   print("Valid options are:")
-  longest, t = setup_list(A.option_list)
-  for _,k in ipairs(t) do
-    local opt = A.option_list[k]
+  longest, t = setup_list(Args.option_list)
+  for _, k in ipairs(t) do
+    local opt = Args.option_list[k]
     local filler = rep(" ", longest - #k + 1)
     if opt["desc"] then
       if opt["short"] then
@@ -264,6 +247,71 @@ Repository  : https://github.com/latex3/l3build
 Bug tracker : https://github.com/latex3/l3build/issues
 Copyright (C) 2014-2020 The LaTeX3 Project
 ]])
+end
+
+function Main.preflight ()
+  Vars:finalize(Opts)
+    
+  --
+  -- Deal with multiple configs for tests
+  --
+  
+  -- When we have specific files to deal with, only use explicit configs
+  -- (or just the std one)
+  if Opts.names then
+    V.checkconfigs = Opts.config or {stdconfig} -- What is stdconfig?
+  else
+    V.checkconfigs = Opts.config or V.checkconfigs
+  end
+  
+  if Opts.target == "check" then
+    if #V.checkconfigs > 1 then
+      local errorlevel = 0
+      local failed = {}
+      for i = 1, #V.checkconfigs do
+        Opts.config = { V.checkconfigs[i] }
+        errorlevel = OS.call({ "." }, "check", Opts) -- remove the 3rd argument
+        if errorlevel ~= 0 then
+          if Opts["halt-on-error"] then
+            exit(1)
+          else
+            failed[#failed+1] = checkconfigs[i]
+          end
+        end
+      end
+      if #failed > 0 then
+        for _,config in ipairs(failed) do
+          print("Failed tests for configuration " .. config .. ":")
+          print("\n  Check failed with difference files")
+          local testdir = V.testdir
+          if config ~= "build" then
+            V.resultdir = V.resultdir .. "-" .. config
+            testdir = V.testdir .. "-" .. config
+          end
+          for _, i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
+            print("  - " .. V.testdir .. "/" .. i)
+          end
+          print("")
+        end
+        exit(1)
+      else
+        -- Avoid running the 'main' set of tests twice
+        exit(0)
+      end
+    end
+  end
+  local checkconfigs_1 = V.checkconfigs[1]
+  if checkconfigs_1 and checkconfigs_1 ~= "build" and
+     (Opts.target == "check" or Opts.target == "save" or Opts.target == "clean") then
+     local config = "./" .. checkconfigs_1:gsub(".lua$","") .. ".lua"
+     if FS.fileexists(config) then
+       dofile(config)
+       Vars:finalize_one_config(checkconfigs_1, _ENV)
+     else
+       print("Error: Cannot find configuration " ..  checkconfigs_1)
+       exit(1)
+     end
+  end
 end
 
 return Main

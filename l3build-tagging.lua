@@ -69,9 +69,9 @@ function tag(tagnames)
   end
   local dirs = FS.remove_duplicates({Vars.currentdir, sourcefiledir, docfiledir})
   local errorlevel = 0
-  for _,dir in pairs(dirs) do
-    for _,filetype in pairs(tagfiles) do
-      for file,_ in pairs(FS.tree(dir, filetype)) do
+  for _, dir in pairs(dirs) do
+    for _, filetype in pairs(tagfiles) do
+      for file, _ in pairs(FS.tree(dir, filetype)) do
         errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
         if errorlevel ~= 0 then
           return errorlevel

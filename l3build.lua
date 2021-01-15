@@ -29,11 +29,8 @@ release_date = "2020-06-04"
 
 -- Local safe guard
 
-local ipairs           = ipairs
-local insert           = table.insert
 local lookup           = kpse.lookup
 local match            = string.match
-local gsub             = string.gsub
 local print            = print
 local exit             = os.exit
 
@@ -43,8 +40,21 @@ OS = {} -- os related
 FS = {} -- file system related
 Vars = {}
 Args = {}
+Ins = {}
+Chk = {}
 CTAN = {}
+Pack = {}
 Main = {}
+
+-- Main utilities
+
+Require = function (M)
+  return assert(#M) and M
+end
+
+Provide = function (M)
+  return M or {}
+end
 
 -- l3build setup and functions
 kpse.set_program_name("kpsewhich")
@@ -79,10 +89,10 @@ build_require("stdmain")
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
 if Opts.target == "help" then
-  Help.help(arg[0], target_list)
+  Main.help(arg[0])
   exit(0)
 elseif Opts.target == "version" then
-  Help.version()
+  Main.version()
   exit(0)
 end
 
@@ -93,7 +103,10 @@ end
 OS.expose()
 FS.expose()
 
-if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
+local M = Main
+local O = Opts
+
+if arg[0]:match("l3build$") or arg[0]:match("l3build%.lua$") then
   -- Look for some configuration details
   if FS.fileexists("build.lua") then
     dofile("build.lua")
@@ -103,86 +116,6 @@ if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   end
 end
 
-
--- Tidy up the epoch setting
--- Force an epoch if set at the command line
--- Must be done after loading variables, etc.
-if Opts.epoch then
-  epoch           = Opts.epoch
-  forcecheckepoch = true
-  forcedocepoch   = true
-end
-normalise_epoch()
-
--- Sanity check
-A.check_engines(Opts, checkengines)
-
---
--- Deal with multiple configs for tests
---
-
--- When we have specific files to deal with, only use explicit configs
--- (or just the std one)
-if Opts.names then
-  checkconfigs = Opts.config or {stdconfig} -- What is stdconfig?
-else
-  checkconfigs = Opts.config or checkconfigs
-end
-
-if Opts.target == "check" then
-  if #checkconfigs > 1 then
-    local errorlevel = 0
-    local failed = {}
-    for i = 1, #checkconfigs do
-      Opts.config = {checkconfigs[i]}
-      errorlevel = call({"."}, "check", Opts) -- remove the 3rd argument
-      if errorlevel ~= 0 then
-        if Opts["halt-on-error"] then
-          exit(1)
-        else
-          insert(failed, checkconfigs[i])
-        end
-      end
-    end
-    if #failed > 0 then
-      for _,config in ipairs(failed) do
-        print("Failed tests for configuration " .. config .. ":")
-        print("\n  Check failed with difference files")
-        local testdir = testdir
-        if config ~= "build" then
-          resultdir = resultdir .. "-" .. config
-          testdir = testdir .. "-" .. config
-        end
-        for _,i in ipairs(FS.filelist(testdir,"*" .. OS.diffext)) do
-          print("  - " .. testdir .. "/" .. i)
-        end
-        print("")
-      end
-      exit(1)
-    else
-      -- Avoid running the 'main' set of tests twice
-      exit(0)
-    end
-  end
-end
-if #checkconfigs == 1 and
-   checkconfigs[1] ~= "build" and
-   (Opts.target == "check" or Opts.target == "save" or Opts.target == "clean") then
-   local config = "./" .. gsub(checkconfigs[1],".lua$","") .. ".lua"
-   if FS.fileexists(config) then
-     local savedtestfiledir = testfiledir
-     dofile(config)
-     testdir = testdir .. "-" .. checkconfigs[1]
-     -- Reset testsuppdir if required
-     if savedtestfiledir ~= testfiledir and
-       testsuppdir == savedtestfiledir .. "/support" then
-       testsuppdir = testfiledir .. "/support"
-     end
-   else
-     print("Error: Cannot find configuration " ..  checkconfigs[1])
-     exit(1)
-   end
-end
-
 -- Call the main function
-main(Opts.target, Opts.names)
+M.preflight()
+M.main(O.target, O.names)

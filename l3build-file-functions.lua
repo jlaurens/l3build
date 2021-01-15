@@ -151,7 +151,7 @@ end
 -- Copy files 'quietly'
 FS.cp = function (glob, source, dest)
   local errorlevel
-  for i,_ in pairs(FS.tree(source, glob)) do
+  for i, _ in pairs(FS.tree(source, glob)) do
     local source = source .. "/" .. i
     if OS.type == "windows" then
       if attributes(source)["mode"] == "directory" then
@@ -258,7 +258,7 @@ end
 
 -- Remove file(s) based on a glob
 function FS.rm(source, glob)
-  for i,_ in pairs(FS.tree(source, glob)) do
+  for i, _ in pairs(FS.tree(source, glob)) do
     rmfile(source, i)
   end
   -- os.remove doesn't give a sensible errorlevel
@@ -380,7 +380,7 @@ FS.remove_duplicates = function (a)
   local uniq = {}
   local hash = {}
 
-  for _,v in ipairs(a) do
+  for _, v in ipairs(a) do
     if (not hash[v]) then
       hash[v] = true
       uniq[#uniq+1] = v
@@ -412,8 +412,8 @@ end
 
 -- Look for files, directory by directory, and return the first existing
 function FS.locate(dirs, names)
-  for _,i in ipairs(dirs) do
-    for _,j in ipairs(names) do
+  for _, i in ipairs(dirs) do
+    for _, j in ipairs(names) do
       local path = i .. "/" .. j
       if FS.fileexists(path) then
         return path

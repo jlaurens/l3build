@@ -22,7 +22,8 @@ for those people who are interested.
 
 --]]
 
--- Local access to functions
+-- Local safe guards
+
 local open             = io.open
 local close            = io.close
 local write            = io.write
@@ -32,14 +33,9 @@ local rnd              = math.random
 
 local luatex_version   = status.luatex_version
 
-local len              = string.len
 local char             = string.char
 local format           = string.format
-local gmatch           = string.gmatch
-local gsub             = string.gsub
-local match            = string.match
 
-local insert           = table.insert
 local sort             = table.sort
 
 local utf8_char        = unicode.utf8.char
@@ -48,48 +44,58 @@ local exit             = os.exit
 local execute          = os.execute
 local remove           = os.remove
 
+-- Global tables
+
+local OS   = Require(OS)
+local Aux  = Require(Aux)
+local FS   = Require(FS)
+local V    = Require(Vars)
+local Pack = Require(Pack)
+
+-- Module
+
+local Chk = Provide(Chk)
+
 --
 -- Auxiliary functions which are used by more than one main function
 --
 
 -- Set up the check system files: needed for checking one or more tests and
 -- for saving the test files
-function checkinit()
+local function checkinit()
   if not Opts.dirty then
-    FS.cleandir(testdir)
-    FS.cleandir(resultdir)
+    FS.cleandir(V.testdir)
+    FS.cleandir(V.resultdir)
   end
-  depinstall(checkdeps)
+  Aux.depinstall(V.checkdeps)
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for _,i in ipairs(FS.filelist(localdir)) do
-    FS.cp(i, localdir, testdir)
+  for _, i in ipairs(FS.filelist(V.localdir)) do
+    FS.cp(i, V.localdir, V.testdir)
   end
-  bundleunpack({sourcefiledir, testfiledir})
-  for _,i in ipairs(installfiles) do
-    FS.cp(i, unpackdir, testdir)
+  Pack.bundleunpack({ V.sourcefiledir, V.testfiledir })
+  for _, i in ipairs(V.installfiles) do
+    FS.cp(i, V.unpackdir, V.testdir)
   end
-  for _,i in ipairs(checkfiles) do
-    FS.cp(i, unpackdir, testdir)
+  for _, i in ipairs(V.checkfiles) do
+    FS.cp(i, V.unpackdir, V.testdir)
   end
-  if FS.direxists(testsuppdir) then
-    for _,i in ipairs(FS.filelist(testsuppdir)) do
-      FS.cp(i, testsuppdir, testdir)
+  if FS.direxists(V.testsuppdir) then
+    for _, i in ipairs(FS.filelist(V.testsuppdir)) do
+      FS.cp(i, V.testsuppdir, V.testdir)
     end
   end
-  for _,i in ipairs(checksuppfiles) do
-    FS.cp(i, supportdir, testdir)
+  for _, i in ipairs(V.checksuppfiles) do
+    FS.cp(i, V.supportdir, V.testdir)
   end
-  execute(OS.ascii .. ">" .. testdir .. "/ascii.tcx")
-  return checkinit_hook()
+  execute(OS.ascii .. ">" .. V.testdir .. "/ascii.tcx")
+  return V.checkinit_hook()
 end
-
-checkinit_hook = checkinit_hook or function() return 0 end
 
 local function rewrite(source, result, processor, ...)
   local file = assert(open(source,"rb"))
-  local content = gsub(file:read("*all") .. "\n","\r\n","\n")
+  local content = (file:read("a") .. "\n"):gsub("\r\n","\n")
   close(file)
   local new_content = processor(content, ...)
   local newfile = open(result,"w")
@@ -101,90 +107,86 @@ end
 -- Convert the raw log file into one for comparison/storage: keeps only
 -- the 'business' part from the tests and removes system-dependent stuff
 local function normalize_log(content, engine, errlevels)
-  local maxprintline = maxprintline
-  if match(engine,"^lua") or match(engine,"^harf") then
+  local maxprintline = V.maxprintline
+  if engine:match("^lua") or engine:match("^harf") then
     maxprintline = maxprintline + 1 -- Deal with an out-by-one error
   end
   local function killcheck(line)
       -- Skip \openin/\openout lines in web2c 7.x
       -- As Lua doesn't allow "(in|out)", a slightly complex approach:
       -- do a substitution to check the line is exactly what is required!
-    if match(gsub(line, "^\\openin", "\\openout"), "^\\openout%d%d? = ") then
-      return true
-    end
-    return false
+    return line:gsub("^\\openin", "\\openout"):match("^\\openout%d%d? = ")
   end
     -- Substitutions to remove some non-useful changes
   local function normalize(line, lastline, drop_fd)
     if drop_fd then
-      if match(line, " *%)") then
-        return "",""
+      if line:match(" *%)") then
+        return "", ""
       else
-        return "","",true
+        return "", "", true
       end
+    end
+    local function gsub(pattern, repl)
+      line = line:gsub(pattern, repl)
     end
     -- Zap line numbers from \show, \showbox, \box_show and the like:
     -- do this before wrapping lines
-    line = gsub(line, "^l%.%d+ ", "l. ...")
+    gsub("^l%.%d+ ", "l. ...")
     -- Also from lua stack traces.
-    line = gsub(line, "lua:%d+: in function", "lua:...: in function")
+    gsub("lua:%d+: in function", "lua:...: in function")
     -- Allow for wrapped lines: preserve the content and wrap
     -- Skip lines that have an explicit marker for truncation
-    if len(line) == maxprintline  and
-       not match(line, "%.%.%.$") then
+    if #line == maxprintline  and not line:match("%.%.%.$") then
       return "", (lastline or "") .. line
     end
     local line = (lastline or "") .. line
     lastline = ""
     -- Zap ./ at begin of filename
-    line = gsub(line, "%(%.%/", "(")
+    gsub("%(%.%/", "(")
     -- Zap paths
     -- The pattern excludes < and > as the image part can have
     -- several entries on one line
     local pattern = "%w?:?/[^ %<%>]*/([^/%(%)]*%.%w*)"
     -- Files loaded from TeX: all start ( -- )
-    line = gsub(line, "%(" .. pattern, "(../%1")
+    gsub("%(" .. pattern, "(../%1")
     -- Images
-    line = gsub(line, "<" .. pattern .. ">", "<../%1>")
+    gsub("<" .. pattern .. ">", "<../%1>")
     -- luaotfload files start with keywords
-    line = gsub(line, "from " .. pattern .. "%(", "from. ./%1(")
-    line = gsub(line, ": " .. pattern .. "%)", ": ../%1)")
+    gsub("from " .. pattern .. "%(", "from. ./%1(")
+    gsub(": " .. pattern .. "%)", ": ../%1)")
     -- Deal with XeTeX specials
-    if match(line, "^%.+\\XeTeX.?.?.?file") then
-      line = gsub(line, pattern, "../%1")
+    if line:match("^%.+\\XeTeX.?.?.?file") then
+      gsub(pattern, "../%1")
     end
     -- Deal with dates
-    if match(line, "[^<]%d%d%d%d[/%-]%d%d[/%-]%d%d") then
-        line = gsub(line,"%d%d%d%d[/%-]%d%d[/%-]%d%d","....-..-..")
-        line = gsub(line,"v%d+%.?%d?%d?%w?","v...")
+    if line:match("[^<]%d%d%d%d[/%-]%d%d[/%-]%d%d") then
+        gsub("%d%d%d%d[/%-]%d%d[/%-]%d%d","....-..-..")
+        gsub("v%d+%.?%d?%d?%w?","v...")
     end
     -- Deal with leading spaces for file and page number lines
-    line = gsub(line, "^ *%[(%d)","[%1")
-    line = gsub(line,"^ *%(","(")
+    gsub("^ *%[(%d)", "[%1")
+    gsub("^ *%(", "(")
     -- Zap .fd lines: drop the first part, and skip to the end
-    if match(line, "^ *%([%.%/%w]+%.fd[^%)]*$") then
-      return "","",true
+    if line:match("^ *%([%.%/%w]+%.fd[^%)]*$") then
+      return "", "", true
     end
     -- TeX90/XeTeX knows only the smaller set of dimension units
-    line = gsub(line,
-      "cm, mm, dd, cc, bp, or sp",
-      "cm, mm, dd, cc, nd, nc, bp, or sp")
+    gsub("cm, mm, dd, cc, bp, or sp",
+         "cm, mm, dd, cc, nd, nc, bp, or sp")
     -- On the other hand, (u)pTeX has some new units!
-    line = gsub(line,
-      "em, ex, zw, zh, in, pt, pc,",
-      "em, ex, in, pt, pc,")
-    line = gsub(line,
-      "cm, mm, dd, cc, bp, H, Q, or sp;",
-      "cm, mm, dd, cc, nd, nc, bp, or sp;")
+    gsub("em, ex, zw, zh, in, pt, pc,",
+         "em, ex, in, pt, pc,")
+    gsub("cm, mm, dd, cc, bp, H, Q, or sp;",
+         "cm, mm, dd, cc, nd, nc, bp, or sp;")
     -- Normalise a case where fixing a TeX bug changes the message text
-    line = gsub(line, "\\csname\\endcsname ", "\\csname\\endcsname")
+    gsub("\\csname\\endcsname ", "\\csname\\endcsname")
     -- Zap "on line <num>" and replace with "on line ..."
     -- Two similar cases, Lua patterns mean we need to do them separately
-    line = gsub(line, "on line %d*", "on line ...")
-    line = gsub(line, "on input line %d*", "on input line ...")
+    gsub("on line %d*", "on line ...")
+    gsub("on input line %d*", "on input line ...")
     -- Tidy up to ^^ notation
     for i = 0, 31 do
-      line = gsub(line, char(i), "^^" .. char(64 + i))
+      gsub(char(i), "^^" .. char(64 + i))
     end
     -- Normalise register allocation to hard-coded numbers
     -- No regex, so use a pattern plus lookup approach
@@ -209,67 +211,67 @@ local function normalize_log(content, engine, errlevels)
         write          = true,
         XeTeXcharclass = true
       }
-    if register_types[match(line, "^\\[^%]]+=\\([a-z]+)%d+$")] then
-      line = gsub(line, "%d+$", "...")
+    if register_types[line:match("^\\[^%]]+=\\([a-z]+)%d+$")] then
+      gsub("%d+$", "...")
     end
     -- Also deal with showing boxes
-    if match(line, "^> \\box%d+=$") or match(line, "^> \\box%d+=(void)$") then
-      line = gsub(line, "%d+=", "...=")
+    if line:match("^> \\box%d+=$") or line:match("^> \\box%d+=(void)$") then
+      gsub("%d+=", "...=")
     end
-    if not match(stdengine,"^e?u?ptex$") then
+    if not V.stdengine:match("^e?u?ptex$") then
       -- Remove 'normal' direction information on boxes with (u)pTeX
-      line = gsub(line, ",? yoko direction,?", "")
-      line = gsub(line, ",? yoko%(math%) direction,?", "")
+      gsub(",? yoko direction,?", "")
+      gsub(",? yoko%(math%) direction,?", "")
       -- Remove '\displace 0.0' lines in (u)pTeX
-      if match(line,"^%.*\\displace 0%.0$") then
+      if line:match("^%.*\\displace 0%.0$") then
         return ""
        end
      end
     -- Deal with Lua function calls
-    if match(line, "^Lua function") then
-      line = gsub(line,"= %d+$","= ...")
+    if line:match("^Lua function") then
+      gsub("= %d+$", "= ...")
     end
      -- Remove the \special line that in DVI mode keeps PDFs comparable
-    if match(line, "^%.*\\special%{pdf: docinfo << /Creator") or
-      match(line, "^%.*\\special%{ps: /setdistillerparams") or
-      match(line, "^%.*\\special%{! <</........UUID") then
+    if line:match("^%.*\\special%{pdf: docinfo << /Creator") or
+       line:match("^%.*\\special%{ps: /setdistillerparams") or
+       line:match("^%.*\\special%{! <</........UUID") then
       return ""
     end
      -- Remove \special lines for DVI .pro files
-    if match(line, "^%.*\\special%{header=") then
+    if line:match("^%.*\\special%{header=") then
       return ""
     end
-    if match(line, "^%.*\\special%{dvipdfmx:config") then
+    if line:match("^%.*\\special%{dvipdfmx:config") then
       return ""
     end
     -- Remove the \special line possibly present in DVI mode for paper size
-    if match(line, "^%.*\\special%{papersize") then
+    if line:match("^%.*\\special%{papersize") then
       return ""
     end
     -- Remove ConTeXt stuff
-    if match(line, "^backend         >") or
-       match(line, "^close source    >") or
-       match(line, "^mkiv lua stats  >") or
-       match(line, "^pages           >") or
-       match(line, "^system          >") or
-       match(line, "^used file       >") or
-       match(line, "^used option     >") or
-       match(line, "^used structure  >") then
+    if line:match("^backend         >") or
+       line:match("^close source    >") or
+       line:match("^mkiv lua stats  >") or
+       line:match("^pages           >") or
+       line:match("^system          >") or
+       line:match("^used file       >") or
+       line:match("^used option     >") or
+       line:match("^used structure  >") then
        return ""
     end
     -- The first time a new font is used by LuaTeX, it shows up
     -- as being cached: make it appear loaded every time
-    line = gsub(line, "save cache:", "load cache:")
+    gsub("save cache:", "load cache:")
     -- A tidy-up to keep LuaTeX and other engines in sync
-    line = gsub(line, utf8_char(127), "^^?")
+    gsub(utf8_char(127), "^^?")
     -- Remove lua data reference ids
-    line = gsub(line, "<lua data reference [0-9]+>",
-                      "<lua data reference ...>")
+    gsub("<lua data reference [0-9]+>",
+         "<lua data reference ...>")
     -- Unicode engines display chars in the upper half of the 8-bit range:
     -- tidy up to match pdfTeX if an ASCII engine is in use
-    if next(asciiengines) then
+    if V.asciiengines[1] then
       for i = 128, 255 do
-        line = gsub(line, utf8_char(i), "^^" .. format("%02x", i))
+        gsub(utf8_char(i), "^^" .. format("%02x", i))
       end
     end
     return line, lastline
@@ -279,26 +281,26 @@ local function normalize_log(content, engine, errlevels)
   local new_content = ""
   local prestart = true
   local skipping = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     if line == "START-TEST-LOG" then
       prestart = false
     elseif line == "END-TEST-LOG" or
-      match(line, "^Here is how much of .?.?.?TeX\'s memory you used:") then
+      line:match("^Here is how much of .?.?.?TeX\'s memory you used:") then
       break
     elseif line == "OMIT" then
       skipping = true
-    elseif match(line, "^%)?TIMO$") then
+    elseif line:match("^%)?TIMO$") then
       skipping = false
     elseif not prestart and not skipping then
       line, lastline, drop_fd = normalize(line, lastline, drop_fd)
-      if not match(line, "^ *$") and not killcheck(line) then
+      if not line:match("^ *$") and not killcheck(line) then
         new_content = new_content .. line .. OS.newline
       end
     end
   end
-  if recordstatus then
+  if V.recordstatus then
     new_content = new_content .. '***************' .. OS.newline
-    for i = 1, checkruns do
+    for i = 1, V.checkruns do
       if (errlevels[i]==nil) then
         new_content = new_content ..
           'Compilation ' .. i .. ' of test file skipped ' .. OS.newline
@@ -317,103 +319,101 @@ local function normalize_lua_log(content, luatex)
   local function normalize(line, lastline, dropping)
     -- Find \discretionary or \whatsit lines:
     -- These may come back later
-    if match(line, "^%.+\\discretionary$")                or
-       match(line, "^%.+\\discretionary %(penalty 50%)$") or
-       match(line, "^%.+\\discretionary50%|$")            or
-       match(line, "^%.+\\discretionary50%| replacing $") or
-       match(line, "^%.+\\whatsit$")                      then
+    if line:match("^%.+\\discretionary$")                or
+       line:match("^%.+\\discretionary %(penalty 50%)$") or
+       line:match("^%.+\\discretionary50%|$")            or
+       line:match("^%.+\\discretionary50%| replacing $") or
+       line:match("^%.+\\whatsit$")                      then
       return "", line
     end
     -- For \mathon, we always need this line but the next
     -- may be affected
-    if match(line, "^%.+\\mathon$") then
+    if line:match("^%.+\\mathon$") then
       return line, line
     end
+    local function gsub(pattern, repl)
+      line = line:gsub(pattern, repl)
+    end
     -- LuaTeX has a flexible output box
-    line = gsub(line,"\\box\\outputbox", "\\box255")
+    gsub("\\box\\outputbox", "\\box255")
     -- LuaTeX identifies spaceskip glue
-    line = gsub(line, "%(\\spaceskip%) ", " ")
+    gsub("%(\\spaceskip%) ", " ")
     -- Remove 'display' at end of display math boxes:
     -- LuaTeX omits this as it includes direction in all cases
-    line = gsub(line, "(\\hbox%(.*), display$", "%1")
+    gsub("(\\hbox%(.*), display$", "%1")
     -- Remove 'normal' direction information on boxes:
     -- any bidi/vertical stuff will still show
-    line = gsub(line, ", direction TLT", "")
+    gsub(", direction TLT", "")
     -- Find glue setting and round out the last place
     local function round_digits(l, m)
-      return gsub(
-        l,
+      return l:gsub(
         m .. " (%-?)%d+%.%d+",
         m .. " %1"
           .. format(
             "%.3f",
-            match(line, m .. " %-?(%d+%.%d+)") or 0
+            line:match(m .. " %-?(%d+%.%d+)") or 0
           )
       )
     end
-    if match(line, "glue set %-?%d+%.%d+") then
+    if line:match("glue set %-?%d+%.%d+") then
       line = round_digits(line, "glue set")
     end
-    if match(
-        line, "glue %-?%d+%.%d+ plus %-?%d+%.%d+ minus %-?%d+%.%d+$"
-      )
-      then
+    if line:match(
+        "glue %-?%d+%.%d+ plus %-?%d+%.%d+ minus %-?%d+%.%d+$"
+      ) then
       line = round_digits(line, "glue")
       line = round_digits(line, "plus")
       line = round_digits(line, "minus")
     end
     -- LuaTeX writes ^^M as a new line, which we lose
-    line = gsub(line, "%^%^M", "")
+    gsub("%^%^M", "")
     -- Remove U+ notation in the "Missing character" message
-    line = gsub(
-        line,
-        "Missing character: There is no (%^%^..) %(U%+(....)%)",
-        "Missing character: There is no %1"
-      )
+    gsub( "Missing character: There is no (%^%^..) %(U%+(....)%)",
+          "Missing character: There is no %1")
     -- LuaTeX from v1.07 logs kerns differently ...
     -- This block only applies to the output of LuaTeX itself,
     -- hence needing a flag to skip the case of the reference log
     if luatex and
        tonumber(luatex_version) >= 107 and
-       match(line, "^%.*\\kern") then
+       line:match("^%.*\\kern") then
        -- Re-insert the space in explicit kerns
-       if match(line, "kern%-?%d+%.%d+ *$") then
-         line = gsub(line, "kern", "kern ")
-       elseif match(line, "%(accent%)$") then
-         line = gsub(line, "kern", "kern ")
-         line = gsub(line, "%(accent%)$", "(for accent)")
-       elseif match(line, "%(italic%)$") then
-         line = gsub(line, "kern", "kern ")
-         line = gsub(line, " %(italic%)$", "")
+       if line:match("kern%-?%d+%.%d+ *$") then
+         gsub("kern", "kern ")
+       elseif line:match("%(accent%)$") then
+         gsub("kern", "kern ")
+         gsub("%(accent%)$", "(for accent)")
+       elseif line:match("%(italic%)$") then
+         gsub("kern", "kern ")
+         gsub(" %(italic%)$", "")
        else
-         line = gsub(line, " %(font%)$", "")
+         gsub(" %(font%)$", "")
        end
     end
     -- Changes in PDF specials
-    line = gsub(line, "\\pdfliteral origin", "\\pdfliteral")
+    gsub("\\pdfliteral origin", "\\pdfliteral")
     -- A function to handle the box prefix part
     local function boxprefix(s)
-      return gsub(match(s, "^(%.+)"), "%.", "%%.")
+      return s:match("^(%.+)"):gsub("%.", "%%.")
     end
     -- 'Recover' some discretionary data
-    if match(lastline, "^%.+\\discretionary %(penalty 50%)$") and
-       match(line, boxprefix(lastline) .. "%.= ") then
-       line = gsub(line, " %(font%)$","")
-       return gsub(line, "%.= ", ""),""
+    if lastline:match("^%.+\\discretionary %(penalty 50%)$") and
+       line:match(boxprefix(lastline) .. "%.= ") then
+       gsub(" %(font%)$", "")
+       return line:gsub("%.= ", ""), ""
     end
     -- Where the last line was a discretionary, looks for the
     -- info one level in about what it represents
-    if match(lastline, "^%.+\\discretionary$")                or
-       match(lastline, "^%.+\\discretionary %(penalty 50%)$") or
-       match(lastline, "^%.+\\discretionary50%|$")            or
-       match(lastline, "^%.+\\discretionary50%| replacing $") then
+    if lastline:match("^%.+\\discretionary$")                or
+       lastline:match("^%.+\\discretionary %(penalty 50%)$") or
+       lastline:match("^%.+\\discretionary50%|$")            or
+       lastline:match("^%.+\\discretionary50%| replacing $") then
       local prefix = boxprefix(lastline)
-      if match(line, prefix .. "%.") or
-         match(line, prefix .. "%|") then
-         if match(lastline, " replacing $") and
+      if line:match(prefix .. "%.") or
+         line:match(prefix .. "%|") then
+         if lastline:match(" replacing $") and
             not dropping then
            -- Modify the return line
-           return gsub(line, "^%.", ""), lastline, true
+           return line:gsub("^%.", ""), lastline, true
          else
            return "", lastline, true
          end
@@ -423,11 +423,11 @@ local function normalize_lua_log(content, luatex)
           return line, ""
         else
           -- Not quite a normal discretionary
-          if match(lastline, "^%.+\\discretionary50%|$") then
-            lastline =  gsub(lastline, "50%|$", "")
+          if lastline:match("^%.+\\discretionary50%|$") then
+            lastline = lastline:gsub("50%|$", "")
           end
           -- Remove some info that TeX90 lacks
-          lastline = gsub(lastline, " %(penalty 50%)$", "")
+          lastline = lastline:gsub(" %(penalty 50%)$", "")
           -- A normal (TeX90) discretionary:
           -- add with the line break reintroduced
           return lastline .. OS.newline .. line, ""
@@ -435,14 +435,14 @@ local function normalize_lua_log(content, luatex)
       end
     end
     -- Look for another form of \discretionary, replacing a "-"
-    pattern = "^%.+\\discretionary replacing *$"
-    if match(line, pattern) then
+    local pattern = "^%.+\\discretionary replacing *$"
+    if line:match(pattern) then
       return "", line
     else
-      if match(lastline, pattern) then
+      if lastline:match(pattern) then
         local prefix = boxprefix(lastline)
-        if match(line, prefix .. "%.\\kern") then
-          return gsub(line, "^%.", ""), lastline, true
+        if line:match(prefix .. "%.\\kern") then
+          return line:gsub("^%.", ""), lastline, true
         elseif dropping then
           return "", ""
         else
@@ -452,26 +452,26 @@ local function normalize_lua_log(content, luatex)
     end
     -- For \mathon, if the current line is an empty \hbox then
     -- drop it
-    if match(lastline, "^%.+\\mathon$") then
+    if lastline:match("^%.+\\mathon$") then
       local prefix = boxprefix(lastline)
-      if match(line, prefix .. "\\hbox%(0%.0%+0%.0%)x0%.0$") then
+      if line:match(prefix .. "\\hbox%(0%.0%+0%.0%)x0%.0$") then
         return "", ""
       end
     end
     -- Various \local... things that other engines do not do:
     -- Only remove the no-op versions
-    if match(line, "^%.+\\localpar$")                or
-       match(line, "^%.+\\localinterlinepenalty=0$") or
-       match(line, "^%.+\\localbrokenpenalty=0$")    or
-       match(line, "^%.+\\localleftbox=null$")       or
-       match(line, "^%.+\\localrightbox=null$")      then
+    if line:match("^%.+\\localpar$")                or
+       line:match("^%.+\\localinterlinepenalty=0$") or
+       line:match("^%.+\\localbrokenpenalty=0$")    or
+       line:match("^%.+\\localleftbox=null$")       or
+       line:match("^%.+\\localrightbox=null$")      then
        return "", ""
     end
     -- Older LuaTeX versions set the above up as a whatsit
     -- (at some stage this can therefore go)
-    if match(lastline, "^%.+\\whatsit$") then
+    if lastline:match("^%.+\\whatsit$") then
       local prefix = boxprefix(lastline)
-      if match(line, prefix .. "%.") then
+      if line:match(prefix .. "%.") then
         return "", lastline, true
       else
         -- End of a \whatsit block
@@ -481,33 +481,33 @@ local function normalize_lua_log(content, luatex)
     -- Wrap some cases that can be picked out
     -- In some places LuaTeX does use max_print_line, then we
     -- get into issues with different wrapping approaches
-    if len(line) == maxprintline then
+    if #line == V.maxprintline then
       return "", lastline .. line
-    elseif len(lastline) == maxprintline then
-      if match(line, "\\ETC%.%}$") then
+    elseif #lastline == V.maxprintline then
+      if line:match("\\ETC%.%}$") then
         -- If the line wrapped at \ETC we might have lost a space
         return lastline
-          .. ((match(line, "^\\ETC%.%}$") and " ") or "")
+          .. ((line:match("^\\ETC%.%}$") and " ") or "")
           .. line, ""
-      elseif match(line, "^%}%}%}$") then
+      elseif line:match("^%}%}%}$") then
         return lastline .. line, ""
       else
         return lastline .. OS.newline .. line, ""
       end
     -- Return all of the text for a wrapped (multi)line
-    elseif len(lastline) > maxprintline then
+    elseif #lastline > V.maxprintline then
       return lastline .. line, ""
     end
     -- Remove spaces at the start of lines: deals with the fact that LuaTeX
     -- uses a different number to the other engines
-    return gsub(line, "^%s+", ""), ""
+    return line:gsub("^%s+", ""), ""
   end
   local new_content = ""
   local lastline = ""
   local dropping = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     line, lastline, dropping = normalize(line, lastline, dropping)
-    if not match(line, "^ *$") then
+    if not line:match("^ *$") then
       new_content = new_content .. line .. OS.newline
     end
   end
@@ -519,9 +519,9 @@ local function normalize_pdf(content)
   local stream_content = ""
   local binary = false
   local stream = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     if stream then
-      if match(line,"endstream") then
+      if line:match("endstream") then
         stream = false
         if binary then
           new_content = new_content .. "[BINARY STREAM]" .. OS.newline
@@ -531,146 +531,101 @@ local function normalize_pdf(content)
         binary = false
       else
         for i = 0, 31 do
-          if match(line, char(i)) then
+          if line:match(char(i)) then
             binary = true
             break
           end
         end
-        if not binary and not match(line, "^ *$") then
+        if not binary and not line:match("^ *$") then
           stream_content = stream_content .. line .. OS.newline
         end
       end
-    elseif match(line,"^stream$") then
+    elseif line:match("^stream$") then
       binary = false
       stream = true
       stream_content = "stream" .. OS.newline
-    elseif not match(line, "^ *$") and
-      not match(line,"^%%%%Invocation") and 
-      not match(line,"^%%%%%+") then
-      line = gsub(line, "%/ID( ?)%[<[^>]+><[^>]+>]","/ID%1[<ID-STRING><ID-STRING>]")
+    elseif not line:match("^ *$") and
+      not line:match("^%%%%Invocation") and 
+      not line:match("^%%%%%+") then
+      line = line:gsub("%/ID( ?)%[<[^>]+><[^>]+>]",
+                       "/ID%1[<ID-STRING><ID-STRING>]")
       new_content = new_content .. line .. OS.newline
     end
   end
   return new_content
 end
 
--- Run one test which may have multiple engine-dependent comparisons
--- Should create a difference file for each failed test
-function runcheck(name, hide)
-  if not testexists(name) then
-    print("Failed to find input for test " .. name)
-    return 1
-  end
-  local checkengines = checkengines
-  if Opts.engine then
-    checkengines = Opts.engine
-  end
-  -- Used for both .lvt and .pvt tests
-  local function check_and_diff(ext, engine, comp, pdftest)
-    runtest(name, engine, hide, ext, pdftest, true)
-    local errorlevel = comp(name, engine)
-    if errorlevel == 0 then
-      return errorlevel
-    end
-    if Opts["show-log-on-error"] then
-      showfailedlog(name)
-    end
-    if Opts["halt-on-error"] then
-      showfaileddiff()
-    end
-    return errorlevel
-  end
-  local errorlevel = 0
-  for _,engine in pairs(checkengines) do
-    setup_check(name, engine)
-    local errlevel = 0
-    if FS.fileexists(testfiledir .. "/" .. name .. pvtext) then
-      errlevel = check_and_diff(pvtext, engine, compare_pdf, true)
-    else
-      errlevel = check_and_diff(lvtext, engine, compare_tlg)
-    end
-    if errlevel ~= 0 and Opts["halt-on-error"] then
-      return 1
-    end
-    if errlevel > errorlevel then
-      errorlevel = errlevel
-    end
-  end
-  -- Return everything
-  return errorlevel
+-- Look for a test: could be in the testfiledir or the unpackdir
+local function testexists(test)
+  return(FS.locate( { V.testfiledir, V.unpackdir },
+                    { test .. V.lvtext, test .. V.pvtext }))
 end
 
-function setup_check(name, engine)
-  local testname = name .. "." .. engine
-  local tlgfile = FS.locate(
-    {testfiledir, unpackdir},
-    {testname .. tlgext, name .. tlgext}
-  )
-  local tpffile = FS.locate(
-    {testfiledir, unpackdir},
-    {testname .. tpfext, name .. tpfext}
-  )
-  -- Attempt to generate missing reference file from expectation
-  if not (tlgfile or tpffile) then
-    if not FS.locate({unpackdir, testfiledir}, {name .. lveext}) then
-      print(
-        "Error: failed to find " .. tlgext .. ", " .. tpfext .. " or "
-          .. lveext .. " file for " .. name .. "!"
-      )
-      exit(1)
-    end
-    runtest(name, engine, true, lveext)
-    FS.ren(testdir, testname .. logext, testname .. tlgext)
-  else
-    -- Install comparison files found
-    for _,v in pairs({tlgfile, tpffile}) do
-      if v then
-        FS.cp(
-          match(v, ".*/(.*)"),
-          match(v, "(.*)/.*"),
-          testdir
-        )
-      end
-    end
+local function showfailedlog(name, testdir)
+  print("\nCheck failed with log file")
+  for _, i in ipairs(FS.filelist(testdir, name..".log")) do
+    print("  - " .. testdir .. "/" .. i)
+    print("")
+    local f = open(testdir .. "/" .. i,"r")
+    local content = f:read("*all")
+    close(f)
+    print("-----------------------------------------------------------------------------------")
+    print(content)
+    print("-----------------------------------------------------------------------------------")
   end
 end
 
-function compare_pdf(name, engine, cleanup)
+local function showfaileddiff(testdir)
+  print("\nCheck failed with difference file")
+  for _, i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
+    print("  - " .. testdir .. "/" .. i)
+    print("")
+    local f = open(testdir .. "/" .. i,"r")
+    local content = f:read("*all")
+    close(f)
+    print("-----------------------------------------------------------------------------------")
+    print(content)
+    print("-----------------------------------------------------------------------------------")
+  end
+end
+
+local function compare_pdf(name, engine, cleanup)
   local testname = name .. "." .. engine
-  local difffile = testdir .. "/" .. testname .. pdfext .. OS.diffext
-  local pdffile  = testdir .. "/" .. testname .. pdfext
-  local tpffile  = FS.locate({testdir}, {testname .. tpfext, name .. tpfext})
-  if not tpffile then
+  local diff_p = V.testdir .. "/" .. testname .. V.pdfext .. OS.diffext
+  local pdf_p  = V.testdir .. "/" .. testname .. V.pdfext
+  local tpf_p  = FS.locate( { V.testdir },
+                            { testname .. V.tpfext, name .. V.tpfext })
+  if not tpf_p then
     return 1
   end
   local errorlevel = execute(OS.diffexe .. " "
-    .. FS.normalize_path(tpffile .. " " .. pdffile .. " > " .. difffile))
+    .. FS.normalize_path(tpf_p .. " " .. pdf_p .. " > " .. diff_p))
   if errorlevel == 0 or cleanup then
-    remove(difffile)
+    remove(diff_p)
   end
   return errorlevel
 end
 
-function compare_tlg(name, engine, cleanup)
+local function compare_tlg(name, engine, cleanup)
   local errorlevel
   local testname = name .. "." .. engine
-  local difffile = testdir .. "/" .. testname .. OS.diffext
-  local logfile  = testdir .. "/" .. testname .. logext
-  local tlgfile  = FS.locate({testdir}, {testname .. tlgext, name .. tlgext})
+  local difffile = V.testdir .. "/" .. testname .. OS.diffext
+  local logfile  = V.testdir .. "/" .. testname .. V.logext
+  local tlgfile  = FS.locate({testdir}, {testname .. V.tlgext, name .. V.tlgext})
   if not tlgfile then
     return 1
   end
   -- Do additional log formatting if the engine is LuaTeX, there is no
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
-  if (match(engine,"^lua") or match(engine,"^harf"))
-    and not match(tlgfile, "%.luatex" .. "%" .. tlgext)
-    and not match(stdengine,"^lua")
+  if (engine:match("^lua") or engine:match("^harf"))
+    and not tlgfile:match("%.luatex" .. "%" .. V.tlgext)
+    and not V.stdengine:match("^lua")
     then
     local lualogfile = logfile
     if cleanup then
-      lualogfile = testdir .. "/" .. testname .. ".tmp" .. logext
+      lualogfile = testdir .. "/" .. testname .. ".tmp" .. V.logext
     end
-    local luatlgfile = testdir .. "/" .. testname .. tlgext
+    local luatlgfile = testdir .. "/" .. testname .. V.tlgext
     rewrite(tlgfile, luatlgfile, normalize_lua_log)
     rewrite(logfile, lualogfile, normalize_lua_log, true)
     errorlevel = execute(OS.diffexe .. " "
@@ -691,19 +646,18 @@ end
 
 -- Run one of the test files: doesn't check the result so suitable for
 -- both creating and verifying
-function runtest(name, engine, hide, ext, pdfmode, breakout)
-  local lvtfile = name .. (ext or lvtext)
-  FS.cp(lvtfile, FS.fileexists(testfiledir .. "/" .. lvtfile)
-    and testfiledir or unpackdir, testdir)
-  local checkopts = checkopts
-  local engine = engine or stdengine
+local function runtest(name, engine, hide, ext, pdfmode, breakout)
+  local lvt_p = name .. (ext or V.lvtext)
+  FS.cp(lvt_p, FS.fileexists(V.testfiledir .. "/" .. lvt_p)
+    and V.testfiledir or V.unpackdir, V.testdir)
+  local checkopts = V.checkopts
+  local engine = engine or V.stdengine
   local binary = engine
-  local format = gsub(engine,"tex$",checkformat)
+  local format = engine:gsub("tex$", V.checkformat)
   -- Special binary/format combos
-  if specialformats[checkformat] and next(specialformats[checkformat]) then
-    local t = specialformats[checkformat]
-    if t[engine] and next(t[engine]) then
-      local t = t[engine]
+  if V.specialformats[V.checkformat] then
+    local t = V.specialformats[V.checkformat][engine]
+    if t and t[1] then
       binary    = t.binary  or binary
       checkopts = t.options or checkopts
       format    = t.format  or format
@@ -714,49 +668,49 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
     format = " --fmt=" .. format
   end
   -- Special casing for XeTeX engine
-  if match(engine, "xetex") and not pdfmode then
+  if engine:match("xetex") and not pdfmode then
     checkopts = checkopts .. " -no-pdf"
   end
   -- Special casing for ConTeXt
   local function setup(file)
     return " -jobname=" .. name .. " " .. ' "\\input ' .. file .. '" '
   end
-  if match(checkformat,"^context$") then
-    function setup(file) return ' "' .. file .. '" '  end
+  if V.checkformat:match("^context$") then
+    setup = function (file) return ' "' .. file .. '" '  end
   end
-  local basename = testdir .. "/" .. name
-  local logfile = basename .. logext
-  local newfile = basename .. "." .. engine .. logext
-  local pdffile = basename .. pdfext
-  local npffile = basename .. "." .. engine .. pdfext
+  local basename = V.testdir .. "/" .. name
+  local log_p = basename .. V.logext
+  local new_p = basename .. "." .. engine .. V.logext
+  local pdf_p = basename .. V.pdfext
+  local npf_p = basename .. "." .. engine .. V.pdfext
   local asciiopt = ""
-  for _,i in ipairs(asciiengines) do
+  for _, i in ipairs(V.asciiengines) do
     if binary == i then
       asciiopt = "-translate-file ./ascii.tcx "
       break
     end
   end
   -- Clean out any dynamic files
-  for _,filetype in pairs(dynamicfiles) do
+  for _, filetype in pairs(V.dynamicfiles) do
     FS.rm(testdir, filetype)
   end
   -- Ensure there is no stray .log file
-  FS.rm(testdir, name .. logext)
+  FS.rm(testdir, name .. V.logext)
   local errlevels = {}
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and FS.direxists(texmfdir) then
-    localtexmf = OS.pathsep .. FS.abspath(texmfdir) .. "//"
+  if V.texmfdir and V.texmfdir ~= "" and FS.direxists(V.texmfdir) then
+    localtexmf = OS.pathsep .. FS.abspath(V.texmfdir) .. "//"
   end
-  for i = 1, checkruns do
+  for i = 1, V.checkruns do
     errlevels[i] = OS.run(
       testdir,
       -- No use of localdir here as the files get copied to testdir:
       -- avoids any paths in the logs
       OS.setenv .. " TEXINPUTS=." .. localtexmf
-        .. (checksearch and OS.pathsep or "")
+        .. (V.checksearch and OS.pathsep or "")
         .. OS.concat ..
       OS.setenv .. " LUAINPUTS=." .. localtexmf
-        .. (checksearch and OS.pathsep or "")
+        .. (V.checksearch and OS.pathsep or "")
         .. OS.concat ..
       -- Avoid spurious output from (u)pTeX
       OS.setenv .. " GUESS_INPUT_KANJI_ENCODING=0"
@@ -764,55 +718,55 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
       -- Allow for local texmf files
       OS.setenv .. " TEXMFCNF=." .. OS.pathsep
         .. OS.concat ..
-      (forcecheckepoch and setepoch() or "") ..
+      (V.forcecheckepoch and setepoch() or "") ..
       -- Ensure lines are of a known length
-      OS.setenv .. " max_print_line=" .. maxprintline
+      OS.setenv .. " max_print_line=" .. V.maxprintline
         .. OS.concat ..
       binary .. format
         .. " " .. asciiopt .. " " .. checkopts
-        .. setup(lvtfile)
+        .. setup(lvt_p)
         .. (hide and (" > " .. OS.null) or "")
         .. OS.concat ..
-      runtest_tasks(FS.jobname(lvtfile), i)
+      runtest_tasks(FS.jobname(lvt_p), i)
     )
     -- Break the loop if the result is stable
-    if breakout and i < checkruns then
+    if breakout and i < V.checkruns then
       if pdfmode then
-        if FS.fileexists(testdir .. "/" .. name .. dviext) then
-          dvitopdf(name, testdir, engine, hide)
+        if FS.fileexists(V.testdir .. "/" .. name .. V.dviext) then
+          dvitopdf(name, V.testdir, engine, hide)
         end
-        rewrite(pdffile, npffile, normalize_pdf)
+        rewrite(pdf_p, npf_p, normalize_pdf)
         if compare_pdf(name, engine, true) == 0 then
           break
         end
       else
-        rewrite(logfile, newfile, normalize_log, engine, errlevels)
+        rewrite(log_p, new_p, normalize_log, engine, errlevels)
         if compare_tlg(name, engine, true) == 0 then
           break
         end
       end
     end
   end
-  if pdfmode and FS.fileexists(testdir .. "/" .. name .. dviext) then
+  if pdfmode and FS.fileexists(testdir .. "/" .. name .. V.dviext) then
     dvitopdf(name, testdir, engine, hide)
   end
   if pdfmode then
-    FS.cp(name .. pdfext, testdir, resultdir)
-    FS.ren(resultdir,name .. pdfext,name .. "." .. engine .. pdfext)
-    rewrite(pdffile, npffile, normalize_pdf)
+    FS.cp(name .. V.pdfext, V.testdir, resultdir)
+    FS.ren(resultdir, name .. V.pdfext, name .. "." .. engine .. V.pdfext)
+    rewrite(pdf_p, npf_p, normalize_pdf)
   else
-    rewrite(logfile, newfile, normalize_log, engine, errlevels)
+    rewrite(log_p, new_p, normalize_log, engine, errlevels)
   end
   -- Store secondary files for this engine
-  for _,filetype in pairs(auxfiles) do
-    for _,file in pairs(FS.filelist(testdir, filetype)) do
-      if match(file,"^" .. name .. ".[^.]+$") then
-        local ext = match(file, "%.[^.]+$")
-        if ext ~= lvtext and
-           ext ~= tlgext and
-           ext ~= lveext and
-           ext ~= logext then
-           local newname = gsub(file, "(%.[^.]+)$","." .. engine .. "%1")
+  for _, filetype in pairs(V.auxfiles) do
+    for _, file in pairs(FS.filelist(V.testdir, filetype)) do
+      if file:match("^" .. name .. ".[^.]+$") then
+        ext = file:match("%.[^.]+$")
+        if ext ~= V.lvtext and
+           ext ~= V.tlgext and
+           ext ~= V.lveext and
+           ext ~= V.logext then
+           local newname = file:gsub("(%.[^.]+)$","." .. engine .. "%1")
            if FS.fileexists(testdir, newname) then
              FS.rm(testdir, newname)
            end
@@ -824,57 +778,132 @@ function runtest(name, engine, hide, ext, pdfmode, breakout)
   return 0
 end
 
+local function setup_check(name, engine)
+  local testname = name .. "." .. engine
+  local tlgfile = FS.locate(
+    { V.testfiledir, V.unpackdir },
+    { testname .. V.tlgext, name .. V.tlgext }
+  )
+  local tpffile = FS.locate(
+    { V.testfiledir, V.unpackdir },
+    { testname .. V.tpfext, name .. V.tpfext }
+  )
+  -- Attempt to generate missing reference file from expectation
+  if not (tlgfile or tpffile) then
+    if not FS.locate( { V.unpackdir, V.testfiledir },
+                      { name .. V.lveext } ) then
+      print(
+        "Error: failed to find "
+          .. V.tlgext .. ", " .. V.tpfext .. " or "
+          .. V.lveext .. " file for " .. name .. "!"
+      )
+      exit(1)
+    end
+    runtest(name, engine, true, V.lveext)
+    FS.ren(testdir, testname .. V.logext, testname .. V.tlgext)
+  else
+    -- Install comparison files found
+    for _, v in pairs({tlgfile, tpffile}) do
+      if v then
+        FS.cp(v:match(".*/(.*)"),
+              v:match("(.*)/.*"),
+              V.testdir)
+      end
+    end
+  end
+end
+
+-- Run one test which may have multiple engine-dependent comparisons
+-- Should create a difference file for each failed test
+function Chk.runcheck(name, hide)
+  if not testexists(name) then
+    print("Failed to find input for test " .. name)
+    return 1
+  end
+  local checkengines = V.checkengines
+  if Opts.engine then
+    checkengines = Opts.engine -- PROBLEM: 's' or no 's'?
+  end
+  -- Used for both .lvt and .pvt tests
+  local function check_and_diff(ext, engine, comp, pdftest)
+    runtest(name, engine, hide, ext, pdftest, true)
+    local errorlevel = comp(name, engine)
+    if errorlevel == 0 then
+      return errorlevel
+    end
+    if Opts["show-log-on-error"] then
+      showfailedlog(name, V.testdir)
+    end
+    if Opts["halt-on-error"] then
+      showfaileddiff(V.testdir)
+    end
+    return errorlevel
+  end
+  local errorlevel = 0
+  for _, engine in pairs(checkengines) do
+    setup_check(name, engine)
+    local errlevel = 0
+    if FS.fileexists(testfiledir .. "/" .. name .. V.pvtext) then
+      errlevel = check_and_diff(V.pvtext, engine, compare_pdf, true)
+    else
+      errlevel = check_and_diff(V.lvtext, engine, compare_tlg)
+    end
+    if errlevel ~= 0 and Opts["halt-on-error"] then
+      return 1
+    end
+    if errlevel > errorlevel then
+      errorlevel = errlevel
+    end
+  end
+  -- Return everything
+  return errorlevel
+end
+
 -- A hook to allow additional tasks to run for the tests
 runtest_tasks = runtest_tasks or function(name, run)
   return ""
 end
 
--- Look for a test: could be in the testfiledir or the unpackdir
-function testexists(test)
-  return(FS.locate({testfiledir, unpackdir},
-    {test .. lvtext, test .. pvtext}))
-end
-
-function check(names)
+function Chk.check(names)
   local errorlevel = 0
   if testfiledir ~= "" and FS.direxists(testfiledir) then
     if not Opts.rerun then
       checkinit()
     end
     local hide = true
-    if names and next(names) then
+    if names and names[1] then
       hide = false
     end
     names = names or {}
     -- No names passed: find all test files
     if not next(names) then
       local excludenames = {}
-      for _,glob in pairs(excludetests) do
-        for _,name in pairs(FS.filelist(testfiledir, glob .. lvtext)) do
+      for _, glob in pairs(V.excludetests) do
+        for _, name in pairs(FS.filelist(V.testfiledir, glob .. V.lvtext)) do
           excludenames[FS.jobname(name)] = true
         end
-        for _,name in pairs(FS.filelist(unpackdir, glob .. lvtext)) do
+        for _, name in pairs(FS.filelist(V.unpackdir, glob .. V.lvtext)) do
           excludenames[FS.jobname(name)] = true
         end
-        for _,name in pairs(FS.filelist(testfiledir, glob .. pvtext)) do
+        for _, name in pairs(FS.filelist(V.testfiledir, glob .. V.pvtext)) do
           excludenames[FS.jobname(name)] = true
         end
       end
       local function addname(name)
         if not excludenames[FS.jobname(name)] then
-          insert(names, FS.jobname(name))
+          names[#names+1] = FS.jobname(name)
         end
       end
-      for _,glob in pairs(includetests) do
-        for _,name in pairs(FS.filelist(testfiledir, glob .. lvtext)) do
+      for _, glob in pairs(V.includetests) do
+        for _, name in pairs(FS.filelist(V.testfiledir, glob .. V.lvtext)) do
           addname(name)
         end
-        for _,name in pairs(FS.filelist(testfiledir, glob .. pvtext)) do
+        for _, name in pairs(FS.filelist(V.testfiledir, glob .. V.pvtext)) do
           addname(name)
         end
-        for _,name in pairs(FS.filelist(unpackdir, glob .. lvtext)) do
-          if FS.fileexists(testfiledir .. "/" .. name) then
-            print("Duplicate test file: " .. i)
+        for _, name in pairs(FS.filelist(V.unpackdir, glob .. V.lvtext)) do
+          if FS.fileexists(V.testfiledir .. "/" .. name) then
+            print("Duplicate test file: " .. name)
             return 1
           end
           addname(name)
@@ -887,12 +916,12 @@ function check(names)
         local active = false
         local firstname = Opts.first
         names = {}
-        for _,name in ipairs(allnames) do
+        for _, name in ipairs(allnames) do
           if name == firstname then
             active = true
           end
           if active then
-            insert(names, name)
+            names[#names+1] = name
           end
         end
       end
@@ -900,8 +929,8 @@ function check(names)
         local allnames = names
         local lastname = Opts.last
         names = {}
-        for _,name in ipairs(allnames) do
-          insert(names, name)
+        for _, name in ipairs(allnames) do
+          names[#names+1] = name
           if name == lastname then
             break
           end
@@ -923,10 +952,10 @@ function check(names)
     -- Actually run the tests
     print("Running checks on")
     local i = 0
-    for _,name in ipairs(names) do
+    for _, name in ipairs(names) do
       i = i + 1
       print("  " .. name .. " (" ..  i.. "/" .. #names ..")")
-      local errlevel = runcheck(name, hide)
+      local errlevel = Chk.runcheck(name, hide)
       -- Return value must be 1 not errlevel
       if errlevel ~= 0 then
         if Opts["halt-on-error"] then
@@ -950,59 +979,31 @@ end
 -- A short auxiliary to print the list of differences for check
 function checkdiff()
   print("\n  Check failed with difference files")
-  for _,i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
+  for _, i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
     print("  - " .. testdir .. "/" .. i)
   end
   print("")
 end
 
-function showfailedlog(name)
-  print("\nCheck failed with log file")
-  for _,i in ipairs(FS.filelist(testdir, name..".log")) do
-    print("  - " .. testdir .. "/" .. i)
-    print("")
-    local f = open(testdir .. "/" .. i,"r")
-    local content = f:read("*all")
-    close(f)
-    print("-----------------------------------------------------------------------------------")
-    print(content)
-    print("-----------------------------------------------------------------------------------")
-  end
-end
-
-function showfaileddiff()
-  print("\nCheck failed with difference file")
-  for _,i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
-    print("  - " .. testdir .. "/" .. i)
-    print("")
-    local f = open(testdir .. "/" .. i,"r")
-    local content = f:read("*all")
-    close(f)
-    print("-----------------------------------------------------------------------------------")
-    print(content)
-    print("-----------------------------------------------------------------------------------")
-  end
-end
-
 function save(names)
   checkinit()
-  local engines = Opts.engine or {stdengine}
+  local engines = Opts.engine or { V.stdengine }
   if names == nil then
     print("Arguments are required for the save command")
     return 1
   end
-  for _,name in pairs(names) do
+  for _, name in pairs(names) do
     if testexists(name) then
-      for _,engine in pairs(engines) do
-        local testengine = ((engine == stdengine and "") or "." .. engine)
+      for _, engine in pairs(engines) do
+        local testengine = (engine == V.stdengine and "") or ("." .. engine) -- why "."?
         local function save_test(test_ext, gen_ext, out_ext, pdfmode)
           local out_file = name .. testengine .. out_ext
           local gen_file = name .. "." .. engine .. gen_ext
           print("Creating and copying " .. out_file)
           runtest(name, engine, false, test_ext, pdfmode)
-          FS.ren(testdir, gen_file, out_file)
-          FS.cp(out_file, testdir, testfiledir)
-          if FS.fileexists(unpackdir .. "/" .. out_file) then
+          FS.ren(V.testdir, gen_file, out_file)
+          FS.cp(out_file, V.testdir, V.testfiledir)
+          if FS.fileexists(V.unpackdir .. "/" .. out_file) then
             print("Saved " .. out_ext
               .. " file overrides unpacked version of the same name")
             return 1
@@ -1010,16 +1011,17 @@ function save(names)
           return 0
         end
         local errorlevel
-        if FS.fileexists(testfiledir .. "/" .. name .. lvtext) then
-          errorlevel = save_test(lvtext, logext, tlgext)
+        if FS.fileexists(V.testfiledir .. "/" .. name .. V.lvtext) then
+          errorlevel = save_test(V.lvtext, V.logext, V.tlgext)
         else
-          errorlevel = save_test(pvtext, pdfext, tpfext, true)
+          errorlevel = save_test(V.pvtext, V.pdfext, V.tpfext, true)
         end
         if errorlevel ~=0 then return errorlevel end
       end
-    elseif FS.locate({unpackdir, testfiledir}, {name .. lveext}) then
-      print("Saved " .. tlgext .. " file overrides a "
-        .. lveext .. " file of the same name")
+    elseif FS.locate( { V.unpackdir, V.testfiledir },
+                      { name .. V.lveext }) then
+      print("Saved " .. V.tlgext .. " file overrides a "
+        .. V.lveext .. " file of the same name")
       return 1
     else
       print('Test "' .. name .. '" not found')

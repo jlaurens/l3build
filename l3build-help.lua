@@ -63,7 +63,7 @@ H.help = function (arg0, target_list)
 ]])
   print("Valid targets are:")
   local longest, t = setup_list(target_list)
-  for _,k in ipairs(t) do
+  for _, k in ipairs(t) do
     local target = target_list[k]
     local filler = rep(" ", longest - #k + 1)
     if target["desc"] then
@@ -73,7 +73,7 @@ H.help = function (arg0, target_list)
   print("")
   print("Valid options are:")
   longest, t = setup_list(A.option_list)
-  for _,k in ipairs(t) do
+  for _, k in ipairs(t) do
     local opt = A.option_list[k]
     local filler = rep(" ", longest - #k + 1)
     if opt["desc"] then

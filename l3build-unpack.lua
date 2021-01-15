@@ -35,7 +35,7 @@ function unpack(sources, sourcedirs)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  for _,i in ipairs(installfiles) do
+  for _, i in ipairs(installfiles) do
     errorlevel = FS.cp(i, unpackdir, localdir)
     if errorlevel ~= 0 then
       return errorlevel
@@ -55,9 +55,9 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
   if errorlevel ~=0 then
     return errorlevel
   end
-  for _,i in ipairs(sourcedirs or {sourcefiledir}) do
-    for _,j in ipairs(sources or {sourcefiles}) do
-      for _,k in ipairs(j) do
+  for _, i in ipairs(sourcedirs or {sourcefiledir}) do
+    for _, j in ipairs(sources or {sourcefiles}) do
+      for _, k in ipairs(j) do
         errorlevel = FS.cp(k, i, unpackdir)
         if errorlevel ~=0 then
           return errorlevel
@@ -65,14 +65,14 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
       end
     end
   end
-  for _,i in ipairs(unpacksuppfiles) do
+  for _, i in ipairs(unpacksuppfiles) do
     errorlevel = FS.cp(i, supportdir, localdir)
     if errorlevel ~=0 then
       return errorlevel
     end
   end
-  for _,i in ipairs(unpackfiles) do
-    for j,_ in pairs(FS.tree(unpackdir, i)) do
+  for _, i in ipairs(unpackfiles) do
+    for j, _ in pairs(FS.tree(unpackdir, i)) do
       local path, name = FS.splitpath(j)
       local localdir = FS.abspath(localdir)
       local success = io.popen(

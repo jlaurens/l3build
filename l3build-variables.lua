@@ -27,8 +27,9 @@ for those people who are interested.
 local pairs = pairs
 local banner = status and status.banner or ""
 
--- 
-local FS = assert(#FS) and FS
+-- global tables
+
+local FS = Require(FS)
 
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
@@ -39,7 +40,7 @@ end
 
 -- module table
 
-local Vars = Vars or {}
+local Vars = Provide(Vars)
 
 local function special_latex_luatex ()
   if not banner:find("2019") then
@@ -188,6 +189,8 @@ local defaults = {
 -- Upload settings
   curlexe = "curl",
   uploadconfig = {},
+-- Checking
+  checkinit_hook = function () return 0 end,
 }
 
 local defaults_no_nil = {
@@ -200,10 +203,48 @@ local defaults_no_nil = {
   flattentds = true,
 }
 
+-- Sanity check
+local function check_engines (opts, checkengines)
+  if opts.engine and not opts.force then
+    -- Make a lookup table
+    local t = {}
+    for _, engine in pairs(checkengines) do
+      t[engine] = true
+    end
+    for _, engine in pairs(opts.engine) do
+      if not t[engine] then
+        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
+        print("\n  Valid values are:")
+        for _, engine in ipairs(checkengines) do
+          print("  - " .. engine)
+        end
+        print("")
+        os.exit(1)
+      end
+    end
+  end
+end
+
+local function normalise_epoch(epoch)
+  -- If given as an ISO date, turn into an epoch number
+  local y, m, d = epoch:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  if y then
+    epoch =
+      os.time({ year = y,    month = m, day = d, hour = 0, sec = 0, isdst = nil }) -
+      os.time({ year = 1970, month = 1, day = 1, hour = 0, sec = 0, isdst = nil })
+  elseif epoch:match("^%d+$") then
+    epoch = tonumber(epoch)
+  else
+    epoch = 0
+  end
+  return epoch
+end
 
 -- Merge in the table `t` the defaults and the given environment.
 -- additional management for directory names
-Vars.finalize = function (t, env)
+-- @param env Defaults to `_ENV`
+Vars.finalize = function (t, opts, env)
+  env = env or _ENV
   for k, v in pairs(defaults) do
     t[k] = env[k] or v
   end
@@ -264,8 +305,36 @@ Vars.finalize = function (t, env)
   }) do
     t[v] = FS.escape_path(t[v])
   end
+  -- Tidy up the epoch setting
+  -- Force an epoch if set at the command line
+  -- Must be done after loading variables, etc.
+  if opts.epoch then
+    t.epoch           = opts.epoch
+    t.forcecheckepoch = true
+    t.forcedocepoch   = true
+  end
+  t.epoch = normalise_epoch(t.epoch)
+    -- Sanity check
+  check_engines(opts, t.checkengines)
+end
 
-
+-- Updates the given `t` table with
+-- the configuration name and environment
+-- @param env Defaults to `_ENV`
+function Vars.finalize_one_config(t, cfg, env)
+  env = env or _ENV
+  t.testdir = t.testdir .. "-" .. cfg
+  -- Reset testsuppdir if required
+  if env.testsuppdir and env.testsuppdir ~= t.testsuppdir then
+    -- testsuppdir has change since last `finalize`
+    t.testsuppdir = env.testsuppdir
+  end
+  if env.testfiledir and env.testfiledir ~= t.testfiledir then
+    if env.testsuppdir == t.testfiledir .. "/support" then
+      t.testsuppdir = env.testfiledir .. "/support"
+    end
+    t.testfiledir = env.testfiledir
+  end
 end
 
 return Vars

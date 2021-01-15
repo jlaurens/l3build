@@ -65,7 +65,7 @@ function runcmd(cmd, dir, vars)
   if OS.type == "windows" and match(envpaths," ") then
     envpaths = gsub(envpaths,'"','')
   end
-  for _,var in pairs(vars) do
+  for _, var in pairs(vars) do
     env = env .. OS.concat .. OS.setenv .. " " .. var .. "=" .. envpaths
   end
   return OS.run(dir, (forcedocepoch and setepoch() or "") .. env .. OS.concat .. cmd)
@@ -157,7 +157,7 @@ typeset = typeset or function(file, dir, exe)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  for i = 2,typesetruns do
+  for i = 2, typesetruns do
     errorlevel =
       makeindex(name,dir,".glo",".gls",".glg",glossarystyle) +
       makeindex(name,dir,".idx",".ind",".ilg",indexstyle)    +
@@ -175,17 +175,17 @@ end
 local function docinit()
   -- Set up
   FS.cleandir(typesetdir)
-  for _,filetype in pairs(
+  for _, filetype in pairs(
       {bibfiles, docfiles, typesetfiles, typesetdemofiles}
     ) do
-    for _,file in pairs(filetype) do
+    for _, file in pairs(filetype) do
       FS.cp(file, docfiledir, typesetdir)
     end
   end
-  for _,file in pairs(sourcefiles) do
+  for _, file in pairs(sourcefiles) do
     FS.cp(file, sourcefiledir, typesetdir)
   end
-  for _,file in pairs(typesetsuppfiles) do
+  for _, file in pairs(typesetsuppfiles) do
     FS.cp(file, supportdir, typesetdir)
   end
   depinstall(typesetdeps)
@@ -206,10 +206,10 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for _,typesetfiles in ipairs({typesetdemofiles, typesetfiles}) do
-    for _,glob in pairs(typesetfiles) do
-      for _,dir in ipairs({typesetdir, unpackdir}) do
-        for _,file in pairs(FS.tree(dir, glob)) do
+  for _, typesetfiles in ipairs({typesetdemofiles, typesetfiles}) do
+    for _, glob in pairs(typesetfiles) do
+      for _, dir in ipairs({typesetdir, unpackdir}) do
+        for _, file in pairs(FS.tree(dir, glob)) do
           local path,srcname = FS.splitpath(file)
           local name = FS.jobname(srcname)
           if not done[name] then
@@ -217,7 +217,7 @@ function doc(files)
             -- Allow for command line selection of files
             if files and next(files) then
               typeset = false
-              for _,file in pairs(files) do
+              for _, file in pairs(files) do
                 if name == file then
                   typeset = true
                   break

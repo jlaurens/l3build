@@ -313,9 +313,9 @@ manifest_write_group_file_descr = manifest_write_group_file_descr or function(fi
 
   -- filename+description: Github-flavoured Markdown table
 
-  filestr = string.format(" | %-"..param.filemaxchar.."s",filename)
-  flagstr = param.flag and string.format(" | %s",param.flag) or  ""
-  descstr = string.format(" | %-"..param.descmaxchar.."s",descr)
+  filestr = string.format(" | %-"..param.filemaxchar.."s", filename)
+  flagstr = param.flag and string.format(" | %s", param.flag) or  ""
+  descstr = string.format(" | %-"..param.descmaxchar.."s", descr)
 
   filehandle:write(filestr..flagstr..descstr.." |\n")
 

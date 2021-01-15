@@ -37,19 +37,19 @@ manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for _,f in ipairs(FS.filelist(Vars.ctandir.."/"..Vars.ctanpkg,"*.*")) do
+  for _, f in ipairs(FS.filelist(Vars.ctandir.."/"..Vars.ctanpkg,"*.*")) do
     ctanfiles[f] = true
   end
   tdsfiles = {}
-  for _,subdir in ipairs({"/doc/","/source/","/tex/"}) do
-    for _,f in ipairs(FS.filelist(tdsdir..subdir..moduledir,"*.*")) do
+  for _, subdir in ipairs({"/doc/","/source/","/tex/"}) do
+    for _, f in ipairs(FS.filelist(tdsdir..subdir..moduledir,"*.*")) do
       tdsfiles[f] = true
     end
   end
 
   local manifest_entries = manifest_setup()
 
-  for ii,_ in ipairs(manifest_entries) do
+  for ii, _ in ipairs(manifest_entries) do
     manifest_entries[ii] = manifest_build_list(manifest_entries[ii])
   end
 
@@ -72,22 +72,22 @@ manifest_build_list = function(entry)
     entry = manifest_build_init(entry)
 
     -- build list of excluded files
-    for _,glob_list in ipairs(entry.exclude) do
-      for _,this_glob in ipairs(glob_list) do
-        for _,this_file in ipairs(FS.filelist(maindir, this_glob)) do
+    for _, glob_list in ipairs(entry.exclude) do
+      for _, this_glob in ipairs(glob_list) do
+        for _, this_file in ipairs(FS.filelist(maindir, this_glob)) do
           entry.excludes[this_file] = true
         end
       end
     end
 
     -- build list of matched files
-    for _,glob_list in ipairs(entry.files) do
-      for _,this_glob in ipairs(glob_list) do
+    for _, glob_list in ipairs(entry.files) do
+      for _, this_glob in ipairs(glob_list) do
 
         local these_files = FS.filelist(entry.dir, this_glob)
         these_files = manifest_sort_within_match(these_files)
 
-        for _,this_file in ipairs(these_files) do
+        for _, this_file in ipairs(these_files) do
           entry = manifest_build_file(entry, this_file)
         end
 
@@ -127,7 +127,7 @@ manifest_build_init = function(entry)
   }
 
    -- copy default options to each group if necessary
-  for kk,ll in pairs(manifest_group_defaults) do
+  for kk, ll in pairs(manifest_group_defaults) do
     if entry[kk] == nil then
       entry[kk] = ll
     end
@@ -135,7 +135,7 @@ manifest_build_init = function(entry)
   end
 
   -- initialisation for internal data
-  for kk,ll in pairs(manifest_group_init) do
+  for kk, ll in pairs(manifest_group_init) do
     entry[kk] = ll
   end
 
@@ -198,7 +198,7 @@ manifest_write = function(manifest_entries)
   local f = assert(io.open(manifestfile, "w"))
   manifest_write_opening(f)
 
-  for ii,vv in ipairs(manifest_entries) do
+  for ii, vv in ipairs(manifest_entries) do
     if manifest_entries[ii].subheading then
       manifest_write_subheading(f, manifest_entries[ii].subheading, manifest_entries[ii].description)
     elseif manifest_entries[ii].N > 0 then
@@ -217,7 +217,7 @@ manifest_write_group = function(f, entry)
 
   if entry.ND > 0 then
 
-    for ii,file in ipairs(entry.files_ordered) do
+    for ii, file in ipairs(entry.files_ordered) do
       local descr = entry.descr[file] or ""
       local param = {
         dir         = entry.dir         ,
@@ -242,7 +242,7 @@ manifest_write_group = function(f, entry)
         -- header of table
         -- TODO: generalise
 				local p = {}
-				for k,v in pairs(param) do p[k] = v end
+				for k, v in pairs(param) do p[k] = v end
 				p.count = -1
 				p.flag = p.flag and "Flag"
 				manifest_write_group_file_descr(f,"File","Description",p)
@@ -255,7 +255,7 @@ manifest_write_group = function(f, entry)
 
   else
 
-    for ii,file in ipairs(entry.files_ordered) do
+    for ii, file in ipairs(entry.files_ordered) do
       local param = {
         dir         = entry.dir         ,
       	count       = ii                ,

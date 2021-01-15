@@ -21,286 +21,235 @@ The development version of the bundle can be found at
 for those people who are interested.
 
 --]]
-local A = {}
 
-local stderr           = io.stderr
+-- local safe guards
 
-local find             = string.find
-local gmatch           = string.gmatch
-local match            = string.match
-local sub              = string.sub
+local stderr = io.stderr
 
-local insert           = table.insert
+-- module
+
+local Args = Provide(Args)
 
 -- Parse command line options
 
-A.option_list =
-  {
-    config =
-      {
-        desc  = "Sets the config(s) used for running tests",
-        short = "c",
-        type  = "table"
-      },
-    date =
-      {
-        desc  = "Sets the date to insert into sources",
-        type  = "string"
-      },
-    debug =
-      {
-        desc = "Runs target in debug mode (not supported by all targets)",
-        type = "boolean"
-      },
-    dirty =
-      {
-        desc = "Skip cleaning up the test area",
-        type = "boolean"
-      },
-    ["dry-run"] =
-      {
-        desc = "Dry run for install",
-        type = "boolean"
-      },
-    email =
-      {
-        desc = "Email address of CTAN uploader",
-        type = "string"
-      },
-    engine =
-      {
-        desc  = "Sets the engine(s) to use for running test",
-        short = "e",
-        type  = "table"
-      },
-    epoch =
-      {
-        desc  = "Sets the epoch for tests and typesetting",
-        type  = "string"
-      },
-    file =
-      {
-        desc  = "Take the upload announcement from the given file",
-        short = "F",
-        type  = "string"
-      },
-    first =
-      {
-        desc  = "Name of first test to run",
-        type  = "string"
-      },
-    force =
-      {
-        desc  = "Force tests to run if engine is not set up",
-        short = "f",
-        type  = "boolean"
-      },
-    full =
-      {
-        desc = "Install all files",
-        type = "boolean"
-      },
-    ["halt-on-error"] =
-      {
-        desc  = "Stops running tests after the first failure",
-        short = "H",
-        type  = "boolean"
-      },
-    help =
-      {
-        desc  = "Print this message and exit",
-        short = "h",
-        type  = "boolean"
-      },
-    last =
-      {
-        desc  = "Name of last test to run",
-        type  = "string"
-      },
-    message =
-      {
-        desc  = "Text for upload announcement message",
-        short = "m",
-        type  = "string"
-      },
-    quiet =
-      {
-        desc  = "Suppresses TeX output when unpacking",
-        short = "q",
-        type  = "boolean"
-      },
-    rerun =
-      {
-        desc  = "Skip setup: simply rerun tests",
-        type  = "boolean"
-      },
-    ["show-log-on-error"] =
-      {
-        desc  = "If 'halt-on-error' stops, show the full log of the failure",
-        type  = "boolean"
-      },
-    shuffle =
-      {
-        desc  = "Shuffle order of tests",
-        type  = "boolean"
-      },
-    texmfhome =
-      {
-        desc = "Location of user texmf tree",
-        type = "string"
-      },
-    version =
-      {
-        desc = "Print version information and exit",
-        type = "boolean"
-      }
+Args.option_list = {
+  config = {
+    desc  = "Sets the config(s) used for running tests",
+    short = "c",
+    type  = "table"
+  },
+  date = {
+    desc  = "Sets the date to insert into sources",
+    type  = "string"
+  },
+  debug = {
+    desc = "Runs target in debug mode (not supported by all targets)",
+    type = "boolean"
+  },
+  dirty = {
+    desc = "Skip cleaning up the test area",
+    type = "boolean"
+  },
+  ["dry-run"] = {
+    desc = "Dry run for install",
+    type = "boolean"
+  },
+  email = {
+    desc = "Email address of CTAN uploader",
+    type = "string"
+  },
+  engine = {
+    desc  = "Sets the engine(s) to use for running test",
+    short = "e",
+    type  = "table"
+  },
+  epoch = {
+    desc  = "Sets the epoch for tests and typesetting",
+    type  = "string"
+  },
+  file = {
+    desc  = "Take the upload announcement from the given file",
+    short = "F",
+    type  = "string"
+  },
+  first = {
+    desc  = "Name of first test to run",
+    type  = "string"
+  },
+  force = {
+    desc  = "Force tests to run if engine is not set up",
+    short = "f",
+    type  = "boolean"
+  },
+  full = {
+    desc = "Install all files",
+    type = "boolean"
+  },
+  ["halt-on-error"] = {
+    desc  = "Stops running tests after the first failure",
+    short = "H",
+    type  = "boolean"
+  },
+  help = {
+    desc  = "Print this message and exit",
+    short = "h",
+    type  = "boolean"
+  },
+  last = {
+    desc  = "Name of last test to run",
+    type  = "string"
+  },
+  message = {
+    desc  = "Text for upload announcement message",
+    short = "m",
+    type  = "string"
+  },
+  quiet = {
+    desc  = "Suppresses TeX output when unpacking",
+    short = "q",
+    type  = "boolean"
+  },
+  rerun = {
+    desc  = "Skip setup: simply rerun tests",
+    type  = "boolean"
+  },
+  ["show-log-on-error"] = {
+    desc  = "If 'halt-on-error' stops, show the full log of the failure",
+    type  = "boolean"
+  },
+  shuffle = {
+    desc  = "Shuffle order of tests",
+    type  = "boolean"
+  },
+  texmfhome = {
+    desc = "Location of user texmf tree",
+    type = "string"
+  },
+  version = {
+    desc = "Print version information and exit",
+    short = "v",
+    type = "boolean"
   }
+}
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
-A.argparse = function (arg)
-  local result = {}
-  local names  = {}
-  local long_options =  {}
-  local short_options = {}
-  -- Turn long/short options into two lookup tables
-  for k,v in pairs(A.option_list) do
-    if v.short then
-      short_options[v.short] = k
-    end
-    long_options[k] = k
-  end
-  -- arg[1] is a special case: must be a command or "-h"/"--help"
-  -- Deal with this by assuming help and storing only apparently-valid
-  -- input
-  local a = arg[1]
-  result.target = "help"
-  if a then
+Args.argparse = function (t, arg)
+  -- arg[1] is a special case: either a command or "-v"/"--version"
+  local arg_1 = arg[1]
+  if arg_1 == "--version" or arg_1 == "-v" then
+    return { target = "version" }
+  elseif arg_1 then
     -- No options are allowed in position 1, so filter those out
-    if a == "--version" then
-      result.target = "version"
-    elseif not match(a, "^%-") then
-      result.target = a
+    if arg_1:match("^%-") then
+      return { target = "help" }
     end
+  else
+    return { target = "help" }
   end
-  -- Stop here if help or version is required
-  if result.target == "help" or result.target == "version" then
-    return result
+  local result = {
+    target = arg_1
+  }
+  local opts =  {}
+  local unik = {}
+  -- Turn long/short options into two lookup tables
+  for k, v in pairs(t.option_list) do
+    if v.short then
+      assert(not unik[v.short])
+      unik[v.short] = true
+      opts[v.short] = k
+    end
+    assert(not unik[k])
+    unik[k] = true
+    opts[k] = k
   end
   -- An auxiliary to grab all file names into a table
   local function remainder(num)
-    local names = {}
+    local ans = {}
     for i = num, #arg do
-      insert(names, arg[i])
+      ans[#ans+1] = arg[i]
     end
-    return names
+    return ans
   end
   -- Examine all other arguments
   -- Use a while loop rather than for as this makes it easier
   -- to grab arg for optionals where appropriate
+  local names  = {}
   local i = 2
   while i <= #arg do
-    local a = arg[i]
+    local arg_i = arg[i]
     -- Terminate search for options
-    if a == "--" then
+    if arg_i == "--" then
       names = remainder(i + 1)
       break
     end
     -- Look for optionals
     local opt
-    local optarg
-    local opts
+    local opt_arg
     -- Look for and option and get it into a variable
-    if match(a, "^%-") then
-      if match(a, "^%-%-") then
-        opts = long_options
-        local pos = find(a, "=", 1, true)
-        if pos then
-          opt    = sub(a, 3, pos - 1)
-          optarg = sub(a, pos + 1)
+    if arg_i:match("^%-") then
+      local is_long = arg_i:match("^%-%-")
+      if is_long then
+        local n = arg_i:find("=", 1, true)
+        if n then
+          opt    = arg_i:sub(3, n - 1)
+          opt_arg = arg_i:sub(n + 1)
         else
-          opt = sub(a, 3)
+          opt = arg_i:sub(3)
         end
       else
-        opts = short_options
-        opt  = sub(a, 2, 2)
+        opt  = arg_i:sub(2, 2)
         -- Only set optarg if it is there
-        if #a > 2 then
-          optarg = sub(a, 3)
+        if #arg_i > 2 then
+          opt_arg = arg_i:sub(3)
         end
       end
       -- Now check that the option is valid and sort out the argument
       -- if required
-      local optname = opts[opt]
-      if optname then
-        -- Tidy up arguments
-        if A.option_list[optname].type == "boolean" then
-          if optarg then
-            local opt = "-" .. (match(a, "^%-%-") and "-" or "") .. opt
-            stderr:write("Value not allowed for option " .. opt .."\n")
-            return {"help"}
-          end
-        else
-         if not optarg then
-          optarg = arg[i + 1]
-          if not optarg then
-            stderr:write("Missing value for option " .. a .."\n")
-            return {"help"}
-          end
-          i = i + 1
-         end
+      local opt_name = opts[opt]
+      if not opt_name then
+        stderr:write("Unknown option " .. arg_i .."\n")
+        return { target = "help" }
+      end
+      -- Tidy up arguments
+      if t.option_list[opt_name].type == "boolean" then
+        if opt_arg then
+          opt = (is_long and "--" or "-") .. opt
+          stderr:write("Value not allowed for option " .. opt .."\n")
+          return { target = "help" }
         end
-      else
-        stderr:write("Unknown option " .. a .."\n")
-        return {"help"}
+      elseif not opt_arg then
+        i = i + 1
+        opt_arg = arg[i]
+        if not opt_arg then
+          stderr:write("Missing value for option " .. arg_i .."\n")
+          return { target = "help" }
+        end
       end
       -- Store the result
-      if optarg then
-        if A.option_list[optname].type == "string" then
-          result[optname] = optarg
+      if opt_arg then
+        if t.option_list[opt_name].type == "string" then
+          result[opt_name] = opt_arg
         else
-          local opts = result[optname] or {}
-          for hit in gmatch(optarg, "([^, %s]+)") do
-            insert(opts, hit)
+          local opt_args = result[opt_name] or {}
+          for hit in opt_arg:gmatch("([^,%s]+)") do
+            opt_args[#opt_args+1] = hit
           end
-          result[optname] = opts
+          result[opt_name] = opt_args
         end
       else
-        result[optname] = true
+        result[opt_name] = true
       end
       i = i + 1
-    end
-    if not opt then
+    else
       names = remainder(i)
       break
     end
   end
-  if next(names) then
+  if names[1] then
    result.names = names
   end
   return result
 end
 
--- Sanity check
-A.check_engines = function (options, checkengines)
-  if options.engine and not options.force then
-    -- Make a lookup table
-    local t = {}
-    for _, engine in pairs(checkengines) do
-      t[engine] = true
-    end
-    for _, engine in pairs(options.engine) do
-      if not t[engine] then
-        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
-        print("\n  Valid values are:")
-        for _, engine in ipairs(checkengines) do
-          print("  - " .. engine)
-        end
-        print("")
-        os.exit(1)
-      end
-    end
-  end
-end
-
-return A
+return Args

@@ -322,7 +322,7 @@ function input_multi_line_field (name)
     if answer_line=="" then
       return_count=return_count+1
     else
-      for i=1,return_count,1 do
+      for i=1, return_count,1 do
         field = field .. "\n"
       end
       return_count=0

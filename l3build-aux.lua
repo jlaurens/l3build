@@ -22,30 +22,23 @@ for those people who are interested.
 
 --]]
 
-local match = string.match
+-- local safe guards
 
 local pairs = pairs
 local print = print
-
 local lookup = kpse.lookup
+
+-- global tables
+
+local OS = Require(OS)
+local Opts = Require(Opts)
+local Args = Require(Args)
+
+local Aux = Provide(Aux)
 
 --
 -- Auxiliary functions which are used by more than one main function
 --
-
-function normalise_epoch()
-  -- If given as an ISO date, turn into an epoch number
-  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
-  if y then
-    epoch =
-      os.time({year = y, month = m, day = d, hour = 0, sec = 0, isdst = nil}) -
-      os.time({year = 1970, month = 1, day = 1, hour = 0, sec = 0, isdst = nil})
-  elseif match(epoch, "^%d+$") then
-    epoch = tonumber(epoch)
-  else
-    epoch = 0
-  end
-end
 
 function setepoch()
   return
@@ -58,7 +51,7 @@ function setepoch()
 end
 
 local function getscriptname()
-  if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
+  if arg[0]:match("l3build$") or arg[0]:match("l3build%.lua$") then
     return lookup("l3build.lua")
   else
     return arg[0]
@@ -66,19 +59,19 @@ local function getscriptname()
 end
 
 -- Do some subtarget for all modules in a bundle
-function call(dirs, target, opts)
+function Aux.call(dirs, target, opts)
   -- Turn the option table into a string
   local opts = opts or Opts
   local s = ""
-  for k,v in pairs(opts) do
+  for k, v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases
-      local t = A.option_list[k] or {}
+      local t = Args.option_list[k] or {}
       local arg = ""
       if t["type"] == "string" then
         arg = arg .. "=" .. v
       end
       if t["type"] == "table" then
-        for _,a in pairs(v) do
+        for _, a in pairs(v) do
           if arg == "" then
             arg = "=" .. a -- Add the initial "=" here
           else
@@ -90,12 +83,12 @@ function call(dirs, target, opts)
     end
   end
   if opts["names"] then
-    for _,v in pairs(opts["names"]) do
+    for _, v in pairs(opts["names"]) do
       s = s .. " " .. v
     end
   end
   local scriptname = getscriptname()
-  for _,i in ipairs(dirs) do
+  for _, i in ipairs(dirs) do
     local text = " for module " .. i
     if i == "." and opts["config"] then
       text = " with configuration " .. opts["config"][1]
@@ -115,7 +108,7 @@ end
 -- Unpack files needed to support testing/typesetting/unpacking
 function depinstall(deps)
   local errorlevel
-  for _,i in ipairs(deps) do
+  for _, i in ipairs(deps) do
     print("Installing dependency: " .. i)
     errorlevel = OS.run(i, "texlua " .. getscriptname() .. " unpack -q")
     if errorlevel ~= 0 then
