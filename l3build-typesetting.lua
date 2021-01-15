@@ -26,6 +26,8 @@ for those people who are interested.
 -- Auxiliary functions for typesetting: need to be generally available
 --
 
+-- local safe guards
+
 local ipairs = ipairs
 local pairs  = pairs
 local print  = print
@@ -33,16 +35,24 @@ local print  = print
 local gsub  = string.gsub
 local match = string.match
 
-local OS.type = os.type
+-- Global tables
 
-function dvitopdf(name, dir, engine, hide)
+local OS  = Require(OS)
+local Aux = Require(Aux)
+local V   = Require(Vars)
+
+-- Module
+
+local Tpst = Provide(Tpst)
+
+function Tpst.dvitopdf(name, dir, engine, hide)
   OS.run(
     dir,
-    (forcecheckepoch and setepoch() or "") ..
-    "dvips " .. name .. dviext
+    (V.forcecheckepoch and Aux.setepoch(V.epoch) or "") ..
+    "dvips " .. name .. V.dviext
       .. (hide and (" > " .. OS.null) or "")
       .. OS.concat ..
-   "ps2pdf " .. ps2pdfopt .. name .. psext
+   "ps2pdf " .. V.ps2pdfopt .. name .. V.psext
       .. (hide and (" > " .. OS.null) or "")
   )
 end
@@ -68,7 +78,7 @@ function runcmd(cmd, dir, vars)
   for _, var in pairs(vars) do
     env = env .. OS.concat .. OS.setenv .. " " .. var .. "=" .. envpaths
   end
-  return OS.run(dir, (forcedocepoch and setepoch() or "") .. env .. OS.concat .. cmd)
+  return OS.run(dir, (forcedocepoch and Aux.setepoch(V.epoch) or "") .. env .. OS.concat .. cmd)
 end
 
 function biber(name, dir)

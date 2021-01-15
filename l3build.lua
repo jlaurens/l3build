@@ -59,6 +59,8 @@ end
 -- l3build setup and functions
 kpse.set_program_name("kpsewhich")
 local build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
+require(lookup("l3build-init.lua", { path = build_kpse_path } ) )
+
 local function build_require(s)
   return require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
 end

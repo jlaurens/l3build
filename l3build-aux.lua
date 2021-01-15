@@ -24,8 +24,9 @@ for those people who are interested.
 
 -- local safe guards
 
-local pairs = pairs
-local print = print
+local pairs  = pairs
+local ipairs = ipairs
+local print  = print
 local lookup = kpse.lookup
 
 -- global tables
@@ -40,7 +41,7 @@ local Aux = Provide(Aux)
 -- Auxiliary functions which are used by more than one main function
 --
 
-function setepoch()
+function Aux.setepoch(epoch)
   return
     OS.setenv .. " SOURCE_DATE_EPOCH=" .. epoch
       .. OS.concat ..
@@ -50,11 +51,11 @@ function setepoch()
       .. OS.concat
 end
 
-local function getscriptname()
-  if arg[0]:match("l3build$") or arg[0]:match("l3build%.lua$") then
+local function getscriptname(arg_0)
+  if arg_0:match("l3build$") or arg_0:match("l3build%.lua$") then
     return lookup("l3build.lua")
   else
-    return arg[0]
+    return arg_0
   end
 end
 
@@ -87,7 +88,7 @@ function Aux.call(dirs, target, opts)
       s = s .. " " .. v
     end
   end
-  local scriptname = getscriptname()
+  local scriptname = getscriptname(Args.arg[0])
   for _, i in ipairs(dirs) do
     local text = " for module " .. i
     if i == "." and opts["config"] then
@@ -106,11 +107,11 @@ function Aux.call(dirs, target, opts)
 end
 
 -- Unpack files needed to support testing/typesetting/unpacking
-function depinstall(deps)
+function Aux.depinstall(deps)
   local errorlevel
   for _, i in ipairs(deps) do
     print("Installing dependency: " .. i)
-    errorlevel = OS.run(i, "texlua " .. getscriptname() .. " unpack -q")
+    errorlevel = OS.run(i, "texlua " .. getscriptname(Args.arg[0]) .. " unpack -q")
     if errorlevel ~= 0 then
       return errorlevel
     end

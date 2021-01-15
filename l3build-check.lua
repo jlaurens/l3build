@@ -51,6 +51,7 @@ local Aux  = Require(Aux)
 local FS   = Require(FS)
 local V    = Require(Vars)
 local Pack = Require(Pack)
+local Tpst = Require(Tpst)
 
 -- Module
 
@@ -718,7 +719,7 @@ local function runtest(name, engine, hide, ext, pdfmode, breakout)
       -- Allow for local texmf files
       OS.setenv .. " TEXMFCNF=." .. OS.pathsep
         .. OS.concat ..
-      (V.forcecheckepoch and setepoch() or "") ..
+      (V.forcecheckepoch and Aux.setepoch(V.epoch) or "") ..
       -- Ensure lines are of a known length
       OS.setenv .. " max_print_line=" .. V.maxprintline
         .. OS.concat ..
@@ -733,7 +734,7 @@ local function runtest(name, engine, hide, ext, pdfmode, breakout)
     if breakout and i < V.checkruns then
       if pdfmode then
         if FS.fileexists(V.testdir .. "/" .. name .. V.dviext) then
-          dvitopdf(name, V.testdir, engine, hide)
+          Tpst.dvitopdf(name, V.testdir, engine, hide)
         end
         rewrite(pdf_p, npf_p, normalize_pdf)
         if compare_pdf(name, engine, true) == 0 then
@@ -748,7 +749,7 @@ local function runtest(name, engine, hide, ext, pdfmode, breakout)
     end
   end
   if pdfmode and FS.fileexists(testdir .. "/" .. name .. V.dviext) then
-    dvitopdf(name, testdir, engine, hide)
+    Tpst.dvitopdf(name, testdir, engine, hide)
   end
   if pdfmode then
     FS.cp(name .. V.pdfext, V.testdir, resultdir)

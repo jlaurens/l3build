@@ -30,6 +30,10 @@ local stderr = io.stderr
 
 local Args = Provide(Args)
 
+-- deep copy of arg
+
+Args.arg = {}
+
 -- Parse command line options
 
 Args.option_list = {
@@ -134,6 +138,7 @@ Args.option_list = {
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
+-- On success, `t` contains a deep copy of `arg`.
 Args.argparse = function (t, arg)
   -- arg[1] is a special case: either a command or "-v"/"--version"
   local arg_1 = arg[1]
@@ -146,6 +151,11 @@ Args.argparse = function (t, arg)
     end
   else
     return { target = "help" }
+  end
+  -- make a deep copy first
+  t.arg = {}
+  for i = 1, #arg do
+    t.arg[i] = arg[i]
   end
   local result = {
     target = arg_1

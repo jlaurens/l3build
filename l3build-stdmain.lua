@@ -29,11 +29,14 @@ local lfs = Require(lfs)
 
 -- Global tables
 
-local OS = Require(OS)
+local OS   = Require(OS)
+local Aux  = Require(Aux)
 local Args = Require(Args)
 local Opts = Require(Opts)
-local V = Require(Vars)
+local V    = Require(Vars)
 local CTAN = Require(CTAN)
+local Chk  = Require(Chk)
+local Cln  = Require(Cln)
 
 local Main = Provide(Main)
 
@@ -58,7 +61,7 @@ end
 Main.target_list = {
   -- Some hidden targets
   bundlecheck = {
-    func = check,
+    func = Chk.check,
     pre  = function()
       if Opts.names then
         print("Bundle checks should not list test names")
@@ -73,18 +76,18 @@ Main.target_list = {
   },
   bundleunpack = {
     func = bundleunpack,
-    pre  = function() return(depinstall(unpackdeps)) end
+    pre  = function() return(Aux.depinstall(unpackdeps)) end
   },
   -- Public targets
   check = {
     bundle_target = true,
     desc = "Run all automated tests",
-    func = check,
+    func = Chk.check,
   },
   clean = {
-    bundle_func = bundleclean,
+    bundle_func = Cln.bundleclean,
     desc = "Clean out directory tree",
-    func = clean
+    func = Cln.clean
   },
   ctan = {
     bundle_func = CTAN.ctan,
