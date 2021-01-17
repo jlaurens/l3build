@@ -54,7 +54,7 @@ for those people who are interested.
 --]]
 
 
-manifest_setup = manifest_setup or function()
+manifest_setup = manifest_setup or function ())
   local groups = {
     {
        subheading = "Repository manifest",
@@ -205,7 +205,7 @@ The following group lists the files included in the CTAN package.
     },
     {
        name    = "CTAN files",
-       dir     = Vars.ctandir.."/"..module,
+       dir     = FS.dir.ctan.."/"..module,
        files   = {"*.*"},
        exclude = {".",".."},
        flag    = false,
@@ -220,13 +220,13 @@ end
       ---------------------
 --]]
 
-manifest_sort_within_match = manifest_sort_within_match or function(files)
+manifest_sort_within_match = manifest_sort_within_match or function ()files)
   local f = files
   table.sort(f)
   return f
 end
 
-manifest_sort_within_group = manifest_sort_within_group or function(files)
+manifest_sort_within_group = manifest_sort_within_group or function ()files)
   local f = files
   --[[
       -- no-op by default; make your own definition to customise. E.g.:
@@ -240,7 +240,7 @@ end
       ---------------
 --]]
 
-manifest_write_opening = manifest_write_opening or function(filehandle)
+manifest_write_opening = manifest_write_opening or function ()filehandle)
 
   filehandle:write("# Manifest for " .. module .. "\n\n")
   filehandle:write([[
@@ -250,7 +250,7 @@ It is automatically generated with `texlua build.lua manifest`.
 
 end
 
-manifest_write_subheading = manifest_write_subheading or function(filehandle, heading, description)
+manifest_write_subheading = manifest_write_subheading or function ()filehandle, heading, description)
 
   filehandle:write("\n\n## " .. heading .. "\n\n")
 
@@ -270,7 +270,7 @@ manifest_write_group_heading = manifest_write_group_heading or function (filehan
 
 end
 
-manifest_write_group_file = manifest_write_group_file or function(filehandle, filename, param)
+manifest_write_group_file = manifest_write_group_file or function ()filehandle, filename, param)
   --[[
         filehandle        : write file object
         filename          : the count of the filename to be written
@@ -296,7 +296,7 @@ manifest_write_group_file = manifest_write_group_file or function(filehandle, fi
 
 end
 
-manifest_write_group_file_descr = manifest_write_group_file_descr or function(filehandle, filename, descr, param)
+manifest_write_group_file_descr = manifest_write_group_file_descr or function ()filehandle, filename, descr, param)
   --[[
         filehandle        : write file object
         filename          : the name of the file to write
@@ -326,7 +326,7 @@ end
       -------------------------------------------
 --]]
 
-manifest_extract_filedesc = manifest_extract_filedesc or function(filehandle)
+manifest_extract_filedesc = manifest_extract_filedesc or function ()filehandle)
 
   -- no-op by default; two examples below
 
@@ -335,7 +335,7 @@ end
 --[[
 
 -- From the first match of a pattern in a file:
-manifest_extract_filedesc = function(filehandle)
+manifest_extract_filedesc = function ()filehandle)
 
   local all_file = filehandle:read("*all")
   local matchstr = "\\section{(.-)}"
@@ -346,7 +346,7 @@ manifest_extract_filedesc = function(filehandle)
 end
 
 -- From the match of the 2nd line (say) of a file:
-manifest_extract_filedesc = function(filehandle)
+manifest_extract_filedesc = function ()filehandle)
 
   local end_read_loop = 2
   local matchstr      = "%%%S%s+(.*)"

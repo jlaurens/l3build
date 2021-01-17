@@ -28,7 +28,7 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
-update_tag = update_tag or function(filename, content, tagname, tagdate)
+update_tag = update_tag or function ()filename, content, tagname, tagdate)
   return content
 end
 
@@ -67,14 +67,14 @@ function tag(tagnames)
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = FS.remove_duplicates({Vars.currentdir, sourcefiledir, docfiledir})
-  local errorlevel = 0
+  local dirs = FS.without_duplicates({FS.dir.current, sourcefiledir, docfiledir})
+  local error_n = 0
   for _, dir in pairs(dirs) do
     for _, filetype in pairs(tagfiles) do
       for file, _ in pairs(FS.tree(dir, filetype)) do
-        errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
-        if errorlevel ~= 0 then
-          return errorlevel
+        error_n = update_file_tag(dir .. "/" .. file,tagname,tagdate)
+        if error_n ~= 0 then
+          return error_n
         end
       end
     end

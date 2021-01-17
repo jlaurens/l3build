@@ -29,19 +29,26 @@ local ipairs = ipairs
 local print  = print
 local lookup = kpse.lookup
 
+local L3B  = L3B
+local Opts = Opts
+
 -- global tables
 
-local OS = Require(OS)
-local Opts = Require(Opts)
-local Args = Require(Args)
+local OS   = L3B.require('OS')
+local Args = L3B.require('Args')
 
-local Aux = Provide(Aux)
+-- module
+
+local Aux = L3B.provide('Aux')
 
 --
 -- Auxiliary functions which are used by more than one main function
 --
 
-function Aux.setepoch(epoch)
+---Set the epoch 
+---@param epoch string
+---@return string
+function Aux.set_epoch_cmd(epoch)
   return
     OS.setenv .. " SOURCE_DATE_EPOCH=" .. epoch
       .. OS.concat ..
@@ -51,7 +58,7 @@ function Aux.setepoch(epoch)
       .. OS.concat
 end
 
-local function getscriptname(arg_0)
+local function get_script_name(arg_0)
   if arg_0:match("l3build$") or arg_0:match("l3build%.lua$") then
     return lookup("l3build.lua")
   else
@@ -62,16 +69,16 @@ end
 -- Do some subtarget for all modules in a bundle
 function Aux.call(dirs, target, opts)
   -- Turn the option table into a string
-  local opts = opts or Opts
+  opts = opts or Opts
   local s = ""
   for k, v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases
-      local t = Args.option_list[k] or {}
+      local t = Args.list[k] or {}
       local arg = ""
-      if t["type"] == "string" then
+      if t.type == "string" then
         arg = arg .. "=" .. v
       end
-      if t["type"] == "table" then
+      if t.type == "table" then
         for _, a in pairs(v) do
           if arg == "" then
             arg = "=" .. a -- Add the initial "=" here
@@ -83,24 +90,24 @@ function Aux.call(dirs, target, opts)
       s = s .. " --" .. k .. arg
     end
   end
-  if opts["names"] then
-    for _, v in pairs(opts["names"]) do
+  if opts.names then
+    for _, v in pairs(opts.names) do
       s = s .. " " .. v
     end
   end
-  local scriptname = getscriptname(Args.arg[0])
+  local scriptname = get_script_name(Args.arg[0])
   for _, i in ipairs(dirs) do
     local text = " for module " .. i
-    if i == "." and opts["config"] then
-      text = " with configuration " .. opts["config"][1]
+    if i == "." and opts.config then
+      text = " with configuration " .. opts.config[1]
     end
     print("Running l3build with target \"" .. target .. "\"" .. text )
-    local errorlevel = OS.run(
+    local error_n = OS.run(
       i,
       "texlua " .. scriptname .. " " .. target .. s
     )
-    if errorlevel ~= 0 then
-      return errorlevel
+    if error_n then
+      return error_n
     end
   end
   return 0
@@ -108,12 +115,12 @@ end
 
 -- Unpack files needed to support testing/typesetting/unpacking
 function Aux.depinstall(deps)
-  local errorlevel
+  local error_n
   for _, i in ipairs(deps) do
     print("Installing dependency: " .. i)
-    errorlevel = OS.run(i, "texlua " .. getscriptname(Args.arg[0]) .. " unpack -q")
-    if errorlevel ~= 0 then
-      return errorlevel
+    error_n = OS.run(i, "texlua " .. get_script_name(Args.arg[0]) .. " unpack -q")
+    if error_n ~= 0 then
+      return error_n
     end
   end
   return 0

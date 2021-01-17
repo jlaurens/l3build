@@ -64,7 +64,7 @@ function uninstall()
     dir = dir .. "/" .. subdir
     return zapdir(dir)
   end
-  local errorlevel = 0
+  local error_n = 0
   -- Any script man files need special handling
   local manfiles = {}
   for _, glob in pairs(scriptmanfiles) do
@@ -76,7 +76,7 @@ function uninstall()
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
            select(2, FS.splitpath(file)))
         else
-          errorlevel = errorlevel + FS.rm(installdir, file)
+          error_n = error_n + FS.rm(installdir, file)
         end
       end
     end
@@ -87,19 +87,19 @@ function uninstall()
       print("- " .. v)
     end
   end
-  errorlevel = uninstall_files("doc")
+  error_n = uninstall_files("doc")
          + uninstall_files("source")
          + uninstall_files("tex")
          + uninstall_files("bibtex/bst",module)
          + uninstall_files("makeindex",module)
          + uninstall_files("scripts",module)
-         + errorlevel
-  if errorlevel ~= 0 then return errorlevel end
+         + error_n
+  if error_n ~= 0 then return error_n end
   -- Finally, clean up special locations
   for _, location in ipairs(tdslocations) do
     local path,glob = FS.splitpath(location)
-    errorlevel = zapdir(path)
-    if errorlevel ~= 0 then return errorlevel end
+    error_n = zapdir(path)
+    if error_n ~= 0 then return error_n end
   end
   return 0
 end
@@ -157,15 +157,15 @@ function install_files(target, full, dry_run)
       end
     end
 
-    local errorlevel = 0
+    local error_n = 0
     -- The target is only created if there are actual files to install
     if next(filenames) then
       if not dry_run then
         for _, path in pairs(paths) do
           local dir = target .. "/" .. path
           if not cleanpaths[dir] then
-            errorlevel = FS.cleandir(dir)
-            if errorlevel ~= 0 then return errorlevel end
+            error_n = FS.cleandir(dir)
+            if error_n ~= 0 then return error_n end
           end
           cleanpaths[dir] = true
         end
@@ -183,14 +183,14 @@ function install_files(target, full, dry_run)
     return 0
   end
 
-  local errorlevel = unpack()
-  if errorlevel ~= 0 then return errorlevel end
+  local error_n = unpack()
+  if error_n ~= 0 then return error_n end
 
     -- Creates a 'controlled' list of files
     local function excludelist(dir, include, exclude)
       include = include or {}
       exclude = exclude or {}
-      dir = dir or Vars.currentdir
+      dir = dir or FS.dir.current
       local includelist = {}
       local excludelist = {}
       for _, glob_table in pairs(exclude) do
@@ -213,8 +213,8 @@ function install_files(target, full, dry_run)
   local installlist = excludelist(unpackdir, installfiles, {scriptfiles})
 
   if full then
-    errorlevel = doc()
-    if errorlevel ~= 0 then return errorlevel end
+    error_n = doc()
+    if error_n ~= 0 then return error_n end
     -- For the purposes here, any typesetting demo files need to be
     -- part of the main typesetting list
     local typesetfiles = typesetfiles
@@ -237,10 +237,10 @@ function install_files(target, full, dry_run)
     print("\nFor installation inside " .. target .. ":")
   end 
     
-    errorlevel = create_install_map(sourcefiledir,"source",{sourcelist})
+    error_n = create_install_map(sourcefiledir,"source",{sourcelist})
       + create_install_map(docfiledir,"doc",
           {bibfiles,demofiles,docfiles,pdffiles,textfiles,typesetlist})
-    if errorlevel ~= 0 then return errorlevel end
+    if error_n ~= 0 then return error_n end
 
     -- Rename README if necessary
     if not dry_run then
@@ -262,8 +262,8 @@ function install_files(target, full, dry_run)
         else
           -- Man files should have a single-digit extension: the type
           local installdir = target .. "/doc/man/man"  .. match(file,".$")
-          errorlevel = errorlevel + FS.mkdir(installdir)
-          errorlevel = errorlevel + FS.cp(file, docfiledir, installdir)
+          error_n = error_n + FS.mkdir(installdir)
+          error_n = error_n + FS.cp(file, docfiledir, installdir)
         end
       end
     end
@@ -274,20 +274,20 @@ function install_files(target, full, dry_run)
     end
   end
 
-  if errorlevel ~= 0 then return errorlevel end
+  if error_n ~= 0 then return error_n end
 
-  errorlevel = create_install_map(unpackdir,"tex",{installlist})
+  error_n = create_install_map(unpackdir,"tex",{installlist})
     + create_install_map(unpackdir,"bibtex/bst",{bstfiles},module)
     + create_install_map(unpackdir,"makeindex",{makeindexfiles},module)
     + create_install_map(unpackdir,"scripts",{scriptfiles},module)
 
-  if errorlevel ~= 0 then return errorlevel end
+  if error_n ~= 0 then return error_n end
 
   -- Files are all copied in one shot: this ensures that FS.cleandir()
   -- can't be an issue even if there are complex set-ups
   for _, v in ipairs(installmap) do
-    errorlevel = FS.cp(v.file, v.source, v.dest)
-    if errorlevel ~= 0  then return errorlevel end
+    error_n = FS.cp(v.file, v.source, v.dest)
+    if error_n ~= 0  then return error_n end
   end 
   
   return 0

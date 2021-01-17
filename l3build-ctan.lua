@@ -27,32 +27,34 @@ for those people who are interested.
 local pairs = pairs
 local print = print
 
+local L3B = L3B
+local Opts = Opts
+
 -- global tables
 
-local OS = Require(OS)
-local FS = Require(FS)
-local Aux = Require(Aux)
-local Opts = Require(Opts)
-local V = Require(Vars)
-local Ins = Require(Ins)
+local OS = L3B.require('OS')
+local FS = L3B.require('FS')
+local Aux = L3B.require('Aux')
+local V = L3B.require('Vars')
+local Ins = L3B.require('Ins')
 
 -- Module table
 
-local CTAN = Provide(CTAN)
+local CTAN = L3B.provide('CTAN')
 
 -- Copy files to the main CTAN release directory
 local function copyctan()
-  FS.mkdir(V.ctandir .. "/" .. V.ctanpkg)
+  FS.mkdir(FS.dir.ctan .. "/" .. V.ctanpkg)
   local function copyfiles(files, source)
-    if source == V.currentdir or V.flatten then
+    if source == FS.dir.current or V.flatten then
       for _, filetype in pairs(files) do
-        FS.cp(filetype, source, V.ctandir .. "/" .. V.ctanpkg)
+        FS.cp(filetype, source, FS.dir.ctan .. "/" .. V.ctanpkg)
       end
     else
       for _, filetype in pairs(files) do
         for file, _ in pairs(FS.tree(source, filetype)) do
           local path = FS.splitpath(file)
-          local ctantarget = V.ctandir .. "/" .. V.ctanpkg .. "/"
+          local ctantarget = FS.dir.ctan .. "/" .. V.ctanpkg .. "/"
             .. source .. "/" .. path
           FS.mkdir(ctantarget)
           FS.cp(file, source, ctantarget)
@@ -68,24 +70,24 @@ local function copyctan()
       V.scriptmanfiles,
       V.typesetlist
     }) do
-    copyfiles(tab, V.docfiledir)
+    copyfiles(tab, FS.dir.docfile)
   end
-  copyfiles(V.sourcefiles, V.sourcefiledir)
+  copyfiles(V.sourcefiles, FS.dir.sourcefile)
   for _,file in pairs(V.textfiles) do
-    FS.cp(file, V.textfiledir, V.ctandir .. "/" .. V.ctanpkg)
+    FS.cp(file, FS.dir.textfile, FS.dir.ctan .. "/" .. V.ctanpkg)
   end
 end
 
 function CTAN.bundlectan()
-  local errorlevel = Ins.install_files(V.tdsdir, true)
-  if errorlevel ~=0 then return errorlevel end
+  local error_n = Ins.install_files(FS.dir.tds, true)
+  if error_n ~=0 then return error_n end
   copyctan()
   return 0
 end
 
 function CTAN.ctan()
   -- Always run tests for all engines
-  Opts.engine = nil
+  Opts.engines = nil
   local function dirzip(dir, name)
     local zipname = name .. ".zip"
     local function tab_to_str(table)
@@ -114,28 +116,28 @@ function CTAN.ctan()
         binfiles .. (exclude and (" -x" .. exclude) or "")
     )
   end
-  local errorlevel
+  local error_n
   local standalone = false
   if V.bundle == "" then
     standalone = true
   end
   if standalone then
-    errorlevel = Aux.call({"."},"check")
+    error_n = Aux.call({"."},"check", Opts)
     V.bundle = module
   else
-    errorlevel = Aux.call(V.modules, "bundlecheck")
+    error_n = Aux.call(V.modules, "bundlecheck", Opts)
   end
-  if errorlevel == 0 then
-    FS.rmdir(V.ctandir)
-    FS.mkdir(V.ctandir .. "/" .. V.ctanpkg)
-    FS.rmdir(V.tdsdir)
-    FS.mkdir(V.tdsdir)
+  if error_n == 0 then
+    FS.rmdir(FS.dir.ctan)
+    FS.mkdir(FS.dir.ctan .. "/" .. V.ctanpkg)
+    FS.rmdir(FS.dir.tds)
+    FS.mkdir(FS.dir.tds)
     if standalone then
-      errorlevel = install_files(V.tdsdir, true)
-      if errorlevel ~=0 then return errorlevel end
+      error_n = install_files(FS.dir.tds, true)
+      if error_n ~=0 then return error_n end
       copyctan()
     else
-      errorlevel = Aux.call(V.modules, "bundlectan")
+      error_n = Aux.call(V.modules, "bundlectan", Opts)
     end
   else
     print([[
@@ -143,13 +145,13 @@ function CTAN.ctan()
 Tests failed, zip stage skipped!
 ====================
 ]])
-    return errorlevel
+    return error_n
   end
-  if errorlevel == 0 then
+  if error_n == 0 then
     for _, i in ipairs(V.textfiles) do
-      for _, j in pairs({ V.unpackdir, V.textfiledir }) do
-        FS.cp(i, j, V.ctandir .. "/" .. V.ctanpkg)
-        FS.cp(i, j, V.tdsdir .. "/doc/" .. V.tdsroot .. "/" .. V.bundle)
+      for _, j in pairs({ FS.dir.unpack, FS.dir.textfile }) do
+        FS.cp(i, j, FS.dir.ctan .. "/" .. V.ctanpkg)
+        FS.cp(i, j, FS.dir.tds .. "/doc/" .. V.tdsroot .. "/" .. V.bundle)
       end
     end
     -- Rename README if necessary
@@ -157,8 +159,8 @@ Tests failed, zip stage skipped!
             V.ctanreadme:lower():match("^readme%.%w+") then
       local newfile = "README." .. V.ctanreadme:match("%.(%w+)$")
       for _,dir in pairs({
-        V.ctandir .. "/" .. V.ctanpkg,
-        V.tdsdir .. "/doc/" .. V.tdsroot .. "/" .. V.bundle
+        FS.dir.ctan .. "/" .. V.ctanpkg,
+        FS.dir.tds .. "/doc/" .. V.tdsroot .. "/" .. V.bundle
       }) do
         if FS.fileexists(dir .. "/" .. V.ctanreadme) then
           FS.rm(dir, newfile)
@@ -166,12 +168,12 @@ Tests failed, zip stage skipped!
         end
       end
     end
-    dirzip(V.tdsdir, V.ctanpkg .. ".tds")
+    dirzip(FS.dir.tds, V.ctanpkg .. ".tds")
     if V.packtdszip then
-      FS.cp(V.ctanpkg .. ".tds.zip", V.tdsdir, V.ctandir)
+      FS.cp(V.ctanpkg .. ".tds.zip", FS.dir.tds, FS.dir.ctan)
     end
-    dirzip(V.ctandir, V.ctanzip)
-    FS.cp(V.ctanzip .. ".zip", V.ctandir, V.currentdir)
+    dirzip(FS.dir.ctan, V.ctanzip)
+    FS.cp(V.ctanzip .. ".zip", FS.dir.ctan, FS.dir.current)
   else
     print([[
 ====================
@@ -179,7 +181,7 @@ Typesetting failed, zip stage skipped!
 ====================
 ]])
   end
-  return errorlevel
+  return error_n
 end
 
 return CTAN

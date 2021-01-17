@@ -28,16 +28,18 @@ local stderr = io.stderr
 
 -- module
 
-local Args = Provide(Args)
+local Args = L3B.provide('Args')
 
 -- deep copy of arg
 
 Args.arg = {}
 
--- Parse command line options
+-- Definitions of command line options
+-- This is `target` agnostic.
+-- Some options provided may be useless at runtime.
 
-Args.option_list = {
-  config = {
+Args.defs = {
+  configs = {
     desc  = "Sets the config(s) used for running tests",
     short = "c",
     type  = "table"
@@ -62,7 +64,7 @@ Args.option_list = {
     desc = "Email address of CTAN uploader",
     type = "string"
   },
-  engine = {
+  engines = {
     desc  = "Sets the engine(s) to use for running test",
     short = "e",
     type  = "table"
@@ -95,9 +97,10 @@ Args.option_list = {
     type  = "boolean"
   },
   help = {
-    desc  = "Print this message and exit",
+    desc  = "Print this help message or a topic message and exit",
     short = "h",
-    type  = "boolean"
+    type  = "string",
+    optional  = true
   },
   last = {
     desc  = "Name of last test to run",
@@ -133,133 +136,223 @@ Args.option_list = {
     desc = "Print version information and exit",
     short = "v",
     type = "boolean"
+  },
+  -- aliases plural forms are ok
+  engine = {
+    alias = "engines",
   }
 }
 
--- This is done as a function (rather than do ... end) as it allows early
--- termination (break)
--- On success, `t` contains a deep copy of `arg`.
-Args.argparse = function (t, arg)
-  -- arg[1] is a special case: either a command or "-v"/"--version"
-  local arg_1 = arg[1]
-  if arg_1 == "--version" or arg_1 == "-v" then
-    return { target = "version" }
-  elseif arg_1 then
-    -- No options are allowed in position 1, so filter those out
-    if arg_1:match("^%-") then
-      return { target = "help" }
+---Recommanded usage `local target = Args:parse(arg, Opts)`
+---Except for version query, the receiver will contain
+---a deep copy of `arg`.
+---Populate the `opts` table from `arg` contents.
+---Does not remove previous `opt` contents. 
+---@param self table For example `Args`
+---@param arg table For example the `arg` global variable.
+---@param opts table For example the `Opts` global variable.
+---@return string the target, may be nil on bad command line input
+Args.parse = function (self, arg, opts)
+  -- arg[1] is a special case: either a command or "-v"|"--version"
+  local target = arg[1]
+  if target == "--version" or target == "-v" then
+    return "version"
+  elseif target then
+    -- No other options are allowed in position 1, so filter those out
+    if target:match("^%-") then
+      return
     end
   else
-    return { target = "help" }
+    return
   end
-  -- make a deep copy first
-  t.arg = {}
-  for i = 1, #arg do
-    t.arg[i] = arg[i]
-  end
-  local result = {
-    target = arg_1
-  }
-  local opts =  {}
-  local unik = {}
-  -- Turn long/short options into two lookup tables
-  for k, v in pairs(t.option_list) do
-    if v.short then
-      assert(not unik[v.short])
-      unik[v.short] = true
-      opts[v.short] = k
+  -- normalize short option to long: `f` or `foo` -> `foo`
+  local opt_by_key = {}
+  local alias = {}
+  do
+    local unik = {}
+    for k, v in pairs(self.defs) do
+      local a = v.alias
+      if a then
+        assert(self.defs[a])
+        alias[v] = a
+      else
+        alias[v] = v
+        local s = v.short
+        if s then
+          assert(not unik[s])
+          unik[s] = true
+          opt_by_key[s] = k
+        end
+        assert(not unik[k])
+        unik[k] = true
+        opt_by_key[k] = k
+      end
     end
-    assert(not unik[k])
-    unik[k] = true
-    opts[k] = k
-  end
-  -- An auxiliary to grab all file names into a table
-  local function remainder(num)
-    local ans = {}
-    for i = num, #arg do
-      ans[#ans+1] = arg[i]
-    end
-    return ans
   end
   -- Examine all other arguments
   -- Use a while loop rather than for as this makes it easier
   -- to grab arg for optionals where appropriate
-  local names  = {}
-  local i = 2
-  while i <= #arg do
-    local arg_i = arg[i]
-    -- Terminate search for options
-    if arg_i == "--" then
-      names = remainder(i + 1)
-      break
+  local i = 1
+  local l_opts
+  ---next arguments are collected in a table named `names`.
+  local function collect_remainder()
+    local t  = {}
+    while i < #arg do
+      i = i + 1
+      t[#t + 1] = arg[i]
     end
-    -- Look for optionals
-    local opt
-    local opt_arg
-    -- Look for and option and get it into a variable
-    if arg_i:match("^%-") then
-      local is_long = arg_i:match("^%-%-")
-      if is_long then
-        local n = arg_i:find("=", 1, true)
-        if n then
-          opt    = arg_i:sub(3, n - 1)
-          opt_arg = arg_i:sub(n + 1)
-        else
-          opt = arg_i:sub(3)
+    if t[1] then
+      l_opts.names = t
+    end
+  end
+  -- start
+  while i < #arg do
+    i = i + 1
+    local arg_i = arg[i]
+    ::will_arg_i_match:: -- sometimes arg_i is already available
+    local one, two = arg_i:match("^(%-)(%-?)")
+    if one then -- this is an option
+      ::did_if_one::
+      local key, value -- `--key=value` or `-kvalue`
+      if #two then
+        if #arg_i > 2 then
+          local n = arg_i:find("=", 4, true)
+          if n then
+            key   = arg_i:sub(3, n - 1)
+            value = arg_i:sub(n + 1)
+          else
+            key   = arg_i:sub(3)
+          end
+        else -- arg_i is `--`
+          collect_remainder()
+          break
         end
       else
-        opt  = arg_i:sub(2, 2)
-        -- Only set optarg if it is there
-        if #arg_i > 2 then
-          opt_arg = arg_i:sub(3)
-        end
+        key   = arg_i:sub(2, 2)
+        value = arg_i:sub(3)
       end
       -- Now check that the option is valid and sort out the argument
       -- if required
-      local opt_name = opts[opt]
-      if not opt_name then
-        stderr:write("Unknown option " .. arg_i .."\n")
-        return { target = "help" }
-      end
-      -- Tidy up arguments
-      if t.option_list[opt_name].type == "boolean" then
-        if opt_arg then
-          opt = (is_long and "--" or "-") .. opt
-          stderr:write("Value not allowed for option " .. opt .."\n")
-          return { target = "help" }
-        end
-      elseif not opt_arg then
-        i = i + 1
-        opt_arg = arg[i]
-        if not opt_arg then
-          stderr:write("Missing value for option " .. arg_i .."\n")
-          return { target = "help" }
-        end
-      end
-      -- Store the result
-      if opt_arg then
-        if t.option_list[opt_name].type == "string" then
-          result[opt_name] = opt_arg
-        else
-          local opt_args = result[opt_name] or {}
-          for hit in opt_arg:gmatch("([^,%s]+)") do
-            opt_args[#opt_args+1] = hit
+      key = alias[key] or key
+      local opt = opt_by_key[key]
+      if opt then -- normalized known option
+        local def = self.defs[opt] -- option definition
+        local type = def.type
+        if type == "boolean" then -- lookup special values
+          local b = true -- default
+          if value == "true" or value == "on" then
+            ;
+          elseif value == "false" or value == "off" then
+            b = false
+          elseif value then
+            L3B:error("Unsupported value %s for option -%s%s",
+                      value, two, key)
+            return
+          else -- next argument may be sepcail
+            i = i + 1
+            arg_i = arg[i]
+            if arg_i == "true" or arg_i == "on" then
+              ;
+            elseif arg_i == "false" or arg_i == "off" then
+              b = false
+            else -- nothing special
+              l_opts[opt] = b
+              if arg_i then -- nothing special
+                goto will_arg_i_match
+              else
+                break
+              end
+            end
           end
-          result[opt_name] = opt_args
+          l_opts[opt] = b
+        elseif def.optional then -- optional string
+          if not value then
+            i = i + 1
+            arg_i = arg[i]
+            if arg_i then
+              one, two = arg_i:match("^(%-)(%-?)")
+              if one then
+                l_opts[opt] = true -- "boolean"
+                goto did_if_one
+              end
+              l_opts[opt] = arg_i
+            else
+              l_opts[opt] = true -- "boolean"
+            end
+          end
+          l_opts[opt] = value
+        else -- not a "boolean", require a value
+          if not value then
+            i = i + 1
+            value = arg[i]
+            if not value then
+              L3B:error("Missing value for option -%s%s", two, key)
+              return
+            end
+          end
+          if type == "string" then
+            l_opts[opt] = value
+          else -- type == "table"
+            local t = l_opts[opt] or {}
+            for hit in value:gmatch("([^,%s]+)") do
+              t[#t + 1] = hit
+            end
+            l_opts[opt] = t
+          end
         end
-      else
-        result[opt_name] = true
+      elseif #two then -- custom long option (new in 2021)
+        if key:find("s$") then -- ending 's' for a "table"
+          if not value then
+            i = i + 1
+            value = arg[i]
+            if not value then
+              L3B:error("Missing value for option --" .. key)
+              return
+            end
+          end
+          local t = l_opts[opt] or {}
+          for hit in value:gmatch("([^,%s]+)") do
+            t[#t + 1] = hit
+          end
+          l_opts[opt] = t
+        else -- "string" or "boolean"
+          if not value then
+            i = i + 1
+            arg_i = arg[i]
+            if arg_i then
+              one, two = arg_i:match("^(%-)(%-?)")
+              if one then
+                l_opts[opt] = true -- "boolean"
+                goto did_if_one
+              end
+              value = arg_i
+            else
+              l_opts[opt] = true -- "boolean"
+              break
+            end
+          end
+          l_opts[opt] = value or true
+        end
+        L3B:info("Custom option --" .. key)
+      else -- custom short options are not supported
+        L3B:error("Unsupported option -", key)
+        return
       end
-      i = i + 1
-    else
-      names = remainder(i)
+    else -- Not an option
+      collect_remainder()
       break
     end
   end
-  if names[1] then
-   result.names = names
+  -- Success: make a deep copy first
+  self.arg = {}
+  for j = 1, #arg do
+    self.arg[j] = arg[j]
   end
-  return result
+  -- finally copy the local options to the `opts` argument
+  for k, v in pairs(l_opts) do
+    opts[k] = v
+  end
+  return target
 end
 
 return Args

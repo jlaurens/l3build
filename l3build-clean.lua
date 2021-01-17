@@ -27,7 +27,7 @@ function clean()
   -- To make sure that distribdir never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
   -- all of the files
-  local errorlevel =
+  local error_n =
     FS.rmdir(distribdir)    +
     FS.mkdir(distribdir)    +
     FS.cleandir(localdir)   +
@@ -35,10 +35,10 @@ function clean()
     FS.cleandir(typesetdir) +
     FS.cleandir(unpackdir)
 
-  if errorlevel ~= 0 then return errorlevel end
+  if error_n ~= 0 then return error_n end
 
   local clean_list = {}
-  for _, dir in pairs(FS.remove_duplicates({maindir, sourcefiledir, docfiledir})) do
+  for _, dir in pairs(FS.without_duplicates({maindir, sourcefiledir, docfiledir})) do
     for _, glob in pairs(cleanfiles) do
       for file, _ in pairs(FS.tree(dir, glob)) do
         clean_list[file] = true
@@ -50,8 +50,8 @@ function clean()
       end
     end
     for file, _ in pairs(clean_list) do
-      errorlevel = FS.rm(dir, file)
-      if errorlevel ~= 0 then return errorlevel end
+      error_n = FS.rm(dir, file)
+      if error_n ~= 0 then return error_n end
     end
   end
 
@@ -59,13 +59,13 @@ function clean()
 end
 
 function bundleclean()
-  local errorlevel = call(modules, "clean")
+  local error_n = Aux.call(modules, "clean", Opts)
   for _, i in ipairs(cleanfiles) do
-    errorlevel = FS.rm(Vars.currentdir, i) + errorlevel
+    error_n = FS.rm(FS.dir.current, i) + error_n
   end
   return (
-    errorlevel     +
-    FS.rmdir(Vars.ctandir) +
+    error_n     +
+    FS.rmdir(FS.dir.ctan) +
     FS.rmdir(tdsdir)
   )
 end

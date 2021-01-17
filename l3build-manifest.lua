@@ -33,11 +33,11 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
-manifest = manifest or function()
+manifest = manifest or function ())
 
   -- build list of ctan files
   ctanfiles = {}
-  for _, f in ipairs(FS.filelist(Vars.ctandir.."/"..Vars.ctanpkg,"*.*")) do
+  for _, f in ipairs(FS.filelist(FS.dir.ctan.."/"..Vars.ctanpkg,"*.*")) do
     ctanfiles[f] = true
   end
   tdsfiles = {}
@@ -65,7 +65,7 @@ end
       ---------------------------------------
 --]]
 
-manifest_build_list = function(entry)
+manifest_build_list = function ()entry)
 
   if not(entry.subheading) then
 
@@ -103,7 +103,7 @@ manifest_build_list = function(entry)
 end
 
 
-manifest_build_init = function(entry)
+manifest_build_init = function ()entry)
 
   -- currently these aren't customisable; I guess they could be?
   local manifest_group_defaults = {
@@ -152,7 +152,7 @@ manifest_build_init = function(entry)
 end
 
 
-manifest_build_file = function(entry, this_file)
+manifest_build_file = function ()entry, this_file)
 
   if entry.rename then
     this_file = this_file:gsub(entry.rename[1], entry.rename[2])
@@ -193,7 +193,7 @@ end
       ----------------------------------
 --]]
 
-manifest_write = function(manifest_entries)
+manifest_write = function ()manifest_entries)
 
   local f = assert(io.open(manifestfile, "w"))
   manifest_write_opening(f)
@@ -211,7 +211,7 @@ manifest_write = function(manifest_entries)
 end
 
 
-manifest_write_group = function(f, entry)
+manifest_write_group = function ()f, entry)
 
   manifest_write_group_heading(f, entry.name, entry.description)
 

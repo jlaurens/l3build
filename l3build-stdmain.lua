@@ -24,24 +24,33 @@ for those people who are interested.
 
 -- local safe guards
 
-local exit   = os.exit
-local lfs = Require(lfs)
+local exit = os.exit
+local rep  = string.rep
+local sort = table.sort
+
+local lfs  = require('lfs')
+
+local L3B = L3B
+local Opts = Opts
 
 -- Global tables
 
-local OS   = Require(OS)
-local Aux  = Require(Aux)
-local Args = Require(Args)
-local Opts = Require(Opts)
-local V    = Require(Vars)
-local CTAN = Require(CTAN)
-local Chk  = Require(Chk)
-local Cln  = Require(Cln)
+local OS   = L3B.require('OS')
+local FS   = L3B.require('FS')
+local Aux  = L3B.require('Aux')
+local Args = L3B.require('Args')
+local V    = L3B.require('Vars')
+local CTAN = L3B.require('CTAN')
+local Chk  = L3B.require('Chk')
+local Cln  = L3B.require('Cln')
+local Pack = L3B.require('Pack')
 
-local Main = Provide(Main)
+-- Declare module
+
+local Main = L3B.provide('Main')
 
 -- List all modules
-local function listmodules()
+local function get_test_modules()
   local modules = {}
   local exclmodules = V.exclmodules
   for entry in lfs.dir(".") do
@@ -58,13 +67,13 @@ local function listmodules()
   return modules
 end
 
-Main.target_list = {
+Main.target_defs = { -- global target_list
   -- Some hidden targets
   bundlecheck = {
     func = Chk.check,
-    pre  = function()
+    pre  = function ()
       if Opts.names then
-        print("Bundle checks should not list test names")
+        L3B.warning("Bundle checks should not list test names")
         Main.help()
         exit(1)
       end
@@ -75,8 +84,8 @@ Main.target_list = {
     func = CTAN.bundlectan
   },
   bundleunpack = {
-    func = bundleunpack,
-    pre  = function() return(Aux.depinstall(unpackdeps)) end
+    func = V.bundleunpack,
+    pre  = function () return Aux.depinstall(V.unpackdeps) end
   },
   -- Public targets
   check = {
@@ -111,18 +120,18 @@ Main.target_list = {
     func = save
   },
   tag = {
-    bundle_func = function(names)
-      local modules = V.modules or listmodules()
-      local errorlevel = OS.call(modules, "tag")
+    bundle_func = function (names)
+      local modules = V.modules or get_test_modules()
+      local error_n = Aux.call(modules, "tag", Opts)
       -- Deal with any files in the bundle dir itself
-      if errorlevel == 0 then
-        errorlevel = tag(names)
+      if error_n == 0 then
+        error_n = tag(names)
       end
-      return errorlevel
+      return error_n
     end,
     desc = "Updates release tags in files",
     func = tag,
-    pre  = function(names)
+    pre  = function (names)
       if names and #names > 1 then
         print("Too many tags specified; exactly one required")
         exit(1)
@@ -149,46 +158,43 @@ Main.target_list = {
 -- The overall main function
 --
 
-function Main.stdmain(target, names)
+function Main.other(target, opts)
+  local names = opts.names
   -- Deal with unknown targets up-front
-  if not Main.target_list[target] then
-    Main.help()
-    exit(1)
+  local def_t = Main.target_defs[target]
+  if not def_t then
+    return
   end
-  local errorlevel = 0
+  local error_level = 0
   if module == "" then
-    V.modules = V.modules or listmodules()
-    if Main.target_list[target].bundle_func then
-      errorlevel = Main.target_list[target].bundle_func(names)
+    V.modules = V.modules or get_test_modules()
+    if def_t.bundle_func then
+      error_level = def_t.bundle_func(names)
     else
       -- Detect all of the modules
-      if Main.target_list[target].bundle_target then
+      if def_t.bundle_target then
         target = "bundle" .. target
       end
-      errorlevel = call(V.modules, target)
+      error_level = Aux.call(V.modules, target, Opts)
     end
   else
-    if Main.target_list[target].pre then
-     errorlevel = Main.target_list[target].pre(names)
-     if errorlevel ~= 0 then
+    if def_t.pre then
+     error_level = def_t.pre(names)
+     if error_level ~= 0 then
        exit(1)
      end
     end
-    errorlevel = Main.target_list[target].func(names)
+    error_level = def_t.func(names)
   end
   -- All done, finish up
-  if errorlevel ~= 0 then
+  if error_level ~= 0 then
     exit(1)
   else
-    exit(0)
+    return true
   end
 end
 
-local match  = string.match
-local rep    = string.rep
-local sort   = table.sort
-
-Main.version = function ()
+function Main.version()
   print([[
 l3build: A testing and building system for LaTeX
 
@@ -197,7 +203,7 @@ Copyright (C) 2014-2020 The LaTeX3 Project
 ]])
 end
 
-Main.help = function (arg0)
+function Main.help(topic)
   local function setup_list(list)
     local longest = 0
     for k, _ in pairs(list) do
@@ -214,32 +220,33 @@ Main.help = function (arg0)
     return longest, t
   end
 
-  local scriptname = "l3build"
-  if not (arg0:match("l3build%.lua$") or arg0:match("l3build$")) then
-    scriptname = arg0
-  end
+  local arg_0 = Args.arg[0]
+  local scriptname =
+    not (arg_0:match("l3build%.lua$") or arg_0:match("l3build$"))
+      and "l3build"
+      or  arg_0
   print("usage: " .. scriptname .. [[ <target> [<options>] [<names>]
 ]])
   print("Valid targets are:")
-  local longest, t = setup_list(Main.target_list)
+  local longest, t = setup_list(Main.target_defs)
   for _, k in ipairs(t) do
-    local target = Main.target_list[k]
+    local target = Main.target_defs[k]
     local filler = rep(" ", longest - #k + 1)
-    if target["desc"] then
-      print("   " .. k .. filler .. target["desc"])
+    if target.desc then
+      print("   " .. k .. filler .. target.desc)
     end
   end
   print("")
   print("Valid options are:")
-  longest, t = setup_list(Args.option_list)
+  longest, t = setup_list(Args.list)
   for _, k in ipairs(t) do
-    local opt = Args.option_list[k]
+    local opt = Args.list[k]
     local filler = rep(" ", longest - #k + 1)
-    if opt["desc"] then
-      if opt["short"] then
-        print("   --" .. k .. "|-" .. opt["short"] .. filler .. opt["desc"])
+    if opt.desc then
+      if opt.short then
+        print("   --" .. k .. "|-" .. opt.short .. filler .. opt.desc)
       else
-        print("   --" .. k .. "   " .. filler .. opt["desc"])
+        print("   --" .. k .. "   " .. filler .. opt.desc)
       end
     end
   end
@@ -252,68 +259,78 @@ Copyright (C) 2014-2020 The LaTeX3 Project
 ]])
 end
 
-function Main.preflight ()
-  Vars:finalize(Opts)
-    
-  --
-  -- Deal with multiple configs for tests
-  --
-  
-  -- When we have specific files to deal with, only use explicit configs
-  -- (or just the std one)
-  if Opts.names then
-    V.checkconfigs = Opts.config or {stdconfig} -- What is stdconfig?
-  else
-    V.checkconfigs = Opts.config or V.checkconfigs
+function Main.expose_globals(target, opts)
+  L3B.expose(OS)
+  L3B.expose(FS)
+  L3B.expose(V)
+  L3B.unexpose() -- global internals are no longer available
+  _ENV.target = target
+  _ENV.options = opts
+  -- compatibility code: deprecated `options.target`
+  if not opts.getmetatable() and not opts.target then
+    setmetatable(opts, {
+      __index = function (self, key)
+        if key == 'target' then
+          if not self.already_deprecated__ then
+            self.already_deprecated__ = true
+            L3B.info('`options.target` is deprecated, use `target` instead.')
+          end
+          return target
+        end
+      end
+    })
   end
-  
-  if Opts.target == "check" then
-    if #V.checkconfigs > 1 then
-      local errorlevel = 0
-      local failed = {}
-      for i = 1, #V.checkconfigs do
-        Opts.config = { V.checkconfigs[i] }
-        errorlevel = OS.call({ "." }, "check", Opts) -- remove the 3rd argument
-        if errorlevel ~= 0 then
-          if Opts["halt-on-error"] then
-            exit(1)
-          else
-            failed[#failed+1] = checkconfigs[i]
-          end
-        end
-      end
-      if #failed > 0 then
-        for _,config in ipairs(failed) do
-          print("Failed tests for configuration " .. config .. ":")
-          print("\n  Check failed with difference files")
-          local testdir = V.testdir
-          if config ~= "build" then
-            V.resultdir = V.resultdir .. "-" .. config
-            testdir = V.testdir .. "-" .. config
-          end
-          for _, i in ipairs(FS.filelist(testdir, "*" .. OS.diffext)) do
-            print("  - " .. V.testdir .. "/" .. i)
-          end
-          print("")
-        end
-        exit(1)
-      else
-        -- Avoid running the 'main' set of tests twice
-        exit(0)
-      end
+end
+
+function Main.dofile_build()
+  local arg_0 = Args.arg[0]
+  if arg_0:match("l3build$") or arg_0:match("l3build%.lua$") then
+    -- Look for some configuration details
+    if FS.fileexists("build.lua") then
+      dofile("build.lua")
+    else
+      L3B.error(1, "Error: Cannot find configuration build.lua")
     end
   end
+end
+
+function Main.finalize_one_config()
   local checkconfigs_1 = V.checkconfigs[1]
   if checkconfigs_1 and checkconfigs_1 ~= "build" and
-     (Opts.target == "check" or Opts.target == "save" or Opts.target == "clean") then
-     local config = "./" .. checkconfigs_1:gsub(".lua$","") .. ".lua"
-     if FS.fileexists(config) then
-       dofile(config)
-       Vars:finalize_one_config(checkconfigs_1, _ENV)
-     else
-       print("Error: Cannot find configuration " ..  checkconfigs_1)
-       exit(1)
-     end
+    (target == "check" or target == "save" or target == "clean") then
+    local build_lua = "./" .. checkconfigs_1:gsub(".lua$","") .. ".lua"
+    if FS.fileexists(build_lua) then
+      dofile(build_lua)
+      V:finalize_one_config(checkconfigs_1, _ENV)
+    else
+      L3B.error(1, "Cannot find configuration " ..  checkconfigs_1)
+    end
+  end
+end
+
+function Main.finalize(opts)
+  V:finalize(opts)
+  Chk.check_many()
+  Main.finalize_one_config()
+  Pack:finalize()
+end
+
+function Main.main(opts)
+  opts = opts or Opts
+  local target = Args:parse(arg, opts)
+  if target == "help" then
+    Main.help(opts.help)
+  elseif target == "version" then
+    Main.version()
+  elseif target then
+    Main.expose_globals(target, opts)
+    Main.dofile_build()
+    Main.finalize(opts)
+    if not Main.other(target, opts) and not Main.custom(target, opts) then
+      Main.help()
+    end
+  else -- no target
+    Main.help()
   end
 end
 

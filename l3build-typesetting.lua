@@ -37,18 +37,18 @@ local match = string.match
 
 -- Global tables
 
-local OS  = Require(OS)
-local Aux = Require(Aux)
-local V   = Require(Vars)
+local OS  = L3B.require('OS')
+local Aux = L3B.require('Aux')
+local V   = L3B.require('Vars')
 
 -- Module
 
-local Tpst = Provide(Tpst)
+local Tpst = L3B.provide('Tpst')
 
 function Tpst.dvitopdf(name, dir, engine, hide)
   OS.run(
     dir,
-    (V.forcecheckepoch and Aux.setepoch(V.epoch) or "") ..
+    (V.forcecheckepoch and Aux.set_epoch_cmd(V.epoch) or "") ..
     "dvips " .. name .. V.dviext
       .. (hide and (" > " .. OS.null) or "")
       .. OS.concat ..
@@ -78,7 +78,7 @@ function runcmd(cmd, dir, vars)
   for _, var in pairs(vars) do
     env = env .. OS.concat .. OS.setenv .. " " .. var .. "=" .. envpaths
   end
-  return OS.run(dir, (forcedocepoch and Aux.setepoch(V.epoch) or "") .. env .. OS.concat .. cmd)
+  return OS.run(dir, (forcedocepoch and Aux.set_epoch_cmd(V.epoch) or "") .. env .. OS.concat .. cmd)
 end
 
 function biber(name, dir)
@@ -146,39 +146,39 @@ local function typesetpdf(file, dir)
     fn = specialtypesetting[file].func or fn
     cmd = specialtypesetting[file].cmd or cmd
   end
-  local errorlevel = fn(file, dir, cmd)
-  if errorlevel ~= 0 then
+  local error_n = fn(file, dir, cmd)
+  if error_n ~= 0 then
     print(" ! Compilation failed")
-    return errorlevel
+    return error_n
   end
   pdfname = name .. pdfext
   FS.rm(docfiledir, pdfname)
   return FS.cp(pdfname, dir, docfiledir)
 end
 
-typeset = typeset or function(file, dir, exe)
+typeset = typeset or function ()file, dir, exe)
   dir = dir or "."
-  local errorlevel = tex(file, dir, exe)
-  if errorlevel ~= 0 then
-    return errorlevel
+  local error_n = tex(file, dir, exe)
+  if error_n ~= 0 then
+    return error_n
   end
   local name = FS.jobname(file)
-  errorlevel = biber(name, dir) + bibtex(name, dir)
-  if errorlevel ~= 0 then
-    return errorlevel
+  error_n = biber(name, dir) + bibtex(name, dir)
+  if error_n ~= 0 then
+    return error_n
   end
   for i = 2, typesetruns do
-    errorlevel =
+    error_n =
       makeindex(name,dir,".glo",".gls",".glg",glossarystyle) +
       makeindex(name,dir,".idx",".ind",".ilg",indexstyle)    +
       tex(file, dir, exe)
-    if errorlevel ~= 0 then break end
+    if error_n ~= 0 then break end
   end
-  return errorlevel
+  return error_n
 end
 
 -- A hook to allow additional typesetting of demos
-typeset_demo_tasks = typeset_demo_tasks or function()
+typeset_demo_tasks = typeset_demo_tasks or function ())
   return 0
 end
 
@@ -201,20 +201,20 @@ local function docinit()
   depinstall(typesetdeps)
   unpack({sourcefiles, typesetsourcefiles}, {sourcefiledir, docfiledir})
   -- Main loop for doc creation
-  local errorlevel = typeset_demo_tasks()
-  if errorlevel ~= 0 then
-    return errorlevel
+  local error_n = typeset_demo_tasks()
+  if error_n ~= 0 then
+    return error_n
   end
   return docinit_hook()
 end
 
-docinit_hook = docinit_hook or function() return 0 end
+docinit_hook = docinit_hook or function ()) return 0 end
 
 -- Typeset all required documents
 -- Uses a set of dedicated auxiliaries that need to be available to others
 function doc(files)
-  local errorlevel = docinit()
-  if errorlevel ~= 0 then return errorlevel end
+  local error_n = docinit()
+  if error_n ~= 0 then return error_n end
   local done = {}
   for _, typesetfiles in ipairs({typesetdemofiles, typesetfiles}) do
     for _, glob in pairs(typesetfiles) do
@@ -236,9 +236,9 @@ function doc(files)
             end
             -- Now know if we should typeset this source
             if typeset then
-              local errorlevel = typesetpdf(srcname, path)
-              if errorlevel ~= 0 then
-                return errorlevel
+              local error_n = typesetpdf(srcname, path)
+              if error_n ~= 0 then
+                return error_n
               else
                 done[name] = true
               end

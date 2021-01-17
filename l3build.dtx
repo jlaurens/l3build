@@ -1119,7 +1119,7 @@
 % of the current test (this is equivalent to \TeX{}'s \cs{jobname},
 % \emph{i.e.}~it lacks an extension) and the current run number.
 % The function |runtest_tasks| is run after the main call to the
-% engine for a test cycle. It should return an errorlevel value.
+% engine for a test cycle. It should return an error_n value.
 % If more than one task is required, these should be separated
 % by use of |os_concat|, a string variable defined by \pkg{l3build} as the
 % correct concatenation marker for the system. An example of |runtest_tasks|
@@ -1381,10 +1381,10 @@
 %
 %     function typeset(file)
 %       local name = jobname(file)
-%       local errorlevel = tex (file)
-%       if errorlevel == 0 then
-%         -- Return a non-zero errorlevel if anything goes wrong
-%         errorlevel =(
+%       local error_n = tex (file)
+%       if error_n == 0 then
+%         -- Return a non-zero error_n if anything goes wrong
+%         error_n =(
 %           bibtex(name) +
 %           tex(file)    +
 %           bibtex(name) +
@@ -1392,7 +1392,7 @@
 %           tex(file)
 %         )
 %       end
-%       return errorlevel
+%       return error_n
 %     end
 %   \end{lstlisting}
 %   \caption{A customised PDF creation script.}
@@ -1909,7 +1909,7 @@
 % The setup code for defining each group of files within the manifest looks something like
 % the following:
 % \begin{verbatim}
-% manifest_setup = function()
+% manifest_setup = function ())
 %   local groups = {
 %     {
 %        subheading = "Repository files",
@@ -1997,7 +1997,7 @@
 % By default this is a no-op but can be edited by redefining the |manifest_sort_within_group|
 % function. For example:
 % \begin{verbatim}
-% manifest_sort_within_group = function(files)
+% manifest_sort_within_group = function ()files)
 %   local f = files
 %   table.sort(f)
 %   return f
@@ -2022,7 +2022,7 @@
 % For example, perhaps you are using multiple |.dtx| files for a project and the argument
 % to the first |\section| in each can be used as a file description:
 % \begin{verbatim}
-% manifest_extract_filedesc = function(filehandle,filename)
+% manifest_extract_filedesc = function ()filehandle,filename)
 %
 %   local all_file = filehandle:read("*all")
 %   local matchstr = "\\section{(.-)}"

@@ -22,36 +22,93 @@ for those people who are interested.
 
 --]]
 
+-- local safe guards
+
 local pairs            = pairs
-local print            = print
-
 local open             = io.open
+local remove           = os.remove
 
-local attributes       = lfs.attributes -- lfs is a global variable
-local Vars.currentdir       = lfs.Vars.currentdir
+local currentdir       = lfs.currentdir -- lfs is a global variable
+local attributes       = lfs.attributes
 local chdir            = lfs.chdir
 local lfs_dir          = lfs.dir
 
-local execute          = os.execute
-local exit             = os.exit
-local getenv           = os.getenv
-local remove           = os.remove
+local L3B = L3B
 
-local match            = string.match
-local sub              = string.sub
-local gmatch           = string.gmatch
-local gsub             = string.gsub
+-- global tables
 
-local insert           = table.insert
+local OS = L3B.require(OS)
 
-local FS = {}
+-- Module
 
+local FS = L3B.provide(FS)
+
+FS.dir = {
+  -- Directory structure for the build system
+  -- Use Unix-style path separators
+  current = "./",
+  main    = "./",
+  -- Substructure for file locations
+  docfile    = "./",
+  sourcefile = "./",
+  textfile   = "./",
+  testfile   = "./testfiles/",
+  enable_cache = function (self, yorn)
+    self.cache_enabled__ = yorn
+  end
+}
+
+-- dependant paths. When not provided by the global environment,
+-- build the path
+setmetatable(FS.dir, {
+  __index = function (t, key)
+    local ans = _ENV[key .. 'dir']
+    if ans then
+      ;
+    elseif key == "support" then
+      ans = t.main .. key
+    elseif key == "texmf" then
+      ans = t.main .. key
+    -- Structure within a development area
+    elseif key == "build" then
+      ans = t.main .. key
+    elseif key == "distrib" then
+      ans = t.build .. key
+    elseif key == "local" then
+      ans = t.build .. key
+    elseif key == "result" then
+      ans = t.build .. key
+    elseif key == "test" then
+      ans = t.build .. key
+    elseif key == "doc" then
+      ans = t.build .. key
+    elseif key == "unpacked" then
+      ans = t.build .. key
+    -- Substructure for CTAN release material
+    elseif key == "ctan" then
+      ans = t.distrib .. key
+    elseif key == "tds" then
+      ans = t.distrib .. key
+    -- special and aliases
+    elseif key == "test_support" then
+      ans = t.testfile .. "/support"
+    elseif key == "testsupp" then
+      ans = t.test_support
+    elseif key == "unpack" then
+      ans = t.unpacked
+    elseif key == "typeset" then
+      ans = t.doc
+    end
+    if ans and t.cache_enabled__ then
+      t.key = ans -- next time ans will be found
+    end
+    return ans
+  end
+})
 -- Convert a file glob into a pattern for use by e.g. string.gsub
 -- Based on https://github.com/davidm/lua-glob-pattern
--- Simplified substantially: "[...]" syntax not supported as is not
--- required by the file patterns used by the team. Also note style
--- changes to match coding approach in rest of this file.
---
+-- No more simplification because third party may use it.
+-- Support for `**`.
 -- License for original globtopattern
 --[[
 
@@ -78,121 +135,264 @@ local FS = {}
 
 --]]
 
+---Lua pattern from a glob.
+---@param glob string
+---@return string
 function FS.glob_to_pattern(glob)
-
   local pattern = "^" -- pattern being built
   local i = 0 -- index in glob
-  local char -- char at index i in glob
-
   -- escape pattern char
-  local function escape(chr)
-    return match(chr, "^%w$") and chr or "%" .. chr
+  local function escape(char)
+    return char:match("^%w$") and char or "%" .. char
   end
-
+  local function push(s)
+    pattern = pattern .. s
+  end
   -- Convert tokens.
+  local star = false
   while true do
     i = i + 1
-    char = sub(glob, i, i)
+    local char = glob:sub(i, i)
+    ::will_if_char::
     if char == "" then
-      pattern = pattern .. "$"
+      push("$")
       break
     elseif char == "?" then
-      pattern = pattern .. "."
+      push(".")
     elseif char == "*" then
-      pattern = pattern .. ".*"
+      i = i + 1
+      char = glob:sub(i, i)
+      if char == "*" then
+        if star then
+          L3B.error("`**` syntax not supported in simple globs!")
+        end
+      end
+      push(".*")
+      goto will_if_char
+    elseif char == "/" then
+      -- Ignored
+      L3B.error("`/` syntax not supported in simple globs!")
     elseif char == "[" then
       -- Ignored
-      print("[...] syntax not supported in globs!")
+      L3B.error("`[...]` syntax not supported in simple globs!")
     elseif char == "\\" then
       i = i + 1
-      char = sub(glob, i, i)
+      char = glob:sub(i, i)
       if char == "" then
-        pattern = pattern .. "\\$"
+        push("\\$")
         break
       end
-      pattern = pattern .. escape(char)
+      push(escape(char))
     else
-      pattern = pattern .. escape(char)
+      push(escape(char))
     end
   end
   return pattern
 end
 
+---Lua pattern from a subset of unix globs. See above.
+---@param g string
+---@return string
+function FS.unix_glob_to_pattern(g)
+  g =  g:gsub("^%./", "")
+        :gsub("/%./", "/")
+        :gsub("[^/+]/%.%./", "")
+        :gsub("//", "/")
+
+  local p = "^"  -- pattern being built
+  local i = 0    -- index in g
+
+  -- unescape glob char
+  local function unescape(c)
+    if c == '\\' then
+      i = i + 1; c = g:sub(i,i)
+      if c == '' then
+        p = '[^]'
+        return false
+      end
+    end
+    return true
+  end
+
+  -- escape pattern char
+  local function escape(c)
+    return c:match("^%w$") and c or '%' .. c
+  end
+
+  -- Convert tokens at end of charset.
+  local function charset_end(c)
+    while 1 do
+      if c == '' then
+        p = '[^]'
+        return false
+      elseif c == ']' then
+        p = p .. ']'
+        break
+      else
+        if not unescape(c) then break end
+        local c1 = c
+        i = i + 1; c = g:sub(i,i)
+        if c == '' then
+          p = '[^]'
+          return false
+        elseif c == '-' then
+          i = i + 1; c = g:sub(i,i)
+          if c == '' then
+            p = '[^]'
+            return false
+          elseif c == ']' then
+            p = p .. escape(c1) .. '%-]'
+            break
+          else
+            if not unescape(c) then break end
+            p = p .. escape(c1) .. '-' .. escape(c)
+          end
+        elseif c == ']' then
+          p = p .. escape(c1) .. ']'
+          break
+        else
+          p = p .. escape(c1)
+          i = i - 1 -- put back
+        end
+      end
+      i = i + 1; c = g:sub(i,i)
+    end
+    return true
+  end
+
+  -- Convert tokens in charset.
+  local function charset(c)
+    i = i + 1; c = g:sub(i,i)
+    if c == '' or c == ']' then
+      p = '[^]'
+      return false
+    elseif c == '^' or c == '!' then
+      i = i + 1; c = g:sub(i,i)
+      if c == ']' then
+        -- ignored
+      else
+        p = p .. '[^'
+        if not charset_end(c) then return false end
+      end
+    else
+      p = p .. '['
+      if not charset_end(c) then return false end
+    end
+    return true
+  end
+
+  -- Convert tokens.
+  while 1 do
+    i = i + 1; local c = g:sub(i,i)
+    ::if_c::
+    if c == '' then
+      p = p .. '$'
+      break
+    elseif c == '?' then
+      p = p .. '[^/]'
+    elseif c == '*' then
+      i = i + 1; c = g:sub(i,i)
+      if c == '*' then
+        p = p .. '.*'
+      else
+        p = p .. '[^/]*'
+        goto if_c
+      end
+    elseif c == '[' then
+      if not charset(c) then break end
+    elseif c == '\\' then
+      i = i + 1; c = g:sub(i,i)
+      if c == '' then
+        p = p .. '\\$'
+        break
+      end
+      p = p .. escape(c)
+    else
+      p = p .. escape(c)
+    end
+  end
+  return p
+end
+
 -- Deal with the fact that Windows and Unix use different path separators
-local function unix_to_win(path)
-  return gsub(path, "/", "\\")
+-- necessary at least on command line
+local function win_path(path)
+  return path:gsub("/", "\\")
 end
 
 function FS.normalize_path(path)
   if OS.type == "windows" then
-    return unix_to_win(path)
+    return win_path(path)
   end
   return path
 end
 
 -- Return an absolute path from a relative one
 function FS.abspath(path)
-  local oldpwd = Vars.currentdir()
+  local cwd = currentdir()
   chdir(path)
-  local result = Vars.currentdir()
-  chdir(oldpwd)
-  return FS.escape_path(gsub(result, "\\", "/"))
+  local ans = currentdir()
+  chdir(cwd)
+  return FS.escape_path(ans:gsub("\\", "/"))
 end
 
--- For cleaning out a directory, which also ensures that it exists
+---For cleaning out a directory, which also ensures that it exists
+---@param dir string
+---@return number on error nil otherwise
 function FS.cleandir(dir)
-  local errorlevel = FS.mkdir(dir)
-  if errorlevel ~= 0 then
-    return errorlevel
+  local error_n = FS.mkdir(dir)
+  if error_n ~= 0 then
+    return error_n
   end
   return FS.rm(dir, "**")
 end
 
--- Copy files 'quietly'
+---Copy files 'quietly'
+---@param glob string
+---@param source string path directory
+---@param dest string path directory
+---@return number code error code or nil when ok
 FS.cp = function (glob, source, dest)
-  local errorlevel
   for i, _ in pairs(FS.tree(source, glob)) do
-    local source = source .. "/" .. i
+    local source_i = source .. "/" .. i
+    local cmd
     if OS.type == "windows" then
-      if attributes(source)["mode"] == "directory" then
-        errorlevel = execute(
-          'xcopy /y /e /i "' .. unix_to_win(source) .. '" "'
-             .. unix_to_win(dest .. '/' .. i) .. '" > nul'
-        )
+      if attributes(source_i).mode == "directory" then
+        cmd = 'xcopy /y /e /i "' .. win_path(source_i) .. '" "'
+                .. win_path(dest .. '/' .. i) .. '" > nul'
       else
-        errorlevel = execute(
-          'xcopy /y "' .. unix_to_win(source) .. '" "'
-             .. unix_to_win(dest .. '/') .. '" > nul'
-        )
+        cmd = 'xcopy /y "' .. win_path(source_i) .. '" "'
+                .. win_path(dest .. '/') .. '" > nul'
       end
     else
-      errorlevel = execute("cp -RLf '" .. source .. "' '" .. dest .. "'")
+      cmd = "cp -RLf '" .. source_i .. "' '" .. dest .. "'"
     end
-    if errorlevel ~=0 then
-      return errorlevel
+    local error_n = L3B.execute(cmd)
+    if error_n then
+      return error_n
     end
   end
-  return 0
 end
 
--- OS-dependent test for a directory
+---OS-aware test for a directory
+---@param dir string path
+---@return boolean
 FS.direxists = function (dir)
-  local errorlevel
+  local cmd
   if OS.type == "windows" then
-    errorlevel =
-      execute("if not exist \"" .. unix_to_win(dir) .. "\" exit 1")
+    cmd = "if not exist \"" .. win_path(dir) .. "\" exit 1"
   else
-    errorlevel = execute("[ -d '" .. dir .. "' ]")
+    cmd = "[ -d '" .. dir .. "' ]"
   end
-  if errorlevel ~= 0 then
-    return false
-  end
-  return true
+  return not L3B.execute(cmd)
 end
 
+---Whether the file exists
+---@param file string
+---@return boolean
 FS.fileexists = function (file)
   local f = open(file, "r")
-  if f ~= nil then
+  if f then
     f:close()
     return true
   else
@@ -200,217 +400,225 @@ FS.fileexists = function (file)
   end
 end
 
--- Generate a table containing all file names of the given glob or all files
--- if absent
-FS.filelist = function (path, glob)
-  local files = {}
-  local pattern
-  if glob then
-    pattern = FS.glob_to_pattern(glob)
-  end
+---Generate a table containing all file names of the given glob or all files
+---if absent
+---@param path string
+---@param glob string
+---@return table
+function FS.filelist(path, glob)
+  local ans = {}
   if FS.direxists(path) then
+    local pattern = glob and FS.glob_to_pattern(glob)
     for entry in lfs_dir(path) do
       if pattern then
-        if match(entry, pattern) then
-          insert(files, entry)
+        if entry:match(pattern) then
+          ans[#ans+1] = entry
         end
-      else
-        if entry ~= "." and entry ~= ".." then
-          insert(files, entry)
-        end
+      elseif entry ~= "." and entry ~= ".." then
+        ans[#ans+1] = entry
       end
     end
   end
-  return files
+  return ans
 end
 
+---comment
+---@param dir string
+---@return number
 function FS.mkdir(dir)
+  local cmd
   if OS.type == "windows" then
     -- Windows (with the extensions) will automatically make directory trees
     -- but issues a warning if the dir already exists: avoid by including a test
-    dir = unix_to_win(dir)
-    return execute(
-      "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
-    )
+    dir = win_path(dir)
+    cmd = "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
   else
-    return execute("mkdir -p " .. dir)
+    cmd = "mkdir -p " .. dir
   end
+  return L3B.execute(cmd)
 end
 
 -- Rename
-function FS.ren(dir, source, dest)
+---comment
+---@param dir string
+---@param source string
+---@param dest string
+---@return number code on error, nil otherwise
+function FS.rename(dir, source, dest)
   dir = dir .. "/"
+  local cmd
   if OS.type == "windows" then
-    source = gsub(source, "^%.+/", "")
-    dest = gsub(dest, "^%.+/", "")
-    return execute("ren " .. unix_to_win(dir) .. source .. " " .. dest)
+    source = source:gsub("^%.+/", "") -- Why?
+    dest   =   dest:gsub("^%.+/", "")
+    cmd = "ren " .. win_path(dir) .. source .. " " .. dest
   else
-    return execute("mv " .. dir .. source .. " " .. dir .. dest)
+    cmd = "mv " .. dir .. source .. " " .. dir .. dest
   end
+  return L3B.execute(cmd)
 end
 
--- Remove file
-local function rmfile(source, file)
-  remove(source .. "/" .. file)
-  -- os.remove doesn't give a sensible errorlevel
-  return 0
+FS.ren = FS.rename -- TODO remove transitional alias
+
+---Remove a file
+---@param dir string path
+---@param file string path
+local function rmfile(dir, file)
+  remove(dir .. "/" .. file)
+  -- os.remove doesn't give a sensible error code
+  return
 end
 
--- Remove file(s) based on a glob
+---Remove file(s) in `source` based on a glob
+---@param source string
+---@param glob string
 function FS.rm(source, glob)
   for i, _ in pairs(FS.tree(source, glob)) do
     rmfile(source, i)
   end
-  -- os.remove doesn't give a sensible errorlevel
-  return 0
 end
 
 -- Remove a directory tree
-FS.rmdir = function (dir)
+---comment
+---@param dir string
+---@return number code on error, nil otherwise
+function FS.rmdir(dir)
   -- First, make sure it exists to avoid any errors
   FS.mkdir(dir)
   if OS.type == "windows" then
-    return execute("rmdir /s /q " .. unix_to_win(dir))
+    return L3B.execute("rmdir /s /q " .. win_path(dir))
   else
-    return execute("rm -r " .. dir)
+    return L3B.execute("rm -r " .. dir)
   end
 end
 
--- Split a path into file and directory component
-FS.splitpath = function (file)
-  local path, name = match(file, "^(.*)/([^/]*)$")
-  if path then
-    return path, name
+---Split a path into file and directory component
+---@param path string
+---@return any (dir name, base name)
+function FS.splitpath(path)
+  local dir, name = path:match("^(.*)/([^/]*)$")
+  if dir then
+    return dir, name
   else
-    return ".", file
+    return ".", path
   end
 end
 
--- Arguably clearer names
-FS.basename = function (file)
-  return(select(2, FS.splitpath(file)))
+---Base name of the given path
+---@param path string
+---@return string
+function FS.basename(path)
+  return(select(2, FS.splitpath(path)))
 end
 
-FS.dirname = function (file)
-  return(select(1, FS.splitpath(file)))
+---Directory name of the given path, '.' at least.
+---@param path string
+---@return string
+function FS.dirname(path)
+  return(select(1, FS.splitpath(path)))
 end
 
 -- Strip the extension from a file name (if present)
-FS.jobname = function (file)
-  local name = match(FS.basename(file), "^(.*)%.")
-  return name or file
+function FS.jobname(path)
+  return FS.basename(path):match("^(.*)%.") or path
 end
 
 -- Expose as global only what is documented.
-FS.expose = function ()
-  for k, v in pairs({
-    glob_to_pattern = "glob_to_pattern",
-    normalize_path = "normalize_path",
-    abspath = "abspath",
-    cleandir = "cleandir",
-    cp = "cp",
-    direxists = "direxists",
-    fileexists = "fileexists",
-    filelist = "filelist",
-    mkdir = "mkdir",
-    ren = "ren",
-    rm = "rm",
-    splitpath = "splitpath",
-    basename = "basename",
-    dirname = "dirname",
-    jobname = "jobname",
-  }) do
-    _ENV[k] = FS[v]
-  end
-end
+FS.exposition = {
+  glob_to_pattern = "glob_to_pattern",
+  normalize_path = "normalize_path",
+  abspath = "abspath",
+  cleandir = "cleandir",
+  cp = "cp",
+  direxists = "direxists",
+  fileexists = "fileexists",
+  filelist = "filelist",
+  mkdir = "mkdir",
+  ren = "rename",
+  rm = "rm",
+  splitpath = "splitpath",
+  basename = "basename",
+  dirname = "dirname",
+  jobname = "jobname",
+}
 
--- Does what filelist does, but can also glob subdirectories. In the returned
--- table, the keys are paths relative to the given starting path, the values
--- are their counterparts relative to the current working directory.
-FS.tree = function (path, glob)
-  local function cropdots(p)
-    return gsub(gsub(p, "^%./", ""), "/%./", "/")
-  end
-  local function always_true()
-    return true
-  end
-  local function is_dir(file)
-    return attributes(file)["mode"] == "directory"
-  end
-  local dirs = {["."] = cropdots(path)}
-  for pattern, criterion in gmatch(cropdots(glob), "([^/]+)(/?)") do
-    local criterion = criterion == "/" and is_dir or always_true
-    local function fill(p, dir, table)
-      for _, file in ipairs(FS.filelist(dir, pattern)) do
-        local fullpath = p .. "/" .. file
-        if file ~= "." and file ~= ".." and fullpath ~= builddir then
-          local fulldir = dir .. "/" .. file
-          if criterion(fulldir) then
-            table[fullpath] = fulldir
-          end
+---Does what filelist does, but can also glob subdirectories. In the returned
+---table, the keys are paths relative to the given starting path, the values
+---are their counterparts relative to the current working directory.
+---@param path string
+---@param glob string
+---@return table
+function FS.tree(path, glob)
+  local pattern = FS.unix_glob_to_pattern(glob)
+  path =  path:gsub("^%./", "")
+              :gsub("/%./", "/")
+              :gsub("[^/+]/%.%./", "")
+              :gsub("//", "/")
+  local ans = {}
+  local dirs = {
+    ['.'] = path
+  }
+  while #dirs do
+    local deep = {}
+    local path_p, cwd_p = next(dirs)
+    for p in lfs_dir(cwd_p) do
+      if p ~= "." and p ~= ".." then -- TODO: builddir did not make sense.
+        local path_rel = path_p .. "/" .. p
+        local cwd_rel  = cwd_p  .. "/" .. p
+        if attributes(cwd_rel).mode == "directory" then
+          deep[path_rel] = cwd_rel
+        elseif path_rel:match(pattern) then
+          ans [path_rel] = cwd_rel
         end
       end
     end
-    local newdirs = {}
-    local dir
-    if pattern == "**" then
-      while true do
-        path, dir = next(dirs)
-        if not path then
-          break
-        end
-        dirs[path] = nil
-        newdirs[path] = dir
-        fill(path, dir, dirs)
-      end
-    else
-      for p, d in pairs(dirs) do
-        fill(p, d, newdirs)
-      end
-    end
-    dirs = newdirs
+    dirs = deep
   end
-  return dirs
+  return ans
 end
 
--- Return array with duplicate entries removed from input array `a`.
--- This may not belong here
-FS.remove_duplicates = function (a)
-
-  local uniq = {}
-  local hash = {}
-
+---Return array with duplicate entries removed from input array `a`.
+---This may not belong here
+---@param a table
+---@return table
+FS.without_duplicates = function (a)
+  local ans = {}
+  local set = {}
   for _, v in ipairs(a) do
-    if (not hash[v]) then
-      hash[v] = true
-      uniq[#uniq+1] = v
+    if (not set[v]) then
+      set[v] = true
+      ans[#ans+1] = v
     end
   end
-
-  return uniq
+  return ans
 end
 
+---Escape the unescaped space character.
+---@param path string
+---@return string
 function FS.escape_path(path)
   if OS.type == "windows" then
-    local count
-    path, count = gsub(path,'"','')
+    local ans, count = path:gsub('"','')
     if count % 2 ~= 0 then
-      print("Unbalanced quotes in path")
-      exit(0)
+      L3B.error("Unbalanced quotes in path " .. path)
     else
-      if match(path," ") then
-        return '"' .. path .. '"'
+      if ans:match(" ") then
+        return '"' .. ans .. '"'
       end
-      return path
+      return ans
     end
   else
-    path = gsub(path,"\\ ","[PATH-SPACE]")
-    path = gsub(path," ","\\ ")
-    return gsub(path,"%[PATH-SPACE%]","\\ ")
+    return  path:gsub("\\\\","\0")
+                :gsub("\\ ","\1")
+                :gsub(" ","\\ ")
+                :gsub("\1","\\ ")
+                :gsub("\0","\\\\")
   end
 end
 
--- Look for files, directory by directory, and return the first existing
+---Look for files, directory by directory, and return the first existing
+---@param dirs table
+---@param names table
+---@return string
 function FS.locate(dirs, names)
   for _, i in ipairs(dirs) do
     for _, j in ipairs(names) do

@@ -70,23 +70,21 @@ if OS.type == "windows" then
 end
 
 -- Run a command in a given directory
-OS.run = function (dir, cmd)
-  return execute("cd " .. dir .. OS.concat .. cmd)
+OS.run = function (dir, cmd, ...)
+  local error_n = execute("cd " .. dir .. OS.concat .. cmd:format(...))
+  if error_n ~= 0 then
+    return error_n
+  end
 end
 
 -- Expose as global only what is documented.
-OS.expose = function ()
-  for k, v in pairs({
-    os_concat = "concat",
-    os_null = "null",
-    os_pathsep = "pathsep",
-    os_setenv = "setenv",
-    os_yes = "yes",
-    run = "run"
-  }) do
-    _ENV[k] = OS[v]
-  end
-
-end
+OS.exposition = {
+  os_concat = "concat",
+  os_null = "null",
+  os_pathsep = "pathsep",
+  os_setenv = "setenv",
+  os_yes = "yes",
+  run = "run"
+}
 
 return OS

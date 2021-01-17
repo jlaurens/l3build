@@ -29,7 +29,7 @@ local banner = status and status.banner or ""
 
 -- global tables
 
-local FS = Require(FS)
+local FS = L3B.require('FS')
 
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
@@ -40,7 +40,7 @@ end
 
 -- module table
 
-local Vars = Provide(Vars)
+local Vars = L3B.provide('Vars')
 
 local function special_latex_luatex ()
   if not banner:find("2019") then
@@ -65,14 +65,14 @@ local defaults = {
 
 -- Directory structure for the build system
 -- Use Unix-style path separators
-  currentdir = ".",
-  maindir    = ".",
+  currentdir = ".", -- TODO critical: move to FS
+  maindir    = ".", -- TODO critical: move to FS
 
 -- Substructure for file locations
-  docfiledir    = ".",
-  sourcefiledir = ".",
-  textfiledir   = ".",
-  testfiledir   = "./testfiles",
+  docfiledir    = ".", -- TODO critical: move to FS
+  sourcefiledir = ".", -- TODO critical: move to FS
+  textfiledir   = ".", -- TODO critical: move to FS
+  testfiledir   = "./testfiles", -- TODO critical: move to FS
 
 -- File types for various operations
 -- Use Unix-style globs
@@ -191,6 +191,8 @@ local defaults = {
   uploadconfig = {},
 -- Checking
   checkinit_hook = function () return 0 end,
+-- A hook to allow additional tasks to run for the tests
+  runtest_tasks = function () return "" end
 }
 
 local defaults_no_nil = {
@@ -205,13 +207,13 @@ local defaults_no_nil = {
 
 -- Sanity check
 local function check_engines (opts, checkengines)
-  if opts.engine and not opts.force then
+  if opts.engines and not opts.force then
     -- Make a lookup table
     local t = {}
     for _, engine in pairs(checkengines) do
       t[engine] = true
     end
-    for _, engine in pairs(opts.engine) do
+    for _, engine in pairs(opts.engines) do
       if not t[engine] then
         print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
@@ -316,6 +318,11 @@ Vars.finalize = function (t, opts, env)
   t.epoch = normalise_epoch(t.epoch)
     -- Sanity check
   check_engines(opts, t.checkengines)
+  if opts.names then
+    V.checkconfigs = opts.config or { stdconfig } -- What is stdconfig?
+  else
+    V.checkconfigs = opts.config or V.checkconfigs
+  end
 end
 
 -- Updates the given `t` table with
