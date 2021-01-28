@@ -34,7 +34,7 @@ local insert           = table.insert
 
 -- Parse command line options
 
-option_list =
+local option_list =
   {
     config =
       {
@@ -158,7 +158,7 @@ option_list =
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
-local function argparse()
+local function argparse(arg)
   local result = { }
   local names  = { }
   local long_options =  { }
@@ -170,7 +170,6 @@ local function argparse()
     end
     long_options[k] = k
   end
-  local args = args
   -- arg[1] is a special case: must be a command or "-h"/"--help"
   -- Deal with this by assuming help and storing only apparently-valid
   -- input
@@ -282,10 +281,8 @@ local function argparse()
   return result
 end
 
-options = argparse()
-
 -- Sanity check
-function check_engines()
+function check_engines(options, checkengines)
   if options["engine"] and not options["force"] then
      -- Make a lookup table
      local t = { }
@@ -305,3 +302,12 @@ function check_engines()
     end
   end
 end
+
+---@export
+return {
+  _TYPE = "module",
+  _NAME = "arguments",
+  _VERSION = "2021/01/28",
+  argparse = argparse,
+  option_list = option_list,
+}
