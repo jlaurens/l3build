@@ -31,6 +31,7 @@ local match            = string.match
 local sub              = string.sub
 
 local insert           = table.insert
+local append           = table.insert
 
 -- Parse command line options
 
@@ -151,12 +152,13 @@ local option_list =
       },
     version =
       {
-        desc = "Print version information and exit",
-        type = "boolean"
+        desc  = "Print version information and exit",
+        type  = "boolean",
+        short = "v" -- why no short before
       }
   }
 
--- This is done as a function (rather than do ... end) as it allows early
+  -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
 local function argparse(arg)
   local result = { }
@@ -281,33 +283,302 @@ local function argparse(arg)
   return result
 end
 
--- Sanity check
-function check_engines(options, checkengines)
-  if options["engine"] and not options["force"] then
-     -- Make a lookup table
-     local t = { }
-    for _, engine in pairs(checkengines) do
-      t[engine] = true
-    end
-    for _, engine in pairs(options["engine"]) do
-      if not t[engine] then
-        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
-        print("\n  Valid values are:")
-        for _, engine in ipairs(checkengines) do
-          print("  - " .. engine)
-        end
-        print("")
-        exit(1)
+
+---Option definition table
+---@key desc string description, optional when reserved
+---@key type string one of "string", "boolean" or "table"
+---@key short[opt] string the short option name, length must be 1
+---@key reserved[opt] boolean
+
+
+local defs = {} -- long string -> option definition
+
+-- the same cli option may be given either by its long or short name.
+local map  = {}  -- long or short -> long
+
+---Declare the given cli options.
+---@param key_1 string long option name: `foo` in `--foo`
+---@param def_1 table an option definition
+---@param key_2 string long option name: `bar` in `--bar`
+---@param def_2 table an option definition
+---@return number 0 on proper termination, positive otherwise.
+---@export
+local function declare_options(...)
+  local function readonly_def(d) -- see https://www.lua.org/pil/13.4.5.html
+    return setmetatable({}, {
+      __index = {
+        desc     = d.desc,
+        type     = d.type,
+        reserved = d.reserved,
+      },
+      __newindex = function (t,k,v)
+        error("attempt to update an read-only table", 2)
       end
+    })
+  end
+  local feed
+  -- will be called recursively to consume 2 arguments at a time
+  -- error level + error string or nil
+  feed = function (key_i, def_i, ...)
+    if not key_i  then
+      return 0, nil -- the list is exhausted
+    elseif #key_i < 2  then
+      return 1, "Name too short " .. key_i
+    elseif map[key_i] then
+      return 1, key_i .. " is already an option"
+    elseif not def_i  then
+      return 1, "Missing option definition for " .. key_i
+    end
+    defs[key_i] = readonly_def(def_i)
+    map [key_i] = key_i -- long -> long
+    local short = def_i.short
+    if short then
+      if #short ~= 1 then
+        return 1, short .. " must be 1 char long"
+      elseif map[short] then
+        return 1, short .. " is already a short option"
+      end
+      map[short] = key_i -- short -> long
+    end
+    return feed(...)
+  end
+  local error_level, msg = feed(...)
+  if msg then error("!Error: " .. msg) end
+  return error_level
+end
+
+declare_options( -- can be moved around and split
+  "config", {
+    desc  = "Sets the config(s) used for running tests",
+    short = "c",
+    type  = "table",
+  },
+  "date", {
+    desc  = "Sets the date to insert into sources",
+    type  = "string",
+  },
+  "debug", {
+    desc = "Runs target in debug mode (not supported by all targets)",
+    type = "boolean",
+  },
+  "dirty", {
+    desc = "Skip cleaning up the test area",
+    type = "boolean",
+  },
+  "dry-run", {
+    desc = "Dry run for install",
+    type = "boolean",
+  },
+  "email", {
+    desc = "Email address of CTAN uploader",
+    type = "string",
+  },
+  "engine", {
+    desc  = "Sets the engine(s) to use for running test",
+    short = "e",
+    type  = "table",
+  },
+  "epoch", {
+    desc  = "Sets the epoch for tests and typesetting",
+    type  = "string",
+  },
+  "file", {
+    desc  = "Take the upload announcement from the given file",
+    short = "F",
+    type  = "string",
+  },
+  "first", {
+    desc  = "Name of first test to run",
+    type  = "string",
+  },
+  "force", {
+    desc  = "Force tests to run if engine is not set up",
+    short = "f",
+    type  = "boolean",
+  },
+  "full", {
+    desc = "Install all files",
+    type = "boolean",
+  },
+  "halt-on-error", {
+    desc  = "Stops running tests after the first failure",
+    short = "H",
+    type  = "boolean",
+  },
+  "help", {
+    desc  = "Print this message and exit",
+    short = "h",
+    type  = "boolean",
+  },
+  "last", {
+    desc  = "Name of last test to run",
+    type  = "string",
+  },
+  "message", {
+    desc  = "Text for upload announcement message",
+    short = "m",
+    type  = "string",
+  },
+  "quiet", {
+    desc  = "Suppresses TeX output when unpacking",
+    short = "q",
+    type  = "boolean",
+  },
+  "rerun", {
+    desc  = "Skip setup: simply rerun tests",
+    type  = "boolean",
+  },
+  "show-log-on-error", {
+    desc  = "If 'halt-on-error' stops, show the full log of the failure",
+    type  = "boolean",
+  },
+  "shuffle", {
+    desc  = "Shuffle order of tests",
+    type  = "boolean",
+  },
+  "texmfhome", {
+    desc = "Location of user texmf tree",
+    type = "string",
+  },
+  "version", {
+    desc = "Print version information and exit",
+    type = "boolean",
+    short = "v", -- why no short before
+  }
+)
+
+---Parse the cli call into a table
+---@param arg table For example the `arg` global variable.
+---@return table
+---@usage local options = arguments.parse(arg)
+local function parse(arg)
+  local ans = {}
+  -- arg[1] is a special case:
+  -- *) a target
+  -- *) "-v"|"--version"
+  local i = 1 -- counter of the arg index
+  local target = arg[i]
+  if target == "--version" or target == "-v" then
+    return { target = "version" }
+  elseif target then
+    -- No other options are allowed in position 1, so filter those out
+    if target:match("^%-") then
+      return ans
+    end
+  else
+    return ans
+  end
+  -- Examine all other arguments
+  -- Use a while loop rather than for as this makes it easier
+  -- to grab arg for optionals where appropriate
+  local names  = {} -- to collect trailing non option arguments
+  local function terminate(str, ...)
+    error('!Error: ' .. str:format(...), 2)
+  end
+  -- start
+  while i < #arg do
+    i = i + 1
+    local arg_i = arg[i]    -- consumed at the end of the loop
+    ::consume_arg_i::
+    local one, two = arg_i:match("^(%-)(%-?)")
+    if one then             -- one dash: an option
+      local key, value      -- `--key=value` or `-kvalue`
+      if #two then          -- two dashes: long option
+        if #arg_i > 2 then  -- more than `--`
+          local n = arg_i:find("=", 4, true)
+          if n then         -- `--key=value`
+            key   = arg_i:sub(3, n - 1)
+            value = arg_i:sub(n + 1)
+          else              -- `--key`
+            key   = arg_i:sub(3)
+          end
+        else                -- arg_i is `--`
+          break             -- remaining arguments are trailing names
+        end
+      else                  -- short option
+        key = arg_i:sub(2, 2)
+        if #arg_i > 2 then
+          value = arg_i:sub(3)
+        end
+      end
+      -- Now check that the option is valid and sort out the argument
+      -- if required
+      local long = map[key]
+      if not long then
+        terminate("Unsupported option -%s%s", two, key)
+      end
+      local def = defs[long]    -- logically ~= nil
+      local type = def.type
+      if type == "boolean" then -- lookup special values, sugar
+        local b = true          -- default
+        if value == "true" or value == "on" or value == "yes" then
+          ;
+        elseif value == "false" or value == "off" or value == "no" then
+          b = false
+        elseif value then
+          terminate("Unsupported value %s for option -%s%s",
+                    value, two, key)
+        else -- next argument may be special
+          i = i + 1
+          arg_i = arg[i]
+          if arg_i == "true" or arg_i == "on" or arg_i == "yes" then
+            ;
+          elseif arg_i == "false" or arg_i == "off" or arg_i == "no" then
+            b = false
+          else -- nothing special
+            ans[long] = b
+            if arg_i then -- nothing special, loop to consume
+              goto consume_arg_i
+            else
+              break
+            end
+          end
+        end
+        ans[long] = b
+      else -- not a "boolean", require a value
+        if not value then
+          i = i + 1
+          value = arg[i]
+          if not value then
+            terminate("Missing value for option -%s%s", two, key)
+          end
+        end
+        if type == "string" then
+          ans[long] = value
+        else -- type == "table"
+          local t = ans[long] or {}
+          for hit in value:gmatch("([^,%s]+)") do
+            append(t, hit)
+          end
+          ans[long] = t
+        end
+        -- arg[i] is consumed
+      end
+    else  -- Not an option
+      append(names, arg_i) -- consumed
+      break
     end
   end
+  -- Success: collect the remaining arguments
+  while i < #arg do
+    i = i + 1
+    append(names, arg[i])
+  end
+  if names[1] then
+    ans.names = names -- may conflict with `--names`
+  end
+  ans.target = target -- may conflict with `--target`
+  return ans
 end
 
 ---@export
 return {
-  _TYPE = "module",
-  _NAME = "arguments",
-  _VERSION = "2021/01/28",
-  argparse = argparse,
-  option_list = option_list,
+  _TYPE     = "module",
+  _NAME     = "arguments",
+  _VERSION  = "2021/01/28",
+  argparse        = argparse,
+  old_option_list = option_list,
+  option_list     = defs,
+  parse           = parse,
+  declare_options = declare_options,
 }

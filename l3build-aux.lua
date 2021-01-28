@@ -30,36 +30,11 @@ local pairs = pairs
 local print = print
 
 local lookup = kpse.lookup
-
-local os_time = os_time
 --
 -- Auxiliary functions which are used by more than one main function
 --
 
 ---Convert the given `epoch` to a number.
----@param epoch string
----@return number
----@see l3build.lua
----@usage private?
-function normalise_epoch(epoch)
-  assert(epoch, 'normalize_epoch argument must not be nil')
-  -- If given as an ISO date, turn into an epoch number
-  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
-  if y then
-    return os_time({
-        year = y, month = m, day   = d,
-        hour = 0, sec = 0, isdst = nil
-      }) - os_time({
-        year = 1970, month = 1, day = 1,
-        hour = 0, sec = 0, isdst = nil
-      })
-  elseif match(epoch, "^%d+$") then
-    return tonumber(epoch)
-  else
-    return 0
-  end
-end
-
 ---CLI command to set the epoch, will be run while checking or typesetting
 ---@param epoch string
 ---@return string
