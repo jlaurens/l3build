@@ -43,7 +43,8 @@ local insert           = table.insert
 
 -- option_list = {} defined in the client
 
-local defs = {}
+local defs = {} -- long name -> option def
+local map  = {} -- long name -> long name and short name -> long name
 
 ---Declare option
 ---@param builtin? boolean optional, true for builtin options. Do not document in the dtx.
@@ -63,6 +64,8 @@ function declare_option(builtin, key_1, def_1, ...)
       return -- list exhausted, success
     elseif not type(key_i) == "string" then
       error("Option key must be a string")
+    elseif map[key_i] then
+      error("Option key is already used " .. key_i)
     elseif not key_i:match(long_pattern) then
       error("Option key is too short or contains an unsupported character")
     elseif not def_i then
@@ -72,10 +75,17 @@ function declare_option(builtin, key_1, def_1, ...)
         and def_i.type ~= "table"
     then
       error("The type of " .. key_i .. ' is unsupported')
-    elseif def_i.short and not def_i.short:match(short_pattern) then
-      error("Short option name must be one letter of [a-zA-Z0-9_]" .. tostring(def_i.short))
+    elseif def_i.short then
+      if not def_i.short:match(short_pattern) then
+        error("Short option name must be one letter of [a-zA-Z0-9_]" .. tostring(def_i.short))
+      end
+      if map[def_i.short] then
+        error("Short option already used " .. def_i.short)
+      end
+      map[def_i.short] = key_i
     end
-    option_list[key_i] = {
+    map[key_i] = key_i
+    defs[key_i] = {
       type    = def_i.type,
       desc    = def_i.desc,
       short   = def_i.short,
