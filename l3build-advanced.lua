@@ -89,6 +89,27 @@ consume(1)
 -- Minimal code to do basic checks
 build_require("arguments")
 local cli = build_require("arguments")
+
+-- parsing the CLI arguments must be done at will.
+-- there are 2 possibilities
+-- 1) a global `declare_option` function used once in `build.lua`
+--    At the end this function automatically parses the CLI arguments
+--    and sets everything up
+-- 2) a global `declare_option` function used as many times as required
+--    plus a global `parse_arguments` fired once afterwards.
+-- Option 2 is used
+
+function parse_arguments()
+  -- One shot function
+  parse_arguments = function () end
+  -- disable declare_option
+  declare_option = function ()
+    error("declare_option cannot be used after parse_arguments")
+  end
+
+-- in next lines, only the indentation should change
+-- this is not indented yet to let diff focus on real changes
+
 options = cli.parse(arg)
 
 build_require("help")
@@ -120,6 +141,8 @@ end
 -- Allow main function to be disabled 'higher up'
 main = main or stdmain
 
+end -- end of parse_arguments
+
 -- Load configuration file if running as a script
 if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   -- Look for some configuration details
@@ -130,6 +153,8 @@ if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
     exit(1)
   end
 end
+
+parse_arguments() -- just in case
 
 -- Load standard settings for variables:
 -- comes after any user versions
