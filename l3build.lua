@@ -62,6 +62,7 @@ end
 -- Minimal code to do basic checks
 build_require("arguments")
 local cli = build_require("arguments")
+option_list = cli.defs -- exposed
 options = cli.parse(arg)
 
 build_require("help")

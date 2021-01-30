@@ -2,7 +2,7 @@
 
 --[[
 
-File l3build.lua Copyright (C) 2014-2020 The LaTeX Project
+File l3build-advanced.lua Copyright (C) 2014-2020 The LaTeX3 Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -54,8 +54,9 @@ local function build_require(s)
 end
 
 print("l3build advanced mode")
-l3b = l3b or {}
+local l3b = l3b
 l3b.advanced = true -- this will help to clearly identify what is advanced
+l3b.debug_level = 0 -- Complement to options.debug, > 0 when debug info is required
 
 -- We have just switched to advanced mode
 -- we have consume arg[1] and must shift left the other arguments
@@ -89,6 +90,7 @@ consume(1)
 -- Minimal code to do basic checks
 build_require("arguments")
 local cli = build_require("arguments")
+option_list = cli.defs
 
 -- parsing the CLI arguments must be done at will.
 -- there are 2 possibilities
@@ -138,7 +140,7 @@ elseif options["target"] == "version" then
   exit(0)
 end
 
--- Allow main function to be disabled 'higher up'
+-- Allow main function to be disabled 'higher up', can be moved below
 main = main or stdmain
 
 end -- end of parse_arguments
@@ -146,7 +148,7 @@ end -- end of parse_arguments
 -- Load configuration file if running as a script
 if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
   -- Look for some configuration details
-  if fileexists("build.lua") then
+  if package.searchpath("build", "?.lua") then -- fileexists is not available
     dofile("build.lua")
   else
     print("Error: Cannot find configuration build.lua")

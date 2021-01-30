@@ -1,6 +1,6 @@
 --[[
 
-File l3build-arguments.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-arguments.lua Copyright (C) 2018-2020 The LaTeX3 Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -34,127 +34,191 @@ local insert           = table.insert
 
 -- Parse command line options
 
-option_list =
-  {
-    config =
+---Option definition
+---@key type string one of "boolean", "table", "string"
+---@key desc string the description as displayed in help
+---@key short string one character length option
+---@key builtin boolean for internal use, must not be documented
+---@table option_def
+
+-- option_list = {} defined in the client
+
+local defs = {}
+
+---Declare option
+---@param builtin? boolean optional, true for builtin options. Do not document in the dtx.
+---@param key_1 string option name, some format restrictions
+---@param def_1 table option definition
+---@usage declare_option(builtin, key_1, def_1, ..., key_n, def_n) -- private
+---@usage declare_option(key_1, def_1, ..., key_n, def_n) -- public
+function declare_option(builtin, key_1, def_1, ...)
+  local declare
+  declare = function (key_i, def_i, ...)
+    if l3b.debug_level > 0 then
+      print('Declaring option ' .. key_i)
+    end
+    local long_pattern  = "^[a-zA-Z0-9_][a-zA-Z0-9_%-]+$"
+    local short_pattern = "^[a-zA-Z0-9_]$"
+    if not key_i then
+      return -- list exhausted, success
+    elseif not type(key_i) == "string" then
+      error("Option key must be a string")
+    elseif not key_i:match(long_pattern) then
+      error("Option key is too short or contains an unsupported character")
+    elseif not def_i then
+      error("Missing definition for option " .. key_i)
+    elseif  def_i.type ~= "boolean"
+        and def_i.type ~= "string"
+        and def_i.type ~= "table"
+    then
+      error("The type of " .. key_i .. ' is unsupported')
+    elseif def_i.short and not def_i.short:match(short_pattern) then
+      error("Short option name must be one letter of [a-zA-Z0-9_]" .. tostring(def_i.short))
+    end
+    option_list[key_i] = {
+      type    = def_i.type,
+      desc    = def_i.desc,
+      short   = def_i.short,
+      builtin = builtin,
+    }
+    return declare(...)
+  end
+  local success, msg
+  if type(key_1) == "string" then -- first argument is meant boolean
+    success, msg = pcall(declare, key_1, def_1, ...)
+  else -- no optional first argument given
+    local key_2
+    key_1, def_1, key_2 = builtin, key_1, def_1
+    builtin = false
+    success, msg = pcall(declare, key_1, def_1, key_2, ...)
+  end
+  if not success then
+    error("!Error: " .. msg)
+  end
+end
+
+-- next will be reformatted, in the meanwhile it helps diff analyze
+declare_option(true, -- these are builtin option
+    -- Hidden options are possible (with no desc)?
+    "config",
       {
         desc  = "Sets the config(s) used for running tests",
         short = "c",
         type  = "table"
       },
-    date =
+    "date",
       {
         desc  = "Sets the date to insert into sources",
         type  = "string"
       },
-    debug =
+    "debug",
       {
         desc = "Runs target in debug mode (not supported by all targets)",
         type = "boolean"
       },
-    dirty =
+    "dirty",
       {
         desc = "Skip cleaning up the test area",
         type = "boolean"
       },
-    ["dry-run"] =
+    "dry-run",
       {
         desc = "Dry run for install",
         type = "boolean"
       },
-    email =
+    "email",
       {
         desc = "Email address of CTAN uploader",
         type = "string"
       },
-    engine =
+    "engine",
       {
         desc  = "Sets the engine(s) to use for running test",
         short = "e",
         type  = "table"
       },
-    epoch =
+    "epoch",
       {
         desc  = "Sets the epoch for tests and typesetting",
         type  = "string"
       },
-    file =
+    "file",
       {
         desc  = "Take the upload announcement from the given file",
         short = "F",
         type  = "string"
       },
-    first =
+    "first",
       {
         desc  = "Name of first test to run",
         type  = "string"
       },
-    force =
+    "force",
       {
         desc  = "Force tests to run if engine is not set up",
         short = "f",
         type  = "boolean"
       },
-    full =
+    "full",
       {
         desc = "Install all files",
         type = "boolean"
       },
-    ["halt-on-error"] =
+    "halt-on-error",
       {
         desc  = "Stops running tests after the first failure",
         short = "H",
         type  = "boolean"
       },
-    help =
+    "help",
       {
         desc  = "Print this message and exit",
         short = "h",
         type  = "boolean"
       },
-    last =
+    "last",
       {
         desc  = "Name of last test to run",
         type  = "string"
       },
-    message =
+    "message",
       {
         desc  = "Text for upload announcement message",
         short = "m",
         type  = "string"
       },
-    quiet =
+    "quiet",
       {
         desc  = "Suppresses TeX output when unpacking",
         short = "q",
         type  = "boolean"
       },
-    rerun =
+    "rerun",
       {
         desc  = "Skip setup: simply rerun tests",
         type  = "boolean"
       },
-    ["show-log-on-error"] =
+    "show-log-on-error",
       {
         desc  = "If 'halt-on-error' stops, show the full log of the failure",
         type  = "boolean"
       },
-    shuffle =
+    "shuffle",
       {
         desc  = "Shuffle order of tests",
         type  = "boolean"
       },
-    texmfhome =
+    "texmfhome",
       {
         desc = "Location of user texmf tree",
         type = "string"
       },
-    version =
+    "version",
       {
         desc = "Print version information and exit",
         type = "boolean"
       }
-  }
+)
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
@@ -305,8 +369,9 @@ function check_engines()
 end
 
 return {
-  _TYPE = "module",
-  _NAME = "arguments",
-  _VERSION = "2021/01/30",
-  parse = argparse,
+  _TYPE     = "module",
+  _NAME     = "arguments",
+  _VERSION  = "2021/30/01",
+  parse     = argparse,
+  defs      = defs,
 }
