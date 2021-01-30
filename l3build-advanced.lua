@@ -24,8 +24,10 @@ for those people who are interested.
 
 --]]
 
--- Version information
-release_date = "2020-06-04"
+-- wrapping code chunks in a if l3b.advanced ... end block must have 0 impact on normal code.
+
+-- -- Version information
+-- release_date = "2020-06-04"
 
 -- File operations are aided by the LuaFileSystem module
 local lfs = require("lfs")
@@ -51,13 +53,38 @@ local function build_require(s)
   return require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
 end
 
+print("l3build advanced mode")
 l3b = l3b or {}
+l3b.advanced = true -- this will help to clearly identify what is advanced
 
--- Possibly switch to advanced mode.
-if arg[1] == "--advanced" then
-  build_require("advanced")
-  os.exit(0)
+-- We have just switched to advanced mode
+-- we have consume arg[1] and must shift left the other arguments
+-- to retrieve the normal CLI arguments order
+-- consume will be also used when defining othe advanced options
+
+local function consume(k)
+  assert(k>0)
+  -- arg is assumed to be a sequence
+  -- consume elements 1, ... k of arg
+  for i = 1, #arg do
+    arg[i] = arg[k + i]
+  end
+  -- this for loop is equivalent to
+  -- local max = #arg
+  -- for i = 1, max - k do
+  --   arg[i] = arg[k + i]
+  -- end
+  -- for i = max - k + 1, max do
+  --   arg[i] = nil
+  -- end
+  -- -- because #arg is a border and arg[0] ~= nil such that
+  -- -- arg[#arg] ~= nil and arg[#arg+1] == nil
+  -- -- As arg is a sequence we have arg[#arg+i] == nil for all positive i
 end
+
+consume(1)
+
+-- continue the normal way
 
 -- Minimal code to do basic checks
 build_require("arguments")
