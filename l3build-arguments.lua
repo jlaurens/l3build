@@ -52,10 +52,10 @@ local map  = {} -- long name -> long name and short name -> long name
 ---@param def_1 table option definition
 ---@usage declare_option(builtin, key_1, def_1, ..., key_n, def_n) -- private
 ---@usage declare_option(key_1, def_1, ..., key_n, def_n) -- public
-function declare_option(builtin, key_1, def_1, ...)
+local function declare_option(builtin, key_1, def_1, ...)
   local declare
   declare = function (key_i, def_i, ...)
-    if l3b.debug_level > 0 then
+    if boot.debug_level > 0 then -- see advanced boot.trace
       print('Declaring option ' .. key_i)
     end
     local long_pattern  = "^[a-zA-Z0-9_][a-zA-Z0-9_%-]+$"
@@ -381,7 +381,8 @@ end
 return {
   _TYPE     = "module",
   _NAME     = "arguments",
-  _VERSION  = "2021/30/01",
+  _VERSION  = "2021/30/01(dev)",
   parse     = argparse,
   defs      = defs,
+  declare_option = declare_option,
 }

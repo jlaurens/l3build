@@ -35,6 +35,7 @@ local lfs = require("lfs")
 local assert           = assert
 local ipairs           = ipairs
 local insert           = table.insert
+local kpse             = kpse
 local lookup           = kpse.lookup
 local match            = string.match
 local gsub             = string.gsub
@@ -44,42 +45,69 @@ local select           = select
 local tonumber         = tonumber
 local exit             = os.exit
 
+-- Possibly switch to advanced or unit mode.
+-- This is never executed in normal mode.
+if arg[1] == "--advanced"
+or arg[1] == "--unit"
+then
+  -- This script can be executed as
+  -- x1) `l3build blablabla`
+  -- x2) `texlua l3build.lua blablabla`
+  -- x3) `texlua path to l3build.lua blablabla`
+  -- x4) imported from some other script,
+  --     typically the main package dir or a subfolder
+  -- We would like to identify the subfolder case.
+  -- x1 is the normal way, x4 is|was used by latex2e for example
+  -- x2 and x3 can be used by l3build developers
+  -- who want a full control of the launched tool.
+  --[[ For average users: copy paste this one below
+  kpse.set_program_name("kpsewhich")
+  dofile(kpse.lookup("l3build.lua"):match(".*/") .. "l3build-boot.lua")
+  require("l3build-" .. name)
+  --]]
+  kpse.set_program_name("kpsewhich")
+  local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
+  local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "./"
+  local path = package.searchpath(
+    "?", launch_dir .. "l3build-boot.lua"
+  )  or kpse_dir   .. "l3build-boot.lua"
+  local boot = dofile(path)
+  local mode = arg[1]:sub(3) -- "advanced" or "unit"
+  boot.shift_left(arg, 1)
+  os.exit(require("l3build-" .. mode):run(arg))
+end
+
+boot = {
+  debug_level = 0
+}
 -- l3build setup and functions
 kpse.set_program_name("kpsewhich")
 build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
-local function build_require(s)
+local function builtin_require(s)
   return require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
 end
 
-l3b = l3b or {}
-
--- Possibly switch to advanced mode.
-if arg[1] == "--advanced" then
-  build_require("advanced")
-  os.exit(0)
-end
-
 -- Minimal code to do basic checks
-build_require("arguments")
-local cli = build_require("arguments")
+builtin_require("arguments")
+local cli = builtin_require("arguments")
 option_list = cli.defs -- exposed
 options = cli.parse(arg)
 
-build_require("help")
+builtin_require("help")
 
-build_require("file-functions")
-build_require("typesetting")
-build_require("aux")
-build_require("clean")
-build_require("check")
-build_require("ctan")
-build_require("install")
-build_require("unpack")
-build_require("manifest")
-build_require("manifest-setup")
-build_require("tagging")
-build_require("upload")
-build_require("stdmain")
+builtin_require("file-functions")
+builtin_require("typesetting")
+builtin_require("aux")
+builtin_require("clean")
+builtin_require("check")
+builtin_require("ctan")
+builtin_require("install")
+builtin_require("unpack")
+builtin_require("manifest")
+builtin_require("manifest-setup")
+builtin_require("tagging")
+builtin_require("upload")
+builtin_require("stdmain")
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -107,7 +135,7 @@ end
 
 -- Load standard settings for variables:
 -- comes after any user versions
-build_require("variables")
+builtin_require("variables")
 
 -- Ensure that directories are 'space safe'
 maindir       = escapepath(maindir)

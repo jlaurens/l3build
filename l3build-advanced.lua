@@ -46,50 +46,43 @@ local select           = select
 local tonumber         = tonumber
 local exit             = os.exit
 
--- l3build setup and functions
-kpse.set_program_name("kpsewhich")
-build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
-local function build_require(s)
-  return require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
+print("l3build advanced mode")
+
+-- Get the shared l3b
+
+local path = package.searchpath(
+  "?",
+  l3b.launch_dir .. "l3build-boot.lua"
+)
+if path then -- path found
+  l3b = dofile(path)
+else
+  l3b = l3b.l3build_require("shared")
 end
 
-print("l3build advanced mode")
-local l3b = l3b
+
+kpse.set_program_name("kpsewhich")
+local build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
+local l3b = require(lookup(
+  "l3build-shared.lua",
+  { path = build_kpse_path }
+))
+
 l3b.advanced = true -- this will help to clearly identify what is advanced
 l3b.debug_level = 0 -- Complement to options.debug, > 0 when debug info is required
+
 
 -- We have just switched to advanced mode
 -- we have consume arg[1] and must shift left the other arguments
 -- to retrieve the normal CLI arguments order
--- consume will be also used when defining othe advanced options
 
-local function consume(k)
-  assert(k>0)
-  -- arg is assumed to be a sequence
-  -- consume elements 1, ... k of arg
-  for i = 1, #arg do
-    arg[i] = arg[k + i]
-  end
-  -- this for loop is equivalent to
-  -- local max = #arg
-  -- for i = 1, max - k do
-  --   arg[i] = arg[k + i]
-  -- end
-  -- for i = max - k + 1, max do
-  --   arg[i] = nil
-  -- end
-  -- -- because #arg is a border and arg[0] ~= nil such that
-  -- -- arg[#arg] ~= nil and arg[#arg+1] == nil
-  -- -- As arg is a sequence we have arg[#arg+i] == nil for all positive i
-end
-
-consume(1)
+l3b.shift_left(arg, 1)
 
 -- continue the normal way
 
 -- Minimal code to do basic checks
-build_require("arguments")
-local cli = build_require("arguments")
+l3b.require("arguments")
+local cli = l3b.require("arguments")
 option_list = cli.defs
 
 -- parsing the CLI arguments must be done at will.
@@ -114,21 +107,21 @@ function parse_arguments()
 
 options = cli.parse(arg)
 
-build_require("help")
+l3b.require("help")
 
-build_require("file-functions")
-build_require("typesetting")
-build_require("aux")
-build_require("clean")
-build_require("check")
-build_require("ctan")
-build_require("install")
-build_require("unpack")
-build_require("manifest")
-build_require("manifest-setup")
-build_require("tagging")
-build_require("upload")
-build_require("stdmain")
+l3b.require("file-functions")
+l3b.require("typesetting")
+l3b.require("aux")
+l3b.require("clean")
+l3b.require("check")
+l3b.require("ctan")
+l3b.require("install")
+l3b.require("unpack")
+l3b.require("manifest")
+l3b.require("manifest-setup")
+l3b.require("tagging")
+l3b.require("upload")
+l3b.require("stdmain")
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -160,7 +153,7 @@ parse_arguments() -- just in case
 
 -- Load standard settings for variables:
 -- comes after any user versions
-build_require("variables")
+l3b.require("variables")
 
 -- Ensure that directories are 'space safe'
 maindir       = escapepath(maindir)
