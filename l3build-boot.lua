@@ -27,6 +27,10 @@ for those people who are interested.
 -- http://www.lua.org/manual/5.3/manual.html#6.3
 -- Due to the fact that `l3build` is not installed
 -- where `lua` looks for, we must teach `lua` to do so.
+-- This makes sense if we do not know in advance where
+-- modules and scripts are installed, which is the case when
+-- 1) l3build itself is being developed
+-- 2) we require modules that are not installed, for example while testing
 -- Some attributes and methods are defined to be used
 -- very early.
 
@@ -34,6 +38,7 @@ for those people who are interested.
 
 local currentdir  = lfs.currentdir
 local kpse = kpse
+local remove = table.remove
 
 -- module name
 local _NAME = "l3build-boot"
@@ -45,15 +50,15 @@ if boot then
 end
 
 -- base module attributes
-boot = {
-  _TYPE     = "module",
-  _NAME     = _NAME,
-  _VERSION  = "dev", -- the "dev" must be replaced by a release date
-  PATH  = {}, -- unique key
-  trace = {},
-  trace_prompt = "**",
-  trace_level = 0,
-}
+boot = boot or {} -- some attributes may be defined upwind
+
+boot._TYPE     = "module"
+boot._NAME     = _NAME
+boot._VERSION  = "dev" -- the "dev" must be replaced by a release date
+boot.PATH  = {} -- unique key
+boot.trace = {}
+boot.trace_prompt = "**"
+boot.trace_level = 0
 
 -- ensure that next `require("l3build-boot"")` returns `boot`.
 -- because a `dofile` was certainly used at first because
@@ -130,8 +135,26 @@ local function searcher(name)
   return "\n        [l3build searcher] file not found: '" .. name .. "'"
 end
 
--- We insert a new searcher after the first default searcher.
-table.insert(package.searchers, 2, searcher)
+---Install the l3build dedicated searcher
+function boot.install_searcher()
+  boot.uninstall_searcher() -- if any
+  -- We insert a new searcher after the first default searcher.
+  table.insert(package.searchers, 2, searcher)
+end
+
+function boot.uninstall_searcher()
+  -- Find the index, then remove when found
+  for i,s in ipairs(package.searchers) do
+    if s == searcher then
+      remove(package.searchers, i)
+      return
+    end
+  end
+end
+
+if not boot.legacy then
+  boot.install_searcher()
+end
 
 -- from now on, 
 
