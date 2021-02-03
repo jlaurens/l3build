@@ -152,6 +152,9 @@ function boot.uninstall_searcher()
   end
 end
 
+-- only install the searcher when no in legacy mode
+-- `boot.legacy` must be true prior to importing the boot module.
+-- It is always possible to uninstall the searcher afterwards.
 if not boot.legacy then
   boot.install_searcher()
 end
