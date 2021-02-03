@@ -51,7 +51,7 @@ print("l3build advanced mode")
 -- Get the shared l3b
 
 local path = package.searchpath(
-  "?",
+  "",
   l3b.launch_dir .. "l3build-boot.lua"
 )
 if path then -- path found

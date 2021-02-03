@@ -69,7 +69,7 @@ then
   local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
   local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "./"
   local path = package.searchpath(
-    "?", launch_dir .. "l3build-boot.lua"
+    "", launch_dir .. "l3build-boot.lua"
   )  or kpse_dir   .. "l3build-boot.lua"
   local boot = dofile(path)
   local mode = arg[1]:sub(3) -- "advanced" or "unit"

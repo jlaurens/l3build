@@ -134,11 +134,11 @@ local function run(self, arg)
       end
       name = name:match("^.*%.lua$") or name .. ".lua"
       print(name)
-      return package.searchpath("?", self.test_dir .. name)
+      return package.searchpath("", self.test_dir .. name)
     end
     print("Testing " .. self.run_test)
     assert(
-      package.searchpath("?", self.run_test),
+      package.searchpath("", self.run_test),
       "Unreachable path " .. self.run_test
     )
     -- load the library

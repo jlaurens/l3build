@@ -111,21 +111,21 @@ local function searcher(name)
   local path
   if name:match("^l3build") then
     path = package.searchpath(
-      "?", boot.launch_dir .. long
+      "", boot.launch_dir .. long
     )  or boot.parent_search_path(
       name, boot.current_dir
     )  or package.searchpath(
-      "?", boot.kpse_dir .. long
+      "", boot.kpse_dir .. long
     )
   else
     path = package.searchpath(
-      "?", boot.current_dir .. long
+      "", boot.current_dir .. long
     )  or package.searchpath(
-      "?", boot.launch_dir .. long
+      "", boot.launch_dir .. long
     )  or boot.more_search_path(
       name
     )  or package.searchpath(
-      "?", boot.kpse_dir .. long
+      "", boot.kpse_dir .. long
     )
   end
   if path then
@@ -159,13 +159,23 @@ if not boot.legacy then
   boot.install_searcher()
 end
 
--- from now on, 
+-- Some os specific strings
+boot.directory_separator = package.config:sub(1,1)
+boot.template_separator  = package.config:match("^.-[\r\n]+([^\r\n]+)")
+boot.substitution_mark   = package.config:match("^.-[\r\n]+.-[\r\n]+([^\r\n]+)")
+assert( boot.directory_separator
+    and boot.template_separator
+    and boot.substitution_mark,
+  "bad package.config match:" .. package.config
+)
 
 ---Scans the parents of the current directory.
 ---@param name string
 ---@return string or nil + an error message
 function boot.parent_search_path(name, dir)
-  local pattern = name:match("%.lua$") and "?" or "?.lua"
+  -- what is the mark for substitution points?
+  local mark = boot.substitution_mark
+  local pattern = name:match("%.lua$") and mark or mark .. ".lua"
   for _ in boot.current_dir:gmatch(".*/") do
     dir = dir .. "../"
     local path = package.searchpath(dir .. name, pattern)
