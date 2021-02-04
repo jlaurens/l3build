@@ -2,7 +2,7 @@
 
 --[[
 
-File l3build.lua Copyright (C) 2014-2020 The LaTeX Project
+File l3build-main-unit.lua Copyright (C) 2014-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -43,41 +43,6 @@ local print            = print
 local select           = select
 local tonumber         = tonumber
 local exit             = os.exit
-
--- Possibly switch to advanced or unit mode.
--- This is never executed in normal mode.
-if arg[1] == "--advanced"
-or arg[1] == "--unit"
-then
-  -- This script can be executed as
-  -- x1) `l3build blablabla`
-  -- x2) `texlua l3build.lua blablabla`
-  -- x3) `texlua path to l3build.lua blablabla`
-  -- x4) imported from some other script,
-  --     typically in the main package dir or a subfolder
-  -- We would like to identify the subfolder case.
-  -- x1 is the normal way, x4 is|was used by latex2e for example
-  -- x2 and x3 can be used by l3build developers
-  -- who want a full control on the launched tool.
-  --[[ For average users: copy paste this one below
-  kpse.set_program_name("kpsewhich")
-  local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
-  local main = arg[1]:sub(3) -- "advanced" or "unit"
-  local exe = "l3build-main-" .. main .. ".lua"
-  local path = kpse_dir .. exe
-  os.exit(dofile(path):run(arg))
-  --]]
-  kpse.set_program_name("kpsewhich")
-  local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
-  local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "."
-  local main = arg[1]:sub(3) -- "advanced" or "unit"
-  local exe = "l3build-main-" .. main .. ".lua"
-  local path = package.searchpath(
-    "", launch_dir .. exe
-  )  or kpse_dir   .. exe
-  dofile(path)
-  os.exit()
-end
 
 -- l3build setup and functions
 kpse.set_program_name("kpsewhich")
