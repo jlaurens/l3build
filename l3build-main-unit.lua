@@ -1,8 +1,6 @@
-#!/usr/bin/env texlua
-
 --[[
 
-File l3build-main-unit.lua Copyright (C) 2014-2020 The LaTeX Project
+File l3build-unit.lua Copyright (C) 2018-2020 The LaTeX3 Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -24,173 +22,230 @@ for those people who are interested.
 
 --]]
 
--- Version information
-release_date = "2020-06-04"
+-- This is a main script file not to be required.
 
--- File operations are aided by the LuaFileSystem module
-local lfs = require("lfs")
+local lfs   = require("lfs")
+local kpse  = require("kpse")
 
--- Local access to functions
+local insert = table.insert
+local append = table.insert
 
-local assert           = assert
-local ipairs           = ipairs
-local insert           = table.insert
-local lookup           = kpse.lookup
-local match            = string.match
-local gsub             = string.gsub
-local next             = next
-local print            = print
-local select           = select
-local tonumber         = tonumber
-local exit             = os.exit
-
--- l3build setup and functions
+-- load the booter:
 kpse.set_program_name("kpsewhich")
-build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
-local function build_require(s)
-  require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
+local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
+local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "."
+local path = package.searchpath(
+  "", launch_dir .. "l3build-boot.lua"
+)  or kpse_dir   .. "l3build-boot.lua"
+
+local boot = dofile(path)
+
+-- Consume one argument (the mode switcher flag)
+if arg[1] == "--unit" then
+  boot.shift_left(arg, 1)
 end
 
--- Minimal code to do basic checks
-build_require("arguments")
-build_require("help")
+-- Dealing with the CLI
+local short_defs = { -- short options
+  d = { -- specify the unit test directory
+    on_parsed = function (opts, value)
+      opts.test_dir = value
+    end
+  },
+  r = { -- the full path of a single test to run
+    on_parsed = function (opts, value)
+      opts.run_test = value
+    end
+  },
+  t = { -- cumulative names of test files to run
+    on_parsed = function (opts, value)
+      for v in value:gmatch("[^,]+") do
+        append(opts.tests, v)
+      end
+    end
+  },
+  p = { -- pattern to select only some tests.
+    on_parsed = function (opts, value)
+      append(opts.patterns, value)
+    end
+  },
+}
+local long_defs = { -- long options
+  run = short_defs.r,
+  test = short_defs.t,
+  dir = short_defs.d,
+  pattern = short_defs.p,
+}
 
-build_require("file-functions")
-build_require("typesetting")
-build_require("aux")
-build_require("clean")
-build_require("check")
-build_require("ctan")
-build_require("install")
-build_require("unpack")
-build_require("manifest")
-build_require("manifest-setup")
-build_require("tagging")
-build_require("upload")
-build_require("stdmain")
+local unit = {}
 
--- This has to come after stdmain(),
--- and that has to come after the functions are defined
-if options["target"] == "help" then
-  help()
-  exit(0)
-elseif options["target"] == "version" then
-  version()
-  exit(0)
-end
-
--- Allow main function to be disabled 'higher up'
-main = main or stdmain
-
--- Load configuration file if running as a script
-if match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$") then
-  -- Look for some configuration details
-  if fileexists("build.lua") then
-    dofile("build.lua")
-  else
-    print("Error: Cannot find configuration build.lua")
-    exit(1)
+---Parse the command line arguments.
+---@param arg table, the list of command line arguments
+function unit:parse(arg)
+  while arg[1] do
+    -- print("arg[1]", arg[1])
+    local key, value = arg[1]:match("^%-%-([^=]*)=(.*)$")
+    if key then
+      local def = long_defs[key]
+      if def then
+        -- print(key, value)
+        def.on_parsed(self, value)
+        boot.shift_left(arg, 1)
+        goto continue
+      end
+      error("Unsupported option " .. key, 0)
+    end
+    key = arg[1]:match("^%-%-(.*)$")
+    if key then
+      local def = long_defs[key]
+      if def then
+        if arg[2] then
+          -- print("arg[2]", arg[2])
+          def.on_parsed(self, arg[2])
+          boot.shift_left(arg, 2)
+          goto continue
+        end
+        error('Missing value for ' .. key)
+      end
+      error('Unsupported option ' .. key)
+    end
+    key, value = arg[1]:match("^%-(.)(.+)$")
+    if key then
+      local def = short_defs[key]
+      if def then
+        def.on_parsed(self, value)
+        boot.shift_left(arg, 1)
+        goto continue
+      end
+      error("Unsupported option " .. key, 0)
+    end
+    key = arg[1]:match("^%-(.)$")
+    if key then
+      local def = short_defs[key]
+      if def then
+        if arg[2] then
+          -- print("arg[2]", arg[2])
+          def.on_parsed(self, arg[2])
+          boot.shift_left(arg, 2)
+          goto continue
+        end
+        error('Missing value for ' .. key, 0)
+      end
+      error("Unsupported option " .. key, 0)
+    end
+    break
+    ::continue::
   end
 end
 
--- Load standard settings for variables:
--- comes after any user versions
-build_require("variables")
-
--- Ensure that directories are 'space safe'
-maindir       = escapepath(maindir)
-docfiledir    = escapepath(docfiledir)
-sourcefiledir = escapepath(sourcefiledir)
-supportdir    = escapepath(supportdir)
-testfiledir   = escapepath(testfiledir)
-testsuppdir   = escapepath(testsuppdir)
-builddir      = escapepath(builddir)
-distribdir    = escapepath(distribdir)
-localdir      = escapepath(localdir)
-resultdir     = escapepath(resultdir)
-testdir       = escapepath(testdir)
-typesetdir    = escapepath(typesetdir)
-unpackdir     = escapepath(unpackdir)
-
--- Tidy up the epoch setting
--- Force an epoch if set at the command line
--- Must be done after loading variables, etc.
-if options["epoch"] then
-  epoch           = options["epoch"]
-  forcecheckepoch = true
-  forcedocepoch   = true
-end
-epoch = normalise_epoch(epoch)
-
--- Sanity check
-check_engines()
-
---
--- Deal with multiple configs for tests
---
-
--- When we have specific files to deal with, only use explicit configs
--- (or just the std one)
-if options["names"] then
-  checkconfigs = options["config"] or {stdconfig}
-else
-  checkconfigs = options["config"] or checkconfigs
-end
-
-if options["target"] == "check" then
-  if #checkconfigs > 1 then
-    local errorlevel = 0
-    local opts = options
-    local failed = { }
-    for i = 1, #checkconfigs do
-      opts["config"] = {checkconfigs[i]}
-      errorlevel = call({"."}, "check", opts)
-      if errorlevel ~= 0 then
-        if options["halt-on-error"] then
-          exit(1)
-        else
-          insert(failed,checkconfigs[i])
-        end
+---Run one test.
+---@return boolean whether a test has been performed
+function unit:run_one_test()
+  if self.run_test then
+    -- allow to look for modules in the parent directory
+    -- and the test directory
+    -- before the TDS
+    boot.more_search_path = function (name)
+      -- print("more_search_path", name, self.test_dir)
+      local ans = boot.parent_search_path(name, lfs.currentdir())
+      if ans then
+        return ans
       end
+      name = name:match("^.*%.lua$") or name .. ".lua"
+      return package.searchpath("", self.test_dir .. name)
     end
-    if next(failed) then
-      for _,config in ipairs(failed) do
-        print("Failed tests for configuration " .. config .. ":")
-        print("\n  Check failed with difference files")
-        local testdir = testdir
-        if config ~= "build" then
-          testdir = testdir .. "-" .. config
-        end
-        for _,i in ipairs(filelist(testdir,"*" .. os_diffext)) do
-          print("  - " .. testdir .. "/" .. i)
-        end
-        print("")
-      end
-      exit(1)
+    assert(
+      package.searchpath("", self.run_test),
+      "Unreachable path " .. self.run_test
+    )
+    -- load the library
+    af = require("l3build-assert")
+    -- install the patterns
+    local match = ""
+    for _,p in ipairs(self.patterns) do
+      insert(arg, 1, p)
+      insert(arg, 1, "-p")
+      match = match .. p .. ", "
+    end
+    if #match > 0 then
+      print("Testing " .. self.run_test .. " (match: " .. match .. "\8\8)")
     else
-      -- Avoid running the 'main' set of tests twice
-      exit(0)
+      print("Testing " .. self.run_test)
     end
+    -- load the file
+    dofile(self.run_test)
+    -- terminate
+    return true, af.run()
   end
 end
-if #checkconfigs == 1 and
-   checkconfigs[1] ~= "build" and
-   (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-   local config = "./" .. gsub(checkconfigs[1],".lua$","") .. ".lua"
-   if fileexists(config) then
-     local savedtestfiledir = testfiledir
-     dofile(config)
-     testdir = testdir .. "-" .. checkconfigs[1]
-     -- Reset testsuppdir if required
-     if savedtestfiledir ~= testfiledir and
-       testsuppdir == savedtestfiledir .. "/support" then
-       testsuppdir = testfiledir .. "/support"
-     end
-   else
-     print("Error: Cannot find configuration " ..  checkconfigs[1])
-     exit(1)
-   end
+
+---Main function.
+---@param arg any, the list of command line arguments
+---@return integer
+function unit:run(arg)
+  -- print("l3build in unit mode")
+  -- prepare the tests
+  self.tests = {}
+  self.patterns = {}
+  self:parse(arg)
+
+  local ok, exit = self:run_one_test()
+  if ok then
+    return exit
+  end
+
+  if not next(self.tests) then
+    error("Missing test name", 0)
+  end
+  -- Set up the test directory name
+  self.test_dir = self.tesdir and self.test_dir:match("^.*/$") -- given on the command line
+    or self.tesdir and self.tesdir .. "/"
+    or boot.launch_dir and boot.launch_dir .. "unit_tests/" -- default location relative to the launch directory if any 
+    or "unit_tests/" -- default location relative to the current path
+
+  ---Return the path of the test with the given name in the given directory
+  ---@param name string
+  ---@param dir string, path of a directory, must end with "/" when not empty
+  ---@return string? the path when found, nil otherwise
+  local test_search_path = function (name, dir)
+    return dir and package.searchpath(name , dir .. "?.test.lua")
+  end
+  -- Check if all the given test exist
+  -- associate a path to a test
+  local test_names = {}
+  local test_paths = {}
+  local function search_path(name)
+    return test_search_path(name, "")
+        or test_search_path(name, self.test_dir)
+  end
+  for _, name in ipairs(self.tests) do
+    local path = search_path(name)
+              or search_path("l3build-" .. name)
+    if path then
+      append(test_names, name)
+      test_paths[name] = path
+    end
+  end
+  if #test_names == 0 then
+    error("Unreachable tests, nothing to do.", 0)
+  end
+
+  for _, name in ipairs(test_names) do
+    local path = test_paths[name]
+    local cmd = arg[0]:match("%.lua$") and "texlua " .. arg[0] or arg[0]
+    cmd = cmd .. " --unit"
+    cmd = cmd .. " --run=\"" .. path .. "\""
+    cmd = cmd .. " --dir=\"" .. self.test_dir .. "\""
+    for _,p in ipairs(self.patterns) do
+      cmd = cmd .. " --pattern=\"" .. p .. "\""
+    end
+    -- print(cmd)
+    local ok, msg, code = os.execute(cmd)
+    if not ok then
+      print("Error while testing " .. name, msg, code)
+    end
+  end
+  return 0
 end
 
--- Call the main function
-main(options["target"], options["names"])
+os.exit(unit:run(arg))

@@ -1,0 +1,1 @@
+af.flag.push("bar")
