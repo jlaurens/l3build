@@ -42,6 +42,8 @@ local insert      = table.insert
 local remove      = table.remove
 local execute     = os.execute
 
+local os_type     = os.type
+
 -- module name
 local _NAME = "l3build-boot"
 
@@ -57,10 +59,16 @@ boot = boot or {} -- some attributes may be defined upwind
 boot._TYPE     = "module"
 boot._NAME     = _NAME
 boot._VERSION  = "dev" -- the "dev" must be replaced by a release date
+
 boot.PATH  = {} -- unique key
-boot.trace = {}
-boot.trace_prompt = "**"
-boot.trace_level = 0
+
+boot.os_type = os_type
+
+boot.trace = {
+  flags = {},
+  prompt = "*** ",
+  level = 0,
+}
 
 ---To make the difference between "a variable is defined but contains
 ---nothing" and "a variable was never defined"
@@ -139,13 +147,14 @@ end
 ---@return function
 ---@return string
 local function searcher(name)
-  boot.trace_show(
-    "require",
-    "module required: " .. name
-  )
+  if boot.trace.should("require") then
+    print("module required: " .. name)
+  end
   local path = boot.search_path(name)
   if path then
-    boot.trace_show("require", "module found at: " .. path)
+    if boot.trace.should("require") then
+      print("module found at: " .. path)
+    end
     return loader, path
   end
   return "\n        [l3build searcher] file not found: '" .. name .. "'"
@@ -264,29 +273,41 @@ end
 
 -- Low level utility functions, they belong here because of their early use
 
+---Goody to filter some tracing.
+---@param key string optional when level is provided, true only when `boot.trace.flags[key]` is true
+---@param level number optional when key is provided, true only when the trace level is greater than this level
+function boot.trace.should(key, level)
+  if type(key) == "number" and key > boot.trace.level then
+    return true
+  end
+  if type(level) == "number" and level > boot.trace.level then
+    return true
+  end
+  return not key and false or not boot.trace.flags[key] == false
+end
+
 ---Goody to show some execution trace.
----@param key string optional when level is provided, print only when `3b.trace[key]` is true
+---Arguments are always computed. It is not a C macro.
+---@param key string optional when level is provided, print only when `boot.trace.flags[key]` is true
 ---@param level number optional when key is provided, print only when the trace level is greater than this level
 ---@param fmt string
 ---@param nil ...
-function boot.trace_show(key, level, fmt, ...)
+function boot.trace.show(key, level, fmt, ...)
   local next_arg
   if type(key) == "number" then
     key, level, fmt, next_arg = nil, key, level, fmt
-    if level > boot.trace_level then
-      print(boot.trace_prompt .. fmt:format(next_arg, ...))
+    if level > boot.trace.level then
+      print(boot.trace.prompt .. fmt:format(next_arg, ...))
       return
     end
   end
-  if type(level) == "number" then
-    if level > boot.trace_level or boot.trace[key] then
-      print(boot.trace_prompt .. fmt:format(...))
-    end
-  else
-    level, fmt, next_arg = nil, level, fmt
-    if boot.trace[key] then
-      print(boot.trace_prompt .. fmt:format(next_arg, ...))
-    end
+  if type(level) == "number"  and level > boot.trace.level then
+    print(boot.trace.prompt .. fmt:format(...))
+    return
+  end
+  level, fmt, next_arg = nil, level, fmt
+  if not key or boot.trace.flags[key] then
+    print(boot.trace.prompt .. fmt:format(next_arg, ...))
   end
 end
 
