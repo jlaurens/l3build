@@ -24,26 +24,26 @@ for those people who are interested.
 
 -- This is a main script file not to be required.
 
+local MODE = "unit"
+local KEY  = "--" .. MODE
+
 local lfs   = require("lfs")
 local kpse  = require("kpse")
 
 local insert = table.insert
 local append = table.insert
+local remove = table.remove
+local concat = table.concat
 
 -- load the booter:
 kpse.set_program_name("kpsewhich")
-local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
-local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "."
+local kpse_dir = kpse.lookup("l3build.lua"):match("^.*/")
+local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "./"
 local path = package.searchpath(
-  "", launch_dir .. "l3build-boot.lua"
-)  or kpse_dir   .. "l3build-boot.lua"
+  "?", launch_dir .. "l3build-boot.lua"
+)   or kpse_dir   .. "l3build-boot.lua"
 
 local boot = dofile(path)
-
--- Consume one argument (the mode switcher flag)
-if arg[1] == "--unit" then
-  boot.shift_left(arg, 1)
-end
 
 -- Dealing with the CLI
 local short_defs = { -- short options
@@ -82,51 +82,55 @@ local unit = {}
 ---Parse the command line arguments.
 ---@param arg table, the list of command line arguments
 function unit:parse(arg)
-  while arg[1] do
+  -- turn `arg` into a stack in revert order
+  local args = {}
+  local min = arg[1] == KEY and 2 or 1
+  for i = #arg, min, -1 do
+    append(args, arg[i])
+  end
+  -- consume each argument
+  while #args > 0 do
+    local r = remove(args)
     -- print("arg[1]", arg[1])
-    local key, value = arg[1]:match("^%-%-([^=]*)=(.*)$")
+    local key, value = r:match("^%-%-([^=]*)=(.*)$")
     if key then
       local def = long_defs[key]
       if def then
         -- print(key, value)
         def.on_parsed(self, value)
-        boot.shift_left(arg, 1)
         goto continue
       end
       error("Unsupported option " .. key, 0)
     end
-    key = arg[1]:match("^%-%-(.*)$")
+    key = r:match("^%-%-(.*)$")
     if key then
       local def = long_defs[key]
       if def then
-        if arg[2] then
-          -- print("arg[2]", arg[2])
-          def.on_parsed(self, arg[2])
-          boot.shift_left(arg, 2)
+        if #args > 0 then
+          r = remove(args)
+          def.on_parsed(self, r)
           goto continue
         end
         error('Missing value for ' .. key)
       end
       error('Unsupported option ' .. key)
     end
-    key, value = arg[1]:match("^%-(.)(.+)$")
+    key, value = r:match("^%-(.)(.+)$")
     if key then
       local def = short_defs[key]
       if def then
         def.on_parsed(self, value)
-        boot.shift_left(arg, 1)
         goto continue
       end
       error("Unsupported option " .. key, 0)
     end
-    key = arg[1]:match("^%-(.)$")
+    key = r:match("^%-(.)$")
     if key then
       local def = short_defs[key]
       if def then
-        if arg[2] then
-          -- print("arg[2]", arg[2])
-          def.on_parsed(self, arg[2])
-          boot.shift_left(arg, 2)
+        if #args > 0 then
+          r = remove(args)
+          def.on_parsed(self, r)
           goto continue
         end
         error('Missing value for ' .. key, 0)
@@ -208,39 +212,43 @@ function unit:run(arg)
   ---@param dir string, path of a directory, must end with "/" when not empty
   ---@return string? the path when found, nil otherwise
   local test_search_path = function (name, dir)
-    return dir and package.searchpath(name , dir .. "?.test.lua")
+    return dir and package.searchpath("?" , dir .. name .. ".test.lua")
   end
-  -- Check if all the given test exist
-  -- associate a path to a test
-  local test_names = {}
-  local test_paths = {}
+  -- Check if all the given tests exist
+  -- associate a test path to a test name
+  local test_names = {} -- ordered test names
+  local test_paths = {} -- name -> path
+  -- search in the current directory then in the test directory
   local function search_path(name)
     return test_search_path(name, "")
         or test_search_path(name, self.test_dir)
   end
   for _, name in ipairs(self.tests) do
-    local path = search_path(name)
-              or search_path("l3build-" .. name)
-    if path then
+    local p = search_path(name)
+           or search_path("l3build-" .. name)
+    if p then
       append(test_names, name)
-      test_paths[name] = path
+      test_paths[name] = p
     end
   end
   if #test_names == 0 then
     error("Unreachable tests, nothing to do.", 0)
   end
-
+  -- Do the tests one after the other
   for _, name in ipairs(test_names) do
-    local path = test_paths[name]
-    local cmd = arg[0]:match("%.lua$") and "texlua " .. arg[0] or arg[0]
-    cmd = cmd .. " --unit"
-    cmd = cmd .. " --run=\"" .. path .. "\""
-    cmd = cmd .. " --dir=\"" .. self.test_dir .. "\""
-    for _,p in ipairs(self.patterns) do
-      cmd = cmd .. " --pattern=\"" .. p .. "\""
+    local p = test_paths[name]
+    local cmd = {}
+    if arg[0]:match("%.lua$") then
+      append(cmd, "texlua")
     end
-    -- print(cmd)
-    local ok, msg, code = os.execute(cmd)
+    append(cmd, arg[0])
+    append(cmd, "--unit")
+    append(cmd, "--run=\"" .. p .. "\"")
+    append(cmd, "--dir=\"" .. self.test_dir .. "\"")
+    for _,p in ipairs(self.patterns) do
+      append(cmd, "--pattern=\"" .. p .. "\"")
+    end
+    local ok, msg, code = os.execute(concat(cmd, " "))
     if not ok then
       print("Error while testing " .. name, msg, code)
     end

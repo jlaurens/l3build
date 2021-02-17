@@ -46,9 +46,9 @@ local exit             = os.exit
 
 -- Possibly switch to advanced or unit mode.
 -- This is never executed in normal mode.
-if arg[1] == "--advanced"
-or arg[1] == "--unit"
-then
+local mode = arg[1]:match("^%-%-(.*)") -- "advanced" or "unit"
+
+if mode then
   -- This script can be executed as
   -- x1) `l3build blablabla`
   -- x2) `texlua l3build.lua blablabla`
@@ -70,13 +70,14 @@ then
   kpse.set_program_name("kpsewhich")
   local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
   local launch_dir = arg[0]:match("^(.*/).*%.lua$") or "."
-  local main = arg[1]:sub(3) -- "advanced" or "unit"
-  local exe = "l3build-main-" .. main .. ".lua"
+  local exe = "l3build-mode-" .. mode .. ".lua"
   local path = package.searchpath(
-    "", launch_dir .. exe
-  )  or kpse_dir   .. exe
-  dofile(path)
-  os.exit()
+    "?", launch_dir .. exe
+  )   or kpse_dir   .. exe
+  if path then
+    dofile(path)
+    os.exit()
+  end
 end
 
 -- l3build setup and functions
