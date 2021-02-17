@@ -30,7 +30,8 @@ for those people who are interested.
 -- This makes sense if we do not know in advance where
 -- modules and scripts are installed, which is the case when
 -- 1) l3build itself is being developed
--- 2) we require modules that are not installed, for example while testing
+-- 2) we require modules that are not installed globally,
+-- for example while testing.
 -- Some attributes and methods are defined to be used
 -- very early.
 
@@ -126,7 +127,7 @@ function boot.search_path(name)
   local long = name:match("^.*%.lua$") or name .. ".lua"
   local path
   local function search(p)
-    return package.searchpath("", p)
+    return package.searchpath("?", p)
   end
   if name:match("^l3build") then
     path = search(boot.launch_dir .. long)
@@ -184,26 +185,15 @@ if not boot.legacy then
   boot.install_searcher()
 end
 
--- Some os specific strings
-boot.directory_separator = package.config:sub(1,1)
-boot.template_separator  = package.config:match("^.-[\r\n]+([^\r\n]+)")
-boot.substitution_mark   = package.config:match("^.-[\r\n]+.-[\r\n]+([^\r\n]+)")
-assert( boot.directory_separator
-    and boot.template_separator
-    and boot.substitution_mark,
-  "bad package.config match:" .. package.config
-)
-
 ---Scans the parents of the current directory.
 ---@param name string
 ---@return string or nil + an error message
 function boot.parent_search_path(name, dir)
   -- what is the mark for substitution points? is it relevant to ask?
-  local mark = boot.substitution_mark
-  local pattern = name:match("%.lua$") and mark or mark .. ".lua"
+  local tail = name:match("%.lua$") and "" or ".lua"
   for _ in boot.current_dir:gmatch(".*/") do
     dir = dir .. "../"
-    local path = package.searchpath(dir .. name, pattern)
+    local path = package.searchpath("?", dir .. name .. tail)
     if path then
       return path
     end
@@ -233,9 +223,9 @@ boot.PROXY_NAME = {} -- unique key
 
 ---The module will be loaded only when the usage requires it,
 ---unless someone else has already required it.
----This is interesting when a module does not need the contents of a module
+---This is interesting when a module does not need the contents of another module
 ---until run time, after all the setup and configuration processes are performed.
----Of course `boot.future_load('l3build-boot')` does not make any sense.
+---Of course `boot.delay_require('l3build-boot')` does not make any sense.
 ---@param name string|table
 ---@return table|boolean
 function boot.delay_require(name)
