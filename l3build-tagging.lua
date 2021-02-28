@@ -51,7 +51,7 @@ local function update_file_tag(file, tagname, tagdate)
   local filename = dir_base(file)
   print("Tagging  ".. filename)
   local fh = assert(open(file, "rb"))
-  local content = fh:read("*all")
+  local content = fh:read("a")
   fh:close()
   -- Deal with Unix/Windows line endings
   content = gsub(content .. (match(content, "\n$") and "" or "\n"),

@@ -108,9 +108,9 @@ end
 checkinit_hook = checkinit_hook or function() return 0 end
 
 local function rewrite(source, result, processor, ...)
-  local file = assert(open(source, "rb"))
-  local content = gsub(file:read("*all") .. "\n", "\r\n", "\n")
-  close(file)
+  local fh = assert(open(source, "rb")) -- "b" for pdf files
+  local content = gsub(fh:read("*all") .. "\n", "\r\n", "\n")
+  close(fh)
   local new_content = processor(content, ...)
   local newfile = open(result, "w")
   output(newfile)
@@ -582,6 +582,23 @@ function rewrite_pdf(source, result, engine, errlevels)
   return rewrite(source, result, normalize_pdf, engine, errlevels)
 end
 
+-- Look for a test: could be in the testfiledir or the unpackdir
+local function testexists(test)
+  local filenames = {}
+  for i, kind in ipairs(test_order) do
+    filenames[i] = test .. test_types[kind].test
+  end
+  local found = locate({ testfiledir, unpackdir }, filenames)
+  if found then
+    for i, kind in ipairs(test_order) do
+      local filename = filenames[i]
+      if found:sub(-#filename) == filename then
+        return found, kind
+      end
+    end
+  end
+end
+
 -- Run one test which may have multiple engine-dependent comparisons
 -- Should create a difference file for each failed test
 function runcheck(name, hide)
@@ -853,23 +870,6 @@ runtest_tasks = runtest_tasks or function(name, run)
   return ""
 end
 
--- Look for a test: could be in the testfiledir or the unpackdir
-function testexists(test)
-  local filenames = {}
-  for i, kind in ipairs(test_order) do
-    filenames[i] = test .. test_types[kind].test
-  end
-  local found = locate({ testfiledir, unpackdir }, filenames)
-  if found then
-    for i, kind in ipairs(test_order) do
-      local filename = filenames[i]
-      if found:sub(-#filename) == filename then
-        return found, kind
-      end
-    end
-  end
-end
-
 function check(names)
   local errorlevel = 0
   if testfiledir ~= "" and directory_exists(testfiledir) then
@@ -993,7 +993,7 @@ function showfailedlog(name)
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i, "r")
-    local content = f:read("*all")
+    local content = f:read("a")
     close(f)
     print("-----------------------------------------------------------------------------------")
     print(content)
@@ -1007,7 +1007,7 @@ function showfaileddiff()
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i, "r")
-    local content = f:read("*all")
+    local content = f:read("a")
     close(f)
     print("-----------------------------------------------------------------------------------")
     print(content)

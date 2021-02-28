@@ -354,7 +354,7 @@ function file_contents (filename)
     if f == nil then
       return nil
     else
-      local s = f:read("*all")
+      local s = f:read("a")
       close(f)
       return s
     end
