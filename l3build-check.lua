@@ -770,24 +770,25 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   for i = 1, checkruns do
     errlevels[i] = run(
       testdir, cmd_concat(
-      -- No use of localdir here as the files get copied to testdir:
-      -- avoids any paths in the logs
-      os_setenv .. " TEXINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or ""),
-      os_setenv .. " LUAINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or ""),
-      -- Avoid spurious output from (u)pTeX
-      os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
-      -- Allow for local texmf files
-      os_setenv .. " TEXMFCNF=." .. os_pathsep,
-      set_epoch_cmd(epoch, forcecheckepoch),
-      -- Ensure lines are of a known length
-      os_setenv .. " max_print_line=" .. maxprintline,
-      binary .. format
-        .. " " .. asciiopt .. " " .. checkopts
-        .. setup(lvtfile)
-        .. (hide and (" > " .. os_null) or ""),
-      runtest_tasks(jobname(lvtfile), i)
+        -- No use of localdir here as the files get copied to testdir:
+        -- avoids any paths in the logs
+        os_setenv .. " TEXINPUTS=." .. localtexmf
+          .. (checksearch and os_pathsep or ""),
+        os_setenv .. " LUAINPUTS=." .. localtexmf
+          .. (checksearch and os_pathsep or ""),
+        -- Avoid spurious output from (u)pTeX
+        os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
+        -- Allow for local texmf files
+        os_setenv .. " TEXMFCNF=." .. os_pathsep,
+        set_epoch_cmd(epoch, forcecheckepoch),
+        -- Ensure lines are of a known length
+        os_setenv .. " max_print_line=" .. maxprintline,
+        binary .. format
+          .. " " .. asciiopt .. " " .. checkopts
+          .. setup(lvtfile)
+          .. (hide and (" > " .. os_null) or ""),
+        runtest_tasks(jobname(lvtfile), i)
+      )
     )
     -- Break the loop if the result is stable
     if breakout and i < checkruns then
