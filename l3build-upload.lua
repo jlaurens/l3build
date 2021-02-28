@@ -117,7 +117,7 @@ function upload(tagnames)
 
   -- avoid lower level error from post command if zip file missing
   local zip = open(trim_space(tostring(uploadfile)), "r")
-  if zip~=nil then
+  if zip then
     close(zip)
   else
     error("Missing zip file '" .. tostring(uploadfile) .. "'")
@@ -263,7 +263,7 @@ end
 function ctan_field(fname, fvalue, max, desc, mandatory, multi)
   if type(fvalue)=="table" and multi then
     for i, v in pairs(fvalue) do
-      ctan_single_field(fname, v, max, desc, mandatory and i==1)
+      ctan_single_field(fname, v, max, desc, mandatory and i == 1)
     end
   else
     ctan_single_field(fname, fvalue, max, desc, mandatory)
@@ -326,11 +326,11 @@ function input_multi_line_field (name)
         field = field .. "\n"
       end
       return_count = 0
-      if answer_line~=nil then
+      if answer_line then
         field = field .. "\n" .. answer_line
       end
      end
-  until (return_count==3 or answer_line==nil or answer_line=='\004')
+  until (return_count == 3 or answer_line == nil or answer_line == '\004')
   return field
 end
 
@@ -350,7 +350,7 @@ end
 function file_contents (filename)
   if filename ~= nil then
     local f= open(filename, "r")
-    if f==nil then
+    if f == nil then
       return nil
     else
       local s = f:read("*all")
