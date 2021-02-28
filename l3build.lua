@@ -220,10 +220,15 @@ end
 --[=[ end of booting process ]=]
 
 -- Minimal code to do basic checks
+local util = require("l3b.util")
+local entries = util.entries
+
 require("l3b.arguments")
 require("l3b.help")
 
-require("l3b.file-functions")
+local fifu      = require("l3b.file-functions")
+local all_files = fifu.all_files
+
 require("l3b.typesetting")
 require("l3b.aux")
 require("l3b.clean")
@@ -324,7 +329,7 @@ if options["target"] == "check" then
         if config ~= "build" then
           testdir = testdir .. "-" .. config
         end
-        for i in entries(filelist(testdir, "*" .. os_diffext)) do
+        for i in all_files(testdir, "*" .. os_diffext) do
           print("  - " .. testdir .. "/" .. i)
         end
         print("")

@@ -50,6 +50,9 @@ local exit            = os.exit
 local execute         = os.execute
 local remove          = os.remove
 
+local fifu      = require("l3b.file-functions")
+local all_files = fifu.all_files
+
 local util            = require("l3b.util")
 local entries         = util.entries
 --
@@ -67,7 +70,7 @@ function checkinit()
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for i in entries(filelist(localdir)) do
+  for i in all_files(localdir) do
     cp(i, localdir, testdir)
   end
   bundleunpack({sourcefiledir, testfiledir})
@@ -78,7 +81,7 @@ function checkinit()
     cp(i, unpackdir, testdir)
   end
   if direxists(testsuppdir) then
-    for i in entries(filelist(testsuppdir)) do
+    for i in all_files(testsuppdir) do
       cp(i, testsuppdir, testdir)
     end
   end
@@ -814,7 +817,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   test_type.rewrite(gen_file,new_file,engine,errlevels)
   -- Store secondary files for this engine
   for filetype in entries(auxfiles) do
-    for file in entries(filelist(testdir, filetype)) do
+    for file in all_files(testdir, filetype) do
       if match(file,"^" .. name .. "%.[^.]+$") then
         local newname = gsub(file,"(%.[^.]+)$","." .. engine .. "%1")
         if fileexists(testdir .. "/" .. newname) then
@@ -871,7 +874,7 @@ function check(names)
           excludepatterns[num_exclude] = glob_to_pattern(glob .. ext)
         end
         for glob in entries(includetests) do
-          for name in entries(filelist(testfiledir, glob .. ext)) do
+          for name in all_files(testfiledir, glob .. ext) do
             local exclude
             for i=1, num_exclude do
               if match(name, excludepatterns[i]) then
@@ -883,7 +886,7 @@ function check(names)
               insert(names,jobname(name))
             end
           end
-          for name in entries(filelist(unpackdir, glob .. ext)) do
+          for name in all_files(unpackdir, glob .. ext) do
             local exclude
             for i=1, num_exclude do
               if not match(name, excludepatterns[i]) then
@@ -963,7 +966,7 @@ end
 -- A short auxiliary to print the list of differences for check
 function checkdiff()
   print("\n  Check failed with difference files")
-  for i in entries(filelist(testdir, "*" .. os_diffext)) do
+  for i in all_files(testdir, "*" .. os_diffext) do
     print("  - " .. testdir .. "/" .. i)
   end
   print("")
@@ -971,7 +974,7 @@ end
 
 function showfailedlog(name)
   print("\nCheck failed with log file")
-  for i in entries(filelist(testdir, name..".log")) do
+  for i in all_files(testdir, name..".log") do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")
@@ -985,7 +988,7 @@ end
 
 function showfaileddiff()
   print("\nCheck failed with difference file")
-  for i in entries(filelist(testdir, "*" .. os_diffext)) do
+  for i in all_files(testdir, "*" .. os_diffext) do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")

@@ -70,7 +70,7 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     end
   end
   for i in entries(unpackfiles) do
-    for j,_ in pairs(tree(unpackdir, i)) do
+    for j in keys(tree(unpackdir, i)) do
       local path, name = splitpath(j)
       local localdir = abspath(localdir)
       local success = io.popen(

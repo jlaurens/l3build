@@ -33,6 +33,9 @@ local match = string.match
 
 local insert = table.insert
 
+local fifu      = require("l3b.file-functions")
+local all_files = fifu.all_files
+
 local util = require("l3b.util")
 local entries = util.entries
 local keys = util.keys
@@ -49,7 +52,7 @@ function uninstall()
       local files = filelist(installdir)
       if next(files) then
         print("\n" .. "For removal from " .. installdir .. ":")
-        for file in entries(filelist(installdir)) do
+        for file in all_files(installdir) do
           print("- " .. file)
         end
       end

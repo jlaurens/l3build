@@ -33,23 +33,26 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
+local fifu      = require("l3b.file-functions")
+local all_files = fifu.all_files
+
 manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for f in entries(filelist(ctandir.."/"..ctanpkg,"*.*")) do
+  for f in all_files(ctandir.."/"..ctanpkg,"*.*") do
     ctanfiles[f] = true
   end
   tdsfiles = {}
   for subdir in entries({"/doc/","/source/","/tex/"}) do
-    for f in entries(filelist(tdsdir..subdir..moduledir,"*.*")) do
+    for f in all_files(tdsdir..subdir..moduledir,"*.*") do
       tdsfiles[f] = true
     end
   end
 
   local manifest_entries = manifest_setup()
 
-  for ii,_ in ipairs(manifest_entries) do
+  for ii in keys(manifest_entries) do
     manifest_entries[ii] = manifest_build_list(manifest_entries[ii])
   end
 
@@ -74,7 +77,7 @@ manifest_build_list = function(entry)
     -- build list of excluded files
     for glob_list in entries(entry.exclude) do
       for this_glob in entries(glob_list) do
-        for this_file in entries(filelist(maindir,this_glob)) do
+        for this_file in all_files(maindir,this_glob) do
           entry.excludes[this_file] = true
         end
       end

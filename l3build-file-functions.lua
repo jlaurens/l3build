@@ -48,6 +48,10 @@ local gsub             = string.gsub
 
 local insert           = table.insert
 
+local util    = require("l3b.util")
+local entries = util.entries
+local keys    = util.keys
+
 -- Convert a file glob into a pattern for use by e.g. string.gub
 -- Based on https://github.com/davidm/lua-glob-pattern
 -- Simplified substantially: "[...]" syntax not supported as is not
@@ -288,6 +292,14 @@ function filelist(path, glob)
   return files
 end
 
+---Return an iterator of the files at path matching the given glob.
+---@param path string
+---@param glob string
+---@return fun(): string
+local function all_files(path, glob)
+  return entries(filelist(path, glob))
+end
+
 -- Does what filelist does, but can also glob subdirectories. In the returned
 -- table, the keys are paths relative to the given source path, the values
 -- are their counterparts relative to the current working directory.
@@ -311,7 +323,7 @@ function tree(src_path, glob)
     ---@param p_cwd string path counterpart relative to the current working directory
     ---@param table table
     local function fill(p_src, p_cwd, table)
-      for file in entries(filelist(p_cwd, glob_part)) do
+      for file in all_files(p_cwd, glob_part) do
         local p_src_file = p_src .. "/" .. file
         if file ~= "." and file ~= ".." and
         p_src_file ~= builddir -- TODO: ensure that `builddir` is properly formatted
@@ -453,3 +465,7 @@ function locate(dirs, names)
     end
   end
 end
+
+return {
+  all_files = all_files
+}
