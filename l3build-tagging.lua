@@ -30,6 +30,7 @@ local gsub    = string.gsub
 local util    = require("l3b.util")
 local entries = util.entries
 local values  = util.keys
+local unique_items = util.unique_items
 
 update_tag = update_tag or function(filename, content, tagname, tagdate)
   return content
@@ -70,9 +71,8 @@ function tag(tagnames)
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = remove_duplicates({ currentdir, sourcefiledir, docfiledir })
   local errorlevel = 0
-  for dir in entries(dirs) do
+  for dir in unique_items(currentdir, sourcefiledir, docfiledir) do
     for filetype in entries(tagfiles) do
       for file in values(tree(dir, filetype)) do
         errorlevel = update_file_tag(file, tagname, tagdate)

@@ -42,6 +42,7 @@ local match           = string.match
 
 local insert          = table.insert
 local sort            = table.sort
+local tbl_unpack      = table.unpack
 
 local unicode         = require("unicode")
 local utf8_char       = unicode.utf8.char
@@ -349,7 +350,7 @@ local function normalize_lua_log(content, luatex)
     line = gsub(line, ", direction TLT", "")
     -- Find glue setting and round out the last place
     local function round_digits(l, m)
-      return gsub(
+      return (gsub(
         l,
         m .. " (%-?)%d+%.%d+",
         m .. " %1"
@@ -357,15 +358,14 @@ local function normalize_lua_log(content, luatex)
             "%.3f",
             match(line, m .. " %-?(%d+%.%d+)") or 0
           )
-      )
+      ))
     end
     if match(line, "glue set %-?%d+%.%d+") then
       line = round_digits(line, "glue set")
     end
-    if match(
-        line, "glue %-?%d+%.%d+ plus %-?%d+%.%d+ minus %-?%d+%.%d+$"
-      )
-      then
+    if match(line,
+      "glue %-?%d+%.%d+ plus %-?%d+%.%d+ minus %-?%d+%.%d+$"
+    ) then
       line = round_digits(line, "glue")
       line = round_digits(line, "plus")
       line = round_digits(line, "minus")
@@ -381,9 +381,10 @@ local function normalize_lua_log(content, luatex)
     -- LuaTeX from v1.07 logs kerns differently ...
     -- This block only applies to the output of LuaTeX itself,
     -- hence needing a flag to skip the case of the reference log
-    if luatex and
-      tonumber(luatex_version) >= 107 and
-      match(line, "^%.*\\kern") then
+    if  luatex
+    and tonumber(luatex_version) >= 107
+    and match(line, "^%.*\\kern")
+    then
       -- Re-insert the space in explicit kerns
       if match(line, "kern%-?%d+%.%d+ *$") then
         line = gsub(line, "kern", "kern ")
@@ -401,61 +402,59 @@ local function normalize_lua_log(content, luatex)
     line = gsub(line, "\\pdfliteral origin", "\\pdfliteral")
     -- A function to handle the box prefix part
     local function boxprefix(s)
-      return gsub(match(s, "^(%.+)"), "%.", "%%.")
+      return (gsub(match(s, "^(%.+)"), "%.", "%%."))
     end
     -- 'Recover' some discretionary data
-    if match(lastline, "^%.+\\discretionary %(penalty 50%)$") and
-       match(line, boxprefix(lastline) .. "%.= ") then
+    if  match(lastline, "^%.+\\discretionary %(penalty 50%)$")
+    and match(line, boxprefix(lastline) .. "%.= ")
+    then
       line = gsub(line, " %(font%)$", "")
       return gsub(line, "%.= ", ""), ""
     end
     -- Where the last line was a discretionary, looks for the
     -- info one level in about what it represents
-    if match(lastline, "^%.+\\discretionary$")                or
-       match(lastline, "^%.+\\discretionary %(penalty 50%)$") or
-       match(lastline, "^%.+\\discretionary50%|$")            or
-       match(lastline, "^%.+\\discretionary50%| replacing $") then
+    if match(lastline, "^%.+\\discretionary$")
+    or match(lastline, "^%.+\\discretionary %(penalty 50%)$")
+    or match(lastline, "^%.+\\discretionary50%|$")
+    or match(lastline, "^%.+\\discretionary50%| replacing $")
+    then
       local prefix = boxprefix(lastline)
-      if match(line, prefix .. "%.") or
-         match(line, prefix .. "%|") then
-        if match(lastline, " replacing $") and
-           not dropping then
+      if match(line, prefix .. "%.")
+      or match(line, prefix .. "%|") then
+        if match(lastline, " replacing $")
+        and not dropping then
           -- Modify the return line
           return gsub(line, "^%.", ""), lastline, true
         else
           return "", lastline, true
         end
+      elseif dropping then
+        -- End of a \discretionary block
+        return line, ""
       else
-        if dropping then
-          -- End of a \discretionary block
-          return line, ""
-        else
-          -- Not quite a normal discretionary
-          if match(lastline, "^%.+\\discretionary50%|$") then
-            lastline =  gsub(lastline, "50%|$", "")
-          end
-          -- Remove some info that TeX90 lacks
-          lastline = gsub(lastline, " %(penalty 50%)$", "")
-          -- A normal (TeX90) discretionary:
-          -- add with the line break reintroduced
-          return lastline .. os_newline .. line, ""
+        -- Not quite a normal discretionary
+        if match(lastline, "^%.+\\discretionary50%|$") then
+          lastline = gsub(lastline, "50%|$", "")
         end
+        -- Remove some info that TeX90 lacks
+        lastline = gsub(lastline, " %(penalty 50%)$", "")
+        -- A normal (TeX90) discretionary:
+        -- add with the line break reintroduced
+        return lastline .. os_newline .. line, ""
       end
     end
     -- Look for another form of \discretionary, replacing a "-"
     local pattern = "^%.+\\discretionary replacing *$"
     if match(line, pattern) then
       return "", line
-    else
-      if match(lastline, pattern) then
-        local prefix = boxprefix(lastline)
-        if match(line, prefix .. "%.\\kern") then
-          return gsub(line, "^%.", ""), lastline, true
-        elseif dropping then
-          return "", ""
-        else
-          return lastline .. os_newline .. line, ""
-        end
+    elseif match(lastline, pattern) then
+      local prefix = boxprefix(lastline)
+      if match(line, prefix .. "%.\\kern") then
+        return gsub(line, "^%.", ""), lastline, true
+      elseif dropping then
+        return "", ""
+      else
+        return lastline .. os_newline .. line, ""
       end
     end
     -- For \mathon, if the current line is an empty \hbox then
@@ -468,11 +467,12 @@ local function normalize_lua_log(content, luatex)
     end
     -- Various \local... things that other engines do not do:
     -- Only remove the no-op versions
-    if match(line, "^%.+\\localpar$")                or
-       match(line, "^%.+\\localinterlinepenalty=0$") or
-       match(line, "^%.+\\localbrokenpenalty=0$")    or
-       match(line, "^%.+\\localleftbox=null$")       or
-       match(line, "^%.+\\localrightbox=null$")      then
+    if match(line, "^%.+\\localpar$")
+    or match(line, "^%.+\\localinterlinepenalty=0$")
+    or match(line, "^%.+\\localbrokenpenalty=0$")
+    or match(line, "^%.+\\localleftbox=null$")
+    or match(line, "^%.+\\localrightbox=null$")
+    then
       return "", ""
     end
     -- Older LuaTeX versions set the above up as a whatsit
@@ -552,9 +552,10 @@ local function normalize_pdf(content)
       binary = false
       stream = true
       stream_content = "stream" .. os_newline
-    elseif not match(line, "^ *$") and
-      not match(line, "^%%%%Invocation") and 
-      not match(line, "^%%%%%+") then
+    elseif not match(line, "^ *$")
+    and not match(line, "^%%%%Invocation")
+    and not match(line, "^%%%%%+")
+    then
       line = gsub(line, "%/ID( ?)%[<[^>]+><[^>]+>]", "/ID%1[<ID-STRING><ID-STRING>]")
       new_content = new_content .. line .. os_newline
     end
@@ -646,7 +647,9 @@ function setup_check(name, engine)
     if expectation_file then
       found = true
       runtest(name, engine, true, exp_ext, test_type)
-      ren(testdir, testname .. test_type.generated, testname .. test_type.reference)
+      ren(testdir,
+        testname .. test_type.generated,
+        testname .. test_type.reference)
     end
   end
   if found then
@@ -663,7 +666,9 @@ function base_compare(test_type, name, engine, cleanup)
   local testname = name .. "." .. engine
   local difffile = testdir .. "/" .. testname .. test_type.generated .. os_diffext
   local genfile  = testdir .. "/" .. testname .. test_type.generated
-  local reffile  = locate({ testdir }, { testname .. test_type.reference, name .. test_type.reference })
+  local reffile  = locate({ testdir }, {
+    testname .. test_type.reference,
+    name .. test_type.reference })
   if not reffile then
     return 1
   end
@@ -685,9 +690,9 @@ function compare_tlg(difffile, tlgfile, logfile, cleanup, name, engine)
   -- Do additional log formatting if the engine is LuaTeX, there is no
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
   if (match(engine, "^lua") or match(engine, "^harf"))
-    and not match(tlgfile, "%.luatex" .. "%" .. tlgext)
-    and not match(stdengine, "^lua")
-    then
+  and not match(tlgfile, "%.luatex" .. "%" .. tlgext)
+  and not match(stdengine, "^lua")
+  then
     local lualogfile = logfile
     if cleanup then
       lualogfile = testdir .. "/" .. testname .. ".tmp" .. logext
@@ -715,8 +720,11 @@ end
 -- both creating and verifying
 function runtest(name, engine, hide, ext, test_type, breakout)
   local lvtfile = name .. (ext or lvtext)
-  cp(lvtfile, fileexists(testfiledir .. "/" .. lvtfile)
-    and testfiledir or unpackdir, testdir)
+  cp(lvtfile,
+    fileexists(testfiledir .. "/" .. lvtfile)
+      and testfiledir
+      or unpackdir,
+    testdir)
   local checkopts = checkopts
   engine = engine or stdengine
   local binary = engine
@@ -740,12 +748,15 @@ function runtest(name, engine, hide, ext, test_type, breakout)
     checkopts = checkopts .. " -no-pdf"
   end
   -- Special casing for ConTeXt
-  local function setup(file)
-    return " -jobname=" .. name .. " " .. ' "\\input ' .. file .. '" '
-  end
+  local setup
   if match(checkformat, "^context$") then
     function setup(file) return ' "' .. file .. '" '  end
+  else
+    function setup(file)
+      return " -jobname=" .. name .. " " .. ' "\\input ' .. file .. '" '
+    end
   end
+
   local basename = testdir .. "/" .. name
   local gen_file = basename .. test_type.generated
   local new_file = basename .. "." .. engine .. test_type.generated
@@ -872,7 +883,7 @@ function check(names)
         for glob in entries(includetests) do
           for name in all_files(testfiledir, glob .. ext) do
             local exclude
-            for i=1, num_exclude do
+            for i = 1, num_exclude do
               if match(name, excludepatterns[i]) then
                 exclude = true
                 break
@@ -884,7 +895,7 @@ function check(names)
           end
           for name in all_files(unpackdir, glob .. ext) do
             local exclude
-            for i=1, num_exclude do
+            for i = 1, num_exclude do
               if not match(name, excludepatterns[i]) then
                 exclude = true
                 break
@@ -901,27 +912,24 @@ function check(names)
       end
       sort(names)
       -- Deal limiting range of names
-      if options["first"] then
+      local firstname = options["first"]
+      if firstname then
         local allnames = names
-        local active = false
-        local firstname = options["first"]
         names = {}
-        for name in entries(allnames) do
+        for i, name in ipairs(allnames) do
           if name == firstname then
-            active = true
-          end
-          if active then
-            insert(names, name)
+            names = { tbl_unpack(allnames, i) }
+            break
           end
         end
       end
-      if options["last"] then
+      local lastname = options["last"]
+      if lastname then
         local allnames = names
-        local lastname = options["last"]
         names = {}
-        for name in entries(allnames) do
-          insert(names, name)
+        for i, name in ipairs(allnames) do
           if name == lastname then
+            names = { tbl_unpack(allnames, 1, i) }
             break
           end
         end

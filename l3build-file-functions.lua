@@ -171,7 +171,7 @@ end
 
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(path)
-  return gsub(path, "/", "\\")
+  return (gsub(path, "/", "\\"))
 end
 
 function normalize_path(path)
@@ -189,7 +189,7 @@ function abspath(path)
   if ok then
     local result = currentdir()
     chdir(oldpwd)
-    return escapepath(gsub(result, "\\", "/"))
+    return (escapepath(gsub(result, "\\", "/")))
   end
   error(msg)
 end
@@ -210,7 +210,7 @@ function escapepath(path)
   else
     path = gsub(path, "\\ ", "[PATH-SPACE]")
     path = gsub(path, " ", "\\ ")
-    return gsub(path, "%[PATH-SPACE%]", "\\ ")
+    return (gsub(path, "%[PATH-SPACE%]", "\\ "))
   end
 end
 
@@ -313,7 +313,7 @@ end
 -- are their counterparts relative to the current working directory.
 function tree(src_path, glob)
   local function cropdots(path)
-    return gsub(gsub(path, "^%./", ""), "/%./", "/")
+    return (gsub(gsub(path, "^%./", ""), "/%./", "/"))
   end
   src_path = cropdots(src_path)
   glob = cropdots(glob)
@@ -362,22 +362,6 @@ function tree(src_path, glob)
     result = new_result
   end
   return result
-end
-
-function remove_duplicates(a)
-  -- Return array with duplicate entries removed from input array `a`.
-
-  local uniq = {}
-  local hash = {}
-
-  for v in entries(a) do
-    if not hash[v] then
-      hash[v] = true
-      uniq[#uniq+1] = v
-    end
-  end
-
-  return uniq
 end
 
 function mkdir(dir)
@@ -455,11 +439,11 @@ end
 
 -- Arguably clearer names
 function basename(file)
-  return(select(2, splitpath(file)))
+  return (select(2, splitpath(file)))
 end
 
 function dirname(file)
-  return(select(1, splitpath(file)))
+  return (select(1, splitpath(file))) -- () required
 end
 
 -- Strip the extension from a file name (if present)
