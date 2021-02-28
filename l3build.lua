@@ -127,7 +127,7 @@ do
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
   local function on_debug(f)
-    for o in entries(arg) do
+    for _, o in ipairs(arg) do
       if match(o, "^%-%-debug") then
         f()
         break
