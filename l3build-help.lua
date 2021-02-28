@@ -27,6 +27,10 @@ local match  = string.match
 local rep    = string.rep
 local sort   = table.sort
 
+local util = require("l3b.util")
+local entries = util.entries
+local keys = util.keys
+
 function version()
   print(
     "\n" ..

@@ -346,7 +346,7 @@ if #checkconfigs == 1 and
    config_1 ~= "build" and
    (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
    local config = work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
-   if fileexists(config) then
+   if file_exists(config) then
      local savedtestfiledir = testfiledir
      dofile(config)
      testdir = testdir .. "-" .. config_1

@@ -33,21 +33,32 @@ local items   = util.items
 local values  = util.values
 local to_quoted_string = util.to_quoted_string
 
+local fifu        = require("l3b.file-functions")
+local run = fifu.run
+local make_directory = fifu.make_directory
+local file_exists = fifu.file_exists
+local tree = fifu.tree
+local remove_tree = fifu.remove_tree
+local copy_tree = fifu.copy_tree
+local rename = fifu.rename
+local remove_directory = fifu.remove_directory
+local dir_name = fifu.dir_name
+
 -- Copy files to the main CTAN release directory
 function copyctan()
-  mkdir(ctandir .. "/" .. ctanpkg)
+  make_directory(ctandir .. "/" .. ctanpkg)
   local function copyfiles(files, source)
     if source == currentdir or flatten then
       for filetype in entries(files) do
-        cp(filetype, source, ctandir .. "/" .. ctanpkg)
+        copy_tree(filetype, source, ctandir .. "/" .. ctanpkg)
       end
     else
       for filetype in entries(files) do
         for file in values(tree(source, filetype)) do
-          local path = dirname(file)
+          local path = dir_name(file)
           local ctantarget = ctandir .. "/" .. ctanpkg .. "/" .. path
-          mkdir(ctantarget)
-          cp(file, source, ctantarget)
+          make_directory(ctantarget)
+          copy_tree(file, source, ctantarget)
         end
       end
     end
@@ -60,7 +71,7 @@ function copyctan()
   end
   copyfiles(sourcefiles, sourcefiledir)
   for file in entries(textfiles) do
-    cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
+    copy_tree(file, textfiledir, ctandir .. "/" .. ctanpkg)
   end
 end
 
@@ -107,10 +118,10 @@ function ctan()
     errorlevel = call(modules, "bundlecheck")
   end
   if errorlevel == 0 then
-    rmdir(ctandir)
-    mkdir(ctandir .. "/" .. ctanpkg)
-    rmdir(tdsdir)
-    mkdir(tdsdir)
+    remove_directory(ctandir)
+    make_directory(ctandir .. "/" .. ctanpkg)
+    remove_directory(tdsdir)
+    make_directory(tdsdir)
     if standalone then
       errorlevel = install_files(tdsdir, true)
       if errorlevel ~=0 then return errorlevel end
@@ -127,8 +138,8 @@ function ctan()
   if errorlevel == 0 then
     for i in entries(textfiles) do
       for j in items(unpackdir, textfiledir) do
-        cp(i, j, ctandir .. "/" .. ctanpkg)
-        cp(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
+        copy_tree(i, j, ctandir .. "/" .. ctanpkg)
+        copy_tree(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
       end
     end
     -- Rename README if necessary
@@ -138,18 +149,18 @@ function ctan()
         ctandir .. "/" .. ctanpkg,
         tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle
       ) do
-        if fileexists(dir .. "/" .. ctanreadme) then
-          rm(dir, newfile)
-          ren(dir, ctanreadme, newfile)
+        if file_exists(dir .. "/" .. ctanreadme) then
+          remove_tree(dir, newfile)
+          rename(dir, ctanreadme, newfile)
         end
       end
     end
     dirzip(tdsdir, ctanpkg .. ".tds")
     if packtdszip then
-      cp(ctanpkg .. ".tds.zip", tdsdir, ctandir)
+      copy_tree(ctanpkg .. ".tds.zip", tdsdir, ctandir)
     end
     dirzip(ctandir, ctanzip)
-    cp(ctanzip .. ".zip", ctandir, currentdir)
+    copy_tree(ctanzip .. ".zip", ctandir, currentdir)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

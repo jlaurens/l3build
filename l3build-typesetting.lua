@@ -33,13 +33,23 @@ local match = string.match
 
 local os_type = os.type
 
-local fifu        = require("l3b.file-functions")
-local cmd_concat  = fifu.cmd_concat
-
 local util    = require("l3b.util")
 local entries = util.entries
 local items   = util.items
 local values  = util.values
+
+local fifu              = require("l3b.file-functions")
+local cmd_concat        = fifu.cmd_concat
+local run               = fifu.run
+local directory_exists  = fifu.directory_exists
+local absolute_path     = fifu.absolute_path
+local file_exists       = fifu.file_exists
+local job_name          = fifu.job_name
+local remove_tree       = fifu.remove_tree
+local copy_tree         = fifu.copy_tree
+local make_clean_directory = fifu.make_clean_directory
+local tree              = fifu.tree
+local dir_base          = fifu.dir_base
 
 function dvitopdf(name, dir, engine, hide)
   run(
@@ -56,16 +66,16 @@ end
 -- An auxiliary used to set up the environmental variables
 function runcmd(cmd, dir, vars)
   dir = dir or "."
-  dir = abspath(dir)
+  dir = absolute_path(dir)
   vars = vars or {}
   -- Allow for local texmf files
   local env = os_setenv .. " TEXMFCNF=." .. os_pathsep
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
-    localtexmf = os_pathsep .. abspath(texmfdir) .. "//"
+  if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
+    localtexmf = os_pathsep .. absolute_path(texmfdir) .. "//"
   end
   local envpaths = "." .. localtexmf .. os_pathsep
-    .. abspath(localdir) .. os_pathsep
+    .. absolute_path(localdir) .. os_pathsep
     .. dir .. (typesetsearch and os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and match(envpaths, " ") then
@@ -78,7 +88,7 @@ function runcmd(cmd, dir, vars)
 end
 
 function biber(name, dir)
-  if fileexists(dir .. "/" .. name .. ".bcf") then
+  if file_exists(dir .. "/" .. name .. ".bcf") then
     return
       runcmd(biberexe .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
   end
@@ -87,7 +97,7 @@ end
 
 function bibtex(name, dir)
   dir = dir or "."
-  if fileexists(dir .. "/" .. name .. ".aux") then
+  if file_exists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
     local grep
@@ -112,7 +122,7 @@ end
 
 function makeindex(name, dir, inext, outext, logext, style)
   dir = dir or "."
-  if fileexists(dir .. "/" .. name .. inext) then
+  if file_exists(dir .. "/" .. name .. inext) then
     if style == "" then style = nil end
     return runcmd(makeindexexe .. " " .. makeindexopts
       .. " -o " .. name .. outext
@@ -134,7 +144,7 @@ end
 
 local function typesetpdf(file, dir)
   dir = dir or "."
-  local name = jobname(file)
+  local name = job_name(file)
   print("Typesetting " .. name)
   local fn = typeset
   local cmd = typesetexe .. " " .. typesetopts
@@ -148,8 +158,8 @@ local function typesetpdf(file, dir)
     return errorlevel
   end
   local pdfname = name .. pdfext
-  rm(docfiledir, pdfname)
-  return cp(pdfname, dir, docfiledir)
+  remove_tree(docfiledir, pdfname)
+  return copy_tree(pdfname, dir, docfiledir)
 end
 
 typeset = typeset or function(file, dir, exe)
@@ -158,7 +168,7 @@ typeset = typeset or function(file, dir, exe)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  local name = jobname(file)
+  local name = job_name(file)
   errorlevel = biber(name, dir) + bibtex(name, dir)
   if errorlevel ~= 0 then
     return errorlevel
@@ -180,19 +190,19 @@ end
 
 local function docinit()
   -- Set up
-  cleandir(typesetdir)
+  make_clean_directory(typesetdir)
   for filetype in items(
     bibfiles, docfiles, typesetfiles, typesetdemofiles
   ) do
     for file in entries(filetype) do
-      cp(file, docfiledir, typesetdir)
+      copy_tree(file, docfiledir, typesetdir)
     end
   end
   for file in entries(sourcefiles) do
-    cp(file, sourcefiledir, typesetdir)
+    copy_tree(file, sourcefiledir, typesetdir)
   end
   for file in entries(typesetsuppfiles) do
-    cp(file, supportdir, typesetdir)
+    copy_tree(file, supportdir, typesetdir)
   end
   dep_install(typesetdeps)
   unpack({ sourcefiles, typesetsourcefiles }, { sourcefiledir, docfiledir })
@@ -212,12 +222,12 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for typesetfiles in entries({ typesetdemofiles, typesetfiles }) do
+  for typesetfiles in items(typesetdemofiles, typesetfiles) do
     for glob in entries(typesetfiles) do
-      for dir in entries({ typesetdir, unpackdir }) do
-        for file in values(tree(dir, glob)) do
-          local path, srcname = splitpath(file)
-          local name = jobname(srcname)
+      for dir in items(typesetdir, unpackdir) do
+        for p_cwd in values(tree(dir, glob)) do
+          local path, srcname = dir_base(p_cwd)
+          local name = job_name(srcname)
           if not done[name] then
             local typeset = true
             -- Allow for command line selection of files

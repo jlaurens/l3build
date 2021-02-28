@@ -26,8 +26,14 @@ local util = require("l3b.util")
 local entries = util.entries
 local keys = util.keys
 
-local fifu        = require("l3b.file-functions")
-local cmd_concat  = fifu.cmd_concat
+local fifu                = require("l3b.file-functions")
+local cmd_concat          = fifu.cmd_concat
+local copy_tree           = fifu.copy_tree
+local make_directory      = fifu.make_directory
+local make_clean_drectory = fifu.make_clean_drectory
+local tree                = fifu.tree
+local absolute_path       = fifu.absolute_path
+local dir_base            = fifu.dir_base
 
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
@@ -41,7 +47,7 @@ function unpack(sources, sourcedirs)
     return errorlevel
   end
   for i in entries(installfiles) do
-    errorlevel = cp(i, unpackdir, localdir)
+    errorlevel = copy_tree(i, unpackdir, localdir)
     if errorlevel ~= 0 then
       return errorlevel
     end
@@ -52,18 +58,18 @@ end
 -- Split off from the main unpack so it can be used on a bundle and not
 -- leave only one modules files
 bundleunpack = bundleunpack or function(sourcedirs, sources)
-  local errorlevel = mkdir(localdir)
+  local errorlevel = make_directory(localdir)
   if errorlevel ~=0 then
     return errorlevel
   end
-  errorlevel = cleandir(unpackdir)
+  errorlevel = make_clean_drectory(unpackdir)
   if errorlevel ~=0 then
     return errorlevel
   end
   for i in entries(sourcedirs or { sourcefiledir }) do
     for j in entries(sources or { sourcefiles }) do
       for k in entries(j) do
-        errorlevel = cp(k, i, unpackdir)
+        errorlevel = copy_tree(k, i, unpackdir)
         if errorlevel ~=0 then
           return errorlevel
         end
@@ -71,15 +77,15 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     end
   end
   for i in entries(unpacksuppfiles) do
-    errorlevel = cp(i, supportdir, localdir)
+    errorlevel = copy_tree(i, supportdir, localdir)
     if errorlevel ~=0 then
       return errorlevel
     end
   end
   for i in entries(unpackfiles) do
     for j in keys(tree(unpackdir, i)) do
-      local path, name = splitpath(j)
-      local localdir = abspath(localdir)
+      local path, name = dir_base(j)
+      local localdir = absolute_path(localdir)
       local success = io.popen(cmd_concat(
           "cd " .. unpackdir .. "/" .. path,
           os_setenv .. " TEXINPUTS=." .. os_pathsep

@@ -27,18 +27,25 @@ local entries       = util.entries
 local keys          = util.keys
 local unique_items  = util.unique_items
 
+local fifu        = require("l3b.file-functions")
+local make_directory = fifu.make_directory
+local tree = fifu.tree
+local remove_tree = fifu.remove_tree
+local make_clean_directory = fifu.make_clean_directory
+local remove_directory = fifu.remove_directory
+
 -- Remove all generated files
 function clean()
   -- To make sure that distribdir never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
   -- all of the files
   local errorlevel =
-    rmdir(distribdir)    +
-    mkdir(distribdir)    +
-    cleandir(localdir)   +
-    cleandir(testdir)    +
-    cleandir(typesetdir) +
-    cleandir(unpackdir)
+    remove_directory(distribdir)    +
+    make_directory(distribdir)    +
+    make_clean_directory(localdir)   +
+    make_clean_directory(testdir)    +
+    make_clean_directory(typesetdir) +
+    make_clean_directory(unpackdir)
 
   if errorlevel ~= 0 then return errorlevel end
 
@@ -55,7 +62,7 @@ function clean()
       end
     end
     for file in keys(clean_list) do
-      errorlevel = rm(dir,file)
+      errorlevel = remove_tree(dir,file)
       if errorlevel ~= 0 then return errorlevel end
     end
   end
@@ -66,12 +73,12 @@ end
 function bundleclean()
   local errorlevel = call(modules, "clean")
   for i in entries(cleanfiles) do
-    errorlevel = rm(currentdir, i) + errorlevel
+    errorlevel = remove_tree(currentdir, i) + errorlevel
   end
   return (
     errorlevel     +
-    rmdir(ctandir) +
-    rmdir(tdsdir)
+    remove_directory(ctandir) +
+    remove_directory(tdsdir)
   )
 end
 

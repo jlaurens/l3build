@@ -39,6 +39,7 @@ local os_type = os.type
 local len   = string.len
 local lower = string.lower
 local match = string.match
+local str_rep = string.rep
 
 local util = require("l3b.util")
 local entries = util.entries
@@ -82,6 +83,8 @@ end
 -- For now, this is undocumented. I think I would prefer to keep it always set to ask for the time being.
 
 local ctan_post -- this is private to the module
+local fp_return
+
 
 -- TODO: next is a public global method,
 -- but following functions are semantically local
@@ -99,9 +102,9 @@ function upload(tagnames)
 
   -- Get data from command line if appropriate
   if options["file"] then
-    local f = open(options["file"], "r")
-    uploadconfig.announcement = assert(f:read('*a'))
-    close(f)
+    local fh = open(options["file"], "r")
+    uploadconfig.announcement = assert(fh:read('*a'))
+    close(fh)
   end
   uploadconfig.announcement = options["message"] or uploadconfig.announcement or file_contents(uploadconfig.announcement_file)
   uploadconfig.email = options["email"] or uploadconfig.email
@@ -232,7 +235,7 @@ function construct_ctan_post(uploadfile, debug)
 
   -- start building the curl command:
 -- commandline  ctan_post = curlexe .. " "
-  ctan_post=""
+  ctan_post = ""
   
   -- build up the curl command field-by-field:
 
@@ -315,7 +318,7 @@ end
 function input_multi_line_field (name)
   print("Enter " .. name .. "  three <return> or ctrl-D to stop")
 
-  local field=""
+  local field = ""
 
   local answer_line
   local return_count = 0
@@ -326,9 +329,7 @@ function input_multi_line_field (name)
     if answer_line=="" then
       return_count = return_count+1
     else
-      for i = 1, return_count, 1 do
-        field = field .. "\n"
-      end
+      field = field + str_rep("\n", return_count)
       return_count = 0
       if answer_line then
         field = field .. "\n" .. answer_line
@@ -340,20 +341,16 @@ end
 
 function input_single_line_field(name)
   print("Enter " .. name )
-
-  local field=""
-
   write("> ")
   flush()
-  field = read()
-  return field
+  return read()
 end
 
 
 -- if filename is non nil and file readable return contents otherwise nil
 function file_contents (filename)
   if filename ~= nil then
-    local f= open(filename, "r")
+    local f = open(filename, "r")
     if f == nil then
       return nil
     else

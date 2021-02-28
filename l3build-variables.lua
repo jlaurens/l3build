@@ -22,6 +22,8 @@ for those people who are interested.
 
 --]]
 
+local status = require("status")
+
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
 -- remove the built-in
@@ -127,11 +129,11 @@ specialformats.latex = specialformats.latex or {
     ptex  = { binary = "eptex" },
     uptex = { binary = "euptex" }
   }
-if not string.find(status.banner,"2019") then
+if not string.find(status.banner," 2019") then
   specialformats.latex.luatex = specialformats.latex.luatex or
-    { binary = "luahbtex",format = "lualatex" }
+    { binary = "luahbtex", format = "lualatex" }
   specialformats["latex-dev"] = specialformats["latex-dev"] or
-    { luatex = { binary="luahbtex",format = "lualatex-dev" }}
+    { luatex = { binary="luahbtex", format = "lualatex-dev" }}
 end
 
 stdengine    = stdengine    or "pdftex"

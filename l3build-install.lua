@@ -24,6 +24,7 @@ for those people who are interested.
 
 local print  = print
 
+local kpse = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
@@ -33,33 +34,46 @@ local match = string.match
 
 local insert = table.insert
 
-local fifu      = require("l3b.file-functions")
-local all_files = fifu.all_files
-
 local util = require("l3b.util")
 local entries = util.entries
 local keys = util.keys
 
+local fifu                  = require("l3b.file-functions")
+local file_list             = fifu.file_list
+local directory_exists      = fifu.directory_exists
+local remove_directory      = fifu.remove_directory
+local copy_tree             = fifu.copy_tree
+local file_exists           = fifu.file_exists
+local dir_base              = fifu.dir_base
+local remove_tree           = fifu.remove_tree
+local tree                  = fifu.tree
+local dir_name              = fifu.dir_name
+local glob_to_pattern       = fifu.glob_to_pattern
+local make_clean_directory  = fifu.make_clean_directory
+local make_directory        = fifu.make_directory
+local rename                = fifu.rename
+
+
 local function gethome()
   set_program("latex")
-  return abspath(options["texmfhome"] or var_value("TEXMFHOME"))
+  return (options["texmfhome"] or var_value("TEXMFHOME"))
 end
 
 function uninstall()
   local function zapdir(dir)
     local installdir = gethome() .. "/" .. dir
     if options["dry-run"] then
-      local files = filelist(installdir)
+      local files = file_list(installdir)
       if next(files) then
         print("\n" .. "For removal from " .. installdir .. ":")
-        for file in all_files(installdir) do
+        for file in entries(installdir) do
           print("- " .. file)
         end
       end
       return 0
     else
-      if direxists(installdir) then
-        return rmdir(installdir)
+      if directory_exists(installdir) then
+        return remove_directory(installdir)
       end
     end
     return 0
@@ -76,12 +90,12 @@ function uninstall()
     for file in keys(tree(docfiledir, glob)) do
       -- Man files should have a single-digit extension: the type
       local installdir = gethome() .. "/doc/man/man"  .. match(file, ".$")
-      if fileexists(installdir .. "/" .. file) then
+      if file_exists(installdir .. "/" .. file) then
         if options["dry-run"] then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
-           select(2, splitpath(file)))
+           select(2, dir_base(file)))
         else
-          errorlevel = errorlevel + rm(installdir, file)
+          errorlevel = errorlevel + remove_tree(installdir, file)
         end
       end
     end
@@ -102,7 +116,7 @@ function uninstall()
   if errorlevel ~= 0 then return errorlevel end
   -- Finally, clean up special locations
   for location in entries(tdslocations) do
-    local path = dirname(location)
+    local path = dir_name(location)
     errorlevel = zapdir(path)
     if errorlevel ~= 0 then return errorlevel end
   end
@@ -134,7 +148,7 @@ function install_files(target, full, dry_run)
       for glob in entries(glob_table) do
         for file in keys(tree(source, glob)) do
           -- Just want the name
-          local path, filename = splitpath(file)
+          local path, filename = dir_base(file)
           local sourcepath = "/"
           if path == "." then
             sourcepaths[filename] = source
@@ -145,7 +159,7 @@ function install_files(target, full, dry_run)
           end
           local matched = false
           for location in entries(tdslocations) do
-            local l_dir, l_glob = splitpath(location)
+            local l_dir, l_glob = dir_base(location)
             local pattern = glob_to_pattern(l_glob)
             if match(filename, pattern) then
               insert(paths, l_dir)
@@ -169,7 +183,7 @@ function install_files(target, full, dry_run)
         for path in entries(paths) do
           local target_path = target .. "/" .. path
           if not cleanpaths[target_path] then
-            errorlevel = cleandir(target_path)
+            errorlevel = make_clean_directory(target_path)
             if errorlevel ~= 0 then return errorlevel end
           end
           cleanpaths[target_path] = true
@@ -179,7 +193,7 @@ function install_files(target, full, dry_run)
         if dry_run then
           print("- " .. name)
         else
-          local path, file = splitpath(name)
+          local path, file = dir_base(name)
           insert(installmap,
             { file = file, source = sourcepaths[file], dest = target .. "/" .. path })
         end
@@ -251,8 +265,8 @@ function install_files(target, full, dry_run)
     if not dry_run then
       if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
         local installdir = target .. "/doc/" .. moduledir
-        if fileexists(installdir .. "/" .. ctanreadme) then
-          ren(installdir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
+        if file_exists(installdir .. "/" .. ctanreadme) then
+          rename(installdir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
         end
       end
     end
@@ -263,12 +277,12 @@ function install_files(target, full, dry_run)
       for file in keys(tree(docfiledir, glob)) do
         if dry_run then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
-            select(2, splitpath(file)))
+            select(2, dir_base(file)))
         else
           -- Man files should have a single-digit extension: the type
           local installdir = target .. "/doc/man/man"  .. match(file, ".$")
-          errorlevel = errorlevel + mkdir(installdir)
-          errorlevel = errorlevel + cp(file, docfiledir, installdir)
+          errorlevel = errorlevel + make_directory(installdir)
+          errorlevel = errorlevel + copy_tree(file, docfiledir, installdir)
         end
       end
     end
@@ -291,7 +305,7 @@ function install_files(target, full, dry_run)
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
   for v in entries(installmap) do
-    errorlevel = cp(v.file, v.source, v.dest)
+    errorlevel = copy_tree(v.file, v.source, v.dest)
     if errorlevel ~= 0  then return errorlevel end
   end 
   

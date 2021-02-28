@@ -32,6 +32,13 @@ local entries = util.entries
 local values  = util.keys
 local unique_items = util.unique_items
 
+local fifu        = require("l3b.file-functions")
+local dir_base    = fifu.dir_base
+local rename      = fifu.rename
+local dir_name    = fifu.dir_name
+local remove_glob = fifu.remove_glob
+local tree        = fifu.tree
+
 update_tag = update_tag or function(filename, content, tagname, tagdate)
   return content
 end
@@ -41,11 +48,11 @@ function tag_hook(tagname, tagdate)
 end
 
 local function update_file_tag(file, tagname, tagdate)
-  local filename = basename(file)
+  local filename = dir_base(file)
   print("Tagging  ".. filename)
-  local f = assert(open(file, "rb"))
-  local content = f:read("*all")
-  f:close()
+  local fh = assert(open(file, "rb"))
+  local content = fh:read("*all")
+  fh:close()
   -- Deal with Unix/Windows line endings
   content = gsub(content .. (match(content, "\n$") and "" or "\n"),
     "\r\n", "\n")
@@ -53,14 +60,14 @@ local function update_file_tag(file, tagname, tagdate)
   if content == updated_content then
     return 0
   else
-    local path = dirname(file)
-    ren(path, filename, filename .. ".bak")
-    f = assert(open(file, "w"))
+    local path = dir_name(file)
+    rename(path, filename, filename .. ".bak")
+    fh = assert(open(file, "w"))
     -- Convert line ends back if required during write
     -- Watch for the second return value!
-    f:write((gsub(updated_content, "\n", os_newline)))
-    f:close()
-    rm(path, filename .. ".bak")
+    fh:write((gsub(updated_content, "\n", os_newline)))
+    fh:close()
+    remove_glob(path, filename .. ".bak")
   end
   return 0
 end

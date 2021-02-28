@@ -33,8 +33,14 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
+local util      = require("l3b.util")
+local entries   = util.entries
+local items     = util.items
+local keys      = util.keys
+
 local fifu      = require("l3b.file-functions")
 local all_files = fifu.all_files
+local file_list = fifu.file_list
 
 manifest = manifest or function()
 
@@ -44,7 +50,7 @@ manifest = manifest or function()
     ctanfiles[f] = true
   end
   tdsfiles = {}
-  for subdir in entries({ "/doc/", "/source/", "/tex/" }) do
+  for subdir in items("/doc/", "/source/", "/tex/") do
     for f in all_files(tdsdir..subdir..moduledir, "*.*") do
       tdsfiles[f] = true
     end
@@ -59,7 +65,9 @@ manifest = manifest or function()
   manifest_write(manifest_entries)
 
   printline = "Manifest written to " .. manifestfile
-  print((printline:gsub(".", "*")))  print(printline)  print((printline:gsub(".", "*")))
+  print((printline:gsub(".", "*"))) -- the outer '()' is required
+  print(printline)
+  print((printline:gsub(".", "*")))
 
 end
 
@@ -70,7 +78,7 @@ end
 
 manifest_build_list = function(entry)
 
-  if not(entry.subheading) then
+  if not entry.subheading then
 
     entry = manifest_build_init(entry)
 
@@ -87,7 +95,7 @@ manifest_build_list = function(entry)
     for glob_list in entries(entry.files) do
       for this_glob in entries(glob_list) do
 
-        local these_files = filelist(entry.dir, this_glob)
+        local these_files = file_list(entry.dir, this_glob)
         these_files = manifest_sort_within_match(these_files)
 
         for this_file in entries(these_files) do
@@ -143,10 +151,10 @@ manifest_build_init = function(entry)
   end
 
   -- allow nested tables by requiring two levels of nesting
-  if type(entry.files[1])=="string" then
+  if type(entry.files[1]) == "string" then
     entry.files = { entry.files }
   end
-  if type(entry.exclude[1])=="string" then
+  if type(entry.exclude[1]) == "string" then
     entry.exclude = { entry.exclude }
   end
 
@@ -198,18 +206,18 @@ end
 
 manifest_write = function(manifest_entries)
 
-  local f = assert(io.open(manifestfile, "w"))
-  manifest_write_opening(f)
+  local fh = assert(io.open(manifestfile, "w"))
+  manifest_write_opening(fh)
 
-  for ii, vv in ipairs(manifest_entries) do
-    if manifest_entries[ii].subheading then
-      manifest_write_subheading(f, manifest_entries[ii].subheading, manifest_entries[ii].description)
-    elseif manifest_entries[ii].N > 0 then
-      manifest_write_group(f, manifest_entries[ii])
+  for entry in entries(manifest_entries) do
+    if entry.subheading then
+      manifest_write_subheading(fh, entry.subheading, entry.description)
+    elseif entry.N > 0 then
+      manifest_write_group(fh, entry)
     end
   end
 
-  f:close()
+  fh:close()
 
 end
 
@@ -268,7 +276,7 @@ manifest_write_group = function(f, entry)
       }
       if entry.flag then
         param.flag = ""
-	  		if tdsfiles[file] and not(ctanfiles[file]) then
+	  		if tdsfiles[file] and not ctanfiles[file] then
 	  			param.flag = "†"
 	  		elseif ctanfiles[file] then
 	  			param.flag = "‡"
@@ -280,4 +288,3 @@ manifest_write_group = function(f, entry)
   end
 
 end
-

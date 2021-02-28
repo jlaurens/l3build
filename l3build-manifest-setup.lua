@@ -283,7 +283,7 @@ manifest_write_group_file = manifest_write_group_file or function(filehandle,fil
 
   -- no file description: plain bullet list item:
 
-  flagstr = param.flag or  ""
+  local flagstr = param.flag or  ""
   filehandle:write("* " .. filename .. " " .. flagstr .. "\n")
 
   --[[
@@ -311,9 +311,9 @@ manifest_write_group_file_descr = manifest_write_group_file_descr or function(fi
 
   -- filename+description: Github-flavoured Markdown table
 
-  filestr = string.format(" | %-"..param.filemaxchar.."s",filename)
-  flagstr = param.flag and string.format(" | %s",param.flag) or  ""
-  descstr = string.format(" | %-"..param.descmaxchar.."s",descr)
+  local filestr = string.format(" | %-"..param.filemaxchar.."s",filename)
+  local flagstr = param.flag and string.format(" | %s",param.flag) or  ""
+  local descstr = string.format(" | %-"..param.descmaxchar.."s",descr)
 
   filehandle:write(filestr..flagstr..descstr.." |\n")
 

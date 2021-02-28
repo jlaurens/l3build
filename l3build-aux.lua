@@ -34,11 +34,14 @@ local os_time = os.time
 ---@type l3build_t
 local l3build = require("l3build")
 
-local fifu = require("l3b.file-functions")
-local cmd_concat = fifu.cmd_concat
-
 local util = require("l3b.util")
 local entries = util.entries
+
+local fifu = require("l3b.file-functions")
+local cmd_concat = fifu.cmd_concat
+local dir_base = fifu.dir_base
+local absolute_path = fifu.absolute_path
+local run = fifu.run
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -91,8 +94,8 @@ end
 ---`texlua l3build.lua` -> `/Library/TeX/texbin/l3build.lua` or `./l3build.lua`
 ---@return string
 local function get_script_name()
-  local dir, base = splitpath(l3build.PATH)
-  return abspath(dir) .. '/' .. base
+  local dir, base = dir_base(l3build.PATH)
+  return absolute_path(dir) .. '/' .. base
 end
 
 -- Performs the task named target given modules in a bundle.
