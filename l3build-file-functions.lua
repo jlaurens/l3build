@@ -371,7 +371,7 @@ function remove_duplicates(a)
   local hash = {}
 
   for v in entries(a) do
-    if (not hash[v]) then
+    if not hash[v] then
       hash[v] = true
       uniq[#uniq+1] = v
     end

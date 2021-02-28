@@ -96,7 +96,7 @@ function upload(tagnames)
 
   -- Get data from command line if appropriate
   if options["file"] then
-    local f = open(options["file"],"r")
+    local f = open(options["file"], "r")
     uploadconfig.announcement = assert(f:read('*a'))
     close(f)
   end
@@ -116,19 +116,19 @@ function upload(tagnames)
   end
 
   -- avoid lower level error from post command if zip file missing
-  local zip=open(trim_space(tostring(uploadfile)),"r")
+  local zip=open(trim_space(tostring(uploadfile)), "r")
   if zip~=nil then
     close(zip)
   else
     error("Missing zip file '" .. tostring(uploadfile) .. "'")
   end
 
-  ctan_post = construct_ctan_post(uploadfile,options["debug"])
+  ctan_post = construct_ctan_post(uploadfile, options["debug"])
 
 
 -- curl file version
   local curloptfile = uploadconfig.curlopt_file or (ctanzip .. ".curlopt")
-  local curlopt=open(curloptfile,"w")
+  local curlopt=open(curloptfile, "w")
   output(curlopt)
   write(ctan_post)
   close(curlopt)
@@ -153,7 +153,7 @@ end
   local fp_return=""
 
   -- use popen not execute so get the return body local exit_status=os.execute(ctan_post .. "validate")
-  if (curl_debug==false) then
+  if curl_debug == false then
     print("Contacting CTAN for validation:")
     fp_return = shell(ctan_post .. "validate")
   else
@@ -162,22 +162,22 @@ end
     return 1
   end
   if override_update_check then
-    if match(fp_return,"non%-existent%spackage") then
+    if match(fp_return, "non%-existent%spackage") then
       print("Package not found on CTAN; re-validating as new package:")
       uploadconfig.update = false
       ctan_post = construct_ctan_post(uploadfile)
       fp_return = shell(ctan_post .. "validate")
     end
   end
-  if (match(fp_return,"ERROR")) then
+  if match(fp_return, "ERROR") then
     exit_status=1
   end
 
   -- if upload requested and validation succeeded repost to the upload URL
-    if (exit_status==0 or exit_status==nil) then
-    if (ctanupload ~=nil and ctanupload ~=false and ctanupload ~= true) then
-      if (match(fp_return,"WARNING")) then
-       print("Warnings from CTAN package validation:" .. fp_return:gsub("%[","\n["):gsub("%]%]","]\n]"))
+  if exit_status == 0 or exit_status == nil then
+    if ctanupload ~=nil and ctanupload ~=false and ctanupload ~= true then
+      if match(fp_return, "WARNING") then
+       print("Warnings from CTAN package validation:" .. fp_return:gsub("%[", "\n["):gsub("%]%]", "]\n]"))
       else
        print("Validation successful." )
       end
@@ -186,22 +186,22 @@ end
       io.stdout:write("> ")
       io.stdout:flush()
       answer=read()
-      if(lower(answer,1,1)=="y") then
+      if lower(answer, 1, 1) == "y" then
         ctanupload=true
       end
     end
-    if (ctanupload==true) then
+    if ctanupload then
       fp_return = shell(ctan_post .. "upload")
 --     this is just html, could save to a file
 --     or echo a cleaned up version
       print('Response from CTAN:')
       print(fp_return)
-      if match(fp_return,"WARNING") or match(fp_return,"ERROR") then
+      if match(fp_return, "WARNING") or match(fp_return, "ERROR") then
         exit_status=1
       end
     else
-      if (match(fp_return,"WARNING")) then
-        print("Warnings from CTAN package validation:" .. fp_return:gsub("%[","\n["):gsub("%]%]","]\n]"))
+      if match(fp_return, "WARNING") then
+        print("Warnings from CTAN package validation:" .. fp_return:gsub("%[", "\n["):gsub("%]%]", "]\n]"))
       else
         print("CTAN validation successful")
       end
@@ -213,8 +213,8 @@ end
 end
 
 
-function trim_space(s)
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
+function trim_space(s) -- TODO: move to util
+  return (s:gsub("^%s*(.-)%s*$", "%1")) -- () are required
 end
 
 
@@ -225,7 +225,7 @@ function shell(s)
   return t
 end
 
-function construct_ctan_post(uploadfile,debug)
+function construct_ctan_post(uploadfile, debug)
 
   -- start building the curl command:
 -- commandline  ctan_post = curlexe .. " "
@@ -260,46 +260,46 @@ function construct_ctan_post(uploadfile,debug)
 
 end
 
-function ctan_field(fname,fvalue,max,desc,mandatory,multi)
-  if (type(fvalue)=="table" and multi==true) then
+function ctan_field(fname, fvalue, max, desc, mandatory, multi)
+  if type(fvalue)=="table" and multi then
     for i, v in pairs(fvalue) do
-      ctan_single_field(fname,v,max,desc,mandatory and i==1)
+      ctan_single_field(fname, v, max, desc, mandatory and i==1)
     end
   else
-    ctan_single_field(fname,fvalue,max,desc,mandatory)
+    ctan_single_field(fname, fvalue, max, desc, mandatory)
   end
 end
 
 
-function ctan_single_field(fname,fvalue,max,desc,mandatory)
+function ctan_single_field(fname, fvalue, max, desc, mandatory)
   local fvalueprint = fvalue
   if fvalue == nil then fvalueprint = '??' end
   print('ctan-upload | ' .. fname .. ': ' ..tostring(fvalueprint))
-  if ((fvalue==nil and mandatory) or (fvalue == 'ask')) then
-    if (max < 256) then
-      fvalue=input_single_line_field(fname)
-      else
-        fvalue=input_multi_line_field(fname)
+  if (fvalue == nil and mandatory) or fvalue == 'ask' then
+    if max < 256 then
+      fvalue = input_single_line_field(fname)
+    else
+      fvalue = input_multi_line_field(fname)
     end
   end
-  if (fvalue==nil or type(fvalue)~="table") then
-    local vs=trim_space(tostring(fvalue))
-    if (mandatory==true and (fvalue == nil or vs=="")) then
-      if (fname=="announcement") then
+  if fvalue == nil or type(fvalue) ~= "table" then
+    local vs = trim_space(tostring(fvalue))
+    if mandatory == true and (fvalue == nil or vs=="") then
+      if fname == "announcement" then
         print("Empty announcement: No ctan announcement will be made")
       else
         error("The field " .. fname .. " must contain " .. desc)
       end
     end
-    if (fvalue ~=nil and len(vs) > 0) then
-      if (max > 0 and len(vs) > max) then
+    if fvalue and len(vs) > 0 then
+      if max > 0 and len(vs) > max then
         error("The field " .. fname .. " is longer than " .. max)
       end
-      vs = vs:gsub('"','\\"')
-      vs = vs:gsub('`','\\`')
-      vs = vs:gsub('\n','\\n')
+      vs = vs:gsub('"', '\\"')
+      vs = vs:gsub('`', '\\`')
+      vs = vs:gsub('\n', '\\n')
 -- for strings on commandline version      ctan_post=ctan_post .. ' --form "' .. fname .. "=" .. vs .. '"'
-      ctan_post=ctan_post .. '\nform="' .. fname .. '=' .. vs .. '"'
+      ctan_post = ctan_post .. '\nform="' .. fname .. '=' .. vs .. '"'
     end
   else
     error("The value of the field '" .. fname .."' must be a scalar not a table")
@@ -322,7 +322,7 @@ function input_multi_line_field (name)
     if answer_line=="" then
       return_count=return_count+1
     else
-      for i=1,return_count,1 do
+      for i=1, return_count, 1 do
         field = field .. "\n"
       end
       return_count=0
@@ -349,7 +349,7 @@ end
 -- if filename is non nil and file readable return contents otherwise nil
 function file_contents (filename)
   if filename ~= nil then
-    local f= open(filename,"r")
+    local f= open(filename, "r")
     if f==nil then
       return nil
     else
