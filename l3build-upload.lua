@@ -116,7 +116,7 @@ function upload(tagnames)
   end
 
   -- avoid lower level error from post command if zip file missing
-  local zip=open(trim_space(tostring(uploadfile)), "r")
+  local zip = open(trim_space(tostring(uploadfile)), "r")
   if zip~=nil then
     close(zip)
   else
@@ -128,12 +128,12 @@ function upload(tagnames)
 
 -- curl file version
   local curloptfile = uploadconfig.curlopt_file or (ctanzip .. ".curlopt")
-  local curlopt=open(curloptfile, "w")
+  local curlopt = open(curloptfile, "w")
   output(curlopt)
   write(ctan_post)
   close(curlopt)
   
-  ctan_post=curlexe .. " --config " .. curloptfile
+  ctan_post = curlexe .. " --config " .. curloptfile
   
 
 if options["debug"] then
@@ -149,10 +149,10 @@ else
 end
 
   -- call post command to validate the upload at CTAN's validate URL
-  local exit_status=0
-  local fp_return=""
+  local exit_status = 0
+  local fp_return = ""
 
-  -- use popen not execute so get the return body local exit_status=os.execute(ctan_post .. "validate")
+  -- use popen not execute so get the return body local exit_status = os.execute(ctan_post .. "validate")
   if curl_debug == false then
     print("Contacting CTAN for validation:")
     fp_return = shell(ctan_post .. "validate")
@@ -170,7 +170,7 @@ end
     end
   end
   if match(fp_return, "ERROR") then
-    exit_status=1
+    exit_status = 1
   end
 
   -- if upload requested and validation succeeded repost to the upload URL
@@ -185,9 +185,9 @@ end
       local answer=""
       io.stdout:write("> ")
       io.stdout:flush()
-      answer=read()
+      answer = read()
       if lower(answer, 1, 1) == "y" then
-        ctanupload=true
+        ctanupload = true
       end
     end
     if ctanupload then
@@ -197,7 +197,7 @@ end
       print('Response from CTAN:')
       print(fp_return)
       if match(fp_return, "WARNING") or match(fp_return, "ERROR") then
-        exit_status=1
+        exit_status = 1
       end
     else
       if match(fp_return, "WARNING") then
@@ -314,18 +314,18 @@ function input_multi_line_field (name)
   local field=""
 
   local answer_line
-  local return_count=0
+  local return_count = 0
   repeat
     write("> ")
     flush()
-    answer_line=read()
+    answer_line = read()
     if answer_line=="" then
-      return_count=return_count+1
+      return_count = return_count+1
     else
-      for i=1, return_count, 1 do
+      for i = 1, return_count, 1 do
         field = field .. "\n"
       end
-      return_count=0
+      return_count = 0
       if answer_line~=nil then
         field = field .. "\n" .. answer_line
       end
@@ -341,7 +341,7 @@ function input_single_line_field(name)
 
   write("> ")
   flush()
-  field=read()
+  field = read()
   return field
 end
 
