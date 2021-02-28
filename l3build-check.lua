@@ -50,8 +50,9 @@ local exit            = os.exit
 local execute         = os.execute
 local remove          = os.remove
 
-local fifu      = require("l3b.file-functions")
-local all_files = fifu.all_files
+local fifu        = require("l3b.file-functions")
+local all_files   = fifu.all_files
+local cmd_concat  = fifu.cmd_concat
 
 local util            = require("l3b.util")
 local entries         = util.entries
@@ -94,12 +95,12 @@ end
 
 checkinit_hook = checkinit_hook or function() return 0 end
 
-local function rewrite(source,result,processor,...)
-  local file = assert(open(source,"rb"))
-  local content = gsub(file:read("*all") .. "\n","\r\n","\n")
+local function rewrite(source, result, processor, ...)
+  local file = assert(open(source, "rb"))
+  local content = gsub(file:read("*all") .. "\n", "\r\n", "\n")
   close(file)
-  local new_content = processor(content,...)
-  local newfile = open(result,"w")
+  local new_content = processor(content, ...)
+  local newfile = open(result, "w")
   output(newfile)
   write(new_content)
   close(newfile)
@@ -107,9 +108,9 @@ end
 
 -- Convert the raw log file into one for comparison/storage: keeps only
 -- the 'business' part from the tests and removes system-dependent stuff
-local function normalize_log(content,engine,errlevels)
+local function normalize_log(content, engine, errlevels)
   local maxprintline = maxprintline
-  if match(engine,"^lua") or match(engine,"^harf") then
+  if match(engine, "^lua") or match(engine, "^harf") then
     maxprintline = maxprintline + 1 -- Deal with an out-by-one error
   end
   local function killcheck(line)
@@ -122,12 +123,12 @@ local function normalize_log(content,engine,errlevels)
     return false
   end
     -- Substitutions to remove some non-useful changes
-  local function normalize(line,lastline,drop_fd)
+  local function normalize(line, lastline, drop_fd)
     if drop_fd then
-      if match(line," *%)") then
-        return "",""
+      if match(line, " *%)") then
+        return "", ""
       else
-        return "","",true
+        return "", "", true
       end
     end
     -- Zap line numbers from \show, \showbox, \box_show and the like:
@@ -162,15 +163,15 @@ local function normalize_log(content,engine,errlevels)
     end
     -- Deal with dates
     if match(line, "[^<]%d%d%d%d[/%-]%d%d[/%-]%d%d") then
-        line = gsub(line,"%d%d%d%d[/%-]%d%d[/%-]%d%d","....-..-..")
-        line = gsub(line,"v%d+%.?%d?%d?%w?","v...")
+        line = gsub(line, "%d%d%d%d[/%-]%d%d[/%-]%d%d", "....-..-..")
+        line = gsub(line, "v%d+%.?%d?%d?%w?", "v...")
     end
     -- Deal with leading spaces for file and page number lines
-    line = gsub(line,"^ *%[(%d)","[%1")
-    line = gsub(line,"^ *%(","(")
+    line = gsub(line, "^ *%[(%d)", "[%1")
+    line = gsub(line, "^ *%(", "(")
     -- Zap .fd lines: drop the first part, and skip to the end
     if match(line, "^ *%([%.%/%w]+%.fd[^%)]*$") then
-      return "","",true
+      return "", "", true
     end
     -- TeX90/XeTeX knows only the smaller set of dimension units
     line = gsub(line,
@@ -223,18 +224,18 @@ local function normalize_log(content,engine,errlevels)
     if match(line, "^> \\box%d+=$") or match(line, "^> \\box%d+=(void)$") then
       line = gsub(line, "%d+=", "...=")
     end
-    if not match(stdengine,"^e?u?ptex$") then
+    if not match(stdengine, "^e?u?ptex$") then
       -- Remove 'normal' direction information on boxes with (u)pTeX
       line = gsub(line, ",? yoko direction,?", "")
       line = gsub(line, ",? yoko%(math%) direction,?", "")
       -- Remove '\displace 0.0' lines in (u)pTeX
-      if match(line,"^%.*\\displace 0%.0$") then
+      if match(line, "^%.*\\displace 0%.0$") then
         return ""
       end
     end
     -- Deal with Lua function calls
     if match(line, "^Lua function") then
-      line = gsub(line,"= %d+$","= ...")
+      line = gsub(line, "= %d+$", "= ...")
     end
     -- Remove the \special line that in DVI mode keeps PDFs comparable
     if match(line, "^%.*\\special%{pdf: docinfo << /Creator") or
@@ -297,7 +298,7 @@ local function normalize_log(content,engine,errlevels)
     elseif match(line, "^%)?TIMO$") then
       skipping = false
     elseif not prestart and not skipping then
-      line, lastline, drop_fd = normalize(line, lastline,drop_fd)
+      line, lastline, drop_fd = normalize(line, lastline, drop_fd)
       if not match(line, "^ *$") and not killcheck(line) then
         new_content = new_content .. line .. os_newline
       end
@@ -320,7 +321,7 @@ local function normalize_log(content,engine,errlevels)
 end
 
 -- Additional normalization for LuaTeX
-local function normalize_lua_log(content,luatex)
+local function normalize_lua_log(content, luatex)
   local function normalize(line, lastline, dropping)
     -- Find \discretionary or \whatsit lines:
     -- These may come back later
@@ -337,9 +338,9 @@ local function normalize_lua_log(content,luatex)
       return line, line
     end
     -- LuaTeX has a flexible output box
-    line = gsub(line,"\\box\\outputbox", "\\box255")
+    line = gsub(line, "\\box\\outputbox", "\\box255")
     -- LuaTeX identifies spaceskip glue
-    line = gsub(line,"%(\\spaceskip%) ", " ")
+    line = gsub(line, "%(\\spaceskip%) ", " ")
     -- Remove 'display' at end of display math boxes:
     -- LuaTeX omits this as it includes direction in all cases
     line = gsub(line, "(\\hbox%(.*), display$", "%1")
@@ -405,8 +406,8 @@ local function normalize_lua_log(content,luatex)
     -- 'Recover' some discretionary data
     if match(lastline, "^%.+\\discretionary %(penalty 50%)$") and
        match(line, boxprefix(lastline) .. "%.= ") then
-      line = gsub(line," %(font%)$","")
-      return gsub(line, "%.= ", ""),""
+      line = gsub(line, " %(font%)$", "")
+      return gsub(line, "%.= ", ""), ""
     end
     -- Where the last line was a discretionary, looks for the
     -- info one level in about what it represents
@@ -526,9 +527,9 @@ local function normalize_pdf(content)
   local stream_content = ""
   local binary = false
   local stream = false
-  for line in gmatch(content,"([^\n]*)\n") do
+  for line in gmatch(content, "([^\n]*)\n") do
     if stream then
-      if match(line,"endstream") then
+      if match(line, "endstream") then
         stream = false
         if binary then
           new_content = new_content .. "[BINARY STREAM]" .. os_newline
@@ -538,7 +539,7 @@ local function normalize_pdf(content)
         binary = false
       else
         for i = 0, 31 do
-          if match(line,char(i)) then
+          if match(line, char(i)) then
             binary = true
             break
           end
@@ -547,14 +548,14 @@ local function normalize_pdf(content)
           stream_content = stream_content .. line .. os_newline
         end
       end
-    elseif match(line,"^stream$") then
+    elseif match(line, "^stream$") then
       binary = false
       stream = true
       stream_content = "stream" .. os_newline
     elseif not match(line, "^ *$") and
-      not match(line,"^%%%%Invocation") and 
-      not match(line,"^%%%%%+") then
-      line = gsub(line,"%/ID( ?)%[<[^>]+><[^>]+>]","/ID%1[<ID-STRING><ID-STRING>]")
+      not match(line, "^%%%%Invocation") and 
+      not match(line, "^%%%%%+") then
+      line = gsub(line, "%/ID( ?)%[<[^>]+><[^>]+>]", "/ID%1[<ID-STRING><ID-STRING>]")
       new_content = new_content .. line .. os_newline
     end
   end
@@ -585,7 +586,7 @@ function runcheck(name, hide)
   local test_type = test_types[kind]
   local function check_and_diff(engine)
     runtest(name, engine, hide, test_type.test, test_type, true)
-    local errorlevel = base_compare(test_type,name,engine)
+    local errorlevel = base_compare(test_type, name, engine)
     if errorlevel == 0 then
       return errorlevel
     end
@@ -599,7 +600,7 @@ function runcheck(name, hide)
   end
   local errorlevel = 0
   for engine in entries(checkengines) do
-    setup_check(name,engine)
+    setup_check(name, engine)
     local errlevel = check_and_diff(engine)
     if errlevel ~= 0 and options["halt-on-error"] then
       return 1
@@ -658,7 +659,7 @@ function setup_check(name, engine)
   exit(1)
 end
 
-function base_compare(test_type,name,engine,cleanup)
+function base_compare(test_type, name, engine, cleanup)
   local testname = name .. "." .. engine
   local difffile = testdir .. "/" .. testname .. test_type.generated .. os_diffext
   local genfile  = testdir .. "/" .. testname .. test_type.generated
@@ -683,17 +684,17 @@ function compare_tlg(difffile, tlgfile, logfile, cleanup, name, engine)
   local testname = name .. "." .. engine
   -- Do additional log formatting if the engine is LuaTeX, there is no
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
-  if (match(engine,"^lua") or match(engine,"^harf"))
+  if (match(engine, "^lua") or match(engine, "^harf"))
     and not match(tlgfile, "%.luatex" .. "%" .. tlgext)
-    and not match(stdengine,"^lua")
+    and not match(stdengine, "^lua")
     then
     local lualogfile = logfile
     if cleanup then
       lualogfile = testdir .. "/" .. testname .. ".tmp" .. logext
     end
     local luatlgfile = testdir .. "/" .. testname .. tlgext
-    rewrite(tlgfile,luatlgfile,normalize_lua_log)
-    rewrite(logfile,lualogfile,normalize_lua_log,true)
+    rewrite(tlgfile, luatlgfile, normalize_lua_log)
+    rewrite(logfile, lualogfile, normalize_lua_log, true)
     errorlevel = execute(os_diffexe .. " "
       .. normalize_path(luatlgfile .. " " .. lualogfile .. " > " .. difffile))
     if cleanup then
@@ -719,7 +720,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   local checkopts = checkopts
   engine = engine or stdengine
   local binary = engine
-  local format = gsub(engine,"tex$",checkformat)
+  local format = gsub(engine, "tex$", checkformat)
   -- Special binary/format combos
   local special_check = specialformats[checkformat]
   if special_check and next(special_check) then
@@ -742,7 +743,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   local function setup(file)
     return " -jobname=" .. name .. " " .. ' "\\input ' .. file .. '" '
   end
-  if match(checkformat,"^context$") then
+  if match(checkformat, "^context$") then
     function setup(file) return ' "' .. file .. '" '  end
   end
   local basename = testdir .. "/" .. name
@@ -757,10 +758,10 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   end
   -- Clean out any dynamic files
   for filetype in entries(dynamicfiles) do
-    rm(testdir,filetype)
+    rm(testdir, filetype)
   end
   -- Ensure there is no stray .log file
-  rmfile(testdir,name .. logext)
+  rmfile(testdir, name .. logext)
   local errlevels = {}
   local localtexmf = ""
   if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
@@ -768,31 +769,25 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   end
   for i = 1, checkruns do
     errlevels[i] = run(
-      testdir,
+      testdir, cmd_concat(
       -- No use of localdir here as the files get copied to testdir:
       -- avoids any paths in the logs
       os_setenv .. " TEXINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or "")
-        .. os_concat ..
+        .. (checksearch and os_pathsep or ""),
       os_setenv .. " LUAINPUTS=." .. localtexmf
-        .. (checksearch and os_pathsep or "")
-        .. os_concat ..
+        .. (checksearch and os_pathsep or ""),
       -- Avoid spurious output from (u)pTeX
-      os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0"
-        .. os_concat ..
+      os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
       -- Allow for local texmf files
-      os_setenv .. " TEXMFCNF=." .. os_pathsep
-        .. os_concat ..
-      set_epoch_cmd(epoch, forcecheckepoch) ..
+      os_setenv .. " TEXMFCNF=." .. os_pathsep,
+      set_epoch_cmd(epoch, forcecheckepoch),
       -- Ensure lines are of a known length
-      os_setenv .. " max_print_line=" .. maxprintline
-        .. os_concat ..
+      os_setenv .. " max_print_line=" .. maxprintline,
       binary .. format
         .. " " .. asciiopt .. " " .. checkopts
         .. setup(lvtfile)
-        .. (hide and (" > " .. os_null) or "")
-        .. os_concat ..
-      runtest_tasks(jobname(lvtfile),i)
+        .. (hide and (" > " .. os_null) or ""),
+      runtest_tasks(jobname(lvtfile), i)
     )
     -- Break the loop if the result is stable
     if breakout and i < checkruns then
@@ -801,8 +796,8 @@ function runtest(name, engine, hide, ext, test_type, breakout)
           dvitopdf(name, testdir, engine, hide)
         end
       end
-      test_type.rewrite(gen_file,new_file,engine,errlevels)
-      if base_compare(test_type,name,engine,true) == 0 then
+      test_type.rewrite(gen_file, new_file, engine, errlevels)
+      if base_compare(test_type, name, engine, true) == 0 then
         break
       end
     end
@@ -811,19 +806,19 @@ function runtest(name, engine, hide, ext, test_type, breakout)
     if fileexists(testdir .. "/" .. name .. dviext) then
       dvitopdf(name, testdir, engine, hide)
     end
-    cp(name .. pdfext,testdir,resultdir)
-    ren(resultdir,name .. pdfext,name .. "." .. engine .. pdfext)
+    cp(name .. pdfext, testdir, resultdir)
+    ren(resultdir, name .. pdfext, name .. "." .. engine .. pdfext)
   end
-  test_type.rewrite(gen_file,new_file,engine,errlevels)
+  test_type.rewrite(gen_file, new_file, engine, errlevels)
   -- Store secondary files for this engine
   for filetype in entries(auxfiles) do
     for file in all_files(testdir, filetype) do
-      if match(file,"^" .. name .. "%.[^.]+$") then
-        local newname = gsub(file,"(%.[^.]+)$","." .. engine .. "%1")
+      if match(file, "^" .. name .. "%.[^.]+$") then
+        local newname = gsub(file, "(%.[^.]+)$", "." .. engine .. "%1")
         if fileexists(testdir .. "/" .. newname) then
-          rmfile(testdir,newname)
+          rmfile(testdir, newname)
         end
-        ren(testdir,file,newname)
+        ren(testdir, file, newname)
       end
     end
   end
@@ -831,7 +826,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
 end
 
 -- A hook to allow additional tasks to run for the tests
-runtest_tasks = runtest_tasks or function(name,run)
+runtest_tasks = runtest_tasks or function(name, run)
   return ""
 end
 
@@ -883,7 +878,7 @@ function check(names)
               end
             end
             if not exclude then
-              insert(names,jobname(name))
+              insert(names, jobname(name))
             end
           end
           for name in all_files(unpackdir, glob .. ext) do
@@ -898,7 +893,7 @@ function check(names)
               if fileexists(testfiledir .. "/" .. name) then
                 return 1
               end
-              insert(names,jobname(name))
+              insert(names, jobname(name))
             end
           end
         end
@@ -915,7 +910,7 @@ function check(names)
             active = true
           end
           if active then
-            insert(names,name)
+            insert(names, name)
           end
         end
       end
@@ -924,7 +919,7 @@ function check(names)
         local lastname = options["last"]
         names = {}
         for name in entries(allnames) do
-          insert(names,name)
+          insert(names, name)
           if name == lastname then
             break
           end
@@ -977,7 +972,7 @@ function showfailedlog(name)
   for i in all_files(testdir, name..".log") do
     print("  - " .. testdir .. "/" .. i)
     print("")
-    local f = open(testdir .. "/" .. i,"r")
+    local f = open(testdir .. "/" .. i, "r")
     local content = f:read("*all")
     close(f)
     print("-----------------------------------------------------------------------------------")
@@ -991,7 +986,7 @@ function showfaileddiff()
   for i in all_files(testdir, "*" .. os_diffext) do
     print("  - " .. testdir .. "/" .. i)
     print("")
-    local f = open(testdir .. "/" .. i,"r")
+    local f = open(testdir .. "/" .. i, "r")
     local content = f:read("*all")
     close(f)
     print("-----------------------------------------------------------------------------------")

@@ -34,6 +34,9 @@ local os_time = os.time
 ---@type l3build_t
 local l3build = require("l3build")
 
+local fifu = require("l3b.file-functions")
+local cmd_concat = fifu.cmd_concat
+
 local util = require("l3b.util")
 local entries = util.entries
 
@@ -65,7 +68,7 @@ function normalise_epoch(epoch)
   end
 end
 
----Returns the CLI command (ending with `os_concat`) to set the epoch
+---Returns the CLI command to set the epoch
 ---when forcecheckepoch is true, a void string otherwise.
 ---Will be run while checking or typesetting
 ---@param epoch string
@@ -74,13 +77,10 @@ end
 ---@see check, typesetting
 ---@usage private?
 function set_epoch_cmd(epoch, force)
-  return force and (
-    os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch
-      .. os_concat ..
-    os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
-      .. os_concat ..
+  return force and cmd_concat(
+    os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
+    os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
     os_setenv .. " FORCE_SOURCE_DATE=1"
-      .. os_concat
   ) or ""
 end
 

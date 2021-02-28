@@ -22,6 +22,13 @@ for those people who are interested.
 
 --]]
 
+--[=[
+
+local fifu        = require("l3b.file-functions")
+local all_files   = fifu.all_files
+local cmd_concat  = fifu.cmd_concat
+
+--]=]
 local pairs            = pairs
 local print            = print
 
@@ -47,6 +54,7 @@ local gmatch           = string.gmatch
 local gsub             = string.gsub
 
 local insert           = table.insert
+local concat           = table.concat
 
 local util    = require("l3b.util")
 local entries = util.entries
@@ -424,9 +432,15 @@ function rmdir(dir)
   end
 end
 
+---Concat the given string with `os_concat`
+---@vararg nil ...
+local function cmd_concat(...)
+  return concat({ ... }, os_concat)
+end
+
 -- Run a command in a given directory
 function run(dir, cmd)
-  return execute("cd " .. dir .. os_concat .. cmd)
+  return execute(cmd_concat("cd " .. dir, cmd))
 end
 
 -- Split a path into file and directory component
@@ -467,5 +481,6 @@ function locate(dirs, names)
 end
 
 return {
-  all_files = all_files
+  all_files = all_files,
+  cmd_concat = cmd_concat,
 }

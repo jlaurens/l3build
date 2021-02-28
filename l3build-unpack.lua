@@ -26,6 +26,9 @@ local util = require("l3b.util")
 local entries = util.entries
 local keys = util.keys
 
+local fifu        = require("l3b.file-functions")
+local cmd_concat  = fifu.cmd_concat
+
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
 function unpack(sources, sourcedirs)
@@ -77,17 +80,15 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     for j in keys(tree(unpackdir, i)) do
       local path, name = splitpath(j)
       local localdir = abspath(localdir)
-      local success = io.popen(
-        "cd " .. unpackdir .. "/" .. path .. os_concat ..
-        os_setenv .. " TEXINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat  ..
-        os_setenv .. " LUAINPUTS=." .. os_pathsep
-          .. localdir .. (unpacksearch and os_pathsep or "") ..
-        os_concat ..
-        unpackexe .. " " .. unpackopts .. " " .. name
-          .. (options["quiet"] and (" > " .. os_null) or ""),
-        "w"
+      local success = io.popen(cmd_concat(
+          "cd " .. unpackdir .. "/" .. path,
+          os_setenv .. " TEXINPUTS=." .. os_pathsep
+            .. localdir .. (unpacksearch and os_pathsep or ""),
+          os_setenv .. " LUAINPUTS=." .. os_pathsep
+            .. localdir .. (unpacksearch and os_pathsep or ""),
+          unpackexe .. " " .. unpackopts .. " " .. name
+            .. (options["quiet"] and (" > " .. os_null) or "")
+        ), "w"
       ):write(string.rep("y\n", 300)):close()
       if not success then
         return 1

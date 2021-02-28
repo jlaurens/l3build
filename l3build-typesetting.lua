@@ -33,6 +33,9 @@ local match = string.match
 
 local os_type = os.type
 
+local fifu        = require("l3b.file-functions")
+local cmd_concat  = fifu.cmd_concat
+
 local util    = require("l3b.util")
 local entries = util.entries
 local items   = util.items
@@ -40,18 +43,18 @@ local values  = util.values
 
 function dvitopdf(name, dir, engine, hide)
   run(
-    dir,
-    set_epoch_cmd(epoch, forcecheckepoch) ..
-    "dvips " .. name .. dviext
-      .. (hide and (" > " .. os_null) or "")
-      .. os_concat ..
-    "ps2pdf " .. ps2pdfopt .. name .. psext
-      .. (hide and (" > " .. os_null) or "")
+    dir, cmd_concat(
+      set_epoch_cmd(epoch, forcecheckepoch),
+      "dvips " .. name .. dviext
+        .. (hide and (" > " .. os_null) or ""),
+      "ps2pdf " .. ps2pdfopt .. name .. psext
+        .. (hide and (" > " .. os_null) or "")
+    )
   )
 end
 
 -- An auxiliary used to set up the environmental variables
-function runcmd(cmd,dir,vars)
+function runcmd(cmd, dir, vars)
   dir = dir or "."
   dir = abspath(dir)
   vars = vars or {}
@@ -65,24 +68,24 @@ function runcmd(cmd,dir,vars)
     .. abspath(localdir) .. os_pathsep
     .. dir .. (typesetsearch and os_pathsep or "")
   -- Deal with spaces in paths
-  if os_type == "windows" and match(envpaths," ") then
-    envpaths = gsub(envpaths,'"','')
+  if os_type == "windows" and match(envpaths, " ") then
+    envpaths = gsub(envpaths, '"', '')
   end
   for var in entries(vars) do
-    env = env .. os_concat .. os_setenv .. " " .. var .. "=" .. envpaths
+    env = cmd_concat(env, os_setenv .. " " .. var .. "=" .. envpaths)
   end
-  return run(dir,set_epoch_cmd(epoch, forcedocepoch) .. env .. os_concat .. cmd)
+  return run(dir, cmd_concat(set_epoch_cmd(epoch, forcedocepoch), env, cmd))
 end
 
-function biber(name,dir)
+function biber(name, dir)
   if fileexists(dir .. "/" .. name .. ".bcf") then
     return
-      runcmd(biberexe .. " " .. biberopts .. " " .. name,dir,{ "BIBINPUTS" })
+      runcmd(biberexe .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
   end
   return 0
 end
 
-function bibtex(name,dir)
+function bibtex(name, dir)
   dir = dir or "."
   if fileexists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
@@ -100,14 +103,14 @@ function bibtex(name,dir)
         os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
           .. os_null
       ) == 0 then
-      return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name,dir,
-        { "BIBINPUTS","BSTINPUTS" })
+      return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name, dir,
+        { "BIBINPUTS", "BSTINPUTS" })
     end
   end
   return 0
 end
 
-function makeindex(name,dir,inext,outext,logext,style)
+function makeindex(name, dir, inext, outext, logext, style)
   dir = dir or "."
   if fileexists(dir .. "/" .. name .. inext) then
     if style == "" then style = nil end
@@ -121,15 +124,15 @@ function makeindex(name,dir,inext,outext,logext,style)
   return 0
 end
 
-function tex(file,dir,cmd)
+function tex(file, dir, cmd)
   dir = dir or "."
   cmd = cmd or typesetexe .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
     .. "\\input " .. file .. "\"",
-    dir,{ "TEXINPUTS","LUAINPUTS" })
+    dir, { "TEXINPUTS", "LUAINPUTS" })
 end
 
-local function typesetpdf(file,dir)
+local function typesetpdf(file, dir)
   dir = dir or "."
   local name = jobname(file)
   print("Typesetting " .. name)
@@ -139,32 +142,32 @@ local function typesetpdf(file,dir)
     fn = specialtypesetting[file].func or fn
     cmd = specialtypesetting[file].cmd or cmd
   end
-  local errorlevel = fn(file,dir,cmd)
+  local errorlevel = fn(file, dir, cmd)
   if errorlevel ~= 0 then
     print(" ! Compilation failed")
     return errorlevel
   end
   local pdfname = name .. pdfext
-  rm(docfiledir,pdfname)
-  return cp(pdfname,dir,docfiledir)
+  rm(docfiledir, pdfname)
+  return cp(pdfname, dir, docfiledir)
 end
 
-typeset = typeset or function(file,dir,exe)
+typeset = typeset or function(file, dir, exe)
   dir = dir or "."
-  local errorlevel = tex(file,dir,exe)
+  local errorlevel = tex(file, dir, exe)
   if errorlevel ~= 0 then
     return errorlevel
   end
   local name = jobname(file)
-  errorlevel = biber(name,dir) + bibtex(name,dir)
+  errorlevel = biber(name, dir) + bibtex(name, dir)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  for i = 2,typesetruns do
+  for i = 2, typesetruns do
     errorlevel =
-      makeindex(name,dir,".glo",".gls",".glg",glossarystyle) +
-      makeindex(name,dir,".idx",".ind",".ilg",indexstyle)    +
-      tex(file,dir,exe)
+      makeindex(name, dir, ".glo", ".gls", ".glg", glossarystyle) +
+      makeindex(name, dir, ".idx", ".ind", ".ilg", indexstyle)    +
+      tex(file, dir, exe)
     if errorlevel ~= 0 then break end
   end
   return errorlevel
@@ -209,11 +212,11 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for typesetfiles in entries({ typesetdemofiles,typesetfiles }) do
+  for typesetfiles in entries({ typesetdemofiles, typesetfiles }) do
     for glob in entries(typesetfiles) do
-      for dir in entries({ typesetdir,unpackdir }) do
-        for file in values(tree(dir,glob)) do
-          local path,srcname = splitpath(file)
+      for dir in entries({ typesetdir, unpackdir }) do
+        for file in values(tree(dir, glob)) do
+          local path, srcname = splitpath(file)
           local name = jobname(srcname)
           if not done[name] then
             local typeset = true
@@ -229,7 +232,7 @@ function doc(files)
             end
             -- Now know if we should typeset this source
             if typeset then
-              errorlevel = typesetpdf(srcname,path)
+              errorlevel = typesetpdf(srcname, path)
               if errorlevel ~= 0 then
                 return errorlevel
               else
