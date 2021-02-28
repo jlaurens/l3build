@@ -40,6 +40,9 @@ local len   = string.len
 local lower = string.lower
 local match = string.match
 
+local util = require("l3b.util")
+local entries = util.entries
+
 -- UPLOAD()
 --
 -- takes a package configuration table and an optional boolean
@@ -132,9 +135,9 @@ function upload(tagnames)
   output(curlopt)
   write(ctan_post)
   close(curlopt)
-  
+
   ctan_post = curlexe .. " --config " .. curloptfile
-  
+
 
 if options["debug"] then
     ctan_post = ctan_post ..  ' https://httpbin.org/post'
@@ -213,7 +216,7 @@ end
 end
 
 
-function trim_space(s) -- TODO: move to util
+function trim_space(s) -- TODO: local or move to util
   return (s:gsub("^%s*(.-)%s*$", "%1")) -- () are required
 end
 
@@ -262,8 +265,9 @@ end
 
 function ctan_field(fname, fvalue, max, desc, mandatory, multi)
   if type(fvalue)=="table" and multi then
-    for i, v in pairs(fvalue) do
-      ctan_single_field(fname, v, max, desc, mandatory and i == 1)
+    for v in entries(fvalue) do
+      ctan_single_field(fname, v, max, desc, mandatory)
+      mandatory = false
     end
   else
     ctan_single_field(fname, fvalue, max, desc, mandatory)
