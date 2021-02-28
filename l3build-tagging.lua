@@ -31,35 +31,35 @@ local util    = require("l3b.util")
 local entries = util.entries
 local values  = util.keys
 
-update_tag = update_tag or function(filename,content,tagname,tagdate)
+update_tag = update_tag or function(filename, content, tagname, tagdate)
   return content
 end
 
-function tag_hook(tagname,tagdate)
+function tag_hook(tagname, tagdate)
   return 0
 end
 
-local function update_file_tag(file,tagname,tagdate)
+local function update_file_tag(file, tagname, tagdate)
   local filename = basename(file)
   print("Tagging  ".. filename)
-  local f = assert(open(file,"rb"))
+  local f = assert(open(file, "rb"))
   local content = f:read("*all")
   f:close()
   -- Deal with Unix/Windows line endings
-  content = gsub(content .. (match(content,"\n$") and "" or "\n"),
+  content = gsub(content .. (match(content, "\n$") and "" or "\n"),
     "\r\n", "\n")
-  local updated_content = update_tag(filename,content,tagname,tagdate)
+  local updated_content = update_tag(filename, content, tagname, tagdate)
   if content == updated_content then
     return 0
   else
     local path = dirname(file)
-    ren(path,filename,filename .. ".bak")
-    f = assert(open(file,"w"))
+    ren(path, filename, filename .. ".bak")
+    f = assert(open(file, "w"))
     -- Convert line ends back if required during write
     -- Watch for the second return value!
-    f:write((gsub(updated_content,"\n",os_newline)))
+    f:write((gsub(updated_content, "\n", os_newline)))
     f:close()
-    rm(path,filename .. ".bak")
+    rm(path, filename .. ".bak")
   end
   return 0
 end
@@ -70,11 +70,11 @@ function tag(tagnames)
   if tagnames then
     tagname = tagnames[1]
   end
-  local dirs = remove_duplicates({currentdir, sourcefiledir, docfiledir})
+  local dirs = remove_duplicates({ currentdir, sourcefiledir, docfiledir })
   local errorlevel = 0
   for dir in entries(dirs) do
     for filetype in entries(tagfiles) do
-      for file in values(tree(dir,filetype)) do
+      for file in values(tree(dir, filetype)) do
         errorlevel = update_file_tag(file, tagname, tagdate)
         if errorlevel ~= 0 then
           return errorlevel
@@ -82,6 +82,6 @@ function tag(tagnames)
       end
     end
   end
-  return tag_hook(tagname,tagdate)
+  return tag_hook(tagname, tagdate)
 end
 

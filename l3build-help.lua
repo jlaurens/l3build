@@ -1,6 +1,6 @@
 --[[
 
-File l3build-help.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-help.lua Copyright (C) 2028-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -45,7 +45,7 @@ function help()
       end
     end
     -- Sort the options
-    local t = { }
+    local t = {}
     for k in keys(list) do
       insert(t, k)
     end

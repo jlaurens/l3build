@@ -162,12 +162,12 @@ option_list =
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
 local function argparse()
-  local result = { }
-  local names  = { }
-  local long_options =  { }
-  local short_options = { }
+  local result = {}
+  local names  = {}
+  local long_options =  {}
+  local short_options = {}
   -- Turn long/short options into two lookup tables
-  for k,v in pairs(option_list) do
+  for k, v in pairs(option_list) do
     if v["short"] then
       short_options[v["short"]] = k
     end
@@ -193,7 +193,7 @@ local function argparse()
   end
   -- An auxiliary to grab all file names into a table
   local function remainder(num)
-    local names = { }
+    local names = {}
     for i = num, #arg do
       insert(names, arg[i])
     end
@@ -278,7 +278,7 @@ local function argparse()
         if option_list[optname]["type"] == "string" then
           result[optname] = optarg
         else
-          local opts = result[optname] or { }
+          local opts = result[optname] or {}
           for hit in gmatch(optarg, "([^,%s]+)") do
             insert(opts, hit)
           end
@@ -306,7 +306,7 @@ options = argparse()
 function check_engines()
   if options["engine"] and not options["force"] then
      -- Make a lookup table
-     local t = { }
+     local t = {}
     for engine in entries(checkengines) do
       t[engine] = true
     end

@@ -64,24 +64,24 @@ function uninstall()
     end
     return 0
   end
-  local function uninstall_files(dir,subdir)
+  local function uninstall_files(dir, subdir)
     subdir = subdir or moduledir
     dir = dir .. "/" .. subdir
     return zapdir(dir)
   end
   local errorlevel = 0
   -- Any script man files need special handling
-  local manfiles = { }
+  local manfiles = {}
   for glob in entries(scriptmanfiles) do
-    for file in keys(tree(docfiledir,glob)) do
+    for file in keys(tree(docfiledir, glob)) do
       -- Man files should have a single-digit extension: the type
-      local installdir = gethome() .. "/doc/man/man"  .. match(file,".$")
+      local installdir = gethome() .. "/doc/man/man"  .. match(file, ".$")
       if fileexists(installdir .. "/" .. file) then
         if options["dry-run"] then
-          insert(manfiles,"man" .. match(file,".$") .. "/" ..
-           select(2,splitpath(file)))
+          insert(manfiles, "man" .. match(file, ".$") .. "/" ..
+           select(2, splitpath(file)))
         else
-          errorlevel = errorlevel + rm(installdir,file)
+          errorlevel = errorlevel + rm(installdir, file)
         end
       end
     end
@@ -95,9 +95,9 @@ function uninstall()
   errorlevel = uninstall_files("doc")
          + uninstall_files("source")
          + uninstall_files("tex")
-         + uninstall_files("bibtex/bst",module)
-         + uninstall_files("makeindex",module)
-         + uninstall_files("scripts",module)
+         + uninstall_files("bibtex/bst", module)
+         + uninstall_files("makeindex", module)
+         + uninstall_files("scripts", module)
          + errorlevel
   if errorlevel ~= 0 then return errorlevel end
   -- Finally, clean up special locations
@@ -109,54 +109,54 @@ function uninstall()
   return 0
 end
 
-function install_files(target,full,dry_run)
+function install_files(target, full, dry_run)
 
   -- Needed so paths are only cleaned out once
-  local cleanpaths = { }
+  local cleanpaths = {}
   -- Collect up all file data before copying:
   -- ensures no files are lost during clean-up
-  local installmap = { }
+  local installmap = {}
 
-  local function create_install_map(source,dir,files,subdir)
+  local function create_install_map(source, dir, files, subdir)
     subdir = subdir or moduledir
     -- For material associated with secondary tools (BibTeX, MakeIndex)
     -- the structure needed is slightly different from those items going
     -- into the tex/doc/source trees
-    if (dir == "makeindex" or match(dir,"$bibtex")) and module == "base" then
+    if (dir == "makeindex" or match(dir, "$bibtex")) and module == "base" then
       subdir = "latex"
     end
     dir = dir .. (subdir and ("/" .. subdir) or "")
-    local filenames = { }
-    local sourcepaths = { }
-    local paths = { }
+    local filenames = {}
+    local sourcepaths = {}
+    local paths = {}
     -- Generate a file list and include the directory
     for glob_table in entries(files) do
       for glob in entries(glob_table) do
-        for file in keys(tree(source,glob)) do
+        for file in keys(tree(source, glob)) do
           -- Just want the name
-          local path,filename = splitpath(file)
+          local path, filename = splitpath(file)
           local sourcepath = "/"
           if path == "." then
             sourcepaths[filename] = source
           else
-            path = gsub(path,"^%.","")
+            path = gsub(path, "^%.", "")
             sourcepaths[filename] = source .. path
             if not flattentds then sourcepath = path .. "/" end
           end
           local matched = false
           for location in entries(tdslocations) do
-            local l_dir,l_glob = splitpath(location)
+            local l_dir, l_glob = splitpath(location)
             local pattern = glob_to_pattern(l_glob)
-            if match(filename,pattern) then
-              insert(paths,l_dir)
-              insert(filenames,l_dir .. sourcepath .. filename)
+            if match(filename, pattern) then
+              insert(paths, l_dir)
+              insert(filenames, l_dir .. sourcepath .. filename)
               matched = true
               break
             end
           end
           if not matched then
-            insert(paths,dir)
-            insert(filenames,dir .. sourcepath .. filename)
+            insert(paths, dir)
+            insert(filenames, dir .. sourcepath .. filename)
           end
         end
       end
@@ -179,9 +179,9 @@ function install_files(target,full,dry_run)
         if dry_run then
           print("- " .. name)
         else
-          local path,file = splitpath(name)
+          local path, file = splitpath(name)
           insert(installmap,
-            {file = file, source = sourcepaths[file], dest = target .. "/" .. path})
+            { file = file, source = sourcepaths[file], dest = target .. "/" .. path })
         end
       end
     end
@@ -192,21 +192,21 @@ function install_files(target,full,dry_run)
   if errorlevel ~= 0 then return errorlevel end
 
     -- Creates a 'controlled' list of files
-    local function create_file_list(dir,include,exclude)
+    local function create_file_list(dir, include, exclude)
       dir = dir or currentdir
-      include = include or { }
-      exclude = exclude or { }
-      local excludelist = { }
+      include = include or {}
+      exclude = exclude or {}
+      local excludelist = {}
       for glob_table in entries(exclude) do
         for glob in entries(glob_table) do
-          for file in keys(tree(dir,glob)) do
+          for file in keys(tree(dir, glob)) do
             excludelist[file] = true
           end
         end
       end
-      local result = { }
+      local result = {}
       for glob in entries(include) do
-        for file in keys(tree(dir,glob)) do
+        for file in keys(tree(dir, glob)) do
           if not excludelist[file] then
             insert(result, file)
           end
@@ -215,7 +215,7 @@ function install_files(target,full,dry_run)
       return result
     end
 
-  local installlist = create_file_list(unpackdir,installfiles,{scriptfiles})
+  local installlist = create_file_list(unpackdir, installfiles, { scriptfiles })
 
   if full then
     errorlevel = doc()
@@ -224,51 +224,51 @@ function install_files(target,full,dry_run)
     -- part of the main typesetting list
     local typesetfiles = typesetfiles
     for glob in entries(typesetdemofiles) do
-      insert(typesetfiles,glob)
+      insert(typesetfiles, glob)
     end
 
     -- Find PDF files
-    pdffiles = { }
+    pdffiles = {}
     for glob in entries(typesetfiles) do
-      insert(pdffiles,(gsub(glob,"%.%w+$",".pdf")))
+      insert(pdffiles, (gsub(glob, "%.%w+$", ".pdf")))
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = create_file_list(docfiledir,typesetfiles,{sourcefiles})
-    sourcelist = create_file_list(sourcefiledir,sourcefiles,
-      {bstfiles,installfiles,makeindexfiles,scriptfiles})
+    typesetlist = create_file_list(docfiledir, typesetfiles, { sourcefiles })
+    sourcelist = create_file_list(sourcefiledir, sourcefiles,
+      { bstfiles, installfiles, makeindexfiles, scriptfiles })
  
   if dry_run then
     print("\nFor installation inside " .. target .. ":")
   end 
     
-    errorlevel = create_install_map(sourcefiledir,"source",{sourcelist})
-      + create_install_map(docfiledir,"doc",
-          {bibfiles,demofiles,docfiles,pdffiles,textfiles,typesetlist})
+    errorlevel = create_install_map(sourcefiledir, "source", { sourcelist })
+      + create_install_map(docfiledir, "doc",
+          { bibfiles, demofiles, docfiles, pdffiles, textfiles, typesetlist })
     if errorlevel ~= 0 then return errorlevel end
 
     -- Rename README if necessary
     if not dry_run then
-      if ctanreadme ~= "" and not match(lower(ctanreadme),"^readme%.%w+") then
+      if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
         local installdir = target .. "/doc/" .. moduledir
         if fileexists(installdir .. "/" .. ctanreadme) then
-          ren(installdir,ctanreadme,"README." .. match(ctanreadme,"%.(%w+)$"))
+          ren(installdir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
         end
       end
     end
 
     -- Any script man files need special handling
-    local manfiles = { }
+    local manfiles = {}
     for glob in entries(scriptmanfiles) do
-      for file in keys(tree(docfiledir,glob)) do
+      for file in keys(tree(docfiledir, glob)) do
         if dry_run then
-          insert(manfiles,"man" .. match(file,".$") .. "/" ..
-            select(2,splitpath(file)))
+          insert(manfiles, "man" .. match(file, ".$") .. "/" ..
+            select(2, splitpath(file)))
         else
           -- Man files should have a single-digit extension: the type
-          local installdir = target .. "/doc/man/man"  .. match(file,".$")
+          local installdir = target .. "/doc/man/man"  .. match(file, ".$")
           errorlevel = errorlevel + mkdir(installdir)
-          errorlevel = errorlevel + cp(file,docfiledir,installdir)
+          errorlevel = errorlevel + cp(file, docfiledir, installdir)
         end
       end
     end
@@ -281,17 +281,17 @@ function install_files(target,full,dry_run)
 
   if errorlevel ~= 0 then return errorlevel end
 
-  errorlevel = create_install_map(unpackdir,"tex",{installlist})
-    + create_install_map(unpackdir,"bibtex/bst",{bstfiles},module)
-    + create_install_map(unpackdir,"makeindex",{makeindexfiles},module)
-    + create_install_map(unpackdir,"scripts",{scriptfiles},module)
+  errorlevel = create_install_map(unpackdir, "tex", { installlist })
+    + create_install_map(unpackdir, "bibtex/bst", { bstfiles }, module)
+    + create_install_map(unpackdir, "makeindex", { makeindexfiles }, module)
+    + create_install_map(unpackdir, "scripts", { scriptfiles }, module)
 
   if errorlevel ~= 0 then return errorlevel end
 
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
   for v in entries(installmap) do
-    errorlevel = cp(v.file,v.source,v.dest)
+    errorlevel = cp(v.file, v.source, v.dest)
     if errorlevel ~= 0  then return errorlevel end
   end 
   
@@ -299,5 +299,5 @@ function install_files(target,full,dry_run)
 end
 
 function install()
-  return install_files(gethome(),options["full"],options["dry-run"])
+  return install_files(gethome(), options["full"], options["dry-run"])
 end

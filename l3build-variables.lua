@@ -73,35 +73,35 @@ end
 -- File types for various operations
 -- Use Unix-style globs
 -- All of these may be set earlier, so a initialised conditionally
-auxfiles           = auxfiles           or {"*.aux", "*.lof", "*.lot", "*.toc"}
-bibfiles           = bibfiles           or {"*.bib"}
-binaryfiles        = binaryfiles        or {"*.pdf", "*.zip"}
-bstfiles           = bstfiles           or {"*.bst"}
-checkfiles         = checkfiles         or { }
-checksuppfiles     = checksuppfiles     or { }
-cleanfiles         = cleanfiles         or {"*.log", "*.pdf", "*.zip"}
-demofiles          = demofiles          or { }
-docfiles           = docfiles           or { }
-dynamicfiles       = dynamicfiles       or { }
-excludefiles       = excludefiles       or {"*~"}
-installfiles       = installfiles       or {"*.sty","*.cls"}
-makeindexfiles     = makeindexfiles     or {"*.ist"}
-scriptfiles        = scriptfiles        or { }
-scriptmanfiles     = scriptmanfiles     or { }
-sourcefiles        = sourcefiles        or {"*.dtx", "*.ins", "*-????-??-??.sty"}
-tagfiles           = tagfiles           or {"*.dtx"}
-textfiles          = textfiles          or {"*.md", "*.txt"}
-typesetdemofiles   = typesetdemofiles   or { }
-typesetfiles       = typesetfiles       or {"*.dtx"}
-typesetsuppfiles   = typesetsuppfiles   or { }
-typesetsourcefiles = typesetsourcefiles or { }
-unpackfiles        = unpackfiles        or {"*.ins"}
-unpacksuppfiles    = unpacksuppfiles    or { }
+auxfiles           = auxfiles           or { "*.aux", "*.lof", "*.lot", "*.toc" }
+bibfiles           = bibfiles           or { "*.bib" }
+binaryfiles        = binaryfiles        or { "*.pdf", "*.zip" }
+bstfiles           = bstfiles           or { "*.bst" }
+checkfiles         = checkfiles         or {}
+checksuppfiles     = checksuppfiles     or {}
+cleanfiles         = cleanfiles         or { "*.log", "*.pdf", "*.zip" }
+demofiles          = demofiles          or {}
+docfiles           = docfiles           or {}
+dynamicfiles       = dynamicfiles       or {}
+excludefiles       = excludefiles       or { "*~" }
+installfiles       = installfiles       or { "*.sty","*.cls" }
+makeindexfiles     = makeindexfiles     or { "*.ist" }
+scriptfiles        = scriptfiles        or {}
+scriptmanfiles     = scriptmanfiles     or {}
+sourcefiles        = sourcefiles        or { "*.dtx", "*.ins", "*-????-??-??.sty" }
+tagfiles           = tagfiles           or { "*.dtx" }
+textfiles          = textfiles          or { "*.md", "*.txt" }
+typesetdemofiles   = typesetdemofiles   or {}
+typesetfiles       = typesetfiles       or { "*.dtx" }
+typesetsuppfiles   = typesetsuppfiles   or {}
+typesetsourcefiles = typesetsourcefiles or {}
+unpackfiles        = unpackfiles        or { "*.ins" }
+unpacksuppfiles    = unpacksuppfiles    or {}
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
-checkdeps   = checkdeps   or { }
-typesetdeps = typesetdeps or { }
-unpackdeps  = unpackdeps  or { }
+checkdeps   = checkdeps   or {}
+typesetdeps = typesetdeps or {}
+unpackdeps  = unpackdeps  or {}
 
 -- Executable names plus following options
 typesetexe = typesetexe or "pdflatex"
@@ -114,34 +114,34 @@ unpackopts  = unpackopts  or ""
 zipopts     = zipopts     or "-v -r -X"
 
 -- Engines for testing
-checkengines = checkengines or {"pdftex", "xetex", "luatex"}
+checkengines = checkengines or { "pdftex", "xetex", "luatex" }
 checkformat  = checkformat  or "latex"
-specialformats = specialformats or { }
+specialformats = specialformats or {}
 specialformats.context = specialformats.context or {
-    luatex = {binary = "context", format = ""},
-    pdftex = {binary = "texexec", format = ""},
-    xetex  = {binary = "texexec", format = "", options = "--xetex"}
+    luatex = { binary = "context", format = "" },
+    pdftex = { binary = "texexec", format = "" },
+    xetex  = { binary = "texexec", format = "", options = "--xetex" }
   }
 specialformats.latex = specialformats.latex or {
-    etex  = {format = "latex"},
-    ptex  = {binary = "eptex"},
-    uptex = {binary = "euptex"}
+    etex  = { format = "latex" },
+    ptex  = { binary = "eptex" },
+    uptex = { binary = "euptex" }
   }
 if not string.find(status.banner,"2019") then
   specialformats.latex.luatex = specialformats.latex.luatex or
-    {binary = "luahbtex",format = "lualatex"}
+    { binary = "luahbtex",format = "lualatex" }
   specialformats["latex-dev"] = specialformats["latex-dev"] or
-    {luatex = {binary="luahbtex",format = "lualatex-dev"}}
+    { luatex = { binary="luahbtex",format = "lualatex-dev" }}
 end
 
 stdengine    = stdengine    or "pdftex"
 
 -- The tests themselves
-includetests = includetests or {"*"}
-excludetests = excludetests or { }
+includetests = includetests or { "*" }
+excludetests = excludetests or {}
 
 -- Configs for testing
-checkconfigs = checkconfigs or {"build"}
+checkconfigs = checkconfigs or { "build" }
 
 -- Enable access to trees outside of the repo
 -- As these may be set false, a more elaborate test than normal is needed
@@ -158,7 +158,7 @@ end
 -- Additional settings to fine-tune typesetting
 glossarystyle = glossarystyle or "gglo.ist"
 indexstyle    = indexstyle    or "gind.ist"
-specialtypesetting = specialtypesetting or { }
+specialtypesetting = specialtypesetting or {}
 
 -- Supporting binaries and options
 biberexe      = biberexe      or "biber"
@@ -177,7 +177,7 @@ if forcedocepoch == nil then
 end
 
 -- Other required settings
-asciiengines = asciiengines or {"pdftex"}
+asciiengines = asciiengines or { "pdftex" }
 checkruns    = checkruns    or 1
 ctanreadme   = ctanreadme   or "README.md"
 ctanzip      = ctanzip      or ctanpkg .. "-ctan"
@@ -207,7 +207,7 @@ pvtext = pvtext or ".pvt"
 tlgext = tlgext or ".tlg"
 tpfext = tpfext or ".tpf"
 
-test_types = test_types or { }
+test_types = test_types or {}
 test_types.log = test_types.log or {
   test = lvtext,
   generated = logext,
@@ -223,13 +223,13 @@ test_types.pdf = test_types.pdf or {
   rewrite = rewrite_pdf,
 }
 
-test_order = test_order or {"log", "pdf"}
+test_order = test_order or { "log", "pdf" }
 
 -- Manifest options
 manifestfile = manifestfile or "MANIFEST.md"
 
 -- Non-standard installation locations
-tdslocations = tdslocations or { }
+tdslocations = tdslocations or {}
 
 -- Upload settings
 curlexe  = curlexe  or "curl"

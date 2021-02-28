@@ -57,8 +57,8 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
   if errorlevel ~=0 then
     return errorlevel
   end
-  for i in entries(sourcedirs or {sourcefiledir}) do
-    for j in entries(sources or {sourcefiles}) do
+  for i in entries(sourcedirs or { sourcefiledir }) do
+    for j in entries(sources or { sourcefiles }) do
       for k in entries(j) do
         errorlevel = cp(k, i, unpackdir)
         if errorlevel ~=0 then

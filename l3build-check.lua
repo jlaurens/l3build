@@ -73,7 +73,7 @@ function checkinit()
   for i in all_files(localdir) do
     cp(i, localdir, testdir)
   end
-  bundleunpack({sourcefiledir, testfiledir})
+  bundleunpack({ sourcefiledir, testfiledir })
   for i in entries(installfiles) do
     cp(i, unpackdir, testdir)
   end
@@ -618,8 +618,8 @@ function setup_check(name, engine)
   for kind in entries(test_order) do
     local reference_ext = test_types[kind].reference
     local reference_file = locate(
-      {testfiledir, unpackdir},
-      {testname .. reference_ext, name .. reference_ext}
+      { testfiledir, unpackdir },
+      { testname .. reference_ext, name .. reference_ext }
     )
     if reference_file then
       found = true
@@ -639,8 +639,8 @@ function setup_check(name, engine)
     local test_type = test_types[kind]
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
-      {testfiledir, unpackdir},
-      {name .. exp_ext}
+      { testfiledir, unpackdir },
+      { name .. exp_ext }
     )
     if expectation_file then
       found = true
@@ -662,7 +662,7 @@ function base_compare(test_type,name,engine,cleanup)
   local testname = name .. "." .. engine
   local difffile = testdir .. "/" .. testname .. test_type.generated .. os_diffext
   local genfile  = testdir .. "/" .. testname .. test_type.generated
-  local reffile  = locate({testdir}, {testname .. test_type.reference, name .. test_type.reference})
+  local reffile  = locate({ testdir }, { testname .. test_type.reference, name .. test_type.reference })
   if not reffile then
     return 1
   end
@@ -841,7 +841,7 @@ function testexists(test)
   for i, kind in ipairs(test_order) do
     filenames[i] = test .. test_types[kind].test
   end
-  local found = locate({testfiledir, unpackdir}, filenames)
+  local found = locate({ testfiledir, unpackdir }, filenames)
   if found then
     for i, kind in ipairs(test_order) do
       local filename = filenames[i]
@@ -862,12 +862,12 @@ function check(names)
     if names and next(names) then
       hide = false
     end
-    names = names or { }
+    names = names or {}
     -- No names passed: find all test files
     if not next(names) then
       for kind in entries(test_order) do
         local ext = test_types[kind].test
-        local excludepatterns = { }
+        local excludepatterns = {}
         local num_exclude = 0
         for glob in entries(excludetests) do
           num_exclude = num_exclude+1
@@ -909,7 +909,7 @@ function check(names)
         local allnames = names
         local active = false
         local firstname = options["first"]
-        names = { }
+        names = {}
         for name in entries(allnames) do
           if name == firstname then
             active = true
@@ -922,7 +922,7 @@ function check(names)
       if options["last"] then
         local allnames = names
         local lastname = options["last"]
-        names = { }
+        names = {}
         for name in entries(allnames) do
           insert(names,name)
           if name == lastname then
@@ -1002,7 +1002,7 @@ end
 
 function save(names)
   checkinit()
-  local engines = options["engine"] or {stdengine}
+  local engines = options["engine"] or { stdengine }
   if names == nil then
     print("Arguments are required for the save command")
     return 1
@@ -1014,7 +1014,7 @@ function save(names)
       return 1
     end
     local test_type = test_types[kind]
-    if locate({unpackdir, testfiledir}, {name .. test_type.expectation}) then
+    if locate({ unpackdir, testfiledir }, { name .. test_type.expectation }) then
       print("Saved " .. test_type.test .. " file would override a "
         .. test_type.expectation .. " file of the same name")
       return 1

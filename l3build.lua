@@ -300,7 +300,7 @@ check_engines()
 -- When we have specific files to deal with, only use explicit configs
 -- (or just the std one)
 if options["names"] then
-  checkconfigs = options["config"] or {stdconfig}
+  checkconfigs = options["config"] or {stdconfig }
 else
   checkconfigs = options["config"] or checkconfigs
 end
@@ -309,10 +309,10 @@ if options["target"] == "check" then
   if #checkconfigs > 1 then
     local error_level = 0
     local opts = options -- TODO: remove this shallow copy
-    local failed = { }
+    local failed = {}
     for config in entries(checkconfigs) do
       opts["config"] = { config }
-      error_level = call({"."}, "check", opts)
+      error_level = call({"." }, "check", opts)
       if error_level ~= 0 then
         if options["halt-on-error"] then
           exit(1)
@@ -345,7 +345,7 @@ local config_1 = checkconfigs[1]
 if #checkconfigs == 1 and
    config_1 ~= "build" and
    (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-   local config = work_dir .. gsub(config_1, ".lua$","") .. ".lua"
+   local config = work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
    if fileexists(config) then
      local savedtestfiledir = testfiledir
      dofile(config)

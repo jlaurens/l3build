@@ -1,6 +1,6 @@
 --[[
 
-File l3build-manifest-setup.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-manifest-setup.lua Copyright (C) 2028-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -71,7 +71,7 @@ These are source files for a number of purposes, including the `unpack` process 
 generates the installation files of the package. Additional files included here will also
 be installed for processing such as testing.
 ]],
-       files   = {sourcefiles},
+       files   = { sourcefiles },
        dir     = sourcefiledir or maindir, -- TODO: remove "or maindir" after rebasing onto master
     },
     {
@@ -79,7 +79,7 @@ be installed for processing such as testing.
        description = [[
 These files are typeset using LaTeX to produce the PDF documentation for the package.
 ]],
-       files   = {typesetfiles,typesetsourcefiles,typesetdemofiles},
+       files   = { typesetfiles,typesetsourcefiles,typesetdemofiles },
     },
     {
        name    = "Documentation files",
@@ -87,7 +87,7 @@ These files are typeset using LaTeX to produce the PDF documentation for the pac
 These files form part of the documentation but are not typeset. Generally they will be
 additional input files for the typeset documentation files listed above.
 ]],
-       files   = {docfiles},
+       files   = { docfiles },
        dir     = docfiledir or maindir, -- TODO: remove "or maindir" after rebasing onto master
     },
     {
@@ -95,7 +95,7 @@ additional input files for the typeset documentation files listed above.
        description = [[
 Plain text files included as documentation or metadata.
 ]],
-       files   = {textfiles},
+       files   = { textfiles },
        skipfiledescription = true,
     },
     {
@@ -104,14 +104,14 @@ Plain text files included as documentation or metadata.
 Files included to demonstrate package functionality. These files are *not*
 typeset or compiled in any way.
 ]],
-       files   = {demofiles},
+       files   = { demofiles },
     },
     {
        name    = "Bibliography and index files",
        description = [[
 Supplementary files used for compiling package documentation.
 ]],
-       files   = {bibfiles,bstfiles,makeindexfiles},
+       files   = { bibfiles,bstfiles,makeindexfiles },
     },
     {
        name    = "Derived files",
@@ -119,8 +119,8 @@ Supplementary files used for compiling package documentation.
 The files created by ‘unpacking’ the package sources. This typically includes
 `.sty` and `.cls` files created from DocStrip `.dtx` files.
 ]],
-       files   = {installfiles},
-       exclude = {excludefiles,sourcefiles},
+       files   = { installfiles },
+       exclude = { excludefiles,sourcefiles },
        dir     = unpackdir,
        skipfiledescription = true,
     },
@@ -130,8 +130,8 @@ The files created by ‘unpacking’ the package sources. This typically include
 The output files (PDF, essentially) from typesetting the various source, demo,
 etc., package files.
 ]],
-       files   = {typesetfiles,typesetsourcefiles,typesetdemofiles},
-       rename  = {"%.%w+$", ".pdf"},
+       files   = { typesetfiles,typesetsourcefiles,typesetdemofiles },
+       rename  = { "%.%w+$", ".pdf" },
        skipfiledescription = true,
     },
     {
@@ -139,7 +139,7 @@ etc., package files.
        description = [[
 These files are used for unpacking, typesetting, or checking purposes.
 ]],
-       files   = {unpacksuppfiles,typesetsuppfiles,checksuppfiles},
+       files   = { unpacksuppfiles,typesetsuppfiles,checksuppfiles },
        dir     = supportdir,
     },
     {
@@ -147,8 +147,8 @@ These files are used for unpacking, typesetting, or checking purposes.
        description = [[
 Support files for checking the test suite.
 ]],
-       files   = {"*.*"},
-       exclude = {{".",".."},excludefiles},
+       files   = { "*.*" },
+       exclude = { { ".",".." },excludefiles },
        dir     = testsuppdir,
     },
     {
@@ -159,7 +159,7 @@ unit tests, and `.tlg` are the stored output for ensuring changes to the package
 the same output. These output files are sometimes shared and sometime specific for
 different engines (pdfTeX, XeTeX, LuaTeX, etc.).
 ]],
-       files   = {"*"..lvtext,"*"..lveext,"*"..tlgext},
+       files   = { "*"..lvtext,"*"..lveext,"*"..tlgext },
        dir     = testfiledir,
        skipfiledescription = true,
     },
@@ -174,8 +174,8 @@ the package into a TeX distribution.
        name    = "Source files (TDS)",
        description = "All files included in the `"..module.."/source` directory.\n",
        dir     = tdsdir.."/source/"..moduledir,
-       files   = {"*.*"},
-       exclude = {".",".."},
+       files   = { "*.*" },
+       exclude = { ".",".." },
        flag    = false,
        skipfiledescription = true,
     },
@@ -183,8 +183,8 @@ the package into a TeX distribution.
        name    = "TeX files (TDS)",
        description = "All files included in the `"..module.."/tex` directory.\n",
        dir     = tdsdir.."/tex/"..moduledir,
-       files   = {"*.*"},
-       exclude = {".",".."},
+       files   = { "*.*" },
+       exclude = { ".",".." },
        flag    = false,
        skipfiledescription = true,
     },
@@ -192,8 +192,8 @@ the package into a TeX distribution.
        name    = "Doc files (TDS)",
        description = "All files included in the `"..module.."/doc` directory.\n",
        dir     = tdsdir.."/doc/"..moduledir,
-       files   = {"*.*"},
-       exclude = {".",".."},
+       files   = { "*.*" },
+       exclude = { ".",".." },
        flag    = false,
        skipfiledescription = true,
     },
@@ -206,8 +206,8 @@ The following group lists the files included in the CTAN package.
     {
        name    = "CTAN files",
        dir     = ctandir.."/"..module,
-       files   = {"*.*"},
-       exclude = {".",".."},
+       files   = { "*.*" },
+       exclude = { ".",".." },
        flag    = false,
        skipfiledescription = true,
     },

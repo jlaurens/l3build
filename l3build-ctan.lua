@@ -36,36 +36,36 @@ local to_quoted_string = util.to_quoted_string
 -- Copy files to the main CTAN release directory
 function copyctan()
   mkdir(ctandir .. "/" .. ctanpkg)
-  local function copyfiles(files,source)
+  local function copyfiles(files, source)
     if source == currentdir or flatten then
       for filetype in entries(files) do
-        cp(filetype,source,ctandir .. "/" .. ctanpkg)
+        cp(filetype, source, ctandir .. "/" .. ctanpkg)
       end
     else
       for filetype in entries(files) do
-        for file in values(tree(source,filetype)) do
+        for file in values(tree(source, filetype)) do
           local path = dirname(file)
           local ctantarget = ctandir .. "/" .. ctanpkg .. "/" .. path
           mkdir(ctantarget)
-          cp(file,source,ctantarget)
+          cp(file, source, ctantarget)
         end
       end
     end
   end
   for tab in items(
-    bibfiles,demofiles,docfiles,
-    pdffiles,scriptmanfiles,typesetlist
+    bibfiles, demofiles, docfiles,
+    pdffiles, scriptmanfiles, typesetlist
   ) do
-    copyfiles(tab,docfiledir)
+    copyfiles(tab, docfiledir)
   end
-  copyfiles(sourcefiles,sourcefiledir)
+  copyfiles(sourcefiles, sourcefiledir)
   for file in entries(textfiles) do
     cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
   end
 end
 
 function bundlectan()
-  local errorlevel = install_files(tdsdir,true)
+  local errorlevel = install_files(tdsdir, true)
   if errorlevel ~=0 then return errorlevel end
   copyctan()
   return 0
@@ -101,7 +101,7 @@ function ctan()
     standalone = true
   end
   if standalone then
-    errorlevel = call({"."},"check")
+    errorlevel = call({ "." }, "check")
     bundle = module
   else
     errorlevel = call(modules, "bundlecheck")
@@ -112,7 +112,7 @@ function ctan()
     rmdir(tdsdir)
     mkdir(tdsdir)
     if standalone then
-      errorlevel = install_files(tdsdir,true)
+      errorlevel = install_files(tdsdir, true)
       if errorlevel ~=0 then return errorlevel end
       copyctan()
     else
@@ -132,15 +132,15 @@ function ctan()
       end
     end
     -- Rename README if necessary
-    if ctanreadme ~= "" and not match(lower(ctanreadme),"^readme%.%w+") then
-      local newfile = "README." .. match(ctanreadme,"%.(%w+)$")
+    if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
+      local newfile = "README." .. match(ctanreadme, "%.(%w+)$")
       for dir in items(
         ctandir .. "/" .. ctanpkg,
         tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle
       ) do
         if fileexists(dir .. "/" .. ctanreadme) then
-          rm(dir,newfile)
-          ren(dir,ctanreadme,newfile)
+          rm(dir, newfile)
+          ren(dir, ctanreadme, newfile)
         end
       end
     end

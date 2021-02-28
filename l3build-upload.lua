@@ -106,7 +106,7 @@ function upload(tagnames)
 
   uploadconfig.note =   uploadconfig.note  or file_contents(uploadconfig.note_file)
 
-  tagnames = tagnames or { }
+  tagnames = tagnames or {}
   uploadconfig.version = tagnames[1] or uploadconfig.version
 
   local override_update_check = false

@@ -8,7 +8,7 @@ bundle = ""
 
 -- Non-standard settings
 checkconfigs = {"build", "config-pdf", "config-plain"}
-checkdeps    = { }
+checkdeps    = {}
 checkengines = {"pdftex", "xetex", "luatex", "ptex", "uptex"}
 cleanfiles   = {"*.pdf", "*.tex", "*.zip"}
 installfiles = {"regression-test.tex"}
@@ -17,7 +17,7 @@ scriptfiles  = {"l3build*.lua"}
 scriptmanfiles = {"l3build.1"}
 sourcefiles  = {"*.dtx", "l3build*.lua", "*.ins"}
 typesetcmds  = "\\AtBeginDocument{\\DisableImplementation}"
-unpackdeps   = { }
+unpackdeps   = {}
 tagfiles     = {"l3build.1", "l3build.dtx", "*.md", "l3build.lua"}
 
 uploadconfig = {

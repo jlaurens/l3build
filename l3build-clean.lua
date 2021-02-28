@@ -1,6 +1,6 @@
 --[[
 
-File l3build-clean.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-clean.lua Copyright (C) 2028-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -42,7 +42,7 @@ function clean()
 
   if errorlevel ~= 0 then return errorlevel end
 
-  local clean_list = { }
+  local clean_list = {}
   for dir in unique_items(maindir, sourcefiledir, docfiledir) do
     for glob in entries(cleanfiles) do
       for file in keys(tree(dir,glob)) do

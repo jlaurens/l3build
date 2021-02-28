@@ -108,7 +108,7 @@ function call(modules, target, opts)
   -- Turn the option table into a CLI option string
   opts = opts or options
   local cli_opts = ""
-  for k,v in pairs(opts) do
+  for k, v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases, TODO enhance the design to remove the need for this comment
       local t = option_list[k] or {}
       local value = ""

@@ -29,8 +29,8 @@ local insert = table.insert
 
 -- List all modules
 function listmodules()
-  local modules = { }
-  local exclmodules = exclmodules or { }
+  local modules = {}
+  local exclmodules = exclmodules or {}
   for entry in lfs.dir(".") do
     if entry ~= "." and entry ~= ".." then
       local attr = lfs.attributes(entry)

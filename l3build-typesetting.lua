@@ -77,7 +77,7 @@ end
 function biber(name,dir)
   if fileexists(dir .. "/" .. name .. ".bcf") then
     return
-      runcmd(biberexe .. " " .. biberopts .. " " .. name,dir,{"BIBINPUTS"})
+      runcmd(biberexe .. " " .. biberopts .. " " .. name,dir,{ "BIBINPUTS" })
   end
   return 0
 end
@@ -101,7 +101,7 @@ function bibtex(name,dir)
           .. os_null
       ) == 0 then
       return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name,dir,
-        {"BIBINPUTS","BSTINPUTS"})
+        { "BIBINPUTS","BSTINPUTS" })
     end
   end
   return 0
@@ -116,7 +116,7 @@ function makeindex(name,dir,inext,outext,logext,style)
       .. (style and (" -s " .. style) or "")
       .. " -t " .. name .. logext .. " "  .. name .. inext,
       dir,
-      {"INDEXSTYLE"})
+      { "INDEXSTYLE" })
   end
   return 0
 end
@@ -126,7 +126,7 @@ function tex(file,dir,cmd)
   cmd = cmd or typesetexe .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
     .. "\\input " .. file .. "\"",
-    dir,{"TEXINPUTS","LUAINPUTS"})
+    dir,{ "TEXINPUTS","LUAINPUTS" })
 end
 
 local function typesetpdf(file,dir)
@@ -192,7 +192,7 @@ local function docinit()
     cp(file, supportdir, typesetdir)
   end
   dep_install(typesetdeps)
-  unpack({sourcefiles, typesetsourcefiles}, {sourcefiledir, docfiledir})
+  unpack({ sourcefiles, typesetsourcefiles }, { sourcefiledir, docfiledir })
   -- Main loop for doc creation
   local errorlevel = typeset_demo_tasks()
   if errorlevel ~= 0 then
@@ -209,9 +209,9 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for typesetfiles in entries({typesetdemofiles,typesetfiles}) do
+  for typesetfiles in entries({ typesetdemofiles,typesetfiles }) do
     for glob in entries(typesetfiles) do
-      for dir in entries({typesetdir,unpackdir}) do
+      for dir in entries({ typesetdir,unpackdir }) do
         for file in values(tree(dir,glob)) do
           local path,srcname = splitpath(file)
           local name = jobname(srcname)

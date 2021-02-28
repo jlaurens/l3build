@@ -189,20 +189,20 @@ end
 -- TODO: Fix the cross platform problem
 function escapepath(path)
   if os_type == "windows" then
-    local path,count = gsub(path,'"','')
+    local path, count = gsub(path, '"', '')
     if count % 2 ~= 0 then
       print("Unbalanced quotes in path")
       exit(0)
     else
-      if match(path," ") then
+      if match(path, " ") then
         return '"' .. path .. '"'
       end
       return path
     end
   else
-    path = gsub(path,"\\ ","[PATH-SPACE]")
-    path = gsub(path," ","\\ ")
-    return gsub(path,"%[PATH-SPACE%]","\\ ")
+    path = gsub(path, "\\ ", "[PATH-SPACE]")
+    path = gsub(path, " ", "\\ ")
+    return gsub(path, "%[PATH-SPACE%]", "\\ ")
   end
 end
 
@@ -271,7 +271,7 @@ end
 -- Generate a table containing all file names of the given glob or all files
 -- if absent
 function filelist(path, glob)
-  local files = { }
+  local files = {}
   local pattern
   if glob then
     pattern = glob_to_pattern(glob)
@@ -315,7 +315,7 @@ function tree(src_path, glob)
   local function is_dir(file)
     return attributes(file)["mode"] == "directory"
   end
-  local result = {["."] = src_path}
+  local result = { ["."] = src_path }
   for glob_part, sep in gmatch(glob, "([^/]+)(/?)/*") do
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
@@ -400,7 +400,7 @@ end
 -- Remove file(s) based on a glob
 function rm(source, glob)
   for i in keys(tree(source, glob)) do
-    rmfile(source,i)
+    rmfile(source, i)
   end
   -- os.remove doesn't give a sensible errorlevel
   return 0

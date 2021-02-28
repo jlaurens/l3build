@@ -1,6 +1,6 @@
 --[[
 
-File l3build-manifest.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-manifest.lua Copyright (C) 2028-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -40,12 +40,12 @@ manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for f in all_files(ctandir.."/"..ctanpkg,"*.*") do
+  for f in all_files(ctandir.."/"..ctanpkg, "*.*") do
     ctanfiles[f] = true
   end
   tdsfiles = {}
-  for subdir in entries({"/doc/","/source/","/tex/"}) do
-    for f in all_files(tdsdir..subdir..moduledir,"*.*") do
+  for subdir in entries({ "/doc/", "/source/", "/tex/" }) do
+    for f in all_files(tdsdir..subdir..moduledir, "*.*") do
       tdsfiles[f] = true
     end
   end
@@ -59,7 +59,7 @@ manifest = manifest or function()
   manifest_write(manifest_entries)
 
   printline = "Manifest written to " .. manifestfile
-  print((printline:gsub(".","*")))  print(printline)  print((printline:gsub(".","*")))
+  print((printline:gsub(".", "*")))  print(printline)  print((printline:gsub(".", "*")))
 
 end
 
@@ -77,7 +77,7 @@ manifest_build_list = function(entry)
     -- build list of excluded files
     for glob_list in entries(entry.exclude) do
       for this_glob in entries(glob_list) do
-        for this_file in all_files(maindir,this_glob) do
+        for this_file in all_files(maindir, this_glob) do
           entry.excludes[this_file] = true
         end
       end
@@ -87,11 +87,11 @@ manifest_build_list = function(entry)
     for glob_list in entries(entry.files) do
       for this_glob in entries(glob_list) do
 
-        local these_files = filelist(entry.dir,this_glob)
+        local these_files = filelist(entry.dir, this_glob)
         these_files = manifest_sort_within_match(these_files)
 
         for this_file in entries(these_files) do
-          entry = manifest_build_file(entry,this_file)
+          entry = manifest_build_file(entry, this_file)
         end
 
         entry.files_ordered = manifest_sort_within_group(entry.files_ordered)
@@ -113,7 +113,7 @@ manifest_build_init = function(entry)
     skipfiledescription  = false          ,
     rename               = false          ,
     dir                  = maindir        ,
-    exclude              = {excludefiles} ,
+    exclude              = { excludefiles } ,
     flag                 = true           ,
   }
 
@@ -130,7 +130,7 @@ manifest_build_init = function(entry)
   }
 
    -- copy default options to each group if necessary
-  for kk,ll in pairs(manifest_group_defaults) do
+  for kk, ll in pairs(manifest_group_defaults) do
     if entry[kk] == nil then
       entry[kk] = ll
     end
@@ -138,16 +138,16 @@ manifest_build_init = function(entry)
   end
 
   -- initialisation for internal data
-  for kk,ll in pairs(manifest_group_init) do
+  for kk, ll in pairs(manifest_group_init) do
     entry[kk] = ll
   end
 
   -- allow nested tables by requiring two levels of nesting
   if type(entry.files[1])=="string" then
-    entry.files = {entry.files}
+    entry.files = { entry.files }
   end
   if type(entry.exclude[1])=="string" then
-    entry.exclude = {entry.exclude}
+    entry.exclude = { entry.exclude }
   end
 
   return entry
@@ -155,10 +155,10 @@ manifest_build_init = function(entry)
 end
 
 
-manifest_build_file = function(entry,this_file)
+manifest_build_file = function(entry, this_file)
 
   if entry.rename then
-    this_file = this_file:gsub(entry.rename[1],entry.rename[2])
+    this_file = this_file:gsub(entry.rename[1], entry.rename[2])
   end
 
   if not entry.excludes[this_file] then
@@ -168,20 +168,20 @@ manifest_build_file = function(entry,this_file)
 
       entry.matches[this_file] = true -- store the file name
       entry.files_ordered[entry.N] = this_file -- store the file order
-      entry.Nchar_file = math.max(entry.Nchar_file,this_file:len())
+      entry.Nchar_file = math.max(entry.Nchar_file, this_file:len())
 
     end
 
     if not(entry.skipfiledescription) then
 
       local ff = assert(io.open(entry.dir .. "/" .. this_file, "r"))
-      this_descr  = manifest_extract_filedesc(ff,this_file)
+      this_descr  = manifest_extract_filedesc(ff, this_file)
       ff:close()
 
       if this_descr and this_descr ~= "" then
         entry.descr[this_file] = this_descr
         entry.ND = entry.ND+1
-        entry.Nchar_descr = math.max(entry.Nchar_descr,this_descr:len())
+        entry.Nchar_descr = math.max(entry.Nchar_descr, this_descr:len())
       end
 
     end
@@ -201,11 +201,11 @@ manifest_write = function(manifest_entries)
   local f = assert(io.open(manifestfile, "w"))
   manifest_write_opening(f)
 
-  for ii,vv in ipairs(manifest_entries) do
+  for ii, vv in ipairs(manifest_entries) do
     if manifest_entries[ii].subheading then
-      manifest_write_subheading(f,manifest_entries[ii].subheading,manifest_entries[ii].description)
+      manifest_write_subheading(f, manifest_entries[ii].subheading, manifest_entries[ii].description)
     elseif manifest_entries[ii].N > 0 then
-      manifest_write_group(f,manifest_entries[ii])
+      manifest_write_group(f, manifest_entries[ii])
     end
   end
 
@@ -214,13 +214,13 @@ manifest_write = function(manifest_entries)
 end
 
 
-manifest_write_group = function(f,entry)
+manifest_write_group = function(f, entry)
 
-  manifest_write_group_heading(f,entry.name,entry.description)
+  manifest_write_group_heading(f, entry.name, entry.description)
 
   if entry.ND > 0 then
 
-    for ii,file in ipairs(entry.files_ordered) do
+    for ii, file in ipairs(entry.files_ordered) do
       local descr = entry.descr[file] or ""
       local param = {
         dir         = entry.dir         ,
@@ -245,20 +245,20 @@ manifest_write_group = function(f,entry)
         -- header of table
         -- TODO: generalise
 				local p = {}
-				for k,v in pairs(param) do p[k] = v end
+				for k, v in pairs(param) do p[k] = v end
 				p.count = -1
 				p.flag = p.flag and "Flag"
-				manifest_write_group_file_descr(f,"File","Description",p)
+				manifest_write_group_file_descr(f, "File", "Description", p)
 				p.flag = p.flag and "--- "
-				manifest_write_group_file_descr(f,"---","---",p)
+				manifest_write_group_file_descr(f, "---", "---", p)
       end
 
-      manifest_write_group_file_descr(f,file,descr,param)
+      manifest_write_group_file_descr(f, file, descr, param)
     end
 
   else
 
-    for ii,file in ipairs(entry.files_ordered) do
+    for ii, file in ipairs(entry.files_ordered) do
       local param = {
         dir         = entry.dir         ,
       	count       = ii                ,
@@ -274,7 +274,7 @@ manifest_write_group = function(f,entry)
 	  			param.flag = "‡"
 	  		end
 			end
-      manifest_write_group_file(f,file,param)
+      manifest_write_group_file(f, file, param)
     end
 
   end
