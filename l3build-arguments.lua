@@ -32,6 +32,9 @@ local sub              = string.sub
 
 local insert           = table.insert
 
+local util    = require("l3b.util")
+local entries = util.entries
+
 -- Parse command line options
 
 option_list =
@@ -304,14 +307,14 @@ function check_engines()
   if options["engine"] and not options["force"] then
      -- Make a lookup table
      local t = { }
-    for _, engine in pairs(checkengines) do
+    for engine in entries(checkengines) do
       t[engine] = true
     end
-    for _, engine in pairs(options["engine"]) do
+    for engine in entries(options["engine"]) do
       if not t[engine] then
         print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
-        for _, engine in ipairs(checkengines) do
+        for engine in entries(checkengines) do
           print("  - " .. engine)
         end
         print("")

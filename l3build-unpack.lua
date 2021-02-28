@@ -33,7 +33,7 @@ function unpack(sources, sourcedirs)
   if errorlevel ~= 0 then
     return errorlevel
   end
-  for _,i in ipairs(installfiles) do
+  for i in entries(installfiles) do
     errorlevel = cp(i, unpackdir, localdir)
     if errorlevel ~= 0 then
       return errorlevel
@@ -53,9 +53,9 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
   if errorlevel ~=0 then
     return errorlevel
   end
-  for _,i in ipairs(sourcedirs or {sourcefiledir}) do
-    for _,j in ipairs(sources or {sourcefiles}) do
-      for _,k in ipairs(j) do
+  for i in entries(sourcedirs or {sourcefiledir}) do
+    for j in entries(sources or {sourcefiles}) do
+      for k in entries(j) do
         errorlevel = cp(k, i, unpackdir)
         if errorlevel ~=0 then
           return errorlevel
@@ -63,13 +63,13 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
       end
     end
   end
-  for _,i in ipairs(unpacksuppfiles) do
+  for i in entries(unpacksuppfiles) do
     errorlevel = cp(i, supportdir, localdir)
     if errorlevel ~=0 then
       return errorlevel
     end
   end
-  for _,i in ipairs(unpackfiles) do
+  for i in entries(unpackfiles) do
     for j,_ in pairs(tree(unpackdir, i)) do
       local path, name = splitpath(j)
       local localdir = abspath(localdir)

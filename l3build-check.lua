@@ -23,31 +23,35 @@ for those people who are interested.
 --]]
 
 -- Local access to functions
-local open             = io.open
-local close            = io.close
-local write            = io.write
-local output           = io.output
+local open            = io.open
+local close           = io.close
+local write           = io.write
+local output          = io.output
 
-local rnd              = math.random
+local rnd             = math.random
 
-local luatex_version   = status.luatex_version
+local status          = require("status")
+local luatex_version  = status.luatex_version
 
-local len              = string.len
-local char             = string.char
-local str_format       = string.format
-local gmatch           = string.gmatch
-local gsub             = string.gsub
-local match            = string.match
+local len             = string.len
+local char            = string.char
+local str_format      = string.format
+local gmatch          = string.gmatch
+local gsub            = string.gsub
+local match           = string.match
 
-local insert           = table.insert
-local sort             = table.sort
+local insert          = table.insert
+local sort            = table.sort
 
-local utf8_char        = unicode.utf8.char
+local unicode         = require("unicode")
+local utf8_char       = unicode.utf8.char
 
-local exit             = os.exit
-local execute          = os.execute
-local remove           = os.remove
+local exit            = os.exit
+local execute         = os.execute
+local remove          = os.remove
 
+local util            = require("l3b.util")
+local entries         = util.entries
 --
 -- Auxiliary functions which are used by more than one main function
 --
@@ -63,22 +67,22 @@ function checkinit()
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for _,i in ipairs(filelist(localdir)) do
+  for i in entries(filelist(localdir)) do
     cp(i, localdir, testdir)
   end
   bundleunpack({sourcefiledir, testfiledir})
-  for _,i in ipairs(installfiles) do
+  for i in entries(installfiles) do
     cp(i, unpackdir, testdir)
   end
-  for _,i in ipairs(checkfiles) do
+  for i in entries(checkfiles) do
     cp(i, unpackdir, testdir)
   end
   if direxists(testsuppdir) then
-    for _,i in ipairs(filelist(testsuppdir)) do
+    for i in entries(filelist(testsuppdir)) do
       cp(i, testsuppdir, testdir)
     end
   end
-  for _,i in ipairs(checksuppfiles) do
+  for i in entries(checksuppfiles) do
     cp(i, supportdir, testdir)
   end
   execute(os_ascii .. ">" .. testdir .. "/ascii.tcx")
@@ -591,7 +595,7 @@ function runcheck(name, hide)
     return errorlevel
   end
   local errorlevel = 0
-  for _,engine in pairs(checkengines) do
+  for engine in entries(checkengines) do
     setup_check(name,engine)
     local errlevel = check_and_diff(engine)
     if errlevel ~= 0 and options["halt-on-error"] then
@@ -608,7 +612,7 @@ end
 function setup_check(name, engine)
   local testname = name .. "." .. engine
   local found
-  for _, kind in ipairs(test_order) do
+  for kind in entries(test_order) do
     local reference_ext = test_types[kind].reference
     local reference_file = locate(
       {testfiledir, unpackdir},
@@ -628,7 +632,7 @@ function setup_check(name, engine)
      return
   end
   -- Attempt to generate missing reference file from expectation
-  for _, kind in ipairs(test_order) do
+  for kind in entries(test_order) do
     local test_type = test_types[kind]
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
@@ -742,14 +746,14 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   local gen_file = basename .. test_type.generated
   local new_file = basename .. "." .. engine .. test_type.generated
   local asciiopt = ""
-  for _,i in ipairs(asciiengines) do
+  for i in entries(asciiengines) do
     if binary == i then
       asciiopt = "-translate-file ./ascii.tcx "
       break
     end
   end
   -- Clean out any dynamic files
-  for _,filetype in pairs(dynamicfiles) do
+  for filetype in entries(dynamicfiles) do
     rm(testdir,filetype)
   end
   -- Ensure there is no stray .log file
@@ -809,8 +813,8 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   end
   test_type.rewrite(gen_file,new_file,engine,errlevels)
   -- Store secondary files for this engine
-  for _,filetype in pairs(auxfiles) do
-    for _,file in pairs(filelist(testdir, filetype)) do
+  for filetype in entries(auxfiles) do
+    for file in entries(filelist(testdir, filetype)) do
       if match(file,"^" .. name .. "%.[^.]+$") then
         local newname = gsub(file,"(%.[^.]+)$","." .. engine .. "%1")
         if fileexists(testdir .. "/" .. newname) then
@@ -858,16 +862,16 @@ function check(names)
     names = names or { }
     -- No names passed: find all test files
     if not next(names) then
-      for _, kind in ipairs(test_order) do
+      for kind in entries(test_order) do
         local ext = test_types[kind].test
         local excludepatterns = { }
         local num_exclude = 0
-        for _,glob in pairs(excludetests) do
+        for glob in entries(excludetests) do
           num_exclude = num_exclude+1
           excludepatterns[num_exclude] = glob_to_pattern(glob .. ext)
         end
-        for _,glob in pairs(includetests) do
-          for _,name in pairs(filelist(testfiledir, glob .. ext)) do
+        for glob in entries(includetests) do
+          for name in entries(filelist(testfiledir, glob .. ext)) do
             local exclude
             for i=1, num_exclude do
               if match(name, excludepatterns[i]) then
@@ -879,7 +883,7 @@ function check(names)
               insert(names,jobname(name))
             end
           end
-          for _,name in pairs(filelist(unpackdir, glob .. ext)) do
+          for name in entries(filelist(unpackdir, glob .. ext)) do
             local exclude
             for i=1, num_exclude do
               if not match(name, excludepatterns[i]) then
@@ -903,7 +907,7 @@ function check(names)
         local active = false
         local firstname = options["first"]
         names = { }
-        for _,name in ipairs(allnames) do
+        for name in entries(allnames) do
           if name == firstname then
             active = true
           end
@@ -916,7 +920,7 @@ function check(names)
         local allnames = names
         local lastname = options["last"]
         names = { }
-        for _,name in ipairs(allnames) do
+        for name in entries(allnames) do
           insert(names,name)
           if name == lastname then
             break
@@ -959,7 +963,7 @@ end
 -- A short auxiliary to print the list of differences for check
 function checkdiff()
   print("\n  Check failed with difference files")
-  for _,i in ipairs(filelist(testdir, "*" .. os_diffext)) do
+  for i in entries(filelist(testdir, "*" .. os_diffext)) do
     print("  - " .. testdir .. "/" .. i)
   end
   print("")
@@ -967,7 +971,7 @@ end
 
 function showfailedlog(name)
   print("\nCheck failed with log file")
-  for _,i in ipairs(filelist(testdir, name..".log")) do
+  for i in entries(filelist(testdir, name..".log")) do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")
@@ -981,7 +985,7 @@ end
 
 function showfaileddiff()
   print("\nCheck failed with difference file")
-  for _,i in ipairs(filelist(testdir, "*" .. os_diffext)) do
+  for i in entries(filelist(testdir, "*" .. os_diffext)) do
     print("  - " .. testdir .. "/" .. i)
     print("")
     local f = open(testdir .. "/" .. i,"r")
@@ -1000,7 +1004,7 @@ function save(names)
     print("Arguments are required for the save command")
     return 1
   end
-  for _,name in pairs(names) do
+  for name in entries(names) do
     local test_filename, kind = testexists(name)
     if not test_filename then
       print('Test "' .. name .. '" not found')
@@ -1012,7 +1016,7 @@ function save(names)
         .. test_type.expectation .. " file of the same name")
       return 1
     end
-    for _,engine in pairs(engines) do
+    for engine in entries(engines) do
       local testengine = engine == stdengine and "" or ("." .. engine)
       local out_file = name .. testengine .. test_type.reference
       local gen_file = name .. "." .. engine .. test_type.generated

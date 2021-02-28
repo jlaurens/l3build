@@ -22,8 +22,6 @@ for those people who are interested.
 
 --]]
 
-local ipairs = ipairs
-local pairs  = pairs
 local print  = print
 
 local set_program = kpse.set_program_name
@@ -34,6 +32,10 @@ local lower = string.lower
 local match = string.match
 
 local insert = table.insert
+
+local util = require("l3b.util")
+local entries = util.entries
+local keys = util.keys
 
 local function gethome()
   set_program("latex")
@@ -47,7 +49,7 @@ function uninstall()
       local files = filelist(installdir)
       if next(files) then
         print("\n" .. "For removal from " .. installdir .. ":")
-        for _,file in pairs(filelist(installdir)) do
+        for file in entries(filelist(installdir)) do
           print("- " .. file)
         end
       end
@@ -67,8 +69,8 @@ function uninstall()
   local errorlevel = 0
   -- Any script man files need special handling
   local manfiles = { }
-  for _,glob in pairs(scriptmanfiles) do
-    for file,_ in pairs(tree(docfiledir,glob)) do
+  for glob in entries(scriptmanfiles) do
+    for file in keys(tree(docfiledir,glob)) do
       -- Man files should have a single-digit extension: the type
       local installdir = gethome() .. "/doc/man/man"  .. match(file,".$")
       if fileexists(installdir .. "/" .. file) then
@@ -83,7 +85,7 @@ function uninstall()
   end
   if next(manfiles) then
     print("\n" .. "For removal from " .. gethome() .. "/doc/man:")
-    for _,v in ipairs(manfiles) do
+    for v in entries(manfiles) do
       print("- " .. v)
     end
   end
@@ -96,7 +98,7 @@ function uninstall()
          + errorlevel
   if errorlevel ~= 0 then return errorlevel end
   -- Finally, clean up special locations
-  for _,location in ipairs(tdslocations) do
+  for location in entries(tdslocations) do
     local path = dirname(location)
     errorlevel = zapdir(path)
     if errorlevel ~= 0 then return errorlevel end
@@ -125,9 +127,9 @@ function install_files(target,full,dry_run)
     local sourcepaths = { }
     local paths = { }
     -- Generate a file list and include the directory
-    for _,glob_table in pairs(files) do
-      for _,glob in pairs(glob_table) do
-        for file,_ in pairs(tree(source,glob)) do
+    for glob_table in entries(files) do
+      for glob in entries(glob_table) do
+        for file in keys(tree(source,glob)) do
           -- Just want the name
           local path,filename = splitpath(file)
           local sourcepath = "/"
@@ -139,7 +141,7 @@ function install_files(target,full,dry_run)
             if not flattentds then sourcepath = path .. "/" end
           end
           local matched = false
-          for _,location in ipairs(tdslocations) do
+          for location in entries(tdslocations) do
             local l_dir,l_glob = splitpath(location)
             local pattern = glob_to_pattern(l_glob)
             if match(filename,pattern) then
@@ -161,7 +163,7 @@ function install_files(target,full,dry_run)
     -- The target is only created if there are actual files to install
     if next(filenames) then
       if not dry_run then
-        for _,path in pairs(paths) do
+        for path in entries(paths) do
           local target_path = target .. "/" .. path
           if not cleanpaths[target_path] then
             errorlevel = cleandir(target_path)
@@ -170,7 +172,7 @@ function install_files(target,full,dry_run)
           cleanpaths[target_path] = true
         end
       end
-      for _,name in ipairs(filenames) do
+      for name in entries(filenames) do
         if dry_run then
           print("- " .. name)
         else
@@ -192,16 +194,16 @@ function install_files(target,full,dry_run)
       include = include or { }
       exclude = exclude or { }
       local excludelist = { }
-      for _,glob_table in pairs(exclude) do
-        for _,glob in pairs(glob_table) do
-          for file,_ in pairs(tree(dir,glob)) do
+      for glob_table in entries(exclude) do
+        for glob in entries(glob_table) do
+          for file in keys(tree(dir,glob)) do
             excludelist[file] = true
           end
         end
       end
       local result = { }
-      for _,glob in pairs(include) do
-        for file,_ in pairs(tree(dir,glob)) do
+      for glob in entries(include) do
+        for file in keys(tree(dir,glob)) do
           if not excludelist[file] then
             insert(result, file)
           end
@@ -218,13 +220,13 @@ function install_files(target,full,dry_run)
     -- For the purposes here, any typesetting demo files need to be
     -- part of the main typesetting list
     local typesetfiles = typesetfiles
-    for _,glob in pairs(typesetdemofiles) do
+    for glob in entries(typesetdemofiles) do
       insert(typesetfiles,glob)
     end
 
     -- Find PDF files
     pdffiles = { }
-    for _,glob in pairs(typesetfiles) do
+    for glob in entries(typesetfiles) do
       insert(pdffiles,(gsub(glob,"%.%w+$",".pdf")))
     end
 
@@ -254,8 +256,8 @@ function install_files(target,full,dry_run)
 
     -- Any script man files need special handling
     local manfiles = { }
-    for _,glob in pairs(scriptmanfiles) do
-      for file,_ in pairs(tree(docfiledir,glob)) do
+    for glob in entries(scriptmanfiles) do
+      for file in keys(tree(docfiledir,glob)) do
         if dry_run then
           insert(manfiles,"man" .. match(file,".$") .. "/" ..
             select(2,splitpath(file)))
@@ -268,7 +270,7 @@ function install_files(target,full,dry_run)
       end
     end
     if next(manfiles) then
-      for _,v in ipairs(manfiles) do
+      for v in entries(manfiles) do
         print("- doc/man/" .. v)
       end
     end
@@ -285,7 +287,7 @@ function install_files(target,full,dry_run)
 
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
-  for _,v in ipairs(installmap) do
+  for v in entries(installmap) do
     errorlevel = cp(v.file,v.source,v.dest)
     if errorlevel ~= 0  then return errorlevel end
   end 

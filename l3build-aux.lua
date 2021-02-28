@@ -34,6 +34,9 @@ local os_time = os.time
 ---@type l3build_t
 local l3build = require("l3build")
 
+local util = require("l3b.util")
+local entries = util.entries
+
 --
 -- Auxiliary functions which are used by more than one main function
 --
@@ -112,7 +115,7 @@ function call(modules, target, opts)
       if t["type"] == "string" then
         value = value .. "=" .. v
       elseif t["type"] == "table" then
-        for _,a in pairs(v) do
+        for a in entries(v) do
           if value == "" then
             value = "=" .. a -- Add the initial "=" here
           else
@@ -124,12 +127,12 @@ function call(modules, target, opts)
     end
   end
   if opts.names then
-    for _, name in pairs(opts.names) do
+    for name in entries(opts.names) do
       cli_opts = cli_opts .. " " .. name
     end
   end
   local script_name = get_script_name()
-  for _, module in ipairs(modules) do
+  for module in entries(modules) do
     local text
     if module == "." and opts["config"] and #opts["config"]>0 then
       text = " with configuration " .. opts["config"][1]
@@ -158,7 +161,7 @@ end
 ---@usage Private?
 function dep_install(deps)
   local error_level
-  for _, dep in ipairs(deps) do
+  for dep in entries(deps) do
     print("Installing dependency: " .. dep)
     error_level = run(dep, "texlua " .. get_script_name() .. " unpack -q")
     if error_level ~= 0 then

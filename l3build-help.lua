@@ -39,14 +39,14 @@ end
 function help()
   local function setup_list(list)
     local longest = 0
-    for k,_ in pairs(list) do
+    for k in keys(list) do
       if k:len() > longest then
         longest = k:len()
       end
     end
     -- Sort the options
     local t = { }
-    for k,_ in pairs(list) do
+    for k in keys(list) do
       insert(t, k)
     end
     sort(t)
@@ -61,7 +61,7 @@ function help()
   print("")
   print("Valid targets are:")
   local longest,t = setup_list(target_list)
-  for _,k in ipairs(t) do
+  for k in entries(t) do
     local target = target_list[k]
     local filler = rep(" ", longest - k:len() + 1)
     if target["desc"] then
@@ -71,7 +71,7 @@ function help()
   print("")
   print("Valid options are:")
   longest,t = setup_list(option_list)
-  for _,k in ipairs(t) do
+  for k in entries(t) do
     local opt = option_list[k]
     local filler = rep(" ", longest - k:len() + 1)
     if opt["desc"] then

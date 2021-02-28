@@ -127,7 +127,7 @@ do
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
   local function on_debug(f)
-    for _,o in ipairs(arg) do
+    for o in entries(arg) do
       if match(o, "^%-%-debug") then
         f()
         break
@@ -215,7 +215,7 @@ do
     print("  launch: ".. launch_dir)
     print()
   end)
-  
+
 end
 --[=[ end of booting process ]=]
 
@@ -305,7 +305,7 @@ if options["target"] == "check" then
     local error_level = 0
     local opts = options -- TODO: remove this shallow copy
     local failed = { }
-    for _, config in ipairs(checkconfigs) do
+    for config in entries(checkconfigs) do
       opts["config"] = { config }
       error_level = call({"."}, "check", opts)
       if error_level ~= 0 then
@@ -317,14 +317,14 @@ if options["target"] == "check" then
       end
     end
     if next(failed) then
-      for _,config in ipairs(failed) do
+      for config in entries(failed) do
         print("Failed tests for configuration " .. config .. ":")
         print("\n  Check failed with difference files")
         local testdir = testdir
         if config ~= "build" then
           testdir = testdir .. "-" .. config
         end
-        for _,i in ipairs(filelist(testdir, "*" .. os_diffext)) do
+        for i in entries(filelist(testdir, "*" .. os_diffext)) do
           print("  - " .. testdir .. "/" .. i)
         end
         print("")

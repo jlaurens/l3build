@@ -26,14 +26,17 @@ for those people who are interested.
 -- Auxiliary functions for typesetting: need to be generally available
 --
 
-local ipairs = ipairs
-local pairs  = pairs
 local print  = print
 
 local gsub  = string.gsub
 local match = string.match
 
 local os_type = os.type
+
+local util    = require("l3b.util")
+local entries = util.entries
+local items   = util.items
+local values  = util.values
 
 function dvitopdf(name, dir, engine, hide)
   run(
@@ -65,7 +68,7 @@ function runcmd(cmd,dir,vars)
   if os_type == "windows" and match(envpaths," ") then
     envpaths = gsub(envpaths,'"','')
   end
-  for _,var in pairs(vars) do
+  for var in entries(vars) do
     env = env .. os_concat .. os_setenv .. " " .. var .. "=" .. envpaths
   end
   return run(dir,set_epoch_cmd(epoch, forcedocepoch) .. env .. os_concat .. cmd)
@@ -175,17 +178,17 @@ end
 local function docinit()
   -- Set up
   cleandir(typesetdir)
-  for _,filetype in pairs(
-      {bibfiles, docfiles, typesetfiles, typesetdemofiles}
-    ) do
-    for _,file in pairs(filetype) do
+  for filetype in items(
+    bibfiles, docfiles, typesetfiles, typesetdemofiles
+  ) do
+    for file in entries(filetype) do
       cp(file, docfiledir, typesetdir)
     end
   end
-  for _,file in pairs(sourcefiles) do
+  for file in entries(sourcefiles) do
     cp(file, sourcefiledir, typesetdir)
   end
-  for _,file in pairs(typesetsuppfiles) do
+  for file in entries(typesetsuppfiles) do
     cp(file, supportdir, typesetdir)
   end
   dep_install(typesetdeps)
@@ -206,10 +209,10 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
-  for _,typesetfiles in ipairs({typesetdemofiles,typesetfiles}) do
-    for _,glob in pairs(typesetfiles) do
-      for _,dir in ipairs({typesetdir,unpackdir}) do
-        for _,file in pairs(tree(dir,glob)) do
+  for typesetfiles in entries({typesetdemofiles,typesetfiles}) do
+    for glob in entries(typesetfiles) do
+      for dir in entries({typesetdir,unpackdir}) do
+        for file in values(tree(dir,glob)) do
           local path,srcname = splitpath(file)
           local name = jobname(srcname)
           if not done[name] then
@@ -217,7 +220,7 @@ function doc(files)
             -- Allow for command line selection of files
             if files and next(files) then
               typeset = false
-              for _,file in pairs(files) do
+              for file in entries(files) do
                 if name == file then
                   typeset = true
                   break

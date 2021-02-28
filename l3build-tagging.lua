@@ -22,11 +22,14 @@ for those people who are interested.
 
 --]]
 
-local pairs   = pairs
 local open    = io.open
 local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
+
+local util    = require("l3b.util")
+local entries = util.entries
+local keys    = util.keys
 
 update_tag = update_tag or function(filename,content,tagname,tagdate)
   return content
@@ -69,9 +72,9 @@ function tag(tagnames)
   end
   local dirs = remove_duplicates({currentdir, sourcefiledir, docfiledir})
   local errorlevel = 0
-  for _,dir in pairs(dirs) do
-    for _,filetype in pairs(tagfiles) do
-      for file,_ in pairs(tree(dir,filetype)) do
+  for dir in entries(dirs) do
+    for filetype in entries(tagfiles) do
+      for file in keys(tree(dir,filetype)) do
         errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
         if errorlevel ~= 0 then
           return errorlevel

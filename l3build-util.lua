@@ -22,6 +22,20 @@ for those people who are interested.
 
 --]]
 
+--[=[ Usage
+
+local util = require("l3b.util")
+local to_quoted_string = util.to_quoted_string
+local indices = util.indices
+local entries = util.entries
+local items = util.items
+local unique_entries = util.unique_entries
+local unique_items = util.unique_items
+local keys = util.keys
+local values = util.values
+
+--]=]
+
 -- local safety guards and shortcuts
 
 local next = next
@@ -38,6 +52,15 @@ local function to_quoted_string(table, separator)
   end
   return concat(t, separator or " ")
 end
+--[=[ Original implementation
+local function tab_to_str(table)
+  local string = ""
+  for i in entries(table) do
+    string = string .. " " .. "\"" .. i .. "\""
+  end
+  return string
+end
+]=]
 
 ---@type fun(table: table): fun(): integer
 local indices = ipairs

@@ -311,7 +311,7 @@ function tree(src_path, glob)
     ---@param p_cwd string path counterpart relative to the current working directory
     ---@param table table
     local function fill(p_src, p_cwd, table)
-      for _, file in ipairs(filelist(p_cwd, glob_part)) do
+      for file in entries(filelist(p_cwd, glob_part)) do
         local p_src_file = p_src .. "/" .. file
         if file ~= "." and file ~= ".." and
         p_src_file ~= builddir -- TODO: ensure that `builddir` is properly formatted
@@ -350,7 +350,7 @@ function remove_duplicates(a)
   local uniq = {}
   local hash = {}
 
-  for _,v in ipairs(a) do
+  for v in entries(a) do
     if (not hash[v]) then
       hash[v] = true
       uniq[#uniq+1] = v
@@ -387,7 +387,7 @@ end
 
 -- Remove file(s) based on a glob
 function rm(source, glob)
-  for i,_ in pairs(tree(source, glob)) do
+  for i in keys(tree(source, glob)) do
     rmfile(source,i)
   end
   -- os.remove doesn't give a sensible errorlevel
@@ -444,8 +444,8 @@ end
 
 -- Look for files, directory by directory, and return the first existing
 function locate(dirs, names)
-  for _,i in ipairs(dirs) do
-    for _,j in ipairs(names) do
+  for i in entries(dirs) do
+    for j in entries(names) do
       local path = i .. "/" .. j
       if fileexists(path) then
         return path

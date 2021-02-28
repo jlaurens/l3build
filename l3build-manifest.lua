@@ -37,12 +37,12 @@ manifest = manifest or function()
 
   -- build list of ctan files
   ctanfiles = {}
-  for _,f in ipairs(filelist(ctandir.."/"..ctanpkg,"*.*")) do
+  for f in entries(filelist(ctandir.."/"..ctanpkg,"*.*")) do
     ctanfiles[f] = true
   end
   tdsfiles = {}
-  for _,subdir in ipairs({"/doc/","/source/","/tex/"}) do
-    for _,f in ipairs(filelist(tdsdir..subdir..moduledir,"*.*")) do
+  for subdir in entries({"/doc/","/source/","/tex/"}) do
+    for f in entries(filelist(tdsdir..subdir..moduledir,"*.*")) do
       tdsfiles[f] = true
     end
   end
@@ -72,22 +72,22 @@ manifest_build_list = function(entry)
     entry = manifest_build_init(entry)
 
     -- build list of excluded files
-    for _,glob_list in ipairs(entry.exclude) do
-      for _,this_glob in ipairs(glob_list) do
-        for _,this_file in ipairs(filelist(maindir,this_glob)) do
+    for glob_list in entries(entry.exclude) do
+      for this_glob in entries(glob_list) do
+        for this_file in entries(filelist(maindir,this_glob)) do
           entry.excludes[this_file] = true
         end
       end
     end
 
     -- build list of matched files
-    for _,glob_list in ipairs(entry.files) do
-      for _,this_glob in ipairs(glob_list) do
+    for glob_list in entries(entry.files) do
+      for this_glob in entries(glob_list) do
 
         local these_files = filelist(entry.dir,this_glob)
         these_files = manifest_sort_within_match(these_files)
 
-        for _,this_file in ipairs(these_files) do
+        for this_file in entries(these_files) do
           entry = manifest_build_file(entry,this_file)
         end
 

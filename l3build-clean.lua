@@ -22,6 +22,11 @@ for those people who are interested.
 
 --]]
 
+local util          = require("l3b.util")
+local entries       = util.entries
+local keys          = util.keys
+local unique_items  = util.unique_items
+
 -- Remove all generated files
 function clean()
   -- To make sure that distribdir never contains any stray subdirs,
@@ -38,18 +43,18 @@ function clean()
   if errorlevel ~= 0 then return errorlevel end
 
   local clean_list = { }
-  for _,dir in pairs(remove_duplicates({maindir,sourcefiledir,docfiledir})) do
-    for _,glob in pairs(cleanfiles) do
-      for file,_ in pairs(tree(dir,glob)) do
+  for dir in unique_items(maindir, sourcefiledir, docfiledir) do
+    for glob in entries(cleanfiles) do
+      for file in keys(tree(dir,glob)) do
         clean_list[file] = true
       end
     end
-    for _,glob in pairs(sourcefiles) do
-      for file,_ in pairs(tree(dir,glob)) do
+    for glob in entries(sourcefiles) do
+      for file in keys(tree(dir,glob)) do
         clean_list[file] = nil
       end
     end
-    for file,_ in pairs(clean_list) do
+    for file in keys(clean_list) do
       errorlevel = rm(dir,file)
       if errorlevel ~= 0 then return errorlevel end
     end
@@ -60,7 +65,7 @@ end
 
 function bundleclean()
   local errorlevel = call(modules, "clean")
-  for _,i in ipairs(cleanfiles) do
+  for i in entries(cleanfiles) do
     errorlevel = rm(currentdir, i) + errorlevel
   end
   return (

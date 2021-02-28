@@ -22,23 +22,28 @@ for those people who are interested.
 
 --]]
 
-local pairs = pairs
 local print = print
 
 local lower = string.lower
 local match = string.match
+
+local util    = require("l3b.util")
+local entries = util.entries
+local items   = util.items
+local keys    = util.keys
+local to_quoted_string = util.to_quoted_string
 
 -- Copy files to the main CTAN release directory
 function copyctan()
   mkdir(ctandir .. "/" .. ctanpkg)
   local function copyfiles(files,source)
     if source == currentdir or flatten then
-      for _,filetype in pairs(files) do
+      for filetype in entries(files) do
         cp(filetype,source,ctandir .. "/" .. ctanpkg)
       end
     else
-      for _,filetype in pairs(files) do
-        for file,_ in pairs(tree(source,filetype)) do
+      for filetype in entries(files) do
+        for file in keys(tree(source,filetype)) do
           local path = dirname(file)
           local ctantarget = ctandir .. "/" .. ctanpkg .. "/"
             .. source .. "/" .. path
@@ -48,12 +53,14 @@ function copyctan()
       end
     end
   end
-  for _,tab in pairs(
-    {bibfiles,demofiles,docfiles,pdffiles,scriptmanfiles,typesetlist}) do
+  for tab in items(
+    bibfiles,demofiles,docfiles,
+    pdffiles,scriptmanfiles,typesetlist
+  ) do
     copyfiles(tab,docfiledir)
   end
   copyfiles(sourcefiles,sourcefiledir)
-  for _,file in pairs(textfiles) do
+  for file in entries(textfiles) do
     cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
   end
 end
@@ -70,16 +77,9 @@ function ctan()
   options["engine"] = nil
   local function dirzip(dir, name)
     local zipname = name .. ".zip"
-    local function tab_to_str(table)
-      local string = ""
-      for _,i in ipairs(table) do
-        string = string .. " " .. "\"" .. i .. "\""
-      end
-      return string
-    end
     -- Convert the tables of files to quoted strings
-    local binfiles = tab_to_str(binaryfiles)
-    local exclude = tab_to_str(excludefiles)
+    local binfiles = to_quoted_string(binaryfiles)
+    local exclude = to_quoted_string(excludefiles)
     -- First, zip up all of the text files
     run(
       dir,
@@ -126,8 +126,8 @@ function ctan()
     return errorlevel
   end
   if errorlevel == 0 then
-    for _,i in ipairs(textfiles) do
-      for _,j in pairs({unpackdir, textfiledir}) do
+    for i in entries(textfiles) do
+      for j in items(unpackdir, textfiledir) do
         cp(i, j, ctandir .. "/" .. ctanpkg)
         cp(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
       end
@@ -135,8 +135,10 @@ function ctan()
     -- Rename README if necessary
     if ctanreadme ~= "" and not match(lower(ctanreadme),"^readme%.%w+") then
       local newfile = "README." .. match(ctanreadme,"%.(%w+)$")
-      for _,dir in pairs({ctandir .. "/" .. ctanpkg,
-        tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle}) do
+      for dir in items(
+        ctandir .. "/" .. ctanpkg,
+        tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle
+      ) do
         if fileexists(dir .. "/" .. ctanreadme) then
           rm(dir,newfile)
           ren(dir,ctanreadme,newfile)
