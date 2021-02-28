@@ -143,7 +143,7 @@ function upload(tagnames)
 
 
 if options["debug"] then
-    ctan_post = ctan_post ..  ' https://httpbin.org/post'
+    ctan_post = ctan_post .. ' https://httpbin.org/post'
     fp_return = shell(ctan_post)
     print('\n\nCURL COMMAND:')
     print(ctan_post)
@@ -151,7 +151,7 @@ if options["debug"] then
     print(fp_return)
     return 1
 else
-    ctan_post = ctan_post ..  ' https://ctan.org/submit/'
+    ctan_post = ctan_post .. ' https://ctan.org/submit/'
 end
 
   -- call post command to validate the upload at CTAN's validate URL
@@ -181,7 +181,7 @@ end
 
   -- if upload requested and validation succeeded repost to the upload URL
   if exit_status == 0 or exit_status == nil then
-    if ctanupload ~=nil and ctanupload ~=false and ctanupload ~= true then
+    if ctanupload ~= nil and ctanupload ~= false and ctanupload ~= true then
       if match(fp_return, "WARNING") then
        print("Warnings from CTAN package validation:" .. fp_return:gsub("%[", "\n["):gsub("%]%]", "]\n]"))
       else
