@@ -29,7 +29,7 @@ local gsub    = string.gsub
 
 local util    = require("l3b.util")
 local entries = util.entries
-local keys    = util.keys
+local values  = util.keys
 
 update_tag = update_tag or function(filename,content,tagname,tagdate)
   return content
@@ -74,8 +74,8 @@ function tag(tagnames)
   local errorlevel = 0
   for dir in entries(dirs) do
     for filetype in entries(tagfiles) do
-      for file in keys(tree(dir,filetype)) do
-        errorlevel = update_file_tag(dir .. "/" .. file,tagname,tagdate)
+      for file in values(tree(dir,filetype)) do
+        errorlevel = update_file_tag(file, tagname, tagdate)
         if errorlevel ~= 0 then
           return errorlevel
         end

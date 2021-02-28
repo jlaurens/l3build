@@ -30,7 +30,7 @@ local match = string.match
 local util    = require("l3b.util")
 local entries = util.entries
 local items   = util.items
-local keys    = util.keys
+local values  = util.values
 local to_quoted_string = util.to_quoted_string
 
 -- Copy files to the main CTAN release directory
@@ -43,10 +43,9 @@ function copyctan()
       end
     else
       for filetype in entries(files) do
-        for file in keys(tree(source,filetype)) do
+        for file in values(tree(source,filetype)) do
           local path = dirname(file)
-          local ctantarget = ctandir .. "/" .. ctanpkg .. "/"
-            .. source .. "/" .. path
+          local ctantarget = ctandir .. "/" .. ctanpkg .. "/" .. path
           mkdir(ctantarget)
           cp(file,source,ctantarget)
         end

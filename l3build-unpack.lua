@@ -22,6 +22,10 @@ for those people who are interested.
 
 --]]
 
+local util = require("l3b.util")
+local entries = util.entries
+local keys = util.keys
+
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
 function unpack(sources, sourcedirs)
