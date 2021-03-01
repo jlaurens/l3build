@@ -33,6 +33,7 @@ local entries = utlib.entries
 local items   = utlib.items
 local values  = utlib.values
 local to_quoted_string = utlib.to_quoted_string
+local extend_with     = utlib.extend_with
 
 ---@type wklib_t
 local wklib    = require("l3b.walklib")
@@ -51,6 +52,10 @@ local remove_tree     = fslib.remove_tree
 local copy_tree       = fslib.copy_tree
 local rename          = fslib.rename
 local remove_directory  = fslib.remove_directory
+
+---@type install_t
+local l3b_install = require("l3b.install")
+local install_files = l3b_install.install_files
 
 -- Copy files to the main CTAN release directory
 local function copy_ctan()
@@ -196,7 +201,7 @@ extend_with(_G, global_symbol_map)
 ---@field bundle_ctan function
 
 return {
-  global_symbol_map = global_symbol_map
+  global_symbol_map = global_symbol_map,
   ctan = ctan,
   bundle_ctan = bundle_ctan,
 }

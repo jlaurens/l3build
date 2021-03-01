@@ -51,7 +51,7 @@ local lfs_dir          = lfs.dir
 
 local execute          = os.execute
 local remove           = os.remove
-local os_type          = os.type
+local os_type          = os["type"]
 
 local match            = string.match
 local gmatch           = string.gmatch

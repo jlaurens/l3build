@@ -24,7 +24,7 @@ for those people who are interested.
 
 local print  = print
 
-local kpse = require("kpse")
+local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
@@ -35,9 +35,10 @@ local match = string.match
 local insert = table.insert
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
-local entries = utlib.entries
-local keys = utlib.keys
+local utlib       = require("l3b.utillib")
+local entries     = utlib.entries
+local keys        = utlib.keys
+local extend_with = utlib.extend_with
 
 ---@type gblib_t
 local gblib           = require("l3b.globlib")
@@ -49,7 +50,7 @@ local dir_base        = wklib.dir_base
 local dir_name        = wklib.dir_name
 
 ---@type fslib_t
-local fslib                  = require("l3b.fslib")
+local fslib                 = require("l3b.fslib")
 local file_list             = fslib.file_list
 local directory_exists      = fslib.directory_exists
 local remove_directory      = fslib.remove_directory
@@ -61,13 +62,12 @@ local make_clean_directory  = fslib.make_clean_directory
 local make_directory        = fslib.make_directory
 local rename                = fslib.rename
 
-
 local function gethome()
   set_program("latex")
   return (options["texmfhome"] or var_value("TEXMFHOME"))
 end
 
-function uninstall()
+local function uninstall()
   local function zapdir(dir)
     local installdir = gethome() .. "/" .. dir
     if options["dry-run"] then
@@ -91,7 +91,7 @@ function uninstall()
     dir = dir .. "/" .. subdir
     return zapdir(dir)
   end
-  local errorlevel = 0
+  local error_level = 0
   -- Any script man files need special handling
   local manfiles = {}
   for glob in entries(scriptmanfiles) do
@@ -103,7 +103,7 @@ function uninstall()
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
            select(2, dir_base(file)))
         else
-          errorlevel = errorlevel + remove_tree(installdir, file)
+          error_level = error_level + remove_tree(installdir, file)
         end
       end
     end
@@ -114,24 +114,24 @@ function uninstall()
       print("- " .. v)
     end
   end
-  errorlevel = uninstall_files("doc")
+  error_level = uninstall_files("doc")
          + uninstall_files("source")
          + uninstall_files("tex")
          + uninstall_files("bibtex/bst", module)
          + uninstall_files("makeindex", module)
          + uninstall_files("scripts", module)
-         + errorlevel
-  if errorlevel ~= 0 then return errorlevel end
+         + error_level
+  if error_level ~= 0 then return error_level end
   -- Finally, clean up special locations
   for location in entries(tdslocations) do
     local path = dir_name(location)
-    errorlevel = zapdir(path)
-    if errorlevel ~= 0 then return errorlevel end
+    error_level = zapdir(path)
+    if error_level ~= 0 then return error_level end
   end
   return 0
 end
 
-function install_files(target, full, dry_run)
+local function install_files(target, full, dry_run)
 
   -- Needed so paths are only cleaned out once
   local cleanpaths = {}
@@ -315,11 +315,35 @@ function install_files(target, full, dry_run)
   for v in entries(installmap) do
     errorlevel = copy_tree(v.file, v.source, v.dest)
     if errorlevel ~= 0  then return errorlevel end
-  end 
-  
+  end
+
   return 0
 end
 
-function install()
+local function install()
   return install_files(gethome(), options["full"], options["dry-run"])
 end
+
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  uninstall     = uninstall,
+  install_files = install_files,
+  install       = install,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class install_t
+---@field uninstall function
+---@field install_files function
+---@field install function
+
+return {
+  global_symbol_map = global_symbol_map,
+  uninstall     = uninstall,
+  install_files = install_files,
+  install       = install,
+}

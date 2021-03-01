@@ -28,11 +28,12 @@ local rep    = string.rep
 local sort   = table.sort
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
-local entries = utlib.entries
-local keys = utlib.keys
+local utlib       = require("l3b.utillib")
+local entries     = utlib.entries
+local keys        = utlib.keys
+local extend_with = utlib.extend_with
 
-function version()
+local function version()
   print(
     "\n" ..
     "l3build: A testing and building system for LaTeX\n\n" ..
@@ -41,7 +42,7 @@ function version()
   )
 end
 
-function help()
+local function help()
   local function setup_list(list)
     local longest = 0
     for k in keys(list) do
@@ -94,3 +95,23 @@ function help()
   print("Bug tracker : https://github.com/latex3/l3build/issues")
   print("Copyright (C) 2014-2020 The LaTeX Project")
 end
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  version = version,
+  help    = help,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class help_t
+---@field version function
+---@field help function
+
+return {
+  global_symbol_map = global_symbol_map,
+  version = version,
+  help = help,
+}

@@ -32,7 +32,7 @@ local quoted_path = oslib.quoted_path
 
 local execute          = os.execute
 local getenv           = os.getenv
-local os_type          = os.type
+local os_type          = os["type"]
 
 local status          = require("status")
 local luatex_revision = status.luatex_revision
@@ -138,6 +138,7 @@ extend_with(_G, global_symbol_map)
 ---@field cmd_concat function
 ---@field run function
 ---@field quoted_path function
+
 return {
   global_symbol_map = global_symbol_map,
   cmd_concat = cmd_concat,
