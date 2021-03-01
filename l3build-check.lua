@@ -24,9 +24,6 @@ for those people who are interested.
 
 -- Local access to functions
 local open            = io.open
-local close           = io.close
-local write           = io.write
-local output          = io.output
 
 local rnd             = math.random
 
@@ -51,25 +48,36 @@ local exit            = os.exit
 local execute         = os.execute
 local remove          = os.remove
 
-local util            = require("l3b.utilib")
-local entries         = util.entries
+---@type utlib_t
+local utlib            = require("l3b.utillib")
+local entries         = utlib.entries
 
-local fifu        = require("l3b.file-functions")
-local all_files   = fifu.all_files
-local cmd_concat  = fifu.cmd_concat
-local copy_tree   = fifu.copy_tree
-local file_exists = fifu.file_exists
-local locate      = fifu.locate
-local run         = fifu.run
-local rename      = fifu.rename
-local to_host     = fifu.to_host
-local remove_tree = fifu.remove_tree
-local remove_file = fifu.remove_file
-local job_name    = fifu.job_name
-local directory_exists      = fifu.directory_exists
-local absolute_path         = fifu.absolute_path
-local make_clean_directory  = fifu.make_clean_directory
-local glob_to_pattern       = fifu.glob_to_pattern
+---@type gblib_t
+local gblib             = require("l3b.globlib")
+local glob_to_pattern   = gblib.glob_to_pattern
+
+---@type wklib_t
+local wklib     = require("l3b.walklib")
+local job_name  = wklib.job_name
+
+---@type oslib_t
+local oslib       = require("l3b.oslib")
+local cmd_concat  = oslib.cmd_concat
+local run         = oslib.run
+
+---@type fslib_t
+local fslib       = require("l3b.fslib")
+local all_files   = fslib.all_files
+local copy_tree   = fslib.copy_tree
+local file_exists = fslib.file_exists
+local locate      = fslib.locate
+local rename      = fslib.rename
+local to_host     = fslib.to_host
+local remove_tree = fslib.remove_tree
+local remove_file = fslib.remove_file
+local directory_exists      = fslib.directory_exists
+local absolute_path         = fslib.absolute_path
+local make_clean_directory  = fslib.make_clean_directory
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -671,21 +679,21 @@ local function base_compare(test_type, name, engine, cleanup)
   return error_level
 end
 
-local function showfailedlog(name)
+local function show_failed_log(name)
   print("\nCheck failed with log file")
   for i in all_files(testdir, name..".log") do
     print("  - " .. testdir .. "/" .. i)
     print("")
-    local f = open(testdir .. "/" .. i, "r")
-    local content = f:read("a")
-    close(f)
+    local fh = open(testdir .. "/" .. i, "r")
+    local content = fh:read("a")
+    fh:close()
     print("-----------------------------------------------------------------------------------")
     print(content)
     print("-----------------------------------------------------------------------------------")
   end
 end
 
-local function showfaileddiff()
+local function show_failed_diff()
   print("\nCheck failed with difference file")
   for i in all_files(testdir, "*" .. os_diffext) do
     print("  - " .. testdir .. "/" .. i)
@@ -893,10 +901,10 @@ local function check_and_diff(name, engine, hide, ext, type)
     return error_level
   end
   if options["show-log-on-error"] then
-    showfailedlog(name)
+    show_failed_log(name)
   end
   if options["halt-on-error"] then
-    showfaileddiff()
+    show_failed_diff()
   end
   return error_level
 end

@@ -33,14 +33,16 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
-local util      = require("l3b.utilib")
-local entries   = util.entries
-local items     = util.items
-local keys      = util.keys
+---@type utlib_t
+local utlib      = require("l3b.utillib")
+local entries   = utlib.entries
+local items     = utlib.items
+local keys      = utlib.keys
 
-local fifu      = require("l3b.file-functions")
-local all_files = fifu.all_files
-local file_list = fifu.file_list
+---@type fslib_t
+local fslib      = require("l3b.fslib")
+local all_files = fslib.all_files
+local file_list = fslib.file_list
 
 manifest = manifest or function()
 
@@ -64,7 +66,7 @@ manifest = manifest or function()
 
   manifest_write(manifest_entries)
 
-  printline = "Manifest written to " .. manifestfile
+  local printline = "Manifest written to " .. manifestfile
   print((printline:gsub(".", "*"))) -- the outer '()' is required
   print(printline)
   print((printline:gsub(".", "*")))

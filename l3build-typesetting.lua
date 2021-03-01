@@ -33,23 +33,31 @@ local match = string.match
 
 local os_type = os.type
 
-local util    = require("l3b.utilib")
-local entries = util.entries
-local items   = util.items
-local values  = util.values
+---@type utlib_t
+local utlib   = require("l3b.utillib")
+local entries = utlib.entries
+local items   = utlib.items
+local values  = utlib.values
 
-local fifu              = require("l3b.file-functions")
-local cmd_concat        = fifu.cmd_concat
-local run               = fifu.run
-local directory_exists  = fifu.directory_exists
-local absolute_path     = fifu.absolute_path
-local file_exists       = fifu.file_exists
-local job_name          = fifu.job_name
-local remove_tree       = fifu.remove_tree
-local copy_tree         = fifu.copy_tree
-local make_clean_directory = fifu.make_clean_directory
-local tree              = fifu.tree
-local dir_base          = fifu.dir_base
+---@type wklib_t
+local wklib             = require("l3b.walklib")
+local job_name          = wklib.job_name
+local dir_base          = wklib.dir_base
+
+---@type oslib_t
+local oslib             = require("l3b.oslib")
+local cmd_concat        = oslib.cmd_concat
+local run               = oslib.run
+
+---@type fslib_t
+local fslib             = require("l3b.fslib")
+local directory_exists  = fslib.directory_exists
+local absolute_path     = fslib.absolute_path
+local file_exists       = fslib.file_exists
+local remove_tree       = fslib.remove_tree
+local copy_tree         = fslib.copy_tree
+local make_clean_directory = fslib.make_clean_directory
+local tree              = fslib.tree
 
 function dvitopdf(name, dir, engine, hide)
   run(

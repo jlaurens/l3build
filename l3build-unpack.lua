@@ -22,18 +22,26 @@ for those people who are interested.
 
 --]]
 
-local util = require("l3b.utilib")
-local entries = util.entries
-local keys = util.keys
+---@type utlib_t
+local utlib = require("l3b.utillib")
+local entries = utlib.entries
+local keys = utlib.keys
 
-local fifu                  = require("l3b.file-functions")
-local cmd_concat            = fifu.cmd_concat
-local copy_tree             = fifu.copy_tree
-local make_directory        = fifu.make_directory
-local make_clean_directory  = fifu.make_clean_directory
-local tree                  = fifu.tree
-local absolute_path         = fifu.absolute_path
-local dir_base              = fifu.dir_base
+---@type wklib_t
+local wklib             = require("l3b.walklib")
+local dir_base          = wklib.dir_base
+
+---@type oslib_t
+local oslib             = require("l3b.oslib")
+local cmd_concat        = oslib.cmd_concat
+
+---@type fslib_t
+local fslib                 = require("l3b.fslib")
+local copy_tree             = fslib.copy_tree
+local make_directory        = fslib.make_directory
+local make_clean_directory  = fslib.make_clean_directory
+local tree                  = fslib.tree
+local absolute_path         = fslib.absolute_path
 
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed

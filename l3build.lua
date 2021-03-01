@@ -219,15 +219,16 @@ do
 end
 --[=[ end of booting process ]=]
 
--- Minimal code to do basic checks
-local util = require("l3b.utilib")
-local entries = util.entries
+---@type utlib_t
+local utlib   = require("l3b.utillib")
+local entries = utlib.entries
 
 require("l3b.arguments")
 require("l3b.help")
 
-local fifu      = require("l3b.file-functions")
-local all_files = fifu.all_files
+---@type fslib_t
+local fslib     = require("l3b.file-functions")
+local all_files = fslib.all_files
 
 require("l3b.typesetting")
 require("l3b.aux")

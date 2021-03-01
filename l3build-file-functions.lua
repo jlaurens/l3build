@@ -24,30 +24,30 @@ for those people who are interested.
 
 --[=[
 
-local fifu        = require("l3b.file-functions")
-local cmd_concat = fifu.cmd_concat
-local run = fifu.run
-local glob_to_pattern = fifu.glob_to_pattern
-local to_host = fifu.to_host
-local quoted_path = fifu.quoted_path
-local abspath = fifu.abspath
-local make_directory = fifu.make_directory
-local directory_exists = fifu.directory_exists
-local file_exists = fifu.file_exists
-local file_list = fifu.file_list
-local all_files = fifu.all_files
-local tree = fifu.tree
-local remove_file = fifu.remove_file
-local remove_tree = fifu.remove_tree
-local make_clean_directory = fifu.make_clean_directory
-local copy_tree = fifu.copy_tree
-local rename = fifu.rename
-local remove_directory = fifu.remove_directory
-local dir_base = fifu.dir_base
-local dir_name = fifu.dir_name
-local base_name = fifu.base_name
-local job_name = fifu.job_name
-local locate = fifu.locate
+local fslib        = require("l3b.file-functions")
+local cmd_concat = fslib.cmd_concat
+local run = fslib.run
+local glob_to_pattern = fslib.glob_to_pattern
+local to_host = fslib.to_host
+local quoted_path = fslib.quoted_path
+local abspath = fslib.abspath
+local make_directory = fslib.make_directory
+local directory_exists = fslib.directory_exists
+local file_exists = fslib.file_exists
+local file_list = fslib.file_list
+local all_files = fslib.all_files
+local tree = fslib.tree
+local remove_file = fslib.remove_file
+local remove_tree = fslib.remove_tree
+local make_clean_directory = fslib.make_clean_directory
+local copy_tree = fslib.copy_tree
+local rename = fslib.rename
+local remove_directory = fslib.remove_directory
+local dir_base = fslib.dir_base
+local dir_name = fslib.dir_name
+local base_name = fslib.base_name
+local job_name = fslib.job_name
+local locate = fslib.locate
 
 --]=]
 local pairs            = pairs
@@ -79,10 +79,11 @@ local gsub             = string.gsub
 local insert           = table.insert
 local tbl_concat       = table.concat
 
-local util        = require("l3b.utilib")
-local entries     = util.entries
-local keys        = util.keys
-local extend_with = util.extend_with
+---@type utlib_t
+local utlib        = require("l3b.utillib")
+local entries     = utlib.entries
+local keys        = utlib.keys
+local extend_with = utlib.extend_with
 
 -- Convert a file glob into a pattern for use by e.g. string.gub
 -- Based on https://github.com/davidm/lua-glob-pattern
@@ -499,36 +500,6 @@ local function remove_directory(dir)
   end
 end
 
----Split a path into its base and directory components.
----The base part includes the file extension if any.
----The dir part does not contain the trailing '/'.
----@param path string
----@return string dir is the part before the last '/' if any, "." otherwise.
----@return string
-local function dir_base(path)
-  local dir, base = match(path, "^(.*)/([^/]*)$")
-  if dir then
-    return dir, base
-  else
-    return ".", path
-  end
-end
-
--- Arguably clearer names
-local function base_name(file)
-  return (select(2, dir_base(file)))
-end
-
-local function dir_name(file)
-  return (select(1, dir_base(file))) -- () required
-end
-
--- Strip the extension from a file name (if present)
-local function job_name(file)
-  local name = match(base_name(file), "^(.*)%.")
-  return name or file
-end
-
 ---Look for files, directory by directory, and return the first existing
 ---@param dirs any
 ---@param names any
@@ -562,10 +533,6 @@ local symbol_exportation = {
   cp = copy_tree,
   rmdir = remove_directory,
   ren = rename,
-  splitpath = dir_base,
-  basename = base_name,
-  dirname = dir_name,
-  jobname = job_name,
   locate = locate,
 }
 
@@ -592,9 +559,5 @@ return {
   copy_tree = copy_tree,
   rename = rename,
   remove_directory = remove_directory,
-  dir_base = dir_base,
-  dir_name = dir_name,
-  base_name = base_name,
-  job_name = job_name,
   locate = locate,
 }

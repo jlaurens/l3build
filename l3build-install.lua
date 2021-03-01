@@ -34,24 +34,32 @@ local match = string.match
 
 local insert = table.insert
 
-local util = require("l3b.utilib")
-local entries = util.entries
-local keys = util.keys
+---@type utlib_t
+local utlib = require("l3b.utillib")
+local entries = utlib.entries
+local keys = utlib.keys
 
-local fifu                  = require("l3b.file-functions")
-local file_list             = fifu.file_list
-local directory_exists      = fifu.directory_exists
-local remove_directory      = fifu.remove_directory
-local copy_tree             = fifu.copy_tree
-local file_exists           = fifu.file_exists
-local dir_base              = fifu.dir_base
-local remove_tree           = fifu.remove_tree
-local tree                  = fifu.tree
-local dir_name              = fifu.dir_name
-local glob_to_pattern       = fifu.glob_to_pattern
-local make_clean_directory  = fifu.make_clean_directory
-local make_directory        = fifu.make_directory
-local rename                = fifu.rename
+---@type gblib_t
+local gblib           = require("l3b.globlib")
+local glob_to_pattern = gblib.glob_to_pattern
+
+---@type wklib_t
+local wklib           = require("l3b.walklib")
+local dir_base        = wklib.dir_base
+local dir_name        = wklib.dir_name
+
+---@type fslib_t
+local fslib                  = require("l3b.fslib")
+local file_list             = fslib.file_list
+local directory_exists      = fslib.directory_exists
+local remove_directory      = fslib.remove_directory
+local copy_tree             = fslib.copy_tree
+local file_exists           = fslib.file_exists
+local remove_tree           = fslib.remove_tree
+local tree                  = fslib.tree
+local make_clean_directory  = fslib.make_clean_directory
+local make_directory        = fslib.make_directory
+local rename                = fslib.rename
 
 
 local function gethome()

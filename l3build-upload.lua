@@ -41,8 +41,9 @@ local lower = string.lower
 local match = string.match
 local str_rep = string.rep
 
-local util = require("l3b.utilib")
-local entries = util.entries
+---@type utlib_t
+local utlib = require("l3b.utillib")
+local entries = utlib.entries
 
 -- UPLOAD()
 --
@@ -219,7 +220,7 @@ end
 end
 
 
-function trim_space(s) -- TODO: local or move to util
+function trim_space(s) -- TODO: local or move to utlib
   return (s:gsub("^%s*(.-)%s*$", "%1")) -- () are required
 end
 

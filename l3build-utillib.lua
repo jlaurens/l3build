@@ -1,6 +1,6 @@
 --[[
 
-File l3build-util.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-utillib.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -23,17 +23,16 @@ for those people who are interested.
 --]]
 
 --[=[ Usage
-
-local util = require("l3b.utilib")
-local to_quoted_string = util.to_quoted_string
-local indices = util.indices
-local entries = util.entries
-local items = util.items
-local unique_entries = util.unique_entries
-local unique_items = util.unique_items
-local keys = util.keys
-local values = util.values
-
+---@type utlib_t
+local utlib = require("l3b.utillib")
+local to_quoted_string = utlib.to_quoted_string
+local indices = utlib.indices
+local entries = utlib.entries
+local items = utlib.items
+local unique_entries = utlib.unique_entries
+local unique_items = utlib.unique_items
+local keys = utlib.keys
+local values = utlib.values
 --]=]
 
 -- local safety guards and shortcuts
@@ -135,6 +134,17 @@ local function extend_with(holder, addendum, can_overwrite)
   end
   return holder
 end
+
+---@class utlib_t
+---@field to_quoted_string function
+---@field indices function
+---@field entries function
+---@field items function
+---@field unique_entries function
+---@field unique_items function
+---@field keys function
+---@field values function
+---@field extend_with function
 
 return {
   to_quoted_string = to_quoted_string,

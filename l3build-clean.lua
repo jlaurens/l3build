@@ -22,17 +22,19 @@ for those people who are interested.
 
 --]]
 
-local util          = require("l3b.utilib")
-local entries       = util.entries
-local keys          = util.keys
-local unique_items  = util.unique_items
+---@type utlib_t
+local utlib         = require("l3b.utillib")
+local entries       = utlib.entries
+local keys          = utlib.keys
+local unique_items  = utlib.unique_items
 
-local fifu        = require("l3b.file-functions")
-local make_directory = fifu.make_directory
-local tree = fifu.tree
-local remove_tree = fifu.remove_tree
-local make_clean_directory = fifu.make_clean_directory
-local remove_directory = fifu.remove_directory
+---@type fslib_t
+local fslib                 = require("l3b.fslib")
+local make_directory        = fslib.make_directory
+local tree                  = fslib.tree
+local remove_tree           = fslib.remove_tree
+local make_clean_directory  = fslib.make_clean_directory
+local remove_directory      = fslib.remove_directory
 
 -- Remove all generated files
 function clean()

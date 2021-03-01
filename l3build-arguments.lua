@@ -32,8 +32,9 @@ local sub              = string.sub
 
 local insert           = table.insert
 
-local util    = require("l3b.utilib")
-local entries = util.entries
+---@type utlib_t
+local utlib   = require("l3b.utillib")
+local entries = utlib.entries
 
 -- Parse command line options
 

@@ -27,22 +27,30 @@ local print = print
 local lower = string.lower
 local match = string.match
 
-local util    = require("l3b.utilib")
-local entries = util.entries
-local items   = util.items
-local values  = util.values
-local to_quoted_string = util.to_quoted_string
+---@type utlib_t
+local utlib    = require("l3b.utillib")
+local entries = utlib.entries
+local items   = utlib.items
+local values  = utlib.values
+local to_quoted_string = utlib.to_quoted_string
 
-local fifu        = require("l3b.file-functions")
-local run = fifu.run
-local make_directory = fifu.make_directory
-local file_exists = fifu.file_exists
-local tree = fifu.tree
-local remove_tree = fifu.remove_tree
-local copy_tree = fifu.copy_tree
-local rename = fifu.rename
-local remove_directory = fifu.remove_directory
-local dir_name = fifu.dir_name
+---@type wklib_t
+local wklib    = require("l3b.walklib")
+local dir_name = wklib.dir_name
+
+---@type oslib_t
+local oslib        = require("l3b.oslib")
+local run = oslib.run
+
+---@type fslib_t
+local fslib        = require("l3b.fslib")
+local make_directory = fslib.make_directory
+local file_exists = fslib.file_exists
+local tree = fslib.tree
+local remove_tree = fslib.remove_tree
+local copy_tree = fslib.copy_tree
+local rename = fslib.rename
+local remove_directory = fslib.remove_directory
 
 -- Copy files to the main CTAN release directory
 function copyctan()

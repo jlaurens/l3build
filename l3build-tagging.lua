@@ -27,17 +27,22 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
-local util    = require("l3b.utilib")
-local entries = util.entries
-local values  = util.keys
-local unique_items = util.unique_items
+---@type utlib_t
+local utlib    = require("l3b.utillib")
+local entries = utlib.entries
+local values  = utlib.keys
+local unique_items = utlib.unique_items
 
-local fifu        = require("l3b.file-functions")
-local dir_base    = fifu.dir_base
-local rename      = fifu.rename
-local dir_name    = fifu.dir_name
-local remove_glob = fifu.remove_glob
-local tree        = fifu.tree
+---@type wklib_t
+local wklib       = require("l3b.walklib")
+local dir_base    = wklib.dir_base
+local dir_name    = wklib.dir_name
+
+---@type fslib_t
+local fslib       = require("l3b.fslib")
+local rename      = fslib.rename
+local remove_tree = fslib.remove_tree
+local tree        = fslib.tree
 
 update_tag = update_tag or function(filename, content, tagname, tagdate)
   return content
@@ -67,7 +72,7 @@ local function update_file_tag(file, tagname, tagdate)
     -- Watch for the second return value!
     fh:write((gsub(updated_content, "\n", os_newline)))
     fh:close()
-    remove_glob(path, filename .. ".bak")
+    remove_tree(path, filename .. ".bak")
   end
   return 0
 end
@@ -91,4 +96,3 @@ function tag(tagnames)
   end
   return tag_hook(tagname, tagdate)
 end
-
