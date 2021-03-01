@@ -34,18 +34,20 @@ local execute          = os.execute
 local getenv           = os.getenv
 local os_type          = os.type
 
-local status           = require("status")
-local luatex_revision  = status.luatex_revision
-local luatex_version   = status.luatex_version
+local status          = require("status")
+local luatex_revision = status.luatex_revision
+local luatex_version  = status.luatex_version
 
-local match            = string.match
-local gsub             = string.gsub
+local match           = string.match
+local gsub            = string.gsub
 
-local tbl_concat       = table.concat
+local append          = table.insert
+local concat          = table.concat
 
 ---@type utlib_t
-local utlib        = require("l3b.utillib")
+local utlib       = require("l3b.utillib")
 local extend_with = utlib.extend_with
+local items       = utlib.items
 
 -- Detect the operating system in use
 -- Support items are defined here for cases where a single string can cover
@@ -86,9 +88,15 @@ else
 end
 
 ---Concat the given string with `os_concat`
----@vararg nil ...
+---@vararg string ...
 local function cmd_concat(...)
-  return tbl_concat({ ... }, os_concat)
+  local t = {}
+  for item in items({ ... }) do
+    if #item > 0 then
+      append(t, item)
+    end
+  end
+  return concat(t, os_concat)
 end
 
 ---Run a command in a given directory
