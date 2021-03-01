@@ -37,7 +37,7 @@ local gmatch          = string.gmatch
 local gsub            = string.gsub
 local match           = string.match
 
-local insert          = table.insert
+local append          = table.insert
 local sort            = table.sort
 local tbl_unpack      = table.unpack
 
@@ -49,7 +49,8 @@ local execute         = os.execute
 local remove          = os.remove
 
 ---@type utlib_t
-local utlib            = require("l3b.utillib")
+local utlib           = require("l3b.utillib")
+local extend_with     = utlib.extend_with
 local entries         = utlib.entries
 
 ---@type gblib_t
@@ -83,7 +84,11 @@ local make_clean_directory  = fslib.make_clean_directory
 -- Auxiliary functions which are used by more than one main function
 --
 
-checkinit_hook = checkinit_hook or function() return 0 end
+---Default function that can be overwritten
+---@return integer
+local function checkinit_hook()
+  return 0
+end
 
 -- Set up the check system files: needed for checking one or more tests and
 -- for saving the test files
@@ -115,7 +120,7 @@ local function checkinit()
     copy_tree(i, supportdir, testdir)
   end
   execute(os_ascii .. ">" .. testdir .. "/ascii.tcx")
-  return checkinit_hook()
+  return (_G.checkinit_hook or checkinit_hook)()
 end
 
 ---Apply the `translator` to the content at `path_in`
@@ -617,7 +622,7 @@ end
 ---@param path_out string
 ---@param engine string
 ---@param errlevels table
-function rewrite_log(path_in, path_out, engine, errlevels)
+local function rewrite_log(path_in, path_out, engine, errlevels)
   rewrite(path_in, path_out, normalize_log, engine, errlevels)
 end
 
@@ -626,7 +631,7 @@ end
 ---@param path_out string
 ---@param engine string
 ---@param err_levels table
-function rewrite_pdf(path_in, path_out, engine, err_levels)
+local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
 
@@ -707,6 +712,15 @@ local function show_failed_diff()
   end
 end
 
+-- A hook to allow additional tasks to run for the tests
+---comment
+---@param test_name string
+---@param run_number integer
+---@return string
+local function runtest_tasks(test_name, run_number)
+  return ""
+end
+
 -- Run one of the test files: doesn't check the result so suitable for
 -- both creating and verifying
 ---comment
@@ -777,8 +791,8 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
     localtexmf = os_pathsep .. absolute_path(texmfdir) .. "//"
   end
-  for i = 1, checkruns do
-    errlevels[i] = run(
+  for run_number = 1, checkruns do
+    errlevels[run_number] = run(
       testdir, cmd_concat(
         -- No use of localdir here as the files get copied to testdir:
         -- avoids any paths in the logs
@@ -797,11 +811,11 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
           .. (hide and (" > " .. os_null) or ""),
-        runtest_tasks(job_name(lvt_file), i)
+        (_G.runtest_tasks or runtest_tasks)(job_name(lvt_file), run_number)
       )
     )
     -- Break the loop if the result is stable
-    if breakout and i < checkruns then
+    if breakout and run_number < checkruns then
       if test_type.generated == pdfext then
         if file_exists(testdir .. "/" .. name .. dviext) then
           dvitopdf(name, testdir, engine, hide)
@@ -949,7 +963,7 @@ end
 ---@param name string
 ---@param engine string
 ---@return integer
-function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
+local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   local error_level
   local test_name = name .. "." .. engine
   -- Do additional log formatting if the engine is LuaTeX, there is no
@@ -983,13 +997,8 @@ function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   return error_level
 end
 
--- A hook to allow additional tasks to run for the tests
-runtest_tasks = runtest_tasks or function(name, run)
-  return ""
-end
-
 -- A short auxiliary to print the list of differences for check
-local function checkdiff()
+local function check_diff()
   print("\n  Check failed with difference files")
   for i in all_files(testdir, "*" .. os_diffext) do
     print("  - " .. testdir .. "/" .. i)
@@ -997,7 +1006,10 @@ local function checkdiff()
   print("")
 end
 
-function check(names)
+---Check
+---@param names table<integer, string>
+---@return integer
+local function check(names)
   local errorlevel = 0
   if testfiledir ~= "" and directory_exists(testfiledir) then
     if not options["rerun"] then
@@ -1028,7 +1040,7 @@ function check(names)
               end
             end
             if not exclude then
-              insert(names, job_name(name))
+              append(names, job_name(name))
             end
           end
           for name in all_files(unpackdir, glob .. ext) do
@@ -1043,7 +1055,7 @@ function check(names)
               if file_exists(testfiledir .. "/" .. name) then
                 return 1
               end
-              insert(names, job_name(name))
+              append(names, job_name(name))
             end
           end
         end
@@ -1097,7 +1109,7 @@ function check(names)
       end
     end
     if errorlevel ~= 0 then
-      checkdiff()
+      check_diff()
     else
       print("\n  All checks passed\n")
     end
@@ -1105,7 +1117,10 @@ function check(names)
   return errorlevel
 end
 
-function save(names)
+---Prepare material for a forthcoming check.
+---@param names table<integer, string>
+---@return integer
+local function save(names)
   checkinit()
   local engines = options["engine"] or { stdengine }
   if names == nil then
@@ -1141,3 +1156,33 @@ function save(names)
   end
   return 0
 end
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  rewrite_log     = rewrite_log,
+  rewrite_pdf     = rewrite_pdf,
+  runtest_tasks   = runtest_tasks,
+  compare_tlg     = compare_tlg,
+  check           = check,
+  save            = save,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class check_t
+---@field rewrite_log function
+---@field rewrite_pdf function
+---@field compare_tlg function
+---@field check function
+---@field save function
+
+return {
+  global_symbol_map = global_symbol_map,
+  rewrite_log = rewrite_log,
+  rewrite_pdf = rewrite_pdf,
+  compare_tlg = compare_tlg,
+  check = check,
+  save = save,
+}
