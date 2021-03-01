@@ -363,7 +363,6 @@ end
 
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
-  escapepath = to_host,
   abspath = absolute_path,
   direxists = directory_exists,
   fileexists = file_exists,

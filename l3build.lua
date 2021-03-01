@@ -223,12 +223,16 @@ end
 local utlib   = require("l3b.utillib")
 local entries = utlib.entries
 
-require("l3b.arguments")
-require("l3b.help")
+---@type oslib_t
+local oslib     = require("l3b.oslib")
+local quoted_path = oslib.quoted_path
 
 ---@type fslib_t
-local fslib     = require("l3b.file-functions")
+local fslib     = require("l3b.fslib")
 local all_files = fslib.all_files
+
+require("l3b.arguments")
+require("l3b.help")
 
 require("l3b.typesetting")
 require("l3b.aux")
@@ -267,19 +271,19 @@ end
 require("l3b.variables")
 
 -- Ensure that directories are 'space safe'
-maindir       = escapepath(maindir)
-docfiledir    = escapepath(docfiledir)
-sourcefiledir = escapepath(sourcefiledir)
-supportdir    = escapepath(supportdir)
-testfiledir   = escapepath(testfiledir)
-testsuppdir   = escapepath(testsuppdir)
-builddir      = escapepath(builddir)
-distribdir    = escapepath(distribdir)
-localdir      = escapepath(localdir)
-resultdir     = escapepath(resultdir)
-testdir       = escapepath(testdir)
-typesetdir    = escapepath(typesetdir)
-unpackdir     = escapepath(unpackdir)
+maindir       = quoted_path(maindir)
+docfiledir    = quoted_path(docfiledir)
+sourcefiledir = quoted_path(sourcefiledir)
+supportdir    = quoted_path(supportdir)
+testfiledir   = quoted_path(testfiledir)
+testsuppdir   = quoted_path(testsuppdir)
+builddir      = quoted_path(builddir)
+distribdir    = quoted_path(distribdir)
+localdir      = quoted_path(localdir)
+resultdir     = quoted_path(resultdir)
+testdir       = quoted_path(testdir)
+typesetdir    = quoted_path(typesetdir)
+unpackdir     = quoted_path(unpackdir)
 
 -- Tidy up the epoch setting
 -- Force an epoch if set at the command line
