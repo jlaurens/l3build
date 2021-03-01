@@ -1171,7 +1171,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class check_t
+---@class l3b_check_t
 ---@field rewrite_log function
 ---@field rewrite_pdf function
 ---@field compare_tlg function

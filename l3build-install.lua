@@ -336,7 +336,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class install_t
+---@class l3b_install_t
 ---@field uninstall function
 ---@field install_files function
 ---@field install function

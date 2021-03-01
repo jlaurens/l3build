@@ -34,6 +34,7 @@ local os_time = os.time
 ---@type utlib_t
 local utlib = require("l3b.utillib")
 local entries = utlib.entries
+local extend_with = utlib.extend_with
 
 ---@type wklib_t
 local wklib = require("l3b.walklib")
@@ -60,7 +61,7 @@ local l3build = require("l3build")
 ---@return number
 ---@see l3build.lua
 ---@usage private?
-function normalise_epoch(epoch)
+local function normalise_epoch(epoch)
   assert(epoch, 'normalize_epoch argument must not be nil')
   -- If given as an ISO date, turn into an epoch number
   local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
@@ -87,7 +88,7 @@ end
 ---@return string
 ---@see check, typesetting
 ---@usage private?
-function set_epoch_cmd(epoch, force)
+local function set_epoch_cmd(epoch, force)
   return force and cmd_concat(
     os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
     os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
@@ -115,7 +116,7 @@ end
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public
-function call(modules, target, opts)
+local function call(modules, target, opts)
   -- Turn the option table into a CLI option string
   opts = opts or options
   local cli_opts = ""
@@ -170,7 +171,7 @@ end
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see stdmain, check, unpack, typesetting
 ---@usage Private?
-function dep_install(deps)
+local function dep_install(deps)
   local error_level
   for dep in entries(deps) do
     print("Installing dependency: " .. dep)
@@ -181,3 +182,26 @@ function dep_install(deps)
   end
   return 0
 end
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  call = call,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class l3b_aux_t
+---@field normalise_epoch function
+---@field dep_install function
+---@field call function
+---@field set_epoch_cmd function
+
+return {
+  global_symbol_map = {},
+  normalise_epoch = normalise_epoch,
+  dep_install = dep_install,
+  call = call,
+  set_epoch_cmd = set_epoch_cmd,
+}

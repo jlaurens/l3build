@@ -95,7 +95,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class clean_t
+---@class l3b_clean_t
 ---@field clean function
 ---@field bundle_clean function
 

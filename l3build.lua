@@ -234,7 +234,7 @@ local fslib     = require("l3b.fslib")
 local all_files = fslib.all_files
 local file_exists = fslib.file_exists
 
----@type arguments_t
+---@type l3b_arguments_t
 local arguments = require("l3b.arguments")
 _G.options = arguments.parse(arg)
 l3build.options = _G.options
@@ -242,7 +242,13 @@ l3build.options = _G.options
 require("l3b.help")
 
 require("l3b.typesetting")
-require("l3b.aux")
+
+---@type l3b_aux_t
+local l3b_aux         = require("l3b.aux")
+local help            = l3b_aux.help
+local version         = l3b_aux.version
+local normalise_epoch = l3b_aux.normalise_epoch
+
 require("l3b.clean")
 require("l3b.check")
 require("l3b.ctan")
@@ -252,7 +258,9 @@ require("l3b.manifest")
 require("l3b.manifest-setup")
 require("l3b.tagging")
 require("l3b.upload")
-require("l3b.stdmain")
+
+---@type l3b_main_t
+local l3b_main = require("l3b.stdmain")
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -265,7 +273,7 @@ elseif options["target"] == "version" then
 end
 
 -- Allow main function to be disabled 'higher up'
-main = main or stdmain
+_G.main = _G.main or l3b_main.main
 
 -- Load configuration file if running as a script
 if is_main then

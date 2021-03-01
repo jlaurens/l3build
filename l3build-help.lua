@@ -106,7 +106,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class help_t
+---@class l3b_help_t
 ---@field version function
 ---@field help function
 

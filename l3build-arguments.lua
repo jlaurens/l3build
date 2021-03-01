@@ -327,7 +327,7 @@ local function check_engines()
   end
 end
 
----@class arguments_t
+---@class l3b_arguments_t
 ---@field parse function
 ---@field check_engines function
 

@@ -45,7 +45,7 @@ local fslib      = require("l3b.fslib")
 local all_files = fslib.all_files
 local file_list = fslib.file_list
 
----@type manifest_setup_t
+---@type l3b_manifest_setup_t
 local stp = require("l3b.manifest-setup")
 local extract_filedesc        = stp.extract_filedesc
 local sort_within_match       = stp.sort_within_match
@@ -290,7 +290,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class manifest_t
+---@class l3b_manifest_t
 ---@field manifest function
 
 return {

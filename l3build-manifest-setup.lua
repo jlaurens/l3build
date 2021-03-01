@@ -355,7 +355,7 @@ end
 
 ]]--
 
----@class manifest_setup_t
+---@class l3b_manifest_setup_t
 ---@field setup function
 ---@field sort_within_match function
 ---@field sort_within_group function

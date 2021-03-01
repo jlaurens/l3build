@@ -53,7 +53,7 @@ local copy_tree       = fslib.copy_tree
 local rename          = fslib.rename
 local remove_directory  = fslib.remove_directory
 
----@type install_t
+---@type l3b_install_t
 local l3b_install = require("l3b.install")
 local install_files = l3b_install.install_files
 
@@ -196,7 +196,7 @@ local global_symbol_map = {
 extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
----@class ctan_t
+---@class l3b_ctan_t
 ---@field ctan function
 ---@field bundle_ctan function
 
