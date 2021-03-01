@@ -41,7 +41,7 @@ local lower = string.lower
 local match = string.match
 local str_rep = string.rep
 
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local entries = util.entries
 
 -- UPLOAD()

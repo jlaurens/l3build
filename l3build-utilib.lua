@@ -24,7 +24,7 @@ for those people who are interested.
 
 --[=[ Usage
 
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local to_quoted_string = util.to_quoted_string
 local indices = util.indices
 local entries = util.entries
@@ -123,6 +123,19 @@ local function values(table)
   end
 end
 
+---Merge in place `holder` with `addendum`.
+---@param holder table The receiver
+---@param addendum table What is merged into the receiver
+---@param can_overwrite boolean|nil if falsy overwriting is an error
+---@return table holder
+local function extend_with(holder, addendum, can_overwrite)
+  for key, value in pairs(addendum) do
+    assert(can_overwrite or not holder[key], "Conflicting symbol ".. key)
+    holder[key] = value
+  end
+  return holder
+end
+
 return {
   to_quoted_string = to_quoted_string,
   indices = indices,
@@ -132,4 +145,5 @@ return {
   unique_items = unique_items,
   keys = keys,
   values = values,
+  extend_with = extend_with,
 }

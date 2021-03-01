@@ -33,7 +33,7 @@ local match = string.match
 
 local os_type = os.type
 
-local util    = require("l3b.util")
+local util    = require("l3b.utilib")
 local entries = util.entries
 local items   = util.items
 local values  = util.values

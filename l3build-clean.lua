@@ -22,7 +22,7 @@ for those people who are interested.
 
 --]]
 
-local util          = require("l3b.util")
+local util          = require("l3b.utilib")
 local entries       = util.entries
 local keys          = util.keys
 local unique_items  = util.unique_items

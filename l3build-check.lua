@@ -51,7 +51,7 @@ local exit            = os.exit
 local execute         = os.execute
 local remove          = os.remove
 
-local util            = require("l3b.util")
+local util            = require("l3b.utilib")
 local entries         = util.entries
 
 local fifu        = require("l3b.file-functions")

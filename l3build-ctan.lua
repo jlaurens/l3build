@@ -27,7 +27,7 @@ local print = print
 local lower = string.lower
 local match = string.match
 
-local util    = require("l3b.util")
+local util    = require("l3b.utilib")
 local entries = util.entries
 local items   = util.items
 local values  = util.values

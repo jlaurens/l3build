@@ -33,7 +33,7 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
-local util      = require("l3b.util")
+local util      = require("l3b.utilib")
 local entries   = util.entries
 local items     = util.items
 local keys      = util.keys

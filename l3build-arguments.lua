@@ -32,7 +32,7 @@ local sub              = string.sub
 
 local insert           = table.insert
 
-local util    = require("l3b.util")
+local util    = require("l3b.utilib")
 local entries = util.entries
 
 -- Parse command line options

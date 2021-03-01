@@ -22,18 +22,18 @@ for those people who are interested.
 
 --]]
 
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local entries = util.entries
 local keys = util.keys
 
-local fifu                = require("l3b.file-functions")
-local cmd_concat          = fifu.cmd_concat
-local copy_tree           = fifu.copy_tree
-local make_directory      = fifu.make_directory
-local make_clean_drectory = fifu.make_clean_drectory
-local tree                = fifu.tree
-local absolute_path       = fifu.absolute_path
-local dir_base            = fifu.dir_base
+local fifu                  = require("l3b.file-functions")
+local cmd_concat            = fifu.cmd_concat
+local copy_tree             = fifu.copy_tree
+local make_directory        = fifu.make_directory
+local make_clean_directory  = fifu.make_clean_directory
+local tree                  = fifu.tree
+local absolute_path         = fifu.absolute_path
+local dir_base              = fifu.dir_base
 
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
@@ -62,7 +62,7 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
   if errorlevel ~=0 then
     return errorlevel
   end
-  errorlevel = make_clean_drectory(unpackdir)
+  errorlevel = make_clean_directory(unpackdir)
   if errorlevel ~=0 then
     return errorlevel
   end

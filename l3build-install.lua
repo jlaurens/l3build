@@ -34,7 +34,7 @@ local match = string.match
 
 local insert = table.insert
 
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local entries = util.entries
 local keys = util.keys
 

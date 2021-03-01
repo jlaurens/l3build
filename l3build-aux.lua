@@ -34,7 +34,7 @@ local os_time = os.time
 ---@type l3build_t
 local l3build = require("l3build")
 
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local entries = util.entries
 
 local fifu = require("l3b.file-functions")

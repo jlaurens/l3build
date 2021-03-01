@@ -27,7 +27,7 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
-local util    = require("l3b.util")
+local util    = require("l3b.utilib")
 local entries = util.entries
 local values  = util.keys
 local unique_items = util.unique_items

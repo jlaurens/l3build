@@ -220,7 +220,7 @@ end
 --[=[ end of booting process ]=]
 
 -- Minimal code to do basic checks
-local util = require("l3b.util")
+local util = require("l3b.utilib")
 local entries = util.entries
 
 require("l3b.arguments")

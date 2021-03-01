@@ -55,6 +55,7 @@ local print            = print
 
 local open             = io.open
 
+local lfs              = require("lfs")
 local attributes       = lfs.attributes
 local currentdir       = lfs.currentdir
 local chdir            = lfs.chdir
@@ -78,9 +79,10 @@ local gsub             = string.gsub
 local insert           = table.insert
 local tbl_concat       = table.concat
 
-local util    = require("l3b.util")
-local entries = util.entries
-local keys    = util.keys
+local util        = require("l3b.utilib")
+local entries     = util.entries
+local keys        = util.keys
+local extend_with = util.extend_with
 
 -- Convert a file glob into a pattern for use by e.g. string.gub
 -- Based on https://github.com/davidm/lua-glob-pattern
@@ -240,7 +242,7 @@ end
 ---Due to chdir, path must exist and be accessible.
 ---@param path string
 ---@return string
-local function abspath(path)
+local function absolute_path(path)
   local oldpwd = currentdir()
   local ok, msg = chdir(path)
   if ok then
@@ -497,17 +499,18 @@ local function remove_directory(dir)
   end
 end
 
----Split a path into file and directory components.
+---Split a path into its base and directory components.
+---The base part includes the file extension if any.
 ---The dir part does not contain the trailing '/'.
----@param file any
+---@param path string
 ---@return string dir is the part before the last '/' if any, "." otherwise.
 ---@return string
-local function dir_base(file)
-  local dir, base = match(file, "^(.*)/([^/]*)$")
+local function dir_base(path)
+  local dir, base = match(path, "^(.*)/([^/]*)$")
   if dir then
     return dir, base
   else
-    return ".", file
+    return ".", path
   end
 end
 
@@ -541,30 +544,33 @@ local function locate(dirs, names)
   end
 end
 
---[=[ Export function symbols
+-- this is the map to export function symbols to the global space
+local symbol_exportation = {
+  run = run,
+  glob_to_pattern = glob_to_pattern,
+  escapepath = to_host,
+  quoted_path = quoted_path,
+  abspath = absolute_path,
+  mkdir = make_directory,
+  direxists = directory_exists,
+  fileexists = file_exists,
+  filelist = file_list,
+  -- tree = tree,
+  rmfile = remove_file,
+  rm = remove_tree,
+  cleandir = make_clean_directory,
+  cp = copy_tree,
+  rmdir = remove_directory,
+  ren = rename,
+  splitpath = dir_base,
+  basename = base_name,
+  dirname = dir_name,
+  jobname = job_name,
+  locate = locate,
+}
 
-_G.run = run
-_G.glob_to_pattern = glob_to_pattern
-_G.to_host = to_host
-_G.quoted_path = quoted_path
-_G.abspath = abspath
-_G.mkdir = make_directory
-_G.directory_exists = directory_exists
-_G.fileexists = file_exists
-_G.filelist = file_list
--- _G.tree = tree
-_G.rmfile = remove_file
-_G.rm = remove_tree
-_G.cleandir = make_clean_directory
-_G.cp = copy_tree
-_G.rmdir = remove_directory
-_G.ren = rename
-_G.splitpath = dir_base
-_G.basename = base_name
-_G.dirname = dir_name
-_G.jobname = job_name
-_G.locate = locate
-
+--[=[ Export function symbols ]=]
+extend_with(_G, symbol_exportation)
 -- [=[ ]=]
 
 return {
@@ -573,7 +579,7 @@ return {
   glob_to_pattern = glob_to_pattern,
   to_host = to_host,
   quoted_path = quoted_path,
-  abspath = abspath,
+  absolute_path = absolute_path,
   make_directory = make_directory,
   directory_exists = directory_exists,
   file_exists = file_exists,
@@ -583,7 +589,7 @@ return {
   remove_file = remove_file,
   remove_tree = remove_tree,
   make_clean_directory = make_clean_directory,
-  copy_deep_glob = copy_tree,
+  copy_tree = copy_tree,
   rename = rename,
   remove_directory = remove_directory,
   dir_base = dir_base,
