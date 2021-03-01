@@ -39,21 +39,21 @@ local wklib    = require("l3b.walklib")
 local dir_name = wklib.dir_name
 
 ---@type oslib_t
-local oslib        = require("l3b.oslib")
-local run = oslib.run
+local oslib = require("l3b.oslib")
+local run   = oslib.run
 
 ---@type fslib_t
-local fslib        = require("l3b.fslib")
-local make_directory = fslib.make_directory
-local file_exists = fslib.file_exists
-local tree = fslib.tree
-local remove_tree = fslib.remove_tree
-local copy_tree = fslib.copy_tree
-local rename = fslib.rename
-local remove_directory = fslib.remove_directory
+local fslib           = require("l3b.fslib")
+local make_directory  = fslib.make_directory
+local file_exists     = fslib.file_exists
+local tree            = fslib.tree
+local remove_tree     = fslib.remove_tree
+local copy_tree       = fslib.copy_tree
+local rename          = fslib.rename
+local remove_directory  = fslib.remove_directory
 
 -- Copy files to the main CTAN release directory
-function copyctan()
+local function copy_ctan()
   make_directory(ctandir .. "/" .. ctanpkg)
   local function copyfiles(files, source)
     if source == currentdir or flatten then
@@ -83,13 +83,17 @@ function copyctan()
   end
 end
 
-function bundlectan()
+---comment
+---@return integer
+local function bundle_ctan()
   local errorlevel = install_files(tdsdir, true)
   if errorlevel ~=0 then return errorlevel end
-  copyctan()
+  copy_ctan()
   return 0
 end
 
+---comment
+---@return integer
 function ctan()
   -- Always run tests for all engines
   options["engine"] = nil
@@ -114,36 +118,36 @@ function ctan()
         binfiles .. (exclude and (" -x" .. exclude) or "")
     )
   end
-  local errorlevel
+  local error_level
   local standalone = false
   if bundle == "" then
     standalone = true
   end
   if standalone then
-    errorlevel = call({ "." }, "check")
+    error_level = call({ "." }, "check")
     bundle = module
   else
-    errorlevel = call(modules, "bundlecheck")
+    error_level = call(modules, "bundlecheck")
   end
-  if errorlevel == 0 then
+  if error_level == 0 then
     remove_directory(ctandir)
     make_directory(ctandir .. "/" .. ctanpkg)
     remove_directory(tdsdir)
     make_directory(tdsdir)
     if standalone then
-      errorlevel = install_files(tdsdir, true)
-      if errorlevel ~=0 then return errorlevel end
-      copyctan()
+      error_level = install_files(tdsdir, true)
+      if error_level ~=0 then return error_level end
+      copy_ctan()
     else
-      errorlevel = call(modules, "bundlectan")
+      error_level = call(modules, "bundlectan")
     end
   else
     print("\n====================")
     print("Tests failed, zip stage skipped!")
     print("====================\n")
-    return errorlevel
+    return error_level
   end
-  if errorlevel == 0 then
+  if error_level == 0 then
     for i in entries(textfiles) do
       for j in items(unpackdir, textfiledir) do
         copy_tree(i, j, ctandir .. "/" .. ctanpkg)
@@ -174,6 +178,25 @@ function ctan()
     print("Typesetting failed, zip stage skipped!")
     print("====================\n")
   end
-  return errorlevel
+  return error_level
 end
 
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  ctan       = ctan,
+  bundlectan = bundle_ctan,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class ctan_t
+---@field ctan function
+---@field bundle_ctan function
+
+return {
+  global_symbol_map = global_symbol_map
+  ctan = ctan,
+  bundle_ctan = bundle_ctan,
+}

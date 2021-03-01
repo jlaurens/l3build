@@ -84,7 +84,6 @@ local function bundle_clean()
   )
 end
 
-
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
   clean       = clean,
