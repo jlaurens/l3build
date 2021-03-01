@@ -49,12 +49,34 @@ for those people who are interested.
 
       If you want to omit the files in the development repository, essentially
       producing a minimalist manifest with only the files included for distribution,
-      make a copy of the `manifest_setup` function and delete the groups under
+      make a copy of the `setup` function and delete the groups under
       the ‘Repository manifest’ subheading below.
 --]]
 
+local sort = table.sort
 
-manifest_setup = manifest_setup or function()
+---@class manifest_entry_t
+---@field subheading          string
+---@field name                string
+---@field description         string
+---@field files               table<integer, string>|table<integer, table<integer, string>>
+---@field dir                 string
+---@field skipfiledescription boolean
+---@field exclude             table<integer, string>|table<integer, table<integer, string>>
+---@field rename              table<integer, string>
+---@field flag                boolean
+---@field N                   integer matched files
+---@field ND                  integer descriptions
+---@field matches             table
+---@field excludes            table
+---@field files_ordered       table
+---@field descr               table
+---@field Nchar_file          integer
+---@field Nchar_descr         integer
+
+---comment
+---@return table<integer, manifest_entry_t>
+local function setup()
   local groups = {
     {
        subheading = "Repository manifest",
@@ -120,7 +142,7 @@ The files created by ‘unpacking’ the package sources. This typically include
 `.sty` and `.cls` files created from DocStrip `.dtx` files.
 ]],
        files   = { installfiles },
-       exclude = { excludefiles,sourcefiles },
+       exclude = { excludefiles, sourcefiles },
        dir     = unpackdir,
        skipfiledescription = true,
     },
@@ -148,7 +170,7 @@ These files are used for unpacking, typesetting, or checking purposes.
 Support files for checking the test suite.
 ]],
        files   = { "*.*" },
-       exclude = { { ".",".." },excludefiles },
+       exclude = { { ".", ".." }, excludefiles },
        dir     = testsuppdir,
     },
     {
@@ -159,7 +181,7 @@ unit tests, and `.tlg` are the stored output for ensuring changes to the package
 the same output. These output files are sometimes shared and sometime specific for
 different engines (pdfTeX, XeTeX, LuaTeX, etc.).
 ]],
-       files   = { "*"..lvtext,"*"..lveext,"*"..tlgext },
+       files   = { "*"..lvtext, "*"..lveext, "*"..tlgext },
        dir     = testfiledir,
        skipfiledescription = true,
     },
@@ -175,7 +197,7 @@ the package into a TeX distribution.
        description = "All files included in the `"..module.."/source` directory.\n",
        dir     = tdsdir.."/source/"..moduledir,
        files   = { "*.*" },
-       exclude = { ".",".." },
+       exclude = { ".", ".." },
        flag    = false,
        skipfiledescription = true,
     },
@@ -207,7 +229,7 @@ The following group lists the files included in the CTAN package.
        name    = "CTAN files",
        dir     = ctandir.."/"..module,
        files   = { "*.*" },
-       exclude = { ".",".." },
+       exclude = { ".", ".." },
        flag    = false,
        skipfiledescription = true,
     },
@@ -215,17 +237,18 @@ The following group lists the files included in the CTAN package.
   return groups
 end
 
---[[
-      Sorting within groups
-      ---------------------
---]]
-
-manifest_sort_within_match = manifest_sort_within_match or function(files)
-  table.sort(files)
+---Sort
+---@param files table<integer, string>
+---@return table<integer, string>
+local function sort_within_match(files)
+  sort(files)
   return files
 end
 
-manifest_sort_within_group = manifest_sort_within_group or function(files)
+---Sort
+---@param files table<integer, string>
+---@return table<integer, string>
+local function sort_within_group(files)
   --[[
       -- no-op by default; make your own definition to customise. E.g.:
       table.sort(files)
@@ -233,90 +256,59 @@ manifest_sort_within_group = manifest_sort_within_group or function(files)
   return files
 end
 
---[[
-      Writing to file
-      ---------------
---]]
-
-manifest_write_opening = manifest_write_opening or function(filehandle)
-
-  filehandle:write("# Manifest for " .. module .. "\n\n")
-  filehandle:write([[
+local function write_opening(fh)
+  fh:write("# Manifest for " .. module .. "\n\n")
+  fh:write([[
 This file is a listing of all files considered to be part of this package.
 It is automatically generated with `texlua build.lua manifest`.
 ]])
-
 end
 
-manifest_write_subheading = manifest_write_subheading or function(filehandle,heading,description)
-
-  filehandle:write("\n\n## " .. heading .. "\n\n")
-
+---Write subheading
+---@param fh table file handle
+---@param heading string
+---@param description string
+local function write_heading(fh, heading, description)
+  fh:write("\n\n## " .. heading .. "\n\n")
   if description then
-    filehandle:write(description)
+    fh:write(description)
   end
-
 end
 
-manifest_write_group_heading = manifest_write_group_heading or function (filehandle,heading,description)
+---@class manifest_param_t
+---@field dir          string    the directory of the file
+---@field count        integer   the count of the filename to be written
+---@field filemaxchar  integer   the maximum number of chars of all filenames in this group
+---@field descmaxchar  integer   the maximum number of chars of all descriptions in this group
+---@field flag         boolean|string  false OR string for indicating CTAN/TDS location
+---@field ctanfile     boolean   if file is in CTAN dir
+---@field tdsfile      boolean   if file is in TDS dir
 
-  filehandle:write("\n### " .. heading .. "\n\n")
-
-  if description then
-    filehandle:write(description .. "\n")
-  end
-
-end
-
-manifest_write_group_file = manifest_write_group_file or function(filehandle,filename,param)
-  --[[
-        filehandle        : write file object
-        filename          : the count of the filename to be written
-
-        param.dir         : the directory of the file
-        param.count       : the name of the file to write
-        param.filemaxchar : the maximum number of chars of all filenames in this group
-        param.flag        : false OR string for indicating CTAN/TDS location
-        param.ctanfile    : (boolean) if file is in CTAN dir
-        param.tdsfile     : (boolean) if file is in TDS dir
-  --]]
-
+---comment
+---@param fh       table write file handle
+---@param filename string the name of the file to write
+---@param param    manifest_param_t
+local function write_group_file(fh, filename, param)
   -- no file description: plain bullet list item:
-
   local flagstr = param.flag or  ""
-  filehandle:write("* " .. filename .. " " .. flagstr .. "\n")
-
+  fh:write("* " .. filename .. " " .. flagstr .. "\n")
   --[[
     -- or if you prefer an enumerated list:
-    filehandle:write(param.count..". " .. filename .. "\n")
+    fh:write(param.count..". " .. filename .. "\n")
   --]]
-
-
 end
 
-manifest_write_group_file_descr = manifest_write_group_file_descr or function(filehandle,filename,descr,param)
-  --[[
-        filehandle        : write file object
-        filename          : the name of the file to write
-        descr             : description of the file to write
-
-        param.dir         : the directory of the file
-        param.count       : the count of the filename to be written
-        param.filemaxchar : the maximum number of chars of all filenames in this group
-        param.descmaxchar : the maximum number of chars of all descriptions in this group
-        param.flag        : false OR string for indicating CTAN/TDS location
-        param.ctanfile    : (boolean) if file is in CTAN dir
-        param.tdsfile     : (boolean) if file is in TDS dir
-  --]]
-
+---comment
+---@param fh table write file handle
+---@param filename   string the name of the file to write
+---@param descr string description of the file to write
+---@param param manifest_param_t
+local function write_group_file_descr(fh, filename, descr, param)
   -- filename+description: Github-flavoured Markdown table
-
-  local filestr = string.format(" | %-"..param.filemaxchar.."s",filename)
-  local flagstr = param.flag and string.format(" | %s",param.flag) or  ""
-  local descstr = string.format(" | %-"..param.descmaxchar.."s",descr)
-
-  filehandle:write(filestr..flagstr..descstr.." |\n")
-
+  local filestr = string.format(" | %-"..param.filemaxchar.."s", filename)
+  local flagstr = param.flag and string.format(" | %s", param.flag) or  ""
+  local descstr = string.format(" | %-"..param.descmaxchar.."s", descr)
+  fh:write(filestr..flagstr..descstr.." |\n")
 end
 
 --[[
@@ -324,7 +316,9 @@ end
       -------------------------------------------
 --]]
 
-manifest_extract_filedesc = manifest_extract_filedesc or function(filehandle)
+---Extract file description
+---@param fh table file handle
+local function extract_filedesc(fh)
 
   -- no-op by default; two examples below
 
@@ -360,3 +354,25 @@ manifest_extract_filedesc = function(filehandle)
 end
 
 ]]--
+
+---@class manifest_setup_t
+---@field setup function
+---@field sort_within_match function
+---@field sort_within_group function
+---@field write_opening function
+---@field write_heading function
+---@field write_group_file function
+---@field write_group_file_descr function
+---@field extract_filedesc function
+
+return {
+  global_symbol_map  = {},
+  setup              = setup,
+  sort_within_match  = sort_within_match,
+  sort_within_group  = sort_within_group,
+  write_opening      = write_opening,
+  write_heading      = write_heading,
+  write_group_file   = write_group_file,
+  write_group_file_descr = write_group_file_descr,
+  extract_filedesc   = extract_filedesc,
+}
