@@ -37,7 +37,7 @@ local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
 -- Remove all generated files
-function clean()
+local function clean()
   -- To make sure that distribdir never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
   -- all of the files
@@ -72,7 +72,7 @@ function clean()
   return 0
 end
 
-function bundleclean()
+local function bundle_clean()
   local errorlevel = call(modules, "clean")
   for i in entries(cleanfiles) do
     errorlevel = remove_tree(currentdir, i) + errorlevel
@@ -84,3 +84,23 @@ function bundleclean()
   )
 end
 
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  clean       = clean,
+  bundleclean = bundle_clean,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class clean_t
+---@field clean function
+---@field bundle_clean function
+
+return {
+  global_symbol_map = global_symbol_map
+  clean = clean,
+  bundle_clean = bundle_clean,
+}
