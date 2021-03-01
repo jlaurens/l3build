@@ -61,6 +61,8 @@ assert(not _G.l3build, "No self call")
 ---@field work_dir string where the "build.lua" lives
 ---@field launch_dir string where "l3build.lua" and friends live
 ---@field start_dir string the current directory at load time
+---@field options table
+
 local l3build = { -- global data available as package.
   debug = {} -- storage for special debug flags (private UI)
 }
@@ -232,7 +234,11 @@ local fslib     = require("l3b.fslib")
 local all_files = fslib.all_files
 local file_exists = fslib.file_exists
 
-require("l3b.arguments")
+---@type arguments_t
+local arguments = require("l3b.arguments")
+_G.options = arguments.parse(arg)
+l3build.options = _G.options
+
 require("l3b.help")
 
 require("l3b.typesetting")
@@ -297,7 +303,7 @@ end
 epoch = normalise_epoch(epoch)
 
 -- Sanity check
-check_engines()
+arguments.check_engines()
 
 --
 -- Deal with multiple configs for tests
@@ -306,7 +312,7 @@ check_engines()
 -- When we have specific files to deal with, only use explicit configs
 -- (or just the std one)
 if options["names"] then
-  checkconfigs = options["config"] or {stdconfig }
+  checkconfigs = options["config"] or { stdconfig }
 else
   checkconfigs = options["config"] or checkconfigs
 end

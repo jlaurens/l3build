@@ -32,6 +32,9 @@ local sub              = string.sub
 
 local insert           = table.insert
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type utlib_t
 local utlib   = require("l3b.utillib")
 local entries = utlib.entries
@@ -162,7 +165,7 @@ option_list =
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
-local function argparse()
+local function parse()
   local result = {}
   local names  = {}
   local long_options =  {}
@@ -301,10 +304,9 @@ local function argparse()
   return result
 end
 
-options = argparse()
-
 -- Sanity check
-function check_engines()
+local function check_engines()
+  local options = l3build.options
   if options["engine"] and not options["force"] then
      -- Make a lookup table
      local t = {}
@@ -324,3 +326,12 @@ function check_engines()
     end
   end
 end
+
+---@class arguments_t
+---@field parse function
+---@field check_engines function
+
+return {
+  parse = parse,
+  check_engines = check_engines,
+}
