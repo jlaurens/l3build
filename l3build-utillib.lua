@@ -79,7 +79,7 @@ end
 ---@vararg any
 ---@return fun()
 local function items(...)
-  return _G.entries({ ... })
+  return entries({ ... })
 end
 
 ---Iterator for the entries of a sequencial table.
@@ -105,7 +105,7 @@ end
 ---Iterator for the items given in arguments
 ---Every item is ignored when already listed.
 local function unique_items(...)
-  return _G.unique_entries({ ... })
+  return unique_entries({ ... })
 end
 
 ---@type fun(table: table): fun(): any

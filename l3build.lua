@@ -230,6 +230,7 @@ local quoted_path = oslib.quoted_path
 ---@type fslib_t
 local fslib     = require("l3b.fslib")
 local all_files = fslib.all_files
+local file_exists = fslib.file_exists
 
 require("l3b.arguments")
 require("l3b.help")
