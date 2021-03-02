@@ -34,17 +34,15 @@ local popen = io.popen
 local read  = io.read
 local write = io.write
 
-local os_type = os.type
-
 local len   = string.len
 local lower = string.lower
 local match = string.match
 local str_rep = string.rep
 
 ---@type utlib_t
-local utlib     = require("l3b.utillib")
-local entries   = utlib.entries
-local first_of  = utlib.first_of
+local utlib       = require("l3b.utillib")
+local entries     = utlib.entries
+local trim_space  = utlib.trim
 
 -- UPLOAD()
 --
@@ -105,7 +103,7 @@ function upload(tagnames)
   -- Get data from command line if appropriate
   if options["file"] then
     local fh = open(options["file"], "r")
-    uploadconfig.announcement = assert(fh:read('*a'))
+    uploadconfig.announcement = assert(fh:read("a"))
     close(fh)
   end
   uploadconfig.announcement = options["message"] or uploadconfig.announcement or file_contents(uploadconfig.announcement_file)
@@ -220,16 +218,10 @@ end
   return exit_status
 end
 
-
-function trim_space(s) -- TODO: local or move to utlib
-  return first_of(s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
-
 function shell(s)
-  local h = assert(popen(s, 'r'))
-  local t = assert(h:read('*a'))
-  h:close()
+  local fh = assert(popen(s, "r"))
+  local t = assert(fh:read("a"))
+  fh:close()
   return t
 end
 

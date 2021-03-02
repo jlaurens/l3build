@@ -139,6 +139,13 @@ local function second_of(_, second)
   return second
 end
 
+---Return a copy of s witthout heading nor trailing spaces.
+---@param s string
+---@return string
+local function trim(s) -- TODO: local or move to utlib
+  return s:match("^%s*(.-)%s*$")
+end
+
 ---Merge in place `holder` with `addendum`.
 ---@param holder table The receiver
 ---@param addendum table What is merged into the receiver
@@ -176,5 +183,6 @@ return {
   values = values,
   first_of = first_of,
   second_of = second_of,
+  trim = trim,
   extend_with = extend_with,
 }
