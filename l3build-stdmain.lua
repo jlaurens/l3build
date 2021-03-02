@@ -216,7 +216,7 @@ extend_with(_G, global_symbol_map)
 ---@field target_list table<string, table>
 
 return {
-  global_symbol_map = {},
+  global_symbol_map = global_symbol_map,
   main              = main,
   target_list       = target_list,
 }

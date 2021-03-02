@@ -27,16 +27,20 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type utlib_t
-local utlib    = require("l3b.utillib")
-local entries = utlib.entries
-local values  = utlib.keys
-local unique_items = utlib.unique_items
+local utlib         = require("l3b.utillib")
+local entries       = utlib.entries
+local values        = utlib.keys
+local unique_items  = utlib.unique_items
+local extend_with   = utlib.extend_with
 
 ---@type wklib_t
 local wklib       = require("l3b.walklib")
-local dir_base    = wklib.dir_base
 local dir_name    = wklib.dir_name
+local base_name   = wklib.base_name
 
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
@@ -44,55 +48,73 @@ local rename      = fslib.rename
 local remove_tree = fslib.remove_tree
 local tree        = fslib.tree
 
-update_tag = update_tag or function(filename, content, tagname, tagdate)
-  return content
-end
+---@alias tag_hook_t fun(tag_name: string, tag_date: string): integer
 
-function tag_hook(tagname, tagdate)
-  return 0
-end
-
-local function update_file_tag(file, tagname, tagdate)
-  local filename = dir_base(file)
-  print("Tagging  ".. filename)
-  local fh = assert(open(file, "rb"))
+local function update_file_tag(file_path, tag_name, tag_date)
+  local file_name = base_name(file_path)
+  print("Tagging  ".. file_name)
+  local fh = assert(open(file_path, "rb"))
   local content = fh:read("a")
   fh:close()
   -- Deal with Unix/Windows line endings
   content = gsub(content .. (match(content, "\n$") and "" or "\n"),
     "\r\n", "\n")
-  local updated_content = update_tag(filename, content, tagname, tagdate)
+  local updated_content = _G.update_tag
+    and _G.update_tag(file_name, content, tag_name, tag_date)
+    or content
   if content == updated_content then
     return 0
-  else
-    local path = dir_name(file)
-    rename(path, filename, filename .. ".bak")
-    fh = assert(open(file, "w"))
-    -- Convert line ends back if required during write
-    -- Watch for the second return value!
-    fh:write((gsub(updated_content, "\n", os_newline)))
-    fh:close()
-    remove_tree(path, filename .. ".bak")
   end
+  local dir_path = dir_name(file_path)
+  rename(dir_path, file_name, file_name .. ".bak")
+  fh = assert(open(file_path, "w"))
+  -- Convert line ends back if required during write
+  -- Watch for the second return value!
+  fh:write((gsub(updated_content, "\n", os_newline)))
+  fh:close()
+  remove_tree(dir_path, file_name .. ".bak")
   return 0
 end
 
-function tag(tagnames)
-  local tagdate = options["date"] or os_date("%Y-%m-%d")
-  local tagname = nil
-  if tagnames then
-    tagname = tagnames[1]
+---Target tag
+---@param tag_names table
+---@return integer
+local function tag(tag_names)
+  local options = l3build.options
+  local tag_date = options["date"] or os_date("%Y-%m-%d")
+  local tag_name = nil
+  if tag_names then
+    tag_name = tag_names[1]
   end
-  local errorlevel = 0
+  local error_level = 0
   for dir in unique_items(currentdir, sourcefiledir, docfiledir) do
     for filetype in entries(tagfiles) do
       for file in values(tree(dir, filetype)) do
-        errorlevel = update_file_tag(file, tagname, tagdate)
-        if errorlevel ~= 0 then
-          return errorlevel
+        error_level = update_file_tag(file, tag_name, tag_date)
+        if error_level ~= 0 then
+          return error_level
         end
       end
     end
   end
-  return tag_hook(tagname, tagdate)
+  ---@type tag_hook_t
+  local tag_hook = _G.tag_hook
+  return tag_hook and tag_hook(tag_name, tag_date) or 0
 end
+
+-- this is the map to export function symbols to the global space
+local global_symbol_map = {
+  tag = tag,
+}
+
+--[=[ Export function symbols ]=]
+extend_with(_G, global_symbol_map)
+-- [=[ ]=]
+
+---@class l3b_tagging_t
+---@field tag function
+
+return {
+  global_symbol_map = global_symbol_map,
+  tag = tag,
+}

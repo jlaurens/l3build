@@ -267,9 +267,9 @@ end
 ---@param dir_path string
 ---@param source string the base name of the source
 ---@param dest string the base name of the destination
----@return boolean|nil
----@return nil|string
----@return nil|integer
+---@return boolean?  suc
+---@return exitcode? exitcode
+---@return integer?  code
 local function rename(dir_path, source, dest)
   dir_path = dir_path .. "/"
   if os_type == "windows" then
@@ -348,9 +348,9 @@ end
 
 ---Remove a directory tree.
 ---@param dir string Must be properly escaped.
----@return boolean|nil
----@return nil|string
----@return nil|integer
+---@return boolean?  suc
+---@return exitcode? exitcode
+---@return integer?  code
 local function remove_directory(dir)
   -- First, make sure it exists to avoid any errors
   if os_type == "windows" then

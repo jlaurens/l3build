@@ -199,7 +199,7 @@ extend_with(_G, global_symbol_map)
 ---@field set_epoch_cmd function
 
 return {
-  global_symbol_map = {},
+  global_symbol_map = global_symbol_map,
   normalise_epoch = normalise_epoch,
   dep_install = dep_install,
   call = call,

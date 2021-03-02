@@ -102,7 +102,9 @@ end
 ---Run a command in a given directory
 ---@param dir string
 ---@param cmd string
----@return string
+---@return boolean?  suc
+---@return exitcode? exitcode
+---@return integer?  code
 local function run(dir, cmd)
   return execute(cmd_concat("cd " .. dir, cmd))
 end
@@ -135,9 +137,9 @@ extend_with(_G, global_symbol_map)
 
 ---@class oslib_t
 ---@field global_symbol_map table
----@field cmd_concat function
----@field run function
----@field quoted_path function
+---@field cmd_concat fun(...): string
+---@field run fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
+---@field quoted_path fun(path: string): string
 
 return {
   global_symbol_map = global_symbol_map,
