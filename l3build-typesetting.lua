@@ -280,7 +280,7 @@ end
 
 ---Typeset all required documents
 ---Uses a set of dedicated auxiliaries that need to be available to others
----@param files table<integer, string>
+---@param files string_list_t
 ---@return integer
 local function doc(files)
   local error_level = docinit()
@@ -344,7 +344,7 @@ extend_with(_G, global_symbol_map)
 ---@field makeindex fun(name: string, dir: string, inext: string, outext: string, logext: string, style: string):integer
 ---@field tex fun(file: string, dir: string, cmd: string): integer
 ---@field typeset fun(file: string, dir: string, cmd: string): integer
----@field doc fun(files: table<integer, string>): integer
+---@field doc fun(files: string_list_t): integer
 
 return {
   global_symbol_map = {},

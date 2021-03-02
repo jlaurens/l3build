@@ -53,6 +53,11 @@ assert(not _G.l3build, "No self call")
 
 ---@alias flag_table_t table<string, boolean>
 
+---@class l3build_debug_t
+---@field require boolean
+---@field call boolean
+---@field no_curl_posting boolean
+
 ---@class l3build_t
 ---@field debug flag_table_t the special --debug-foo CLI arguments
 ---@field PACKAGE string "l3build", `package.loaded` key

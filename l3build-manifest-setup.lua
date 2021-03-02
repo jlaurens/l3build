@@ -59,11 +59,11 @@ local sort = table.sort
 ---@field subheading          string
 ---@field name                string
 ---@field description         string
----@field files               table<integer, string>|table<integer, table<integer, string>>
+---@field files               string_list_t|table<integer, string_list_t>
 ---@field dir                 string
 ---@field skipfiledescription boolean
----@field exclude             table<integer, string>|table<integer, table<integer, string>>
----@field rename              table<integer, string>
+---@field exclude             string_list_t|table<integer, string_list_t>
+---@field rename              string_list_t
 ---@field flag                boolean
 ---@field N                   integer matched files
 ---@field ND                  integer descriptions
@@ -238,16 +238,16 @@ The following group lists the files included in the CTAN package.
 end
 
 ---Sort
----@param files table<integer, string>
----@return table<integer, string>
+---@param files string_list_t
+---@return string_list_t
 local function sort_within_match(files)
   sort(files)
   return files
 end
 
 ---Sort
----@param files table<integer, string>
----@return table<integer, string>
+---@param files string_list_t
+---@return string_list_t
 local function sort_within_group(files)
   --[[
       -- no-op by default; make your own definition to customise. E.g.:

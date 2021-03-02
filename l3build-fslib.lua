@@ -174,7 +174,7 @@ end
 ---Returns an empty list if there is no directory at the given path.
 ---@param dir_path string
 ---@param glob string|nil
----@return table<integer, string>
+---@return string_list_t
 local function file_list(dir_path, glob)
   local files = {}
   local pattern

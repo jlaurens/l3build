@@ -261,11 +261,11 @@ local function parse()
         end
       else
         -- Private special debugging options "--debug-<key>"
-        local key = match(a, "^%-%-debug%-(%w[%w%d_]*)")
+        local key = match(a, "^%-%-debug%-(%w[%w%d_-]*)")
         if key then
           ---@type l3build_t
           local l3build = require("l3build")
-          l3build.debug[key] = true
+          l3build.debug[key:gsub("-", "_")] = true
           i = i + 1
           if i <= #arg then
             goto top

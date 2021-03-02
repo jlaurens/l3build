@@ -1008,7 +1008,7 @@ local function check_diff()
 end
 
 ---Check
----@param names table<integer, string>
+---@param names string_list_t
 ---@return integer
 local function check(names)
   local errorlevel = 0
@@ -1119,7 +1119,7 @@ local function check(names)
 end
 
 ---Prepare material for a forthcoming check.
----@param names table<integer, string>
+---@param names string_list_t
 ---@return integer
 local function save(names)
   checkinit()

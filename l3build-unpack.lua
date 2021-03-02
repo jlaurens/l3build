@@ -47,12 +47,12 @@ local make_clean_directory  = fslib.make_clean_directory
 local tree                  = fslib.tree
 local absolute_path         = fslib.absolute_path
 
----@alias bundleunpack_t fun(source_dirs: table<integer, string>, sources: table<integer, string>): integer
+---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
----@param source_dirs table<integer, string>
----@param sources table<integer, string>
+---@param source_dirs string_list_t
+---@param sources string_list_t
 ---@return integer
 local function bundleunpack(source_dirs, sources)
   local error_level = make_directory(localdir)
@@ -103,15 +103,15 @@ end
 
 ---Unpack the package files using an 'isolated' system: this requires
 ---a copy of the 'basic' DocStrip program, which is used then removed
----@param sources table<integer, string>
----@param source_dirs  table<integer, string>
+---@param sources     string_list_t
+---@param source_dirs string_list_t
 ---@return integer
 local function unpack(sources, source_dirs)
   local error_level = dep_install(unpackdeps)
   if error_level ~= 0 then
     return error_level
   end
-  ---@type bundleunpack_t
+  ---@type bundleunpack_f
   local unpacker = _G.bundleunpack or bundleunpack
   error_level = unpacker(source_dirs, sources)
   if error_level ~= 0 then
@@ -127,11 +127,11 @@ local function unpack(sources, source_dirs)
 end
 
 ---@class l3b_unpack_t
----@field bundleunpack bundleunpack_t
----@field unpack bundleunpack_t
+---@field bundleunpack  bundleunpack_f
+---@field unpack        bundleunpack_f
 
 return {
   global_symbol_map = {},
-  unpack = unpack,
-  bundleunpack = bundleunpack,
+  unpack            = unpack,
+  bundleunpack      = bundleunpack,
 }
