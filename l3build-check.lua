@@ -52,6 +52,7 @@ local remove          = os.remove
 local utlib           = require("l3b.utillib")
 local extend_with     = utlib.extend_with
 local entries         = utlib.entries
+local first_of        = utlib.first_of
 
 ---@type gblib_t
 local gblib             = require("l3b.globlib")
@@ -401,7 +402,7 @@ local function normalize_lua_log(content, is_luatex)
     line = gsub(line, ", direction TLT", "")
     -- Find glue setting and round out the last place
     local function round_digits(l, m)
-      return (gsub(
+      return first_of(gsub(
         l,
         m .. " (%-?)%d+%.%d+",
         m .. " %1"
@@ -453,7 +454,7 @@ local function normalize_lua_log(content, is_luatex)
     line = gsub(line, "\\pdfliteral origin", "\\pdfliteral")
     -- A function to handle the box prefix part
     local function boxprefix(s)
-      return (gsub(match(s, "^(%.+)"), "%.", "%%."))
+      return first_of(gsub(match(s, "^(%.+)"), "%.", "%%."))
     end
     -- 'Recover' some discretionary data
     if  match(last_line, "^%.+\\discretionary %(penalty 50%)$")

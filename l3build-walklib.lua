@@ -35,6 +35,8 @@ local match            = string.match
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
+local first_of    = utlib.first_of
+local second_of   = utlib.second_of
 local extend_with = utlib.extend_with
 
 
@@ -55,11 +57,11 @@ end
 
 -- Arguably clearer names
 local function base_name(file)
-  return (select(2, dir_base(file)))
+  return second_of(dir_base(file))
 end
 
 local function dir_name(file)
-  return (select(1, dir_base(file))) -- () required
+  return first_of(dir_base(file))
 end
 
 -- Strip the extension from a file name (if present)

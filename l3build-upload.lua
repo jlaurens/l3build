@@ -42,8 +42,9 @@ local match = string.match
 local str_rep = string.rep
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
-local entries = utlib.entries
+local utlib     = require("l3b.utillib")
+local entries   = utlib.entries
+local first_of  = utlib.first_of
 
 -- UPLOAD()
 --
@@ -221,7 +222,7 @@ end
 
 
 function trim_space(s) -- TODO: local or move to utlib
-  return (s:gsub("^%s*(.-)%s*$", "%1")) -- () are required
+  return first_of(s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
 
@@ -363,3 +364,18 @@ function file_contents (filename)
     return nil
   end
 end
+
+
+---@class l3b_upload_t
+---@field cmd_concat fun(...): string
+---@field run fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
+---@field quoted_path fun(path: string): string
+
+return {
+  global_symbol_map = {},
+  cmd_concat = cmd_concat,
+  run = run,
+  quoted_path = quoted_path,
+}
+
+

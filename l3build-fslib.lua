@@ -60,9 +60,10 @@ local gsub             = string.gsub
 local append           = table.insert
 
 ---@type utlib_t
-local utlib        = require("l3b.utillib")
+local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
+local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type gblib_t
@@ -75,7 +76,7 @@ local quoted_path = oslib.quoted_path
 
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
-  return (gsub(cmd, "/", "\\"))
+  return first_of(gsub(cmd, "/", "\\"))
 end
 
 ---Convert to host directory separator
@@ -212,7 +213,7 @@ end
 ---@return table<string, string>
 local function tree(dir_path, glob)
   local function cropdots(path)
-    return (gsub(gsub(path, "^%./", ""), "/%./", "/"))
+    return first_of(gsub(gsub(path, "^%./", ""), "/%./", "/"))
   end
   dir_path = cropdots(dir_path)
   glob = cropdots(glob)
@@ -383,7 +384,6 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class fslib_t
----@field global_symbol_map table
 ---@field to_host function
 ---@field absolute_path function
 ---@field make_directory function

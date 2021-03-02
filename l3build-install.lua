@@ -38,6 +38,7 @@ local insert = table.insert
 local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
+local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type gblib_t
@@ -252,7 +253,7 @@ local function install_files(target, full, dry_run)
     -- Find PDF files
     pdffiles = {}
     for glob in entries(typesetfiles) do
-      insert(pdffiles, (gsub(glob, "%.%w+$", ".pdf")))
+      insert(pdffiles, first_of(gsub(glob, "%.%w+$", ".pdf")))
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases

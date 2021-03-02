@@ -46,8 +46,9 @@ local concat          = table.concat
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
-local extend_with = utlib.extend_with
 local items       = utlib.items
+local first_of    = utlib.first_of
+local extend_with = utlib.extend_with
 
 -- Detect the operating system in use
 -- Support items are defined here for cases where a single string can cover
@@ -121,7 +122,7 @@ local function quoted_path(path)
   else
     path = gsub(path, "\\ ", "\0")
     path = gsub(path, " ", "\\ ")
-    return (gsub(path, "\0", "\\ "))
+    return first_of(gsub(path, "\0", "\\ "))
   end
 end
 

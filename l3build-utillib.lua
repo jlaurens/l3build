@@ -122,6 +122,23 @@ local function values(table)
   end
 end
 
+---Return the first argument
+---@param first any
+---@return any
+---@usage first_of(gsub(...))
+local function first_of(first)
+  return first
+end
+
+---Return the second argument
+---@param _ any
+---@param second any
+---@return any
+---@usage first_of(gsub(...))
+local function second_of(_, second)
+  return second
+end
+
 ---Merge in place `holder` with `addendum`.
 ---@param holder table The receiver
 ---@param addendum table What is merged into the receiver
@@ -144,6 +161,8 @@ end
 ---@field unique_items function
 ---@field keys function
 ---@field values function
+---@field first_of function
+---@field second_of function
 ---@field extend_with function
 
 return {
@@ -155,5 +174,7 @@ return {
   unique_items = unique_items,
   keys = keys,
   values = values,
+  first_of = first_of,
+  second_of = second_of,
   extend_with = extend_with,
 }

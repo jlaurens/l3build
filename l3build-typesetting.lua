@@ -33,16 +33,12 @@ local match = string.match
 
 local os_type = os["type"]
 
---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
-local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local dep_install = l3b_aux.dep_install
-
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local items       = utlib.items
 local values      = utlib.values
+local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type wklib_t
@@ -64,6 +60,11 @@ local remove_tree       = fslib.remove_tree
 local copy_tree         = fslib.copy_tree
 local make_clean_directory = fslib.make_clean_directory
 local tree              = fslib.tree
+
+--@type l3b_aux_t
+local l3b_aux = require("l3b.aux")
+local set_epoch_cmd = l3b_aux.set_epoch_cmd
+local dep_install = l3b_aux.dep_install
 
 ---dvitopdf
 ---@param name string
@@ -106,7 +107,7 @@ local function runcmd(cmd, dir, vars)
     .. dir .. (typesetsearch and os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and match(envpaths, " ") then
-    envpaths = (gsub(envpaths, '"', '')) -- no '"' in windows!!!
+    envpaths = first_of(gsub(envpaths, '"', '')) -- no '"' in windows!!!
   end
   for var in entries(vars) do
     env = cmd_concat(env, os_setenv .. " " .. var .. "=" .. envpaths)

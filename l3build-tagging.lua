@@ -35,6 +35,7 @@ local utlib         = require("l3b.utillib")
 local entries       = utlib.entries
 local values        = utlib.keys
 local unique_items  = utlib.unique_items
+local first_of    = utlib.first_of
 local extend_with   = utlib.extend_with
 
 ---@type wklib_t
@@ -70,7 +71,7 @@ local function update_file_tag(file_path, tag_name, tag_date)
   fh = assert(open(file_path, "w"))
   -- Convert line ends back if required during write
   -- Watch for the second return value!
-  fh:write((gsub(updated_content, "\n", os_newline)))
+  fh:write(first_of(gsub(updated_content, "\n", os_newline)))
   fh:close()
   remove_tree(dir_path, file_name .. ".bak")
   return 0
