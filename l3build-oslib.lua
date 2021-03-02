@@ -136,7 +136,6 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class oslib_t
----@field global_symbol_map table
 ---@field cmd_concat fun(...): string
 ---@field run fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
 ---@field quoted_path fun(path: string): string

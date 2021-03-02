@@ -81,11 +81,11 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class wklib_t
----@field global_symbol_map table
 ---@field dir_base function
 ---@field dir_name function
 ---@field base_name function
 ---@field job_name function
+
 return {
   global_symbol_map = global_symbol_map,
   dir_base = dir_base,

@@ -117,7 +117,6 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class gblib_t
----@field global_symbol_map table
 ---@field glob_to_pattern   function
 
 return {
