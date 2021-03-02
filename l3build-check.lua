@@ -81,6 +81,19 @@ local directory_exists      = fslib.directory_exists
 local absolute_path         = fslib.absolute_path
 local make_clean_directory  = fslib.make_clean_directory
 
+---@type l3b_aux_t
+local l3b_aux = require("l3b.aux")
+local set_epoch_cmd = l3b_aux.set_epoch_cmd
+local dep_install = l3b_aux.dep_install
+
+---@type l3b_unpack_t
+local l3b_unpack = require("l3b.unpack")
+local bundleunpack = l3b_unpack.bundleunpack
+
+---@type l3b_typesetting_t
+local l3b_typesetting = require("l3b.typesetting")
+local dvitopdf = l3b_typesetting.dvitopdf
+
 --
 -- Auxiliary functions which are used by more than one main function
 --

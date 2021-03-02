@@ -133,15 +133,17 @@ do
 
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
-  local function on_debug(f)
-    for _, o in ipairs(arg) do
-      if match(o, "^%-%-debug") then
+  local function on_debug(f) end
+  
+  for _, o in ipairs(arg) do
+    if match(o, "^%-%-debug") then
+      function on_debug(f)
         f()
-        break
       end
+      break
     end
   end
-
+  
   -- work_dir:
   if cmd_base == "build.lua" then
     work_dir = cmd_dir
@@ -190,6 +192,15 @@ do
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
 
   local require_orig = require
+
+  local debug_require
+  for _, o in ipairs(arg) do
+    if match(o, "^%-%-debug%-require") then
+      debug_require = true
+      break
+    end
+  end
+  
   ---Overwrites global `require`.
   ---When `pkg_name` is "l3b.<name>",
   ---looks for "<l3b_dir>l3build-<name>.lua".
@@ -198,6 +209,9 @@ do
   function require(pkg_name)
     local result = package.loaded[pkg_name]
     if result then return result end -- recursive calls will end here
+    if debug_require then
+      print("DEBUG Info: package required ".. pkg_name)
+    end
     local name = match(pkg_name, "^l3b%.(.*)")
     if name then
       package.loaded[pkg_name] = true
@@ -208,8 +222,8 @@ do
       -- forthcoming management here
       result = require_orig(pkg_name)
     end
-    if l3build.debug.require then
-      print("DEBUG Info: package required ".. pkg_name, result.PATH)
+    if debug_require then
+      print("DEBUG Info: package loaded ".. pkg_name, result.PATH)
     end
     return result
   end
@@ -231,28 +245,30 @@ local utlib   = require("l3b.utillib")
 local entries = utlib.entries
 
 ---@type oslib_t
-local oslib     = require("l3b.oslib")
+local oslib       = require("l3b.oslib")
 local quoted_path = oslib.quoted_path
 
 ---@type fslib_t
-local fslib     = require("l3b.fslib")
-local all_files = fslib.all_files
+local fslib       = require("l3b.fslib")
+local all_files   = fslib.all_files
 local file_exists = fslib.file_exists
 
 ---@type l3b_arguments_t
 local arguments = require("l3b.arguments")
-_G.options = arguments.parse(arg)
+_G.options      = arguments.parse(arg)
 l3build.options = _G.options
 
-require("l3b.help")
+---@type l3b_help_t
+local l3b_help  = require("l3b.help")
+local help      = l3b_help.help
+local version   = l3b_help.version
 
 require("l3b.typesetting")
 
 ---@type l3b_aux_t
 local l3b_aux         = require("l3b.aux")
-local help            = l3b_aux.help
-local version         = l3b_aux.version
 local normalise_epoch = l3b_aux.normalise_epoch
+local call            = l3b_aux.call
 
 require("l3b.clean")
 require("l3b.check")
@@ -325,7 +341,7 @@ arguments.check_engines()
 -- When we have specific files to deal with, only use explicit configs
 -- (or just the std one)
 if options["names"] then
-  checkconfigs = options["config"] or { stdconfig }
+  checkconfigs = options["config"] or { _G.stdconfig }
 else
   checkconfigs = options["config"] or checkconfigs
 end
@@ -337,7 +353,7 @@ if options["target"] == "check" then
     local failed = {}
     for config in entries(checkconfigs) do
       opts["config"] = { config }
-      error_level = call({"." }, "check", opts)
+      error_level = call({ "." }, "check", opts)
       if error_level ~= 0 then
         if options["halt-on-error"] then
           exit(1)

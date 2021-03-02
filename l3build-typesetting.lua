@@ -61,10 +61,18 @@ local copy_tree         = fslib.copy_tree
 local make_clean_directory = fslib.make_clean_directory
 local tree              = fslib.tree
 
+--@type l3build_t
+local l3build = require("l3build")
+local options = l3build.options
+
 --@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
+local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local dep_install = l3b_aux.dep_install
+local dep_install   = l3b_aux.dep_install
+
+--@type l3b_unpack_t
+local l3b_unpack  = require("l3b.unpack")
+local unpack      = l3b_unpack.unpack
 
 ---dvitopdf
 ---@param name string
@@ -115,15 +123,17 @@ local function runcmd(cmd, dir, vars)
   return run(dir, cmd_concat(set_epoch_cmd(epoch, forcedocepoch), env, cmd))
 end
 
+local MT = {}
+
 ---biber
 ---@param name string
 ---@param dir string
 ---@return integer
-local function biber(name, dir)
+function MT.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return
       runcmd(biberexe .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
-      and 0 or 1
+        and 0 or 1
   end
   return 0
 end
@@ -132,7 +142,7 @@ end
 ---@param name string
 ---@param dir string
 ---@return integer
-local function bibtex(name, dir)
+function MT.bibtex(name, dir)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
@@ -160,19 +170,19 @@ end
 ---comment
 ---@param name string
 ---@param dir string
----@param inext string
----@param outext string
----@param logext string
+---@param in_ext string
+---@param out_ext string
+---@param log_ext string
 ---@param style string
 ---@return integer
-local function makeindex(name, dir, inext, outext, logext, style)
+function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "."
-  if file_exists(dir .. "/" .. name .. inext) then
+  if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
     return runcmd(makeindexexe .. " " .. makeindexopts
-      .. " -o " .. name .. outext
+      .. " -o " .. name .. out_ext
       .. (style and (" -s " .. style) or "")
-      .. " -t " .. name .. logext .. " "  .. name .. inext,
+      .. " -t " .. name .. log_ext .. " "  .. name .. in_ext,
       dir,
       { "INDEXSTYLE" }) and 0 or 1
   end
@@ -184,7 +194,7 @@ end
 ---@param dir string
 ---@param cmd string
 ---@return integer
-local function tex(file, dir, cmd)
+function MT.tex(file, dir, cmd)
   dir = dir or "."
   cmd = cmd or typesetexe .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
@@ -192,33 +202,47 @@ local function tex(file, dir, cmd)
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
 
+-- Ctrl.foo is _G.foo if it is a function, 
+local Ctrl = setmetatable({}, {
+  __index = function (t, k)
+    local MT_k = MT[k]
+    if MT_k ~= nil then -- only keys interactive MT are recognized
+      local _G_k = _G[k]
+      local result = type(_G_k) == "function" and _G_k or MT_k
+      if not options.__disable_engine_cache then -- disable engine cache from the command line
+        t[k] = result
+      end
+      return result
+    end
+  end
+})
+
 ---typeset
 ---@param file string
 ---@param dir string
 ---@param cmd string
 ---@return integer
-local function typeset(file, dir, cmd)
+function MT.typeset(file, dir, cmd)
   dir = dir or "."
-  local error_level = tex(file, dir, cmd)
+  local error_level = Ctrl.tex(file, dir, cmd)
   if error_level ~= 0 then
     return error_level
   end
   local name = job_name(file)
-  error_level = biber(name, dir) + bibtex(name, dir)
+  error_level = Ctrl.biber(name, dir) + Ctrl.bibtex(name, dir)
   if error_level ~= 0 then
     return error_level
   end
   for i = 2, typesetruns do
-    error_level =
-      makeindex(name, dir, ".glo", ".gls", ".glg", glossarystyle) +
-      makeindex(name, dir, ".idx", ".ind", ".ilg", indexstyle)    +
-      tex(file, dir, cmd)
+    error_level = Ctrl.makeindex(name, dir, ".glo", ".gls", ".glg", glossarystyle)
+                + Ctrl.makeindex(name, dir, ".idx", ".ind", ".ilg", indexstyle)
+                + Ctrl.tex(file, dir, cmd)
     if error_level ~= 0 then break end
   end
   return error_level
 end
 
----Local
+---Local helper
 ---@param file string
 ---@param dir string
 ---@return integer
@@ -226,56 +250,61 @@ local function typesetpdf(file, dir)
   dir = dir or "."
   local name = job_name(file)
   print("Typesetting " .. name)
-  local func = _G.typeset or typeset
-  local cmd = typesetexe .. " " .. typesetopts
-  local special = specialtypesetting and specialtypesetting[file]
+  local func = Ctrl.typeset
+  local cmd = _G.typesetexe .. " " .. _G.typesetopts
+  local special = _G.specialtypesetting and _G.specialtypesetting[file]
   if special then
     func = special.func or func
-    cmd = special.cmd or cmd
+    cmd  = special.cmd  or cmd
   end
   local error_level = func(file, dir, cmd)
   if error_level ~= 0 then
     print(" ! Compilation failed")
     return error_level
   end
-  local pdf_name = name .. pdfext
-  remove_tree(docfiledir, pdf_name)
-  return copy_tree(pdf_name, dir, docfiledir)
+  local pdf_name = name .. _G.pdfext
+  remove_tree(_G.docfiledir, pdf_name)
+  return copy_tree(pdf_name, dir, _G.docfiledir)
 end
 
----@alias typeset_demo_tasks_t fun(): integer
----@alias docinit_hook_t fun(): integer
+---Do nothing function
+---@return integer
+function MT.typeset_demo_tasks()
+  return 0
+end
+
+---Do nothing function
+---@return integer
+function MT.docinit_hook()
+  return 0
+end
 
 ---comment
 ---@return integer
 local function docinit()
   -- Set up
-  make_clean_directory(typesetdir)
+  make_clean_directory(_G.typesetdir)
   for filetype in items(
-    bibfiles, docfiles, typesetfiles, typesetdemofiles
+    _G.bibfiles, _G.docfiles, _G.typesetfiles, _G.typesetdemofiles
   ) do
     for file in entries(filetype) do
-      copy_tree(file, docfiledir, typesetdir)
+      copy_tree(file, _G.docfiledir, _G.typesetdir)
     end
   end
-  for file in entries(sourcefiles) do
-    copy_tree(file, sourcefiledir, typesetdir)
+  for file in entries(_G.sourcefiles) do
+    copy_tree(file, _G.sourcefiledir, _G.typesetdir)
   end
-  for file in entries(typesetsuppfiles) do
-    copy_tree(file, supportdir, typesetdir)
+  for file in entries(_G.typesetsuppfiles) do
+    copy_tree(file, _G.supportdir, _G.typesetdir)
   end
-  dep_install(typesetdeps)
-  unpack({ sourcefiles, typesetsourcefiles }, { sourcefiledir, docfiledir })
+  dep_install(_G.typesetdeps)
+  unpack({ _G.sourcefiles, _G.typesetsourcefiles }, { _G.sourcefiledir, _G.docfiledir })
   -- Main loop for doc creation
-  ---@type typeset_demo_tasks_t
-  local typeset_demo_tasks = _G.typeset_demo_tasks
-  local error_level = typeset_demo_tasks and typeset_demo_tasks() or 0
+  local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
     return error_level
   end
-  ---@type docinit_hook_t
-  local docinit_hook = _G.docinit_hook
-  return docinit_hook and docinit_hook() or 0
+  return Ctrl.docinit_hook()
 end
 
 ---Typeset all required documents
@@ -286,9 +315,9 @@ local function doc(files)
   local error_level = docinit()
   if error_level ~= 0 then return error_level end
   local done = {}
-  for typeset_files in items(typesetdemofiles, typesetfiles) do
+  for typeset_files in items(_G.typesetdemofiles, _G.typesetfiles) do
     for glob in entries(typeset_files) do
-      for dir in items(typesetdir, unpackdir) do
+      for dir in items(_G.typesetdir, _G.unpackdir) do
         for p_cwd in values(tree(dir, glob)) do
           local path, srcname = dir_base(p_cwd)
           local name = job_name(srcname)
@@ -323,12 +352,7 @@ end
 
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
-  runcmd = runcmd,
-  biber = biber,
-  bibtex = bibtex,
-  makeindex = makeindex,
-  tex = tex,
-  typeset = typeset,
+  runcmd = runcmd, -- dtx
   doc = doc,
 }
 
@@ -337,23 +361,13 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_typesetting_t
----@field dvitopdf fun(name: string, dir: string, engine: string, hide: boolean): integer
----@field runcmd fun(cmd string, dir string, vars table): boolean? suc, exitcode? exitcode, integer? code
----@field biber fun(name: string, dir string): integer
----@field bibtex fun(name: string, dir string): integer
----@field makeindex fun(name: string, dir: string, inext: string, outext: string, logext: string, style: string):integer
----@field tex fun(file: string, dir: string, cmd: string): integer
----@field typeset fun(file: string, dir: string, cmd: string): integer
----@field doc fun(files: string_list_t): integer
+---@field dvitopdf  fun(name: string, dir: string, engine: string, hide: boolean): integer
+---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
+---@field doc       fun(files: string_list_t): integer
 
 return {
-  global_symbol_map = {},
-  dvitopdf = dvitopdf,
-  runcmd = runcmd,
-  biber = biber,
-  bibtex = bibtex,
-  makeindex = makeindex,
-  tex = tex,
-  typeset = typeset,
-  doc = doc,
+  global_symbol_map = global_symbol_map,
+  dvitopdf          = dvitopdf,
+  runcmd            = runcmd,
+  doc               = doc,
 }
