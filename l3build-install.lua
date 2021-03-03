@@ -63,6 +63,14 @@ local make_clean_directory  = fslib.make_clean_directory
 local make_directory        = fslib.make_directory
 local rename                = fslib.rename
 
+---@type l3b_unpack_t
+local l3b_unpack  = require("l3b.unpack")
+local unpack      = l3b_unpack.unpack
+
+---@type l3b_typesetting_t
+local l3b_typesetting = require("l3b.typesetting")
+local doc             = l3b_typesetting.doc
+
 local function gethome()
   set_program("latex")
   return (options["texmfhome"] or var_value("TEXMFHOME"))

@@ -38,14 +38,25 @@ local l3b_aux     = require("l3b.aux")
 local call        = l3b_aux.call
 local dep_install = l3b_aux.dep_install
 
----@type l3b_help_t
-local l3b_help = require("l3b.help")
-local help = l3b_help.help
+local help          = require("l3b.help").help
+local check         = require("l3b.check").check
+local save          = require("l3b.check").save
+local bundlectan    = require("l3b.ctan").bundlectan
+local bundleunpack  = require("l3b.unpack").bundleunpack
+local clean         = require("l3b.clean").clean
+local bundleclean   = require("l3b.clean").bundleclean
+local doc           = require("l3b.doc").doc
+local install       = require("l3b.install").install
+local uninstall     = require("l3b.install").uninstall
+local manifest      = require("l3b.manifest").manifest
+local tag           = require("l3b.tagging").manifest
+local unpack        = require("l3b.unpack").unpack
+local upload        = require("l3b.upload").upload
 
 -- List all modules
 local function listmodules()
   local modules = {}
-  local exclmodules = exclmodules or {}
+  local exclmodules = _G.exclmodules or {}
   for entry in lfs_dir(".") do
     if entry ~= "." and entry ~= ".." then
       if attributes(entry, "mode") == "directory" then

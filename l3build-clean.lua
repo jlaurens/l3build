@@ -27,7 +27,7 @@ local utlib         = require("l3b.utillib")
 local entries       = utlib.entries
 local keys          = utlib.keys
 local unique_items  = utlib.unique_items
-local extend_with     = utlib.extend_with
+local extend_with   = utlib.extend_with
 
 ---@type fslib_t
 local fslib                 = require("l3b.fslib")
@@ -101,6 +101,6 @@ extend_with(_G, global_symbol_map)
 
 return {
   global_symbol_map = global_symbol_map,
-  clean = clean,
-  bundle_clean = bundle_clean,
+  clean             = clean,
+  bundle_clean      = bundle_clean,
 }

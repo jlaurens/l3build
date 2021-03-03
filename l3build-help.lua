@@ -66,9 +66,9 @@ local function help()
   print("usage: " .. scriptname .. " <target> [<options>] [<names>]")
   print("")
   print("Valid targets are:")
-  local longest,t = setup_list(target_list)
+  local longest, t = setup_list(_G.target_list)
   for k in entries(t) do
-    local target = target_list[k]
+    local target = _G.target_list[k]
     local filler = rep(" ", longest - k:len() + 1)
     if target["desc"] then
       print("   " .. k .. filler .. target["desc"])
@@ -76,7 +76,7 @@ local function help()
   end
   print("")
   print("Valid options are:")
-  longest,t = setup_list(option_list)
+  longest, t = setup_list(option_list)
   for k in entries(t) do
     local opt = option_list[k]
     local filler = rep(" ", longest - k:len() + 1)
@@ -98,8 +98,8 @@ end
 
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
-  version = version,
-  help    = help,
+  version = version,  -- dtx
+  help    = help,     -- dtx
 }
 
 --[=[ Export function symbols ]=]
@@ -107,8 +107,8 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_help_t
----@field version function
----@field help function
+---@field version fun()
+---@field help    fun()
 
 return {
   global_symbol_map = global_symbol_map,

@@ -201,6 +201,40 @@ local function deep_copy(original)
   return f(original)
 end
 
+---Return an object that picks its attributes from G or dflt
+---Central method in variables management.
+---@param G any, used with _G
+---@param dflt any
+---@return fun(t: table, k: any): any
+local function chooser(G, dflt)
+  local function __index(t, k)        -- will end in a metatable
+    local dflt_k = dflt[k]            -- default candidate
+    if dflt_k == nil then return end  -- unknown key, stop here
+    local result
+    local G_k = G[k]                  -- global candidate
+    if not G_k then
+      result = dflt_k                 -- choose the default
+    else
+      local type_G_k = type(G_k)
+      local type_dflt_k = type(dflt_k)
+      if type_G_k ~= type_dflt_k then   -- global is not acceptable
+        error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_k)
+      end
+      result = type_G_k == "table"
+        and chooser(G_k, dflt_k)
+        or  G_k
+    end
+    -- cache the result if any such that next time, __index is not called
+    if result ~= nil then
+      t[k] = result
+    end
+    return result
+  end
+  return setmetatable({}, {
+    __index = __index
+  })
+end
+
 ---@class utlib_t
 ---@field to_quoted_string  fun(table: table, separator: string|nil): string
 ---@field indices           fun(table: table): fun(): integer
@@ -232,4 +266,5 @@ return {
   extend_with       = extend_with,
   file_contents     = file_contents,
   deep_copy         = deep_copy,
+  chooser           = chooser,
 }

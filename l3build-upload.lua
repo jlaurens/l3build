@@ -94,7 +94,7 @@ local function input_multi_line_field (name)
         field = field .. "\n" .. answer_line
       end
      end
-  until (return_count == 3 or answer_line == nil or answer_line == '\004')
+  until return_count == 3 or answer_line == nil or answer_line == '\004'
   return field
 end
 
@@ -333,7 +333,7 @@ function MT:construct_request()
   -- start building the curl command:
   -- commandline  self.ctan_post = curlexe .. " "
   self.request = ""
-  
+
   -- build up the curl command field-by-field:
 
   --                        field            max  desc                               mandatory  multi

@@ -53,6 +53,10 @@ local copy_tree       = fslib.copy_tree
 local rename          = fslib.rename
 local remove_directory  = fslib.remove_directory
 
+---@type l3b_aux_t
+local l3b_aux = require("l3b.aux")
+local call    = l3b_aux.call
+
 ---@type l3b_install_t
 local l3b_install = require("l3b.install")
 local install_files = l3b_install.install_files

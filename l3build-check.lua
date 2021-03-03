@@ -50,9 +50,10 @@ local remove          = os.remove
 
 ---@type utlib_t
 local utlib           = require("l3b.utillib")
-local extend_with     = utlib.extend_with
+local chooser         = utlib.chooser
 local entries         = utlib.entries
 local first_of        = utlib.first_of
+local extend_with     = utlib.extend_with
 
 ---@type gblib_t
 local gblib             = require("l3b.globlib")
@@ -82,17 +83,33 @@ local absolute_path         = fslib.absolute_path
 local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
+local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local dep_install = l3b_aux.dep_install
+local dep_install   = l3b_aux.dep_install
 
 ---@type l3b_unpack_t
-local l3b_unpack = require("l3b.unpack")
-local bundleunpack = l3b_unpack.bundleunpack
+local l3b_unpack    = require("l3b.unpack")
+local bundleunpack  = l3b_unpack.bundleunpack
 
 ---@type l3b_typesetting_t
 local l3b_typesetting = require("l3b.typesetting")
-local dvitopdf = l3b_typesetting.dvitopdf
+local dvitopdf        = l3b_typesetting.dvitopdf
+
+-- Variables
+
+---@class test_types_t
+---@field log table<string, string|function>
+---@field pdf table<string, string|function>
+
+---@class check_vars_t
+---@field test_types test_types_t
+---@field test_order string_list_t
+
+---@type check_vars_t
+local dflt -- define below
+
+---@type check_vars_t
+local Vars = chooser(_G, dflt)
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -656,12 +673,12 @@ end
 ---@return string
 local function test_exists(test)
   local file_names = {}
-  for i, kind in ipairs(test_order) do
-    file_names[i] = test .. test_types[kind].test
+  for i, kind in ipairs(Vars.test_order) do
+    file_names[i] = test .. Vars.test_types[kind].test
   end
   local found = locate({ testfiledir, unpackdir }, file_names)
   if found then
-    for i, kind in ipairs(test_order) do
+    for i, kind in ipairs(Vars.test_order) do
       local file_name = file_names[i]
       if found:sub(-#file_name) == file_name then
         return found, kind
@@ -870,8 +887,8 @@ end
 local function setup_check(name, engine)
   local test_name = name .. "." .. engine
   local found
-  for kind in entries(test_order) do
-    local reference_ext = test_types[kind].reference
+  for kind in entries(Vars.test_order) do
+    local reference_ext = Vars.test_types[kind].reference
     local reference_file = locate(
       { testfiledir, unpackdir },
       { test_name .. reference_ext, name .. reference_ext }
@@ -890,8 +907,8 @@ local function setup_check(name, engine)
      return
   end
   -- Attempt to generate missing reference file from expectation
-  for kind in entries(test_order) do
-    local test_type = test_types[kind]
+  for kind in entries(Vars.test_order) do
+    local test_type = Vars.test_types[kind]
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
       { testfiledir, unpackdir },
@@ -953,7 +970,7 @@ local function run_check(test_name, hide)
     check_engines = options["engine"]
   end
   -- Used for both .lvt and .pvt tests
-  local test_type = test_types[kind]
+  local test_type = Vars.test_types[kind]
   local error_level = 0
   for engine in entries(check_engines) do
     setup_check(test_name, engine)
@@ -1020,6 +1037,27 @@ local function check_diff()
   print("")
 end
 
+-- define the default once the required object are properly defined
+dflt = {
+  test_types = {
+    log = {
+      test = lvtext,
+      generated = logext,
+      reference = tlgext,
+      expectation = lveext,
+      compare = compare_tlg,
+      rewrite = rewrite_log,
+    },
+    pdf = {
+      test = pvtext,
+      generated = pdfext,
+      reference = tpfext,
+      rewrite = rewrite_pdf,
+    },
+  },
+  test_order = { "log", "pdf" },
+}
+
 ---Check
 ---@param names string_list_t
 ---@return integer
@@ -1036,8 +1074,8 @@ local function check(names)
     names = names or {}
     -- No names passed: find all test files
     if not next(names) then
-      for kind in entries(test_order) do
-        local ext = test_types[kind].test
+      for kind in entries(Vars.test_order) do
+        local ext = Vars.test_types[kind].test
         local excludepatterns = {}
         local num_exclude = 0
         for glob in entries(excludetests) do
@@ -1147,7 +1185,7 @@ local function save(names)
       print('Test "' .. name .. '" not found')
       return 1
     end
-    local test_type = test_types[kind]
+    local test_type = Vars.test_types[kind]
     if locate({ unpackdir, testfiledir }, { name .. test_type.expectation }) then
       print("Saved " .. test_type.test .. " file would override a "
         .. test_type.expectation .. " file of the same name")
@@ -1173,10 +1211,7 @@ end
 
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
-  rewrite_log     = rewrite_log,
-  rewrite_pdf     = rewrite_pdf,
   runtest_tasks   = runtest_tasks,
-  compare_tlg     = compare_tlg,
   check           = check,
   save            = save,
 }
@@ -1186,17 +1221,11 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_check_t
----@field rewrite_log function
----@field rewrite_pdf function
----@field compare_tlg function
 ---@field check function
 ---@field save function
 
 return {
   global_symbol_map = global_symbol_map,
-  rewrite_log = rewrite_log,
-  rewrite_pdf = rewrite_pdf,
-  compare_tlg = compare_tlg,
   check = check,
   save = save,
 }
