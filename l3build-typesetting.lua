@@ -67,8 +67,10 @@ local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
-local Xtn       = l3b_vars.Xtn
-local Dir       = l3b_vars.Dir
+---@type Xtn_t
+local Xtn   = l3b_vars.Xtn
+---@type Dir_t
+local Dir   = l3b_vars.Dir
 
 
 --@type l3b_aux_t
@@ -291,20 +293,20 @@ local function docinit()
   -- Set up
   make_clean_directory(Dir.typeset)
   for filetype in items(
-    _G.bibfiles, _G.docfiles, _G.typesetfiles, _G.typesetdemofiles
+    _G.Files.bib, _G.Files.doc, _G.Files.typeset, _G.Files.typesetdemo
   ) do
     for file in entries(filetype) do
       copy_tree(file, Dir.docfile, Dir.typeset)
     end
   end
-  for file in entries(_G.sourcefiles) do
+  for file in entries(_G.Files.source) do
     copy_tree(file, Dir.sourcefile, Dir.typeset)
   end
-  for file in entries(_G.typesetsuppfiles) do
+  for file in entries(_G.Files.typesetsupp) do
     copy_tree(file, Dir.support, Dir.typeset)
   end
   dep_install(_G.typesetdeps)
-  unpack({ _G.sourcefiles, _G.typesetsourcefiles }, { Dir.sourcefile, Dir.docfile })
+  unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
@@ -321,7 +323,7 @@ local function doc(files)
   local error_level = docinit()
   if error_level ~= 0 then return error_level end
   local done = {}
-  for typeset_files in items(_G.typesetdemofiles, _G.typesetfiles) do
+  for typeset_files in items(_G.Files.typesetdemo, _G.Files.typeset) do
     for glob in entries(typeset_files) do
       for dir in items(Dir.typeset, Dir.unpack) do
         for p_cwd in values(tree(dir, glob)) do

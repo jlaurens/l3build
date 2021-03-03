@@ -59,6 +59,8 @@ local l3b_vars  = require("l3b.variables")
 local Main      = l3b_vars.Main
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
+---@type Files_t
+local Files     = l3b_vars.Files
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
@@ -89,13 +91,13 @@ local function copy_ctan()
     end
   end
   for tab in items(
-    bibfiles, demofiles, docfiles,
-    pdffiles, scriptmanfiles, typesetlist
+    Files.bib, Files.demo, Files.doc,
+    pdffiles, Files.scriptman, typesetlist
   ) do
     copyfiles(tab, Dir.docfile)
   end
-  copyfiles(sourcefiles, Dir.sourcefile)
-  for file in entries(textfiles) do
+  copyfiles(Files.source, Dir.sourcefile)
+  for file in entries(Files.text) do
     copy_tree(file, Dir.textfile, ctanpkg_dir)
   end
 end
@@ -117,8 +119,8 @@ function ctan()
   local function dirzip(dir, name)
     local zipname = name .. ".zip"
     -- Convert the tables of files to quoted strings
-    local binfiles = to_quoted_string(binaryfiles)
-    local exclude = to_quoted_string(excludefiles)
+    local binfiles = to_quoted_string(Files.binary)
+    local exclude = to_quoted_string(Files.exclude)
     -- First, zip up all of the text files
     run(
       dir,
@@ -165,7 +167,7 @@ function ctan()
     return error_level
   end
   if error_level == 0 then
-    for i in entries(textfiles) do
+    for i in entries(Files.text) do
       for j in items(Dir.unpack, Dir.textfile) do
         copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
         copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle)

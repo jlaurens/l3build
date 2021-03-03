@@ -78,7 +78,7 @@ local Main = chooser(_G, setmetatable({
 ---@field distrib     string
 ---@field ctan        string
 ---@field tds         string
----@field local       string
+---@field local   string
 ---@field result      string
 ---@field test        string
 ---@field typeset     string
@@ -159,30 +159,60 @@ end)
 -- File types for various operations
 -- Use Unix-style globs
 -- All of these may be set earlier, so a initialised conditionally
-auxfiles           = auxfiles           or { "*.aux", "*.lof", "*.lot", "*.toc" }
-bibfiles           = bibfiles           or { "*.bib" }
-binaryfiles        = binaryfiles        or { "*.pdf", "*.zip" }
-bstfiles           = bstfiles           or { "*.bst" }
-checkfiles         = checkfiles         or {}
-checksuppfiles     = checksuppfiles     or {}
-cleanfiles         = cleanfiles         or { "*.log", "*.pdf", "*.zip" }
-demofiles          = demofiles          or {}
-docfiles           = docfiles           or {}
-dynamicfiles       = dynamicfiles       or {}
-excludefiles       = excludefiles       or { "*~" }
-installfiles       = installfiles       or { "*.sty","*.cls" }
-makeindexfiles     = makeindexfiles     or { "*.ist" }
-scriptfiles        = scriptfiles        or {}
-scriptmanfiles     = scriptmanfiles     or {}
-sourcefiles        = sourcefiles        or { "*.dtx", "*.ins", "*-????-??-??.sty" }
-tagfiles           = tagfiles           or { "*.dtx" }
-textfiles          = textfiles          or { "*.md", "*.txt" }
-typesetdemofiles   = typesetdemofiles   or {}
-typesetfiles       = typesetfiles       or { "*.dtx" }
-typesetsuppfiles   = typesetsuppfiles   or {}
-typesetsourcefiles = typesetsourcefiles or {}
-unpackfiles        = unpackfiles        or { "*.ins" }
-unpacksuppfiles    = unpacksuppfiles    or {}
+
+---@class Files_t
+---@field aux           string_list_t
+---@field bib           string_list_t
+---@field binary        string_list_t
+---@field bst           string_list_t
+---@field check         string_list_t
+---@field checksupp     string_list_t
+---@field clean         string_list_t
+---@field demo          string_list_t
+---@field doc           string_list_t
+---@field dynamic       string_list_t
+---@field exclude       string_list_t
+---@field install       string_list_t
+---@field makeindex     string_list_t
+---@field script        string_list_t
+---@field scriptman     string_list_t
+---@field source        string_list_t
+---@field tag           string_list_t
+---@field text          string_list_t
+---@field typesetdemo   string_list_t
+---@field typeset       string_list_t
+---@field typesetsupp   string_list_t
+---@field typesetsource string_list_t
+---@field unpack        string_list_t
+---@field unpacksupp    string_list_t
+
+---@type Files_t
+local Files = chooser(_G, {
+  aux           = { "*.aux", "*.lof", "*.lot", "*.toc" },
+  bib           = { "*.bib" },
+  binary        = { "*.pdf", "*.zip" },
+  bst           = { "*.bst" },
+  check         = {},
+  checksupp     = {},
+  clean         = { "*.log", "*.pdf", "*.zip" },
+  demo          = {},
+  doc           = {},
+  dynamic       = {},
+  exclude       = { "*~" },
+  install       = { "*.sty","*.cls" },
+  makeindex     = { "*.ist" },
+  script        = {},
+  scriptman     = {},
+  source        = { "*.dtx", "*.ins", "*-????-??-??.sty" },
+  tag           = { "*.dtx" },
+  text          = { "*.md", "*.txt" },
+  typesetdemo   = {},
+  typeset       = { "*.dtx" },
+  typesetsupp   = {},
+  typesetsource = {},
+  unpack        = { "*.ins" },
+  unpacksupp    = {},
+}, { suffix = "files" })
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
 checkdeps   = checkdeps   or {}
@@ -314,6 +344,7 @@ local Xtn = chooser(_G, {
 ---@field Main Main_t
 ---@field LOCAL any
 ---@field Dir Dir_t
+---@field Files Files_t
 
 return {
   global_symbol_map = {},
@@ -321,4 +352,5 @@ return {
   Main              = Main,
   LOCAL             = LOCAL,
   Dir               = Dir,
+  Files             = Files,
 }

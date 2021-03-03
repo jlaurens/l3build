@@ -48,8 +48,12 @@ local file_list = fslib.file_list
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
-local Main      = l3b_vars.Main
-local Dir       = l3b_vars.Dir
+---@type Main_t
+local Main  = l3b_vars.Main
+---@type Dir_t
+local Dir   = l3b_vars.Dir
+---@type Files_t
+local Files = l3b_vars.Files
 
 ---@type l3b_manifest_setup_t
 local stp = require("l3b.manifest-setup")
@@ -111,7 +115,7 @@ function MT:build_init(entry)
     skipfiledescription  = false            ,
     rename               = false            ,
     dir                  = Dir.main          ,
-    exclude              = { excludefiles } ,
+    exclude              = { Files.exclude } ,
     flag                 = true             ,
   }
   for kk, ll in pairs(defaults) do

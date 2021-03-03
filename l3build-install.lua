@@ -67,6 +67,7 @@ local rename                = fslib.rename
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 local Dir       = l3b_vars.Dir
+local Files     = l3b_vars.Files
 
 ---@type l3b_unpack_t
 local l3b_unpack  = require("l3b.unpack")
@@ -113,7 +114,7 @@ local function uninstall()
   local error_level = 0
   -- Any script man files need special handling
   local manfiles = {}
-  for glob in entries(scriptmanfiles) do
+  for glob in entries(Files.scriptman) do
     for file in keys(tree(Dir.docfile, glob)) do
       -- Man files should have a single-digit extension: the type
       local install_dir = gethome() .. "/doc/man/man"  .. match(file, ".$")
@@ -256,28 +257,28 @@ local function install_files(target, full, dry_run)
       return result
     end
 
-  local installlist = create_file_list(Dir.unpack, installfiles, { scriptfiles })
+  local installlist = create_file_list(Dir.unpack, Files.install, { Files.script })
 
   if full then
     errorlevel = doc()
     if errorlevel ~= 0 then return errorlevel end
     -- For the purposes here, any typesetting demo files need to be
     -- part of the main typesetting list
-    local typesetfiles = typesetfiles
-    for glob in entries(typesetdemofiles) do
-      insert(typesetfiles, glob)
+    local typeset_files = Files.typeset
+    for glob in entries(Files.typesetdemo) do
+      insert(typeset_files, glob)
     end
 
     -- Find PDF files
     pdffiles = {}
-    for glob in entries(typesetfiles) do
+    for glob in entries(typese_files) do
       insert(pdffiles, first_of(gsub(glob, "%.%w+$", ".pdf")))
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = create_file_list(Dir.docfile, typesetfiles, { sourcefiles })
-    sourcelist = create_file_list(Dir.sourcefile, sourcefiles,
-      { bstfiles, installfiles, makeindexfiles, scriptfiles })
+    typesetlist = create_file_list(Dir.docfile, Files.typeset, { Files.source })
+    sourcelist = create_file_list(Dir.sourcefile, Files.source,
+      { Files.bst, Files.install, Files.makeindex, Files.script })
  
   if dry_run then
     print("\nFor installation inside " .. target .. ":")
@@ -285,7 +286,7 @@ local function install_files(target, full, dry_run)
     
     errorlevel = create_install_map(Dir.sourcefile, "source", { sourcelist })
       + create_install_map(Dir.docfile, "doc",
-          { bibfiles, demofiles, docfiles, pdffiles, textfiles, typesetlist })
+          { Files.bib, Files.demo, Files.doc, pdffiles, Files.text, typesetlist })
     if errorlevel ~= 0 then return errorlevel end
 
     -- Rename README if necessary
@@ -300,7 +301,7 @@ local function install_files(target, full, dry_run)
 
     -- Any script man files need special handling
     local manfiles = {}
-    for glob in entries(scriptmanfiles) do
+    for glob in entries(Files.scriptman) do
       for file in keys(tree(Dir.docfile, glob)) do
         if dry_run then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
@@ -323,9 +324,9 @@ local function install_files(target, full, dry_run)
   if errorlevel ~= 0 then return errorlevel end
 
   errorlevel = create_install_map(Dir.unpack, "tex", { installlist })
-    + create_install_map(Dir.unpack, "bibtex/bst", { bstfiles }, module)
-    + create_install_map(Dir.unpack, "makeindex", { makeindexfiles }, module)
-    + create_install_map(Dir.unpack, "scripts", { scriptfiles }, module)
+    + create_install_map(Dir.unpack, "bibtex/bst", { Files.bst }, module)
+    + create_install_map(Dir.unpack, "makeindex", { Files.makeindex }, module)
+    + create_install_map(Dir.unpack, "scripts", { Files.script }, module)
 
   if errorlevel ~= 0 then return errorlevel end
 

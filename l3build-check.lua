@@ -84,8 +84,12 @@ local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
+---@type Dir_t
 local Dir       = l3b_vars.Dir
+---@type Files_t
+local Files     = l3b_vars.Files
 
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -141,10 +145,10 @@ local function checkinit()
     copy_tree(i, Dir[l3b_vars.LOCAL], Dir.test)
   end
   bundleunpack({ Dir.sourcefile, Dir.testfile })
-  for i in entries(installfiles) do
+  for i in entries(Files.install) do
     copy_tree(i, Dir.unpack, Dir.test)
   end
-  for i in entries(checkfiles) do
+  for i in entries(Files.check) do
     copy_tree(i, Dir.unpack, Dir.test)
   end
   if directory_exists(Dir.testsupp) then
@@ -152,7 +156,7 @@ local function checkinit()
       copy_tree(i, Dir.testsupp, Dir.test)
     end
   end
-  for i in entries(checksuppfiles) do
+  for i in entries(Files.checksupp) do
     copy_tree(i, Dir.support, Dir.test)
   end
   execute(os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
@@ -817,7 +821,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     end
   end
   -- Clean out any dynamic files
-  for filetype in entries(dynamicfiles) do
+  for filetype in entries(Files.dynamic) do
     remove_tree(Dir.test, filetype)
   end
   -- Ensure there is no stray .log file
@@ -872,7 +876,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   test_type.rewrite(gen_file, new_file, engine, errlevels)
   -- Store secondary files for this engine
-  for filetype in entries(auxfiles) do
+  for filetype in entries(Files.aux) do
     for file in all_files(Dir.test, filetype) do
       if match(file, "^" .. name .. "%.[^.]+$") then
         local newname = gsub(file, "(%.[^.]+)$", "." .. engine .. "%1")

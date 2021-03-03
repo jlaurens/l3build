@@ -49,7 +49,10 @@ local absolute_path         = fslib.absolute_path
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
-local Dir       = l3b_vars.Dir
+---@type Dir_t
+local Dir   = l3b_vars.Dir
+---@type Files_t
+local Files = l3b_vars.Files
 
 ---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
@@ -68,7 +71,7 @@ local function bundleunpack(source_dirs, sources)
     return error_level
   end
   for i in entries(source_dirs or { Dir.sourcefile }) do
-    for j in entries(sources or { sourcefiles }) do
+    for j in entries(sources or { Files.source }) do
       for k in entries(j) do
         error_level = copy_tree(k, i, Dir.unpack)
         if error_level ~=0 then
@@ -77,13 +80,13 @@ local function bundleunpack(source_dirs, sources)
       end
     end
   end
-  for i in entries(unpacksuppfiles) do
+  for i in entries(Files.unpacksupp) do
     error_level = copy_tree(i, Dir.support, Dir[l3b_vars.LOCAL])
     if error_level ~=0 then
       return error_level
     end
   end
-  for i in entries(unpackfiles) do
+  for i in entries(Files.unpack) do
     for j in keys(tree(Dir.unpack, i)) do
       local dir_path, base_name = dir_base(j)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
@@ -121,7 +124,7 @@ local function unpack(sources, source_dirs)
   if error_level ~= 0 then
     return error_level
   end
-  for g in entries(installfiles) do
+  for g in entries(Files.install) do
     error_level = copy_tree(g, Dir.unpack, Dir[l3b_vars.LOCAL])
     if error_level ~= 0 then
       return error_level

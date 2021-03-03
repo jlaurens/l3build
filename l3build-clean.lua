@@ -39,7 +39,10 @@ local remove_directory      = fslib.remove_directory
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Dir_t
 local Dir       = l3b_vars.Dir
+---@type Files_t
+local Files     = l3b_vars.Files
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
@@ -61,12 +64,12 @@ local function clean()
 
   local clean_list = {}
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
-    for glob in entries(cleanfiles) do
+    for glob in entries(Files.clean) do
       for file in keys(tree(dir, glob)) do
         clean_list[file] = true
       end
     end
-    for glob in entries(sourcefiles) do
+    for glob in entries(Files.source) do
       for file in keys(tree(dir, glob)) do
         clean_list[file] = nil
       end
@@ -81,7 +84,7 @@ end
 
 local function bundle_clean()
   local error_level = call(modules, "clean")
-  for g in entries(cleanfiles) do
+  for g in entries(Files.clean) do
     error_level = error_level + remove_tree(Dir.current, g)
   end
   return  error_level

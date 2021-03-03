@@ -57,8 +57,12 @@ local sort = table.sort
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
+---@type Dir_t
 local Dir       = l3b_vars.Dir
+---@type Files_t
+local Files     = l3b_vars.Files
 
 ---@class manifest_entry_t
 ---@field subheading          string
@@ -98,7 +102,7 @@ These are source files for a number of purposes, including the `unpack` process 
 generates the installation files of the package. Additional files included here will also
 be installed for processing such as testing.
 ]],
-       files   = { sourcefiles },
+       files   = { Files.source },
        dir     = Dir.sourcefile or Dir.main, -- TODO: remove "or Dir.main" after rebasing onto master
     },
     {
@@ -106,7 +110,7 @@ be installed for processing such as testing.
        description = [[
 These files are typeset using LaTeX to produce the PDF documentation for the package.
 ]],
-       files   = { typesetfiles,typesetsourcefiles,typesetdemofiles },
+       files   = { Files.typeset,Files.typesetsource,Files.typesetdemo },
     },
     {
        name    = "Documentation files",
@@ -114,7 +118,7 @@ These files are typeset using LaTeX to produce the PDF documentation for the pac
 These files form part of the documentation but are not typeset. Generally they will be
 additional input files for the typeset documentation files listed above.
 ]],
-       files   = { docfiles },
+       files   = { Files.doc },
        dir     = Dir.docfile or Dir.main, -- TODO: remove "or Dir.main" after rebasing onto master
     },
     {
@@ -122,7 +126,7 @@ additional input files for the typeset documentation files listed above.
        description = [[
 Plain text files included as documentation or metadata.
 ]],
-       files   = { textfiles },
+       files   = { Files.text },
        skipfiledescription = true,
     },
     {
@@ -131,14 +135,14 @@ Plain text files included as documentation or metadata.
 Files included to demonstrate package functionality. These files are *not*
 typeset or compiled in any way.
 ]],
-       files   = { demofiles },
+       files   = { Files.demo },
     },
     {
        name    = "Bibliography and index files",
        description = [[
 Supplementary files used for compiling package documentation.
 ]],
-       files   = { bibfiles,bstfiles,makeindexfiles },
+       files   = { Files.bib,Files.bst,Files.makeindex },
     },
     {
        name    = "Derived files",
@@ -146,8 +150,8 @@ Supplementary files used for compiling package documentation.
 The files created by ‘unpacking’ the package sources. This typically includes
 `.sty` and `.cls` files created from DocStrip `.dtx` files.
 ]],
-       files   = { installfiles },
-       exclude = { excludefiles, sourcefiles },
+       files   = { Files.install },
+       exclude = { Files.exclude, Files.source },
        dir     = Dir.unpack,
        skipfiledescription = true,
     },
@@ -157,7 +161,7 @@ The files created by ‘unpacking’ the package sources. This typically include
 The output files (PDF, essentially) from typesetting the various source, demo,
 etc., package files.
 ]],
-       files   = { typesetfiles,typesetsourcefiles,typesetdemofiles },
+       files   = { Files.typeset,Files.typesetsource,Files.typesetdemo },
        rename  = { "%.%w+$", ".pdf" },
        skipfiledescription = true,
     },
@@ -166,7 +170,7 @@ etc., package files.
        description = [[
 These files are used for unpacking, typesetting, or checking purposes.
 ]],
-       files   = { unpacksuppfiles,typesetsuppfiles,checksuppfiles },
+       files   = { Files.unpacksupp,Files.typesetsupp,Files.checksupp },
        dir     = Dir.support,
     },
     {
@@ -175,7 +179,7 @@ These files are used for unpacking, typesetting, or checking purposes.
 Support files for checking the test suite.
 ]],
        files   = { "*.*" },
-       exclude = { { ".", ".." }, excludefiles },
+       exclude = { { ".", ".." }, Files.exclude },
        dir     = Dir.testsupp,
     },
     {
