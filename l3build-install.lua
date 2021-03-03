@@ -271,7 +271,7 @@ local function install_files(target, full, dry_run)
 
     -- Find PDF files
     pdffiles = {}
-    for glob in entries(typese_files) do
+    for glob in entries(typeset_files) do
       insert(pdffiles, first_of(gsub(glob, "%.%w+$", ".pdf")))
     end
 
