@@ -250,6 +250,7 @@ end
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field file_contents     fun(file_pat: string): string|nil
 ---@field deep_copy         fun(original: any): any
+---@field chooser           fun(G: table, dflt: table): fun(t: table, k: any): any
 
 return {
   to_quoted_string  = to_quoted_string,

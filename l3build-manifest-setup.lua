@@ -55,6 +55,10 @@ for those people who are interested.
 
 local sort = table.sort
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Xtn       = l3b_vars.Xtn
+
 ---@class manifest_entry_t
 ---@field subheading          string
 ---@field name                string
@@ -181,7 +185,7 @@ unit tests, and `.tlg` are the stored output for ensuring changes to the package
 the same output. These output files are sometimes shared and sometime specific for
 different engines (pdfTeX, XeTeX, LuaTeX, etc.).
 ]],
-       files   = { "*"..lvtext, "*"..lveext, "*"..tlgext },
+       files   = { "*"..Xtn.lvt, "*"..Xtn.lve, "*"..Xtn.tlg },
        dir     = testfiledir,
        skipfiledescription = true,
     },

@@ -65,6 +65,10 @@ local tree              = fslib.tree
 local l3build = require("l3build")
 local options = l3build.options
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Xtn       = l3b_vars.Xtn
+
 --@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
@@ -84,9 +88,9 @@ local function dvitopdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
       set_epoch_cmd(epoch, forcecheckepoch),
-      "dvips " .. name .. dviext
+      "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. os_null) or ""),
-      "ps2pdf " .. ps2pdfopt .. name .. psext
+      "ps2pdf " .. ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. os_null) or "")
     ) and 0 or 1
   )
@@ -262,7 +266,7 @@ local function typesetpdf(file, dir)
     print(" ! Compilation failed")
     return error_level
   end
-  local pdf_name = name .. _G.pdfext
+  local pdf_name = name .. Xtn.pdf
   remove_tree(_G.docfiledir, pdf_name)
   return copy_tree(pdf_name, dir, _G.docfiledir)
 end

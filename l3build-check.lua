@@ -82,6 +82,10 @@ local directory_exists      = fslib.directory_exists
 local absolute_path         = fslib.absolute_path
 local make_clean_directory  = fslib.make_clean_directory
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Xtn       = l3b_vars.Xtn
+
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
@@ -763,7 +767,7 @@ end
 ---@param breakout any
 ---@return integer
 local function run_test(name, engine, hide, ext, test_type, breakout)
-  local lvt_file = name .. (ext or lvtext)
+  local lvt_file = name .. (ext or Xtn.lvt)
   copy_tree(lvt_file,
     file_exists(testfiledir .. "/" .. lvt_file)
       and testfiledir
@@ -788,7 +792,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     format = " --fmt=" .. format
   end
   -- Special casing for XeTeX engine
-  if match(engine, "xetex") and test_type.generated ~= pdfext then
+  if match(engine, "xetex") and test_type.generated ~= Xtn.pdf then
     check_opts = check_opts .. " -no-pdf"
   end
   -- Special casing for ConTeXt
@@ -816,7 +820,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     remove_tree(testdir, filetype)
   end
   -- Ensure there is no stray .log file
-  remove_file(testdir, name .. logext)
+  remove_file(testdir, name .. Xtn.log)
   local errlevels = {}
   local localtexmf = ""
   if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
@@ -847,8 +851,8 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     )
     -- Break the loop if the result is stable
     if breakout and run_number < checkruns then
-      if test_type.generated == pdfext then
-        if file_exists(testdir .. "/" .. name .. dviext) then
+      if test_type.generated == Xtn.pdf then
+        if file_exists(testdir .. "/" .. name .. Xtn.dvi) then
           dvitopdf(name, testdir, engine, hide)
         end
       end
@@ -858,12 +862,12 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
       end
     end
   end
-  if test_type.generated == pdfext then
-    if file_exists(testdir .. "/" .. name .. dviext) then
+  if test_type.generated == Xtn.pdf then
+    if file_exists(testdir .. "/" .. name .. Xtn.dvi) then
       dvitopdf(name, testdir, engine, hide)
     end
-    copy_tree(name .. pdfext, testdir, resultdir)
-    rename(resultdir, name .. pdfext, name .. "." .. engine .. pdfext)
+    copy_tree(name .. Xtn.pdf, testdir, resultdir)
+    rename(resultdir, name .. Xtn.pdf, name .. "." .. engine .. Xtn.pdf)
   end
   test_type.rewrite(gen_file, new_file, engine, errlevels)
   -- Store secondary files for this engine
@@ -1000,16 +1004,16 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   -- Do additional log formatting if the engine is LuaTeX, there is no
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
   if (match(engine, "^lua") or match(engine, "^harf"))
-  and not match(tlg_file, "%.luatex" .. "%" .. tlgext)
+  and not match(tlg_file, "%.luatex" .. "%" .. Xtn.tlg)
   and not match(stdengine, "^lua")
   then
     local lua_log_file
     if cleanup then
-      lua_log_file = testdir .. "/" .. test_name .. ".tmp" .. logext
+      lua_log_file = testdir .. "/" .. test_name .. ".tmp" .. Xtn.log
     else
       lua_log_file = log_file
     end
-    local lua_tlg_file = testdir .. "/" .. test_name .. tlgext
+    local lua_tlg_file = testdir .. "/" .. test_name .. Xtn.tlg
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
     error_level = execute(os_diffexe .. " "
@@ -1041,17 +1045,17 @@ end
 dflt = {
   test_types = {
     log = {
-      test = lvtext,
-      generated = logext,
-      reference = tlgext,
-      expectation = lveext,
+      test = Xtn.lvt,
+      generated = Xtn.log,
+      reference = Xtn.tlg,
+      expectation = Xtn.lve,
       compare = compare_tlg,
       rewrite = rewrite_log,
     },
     pdf = {
-      test = pvtext,
-      generated = pdfext,
-      reference = tpfext,
+      test = Xtn.pvt,
+      generated = Xtn.pdf,
+      reference = Xtn.tpf,
       rewrite = rewrite_pdf,
     },
   },

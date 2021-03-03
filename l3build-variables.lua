@@ -24,6 +24,10 @@ for those people who are interested.
 
 local status = require("status")
 
+---@type utlib_t
+local utlib   = require("l3b.utillib")
+local chooser = utlib.chooser
+
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
 -- remove the built-in
@@ -198,17 +202,32 @@ typesetruns  = typesetruns  or 3
 recordstatus = recordstatus or false
 
 -- Extensions for various file types: used to abstract out stuff a bit
-bakext = bakext or ".bak"
-dviext = dviext or ".dvi"
-logext = logext or ".log"
-lveext = lveext or ".lve"
-lvtext = lvtext or ".lvt"
-pdfext = pdfext or ".pdf"
-psext  = psext  or ".ps"
-pvtext = pvtext or ".pvt"
-tlgext = tlgext or ".tlg"
-tpfext = tpfext or ".tpf"
 
+---@class Xtn_t
+---@field bak string
+---@field dvi string
+---@field log string
+---@field lve string
+---@field lvt string
+---@field pdf string
+---@field ps  string
+---@field pvt string
+---@field tlg string
+---@field tpf string
+
+---@type Xtn_t
+local Xtn = chooser(_G, {
+  bak = ".bak",
+  dvi = ".dvi",
+  log = ".log",
+  lve = ".lve",
+  lvt = ".lvt",
+  pdf = ".pdf",
+  ps  = ".ps" ,
+  pvt = ".pvt",
+  tlg = ".tlg",
+  tpf = ".tpf",
+})
 -- Manifest options
 manifestfile = manifestfile or "MANIFEST.md"
 
@@ -218,3 +237,11 @@ tdslocations = tdslocations or {}
 -- Upload settings
 curlexe  = curlexe  or "curl"
 uploadconfig = uploadconfig or {}
+
+---@class l3b_vars_t
+---@field Xtn Xtn_t
+
+return {
+  global_symbol_map = {},
+  Xtn               = Xtn,
+}

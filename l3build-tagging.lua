@@ -27,9 +27,6 @@ local os_date = os.date
 local match   = string.match
 local gsub    = string.gsub
 
----@type l3build_t
-local l3build = require("l3build")
-
 ---@type utlib_t
 local utlib         = require("l3b.utillib")
 local entries       = utlib.entries
@@ -49,6 +46,13 @@ local rename      = fslib.rename
 local remove_tree = fslib.remove_tree
 local tree        = fslib.tree
 
+---@type l3build_t
+local l3build = require("l3build")
+
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Xtn       = l3b_vars.Xtn
+
 ---@alias tag_hook_t fun(tag_name: string, tag_date: string): integer
 
 local function update_file_tag(file_path, tag_name, tag_date)
@@ -67,13 +71,13 @@ local function update_file_tag(file_path, tag_name, tag_date)
     return 0
   end
   local dir_path = dir_name(file_path)
-  rename(dir_path, file_name, file_name .. ".bak")
+  rename(dir_path, file_name, file_name .. Xtn.bak)
   fh = assert(open(file_path, "w"))
   -- Convert line ends back if required during write
   -- Watch for the second return value!
   fh:write(first_of(gsub(updated_content, "\n", os_newline)))
   fh:close()
-  remove_tree(dir_path, file_name .. ".bak")
+  remove_tree(dir_path, file_name .. Xtn.bak)
   return 0
 end
 
