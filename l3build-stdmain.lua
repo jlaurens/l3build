@@ -41,7 +41,7 @@ local Deps      = l3b_vars.Deps
 ---@type l3b_aux_t
 local l3b_aux     = require("l3b.aux")
 local call        = l3b_aux.call
-local dep_install = l3b_aux.dep_install
+local deps_install = l3b_aux.deps_install
 
 local help          = require("l3b.help").help
 local check         = require("l3b.check").check
@@ -97,7 +97,7 @@ local target_list =
       {
         func = bundleunpack,
         pre  = function()
-          return dep_install(Deps.unpack)
+          return deps_install(Deps.unpack)
         end
       },
     -- Public targets

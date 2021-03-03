@@ -76,7 +76,7 @@ local Dir   = l3b_vars.Dir
 --@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local dep_install   = l3b_aux.dep_install
+local deps_install  = l3b_aux.deps_install
 
 --@type l3b_unpack_t
 local l3b_unpack  = require("l3b.unpack")
@@ -305,7 +305,7 @@ local function docinit()
   for file in entries(_G.Files.typesetsupp) do
     copy_tree(file, Dir.support, Dir.typeset)
   end
-  dep_install(_G.Deps.typeset)
+  deps_install(_G.Deps.typeset)
   unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()

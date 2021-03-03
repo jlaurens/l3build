@@ -171,7 +171,7 @@ end
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see stdmain, check, unpack, typesetting
 ---@usage Private?
-local function dep_install(deps)
+local function deps_install(deps)
   local error_level
   for dep in entries(deps) do
     print("Installing dependency: " .. dep)
@@ -194,14 +194,14 @@ extend_with(_G, global_symbol_map)
 
 ---@class l3b_aux_t
 ---@field normalise_epoch function
----@field dep_install function
+---@field deps_install function
 ---@field call function
 ---@field set_epoch_cmd function
 
 return {
   global_symbol_map = global_symbol_map,
   normalise_epoch = normalise_epoch,
-  dep_install = dep_install,
+  deps_install = deps_install,
   call = call,
   set_epoch_cmd = set_epoch_cmd,
 }

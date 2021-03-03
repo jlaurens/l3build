@@ -96,7 +96,7 @@ local Deps      = l3b_vars.Deps
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local dep_install   = l3b_aux.dep_install
+local deps_install  = l3b_aux.deps_install
 
 ---@type l3b_unpack_t
 local l3b_unpack    = require("l3b.unpack")
@@ -139,7 +139,7 @@ local function checkinit()
     make_clean_directory(Dir.test)
     make_clean_directory(Dir.result)
   end
-  dep_install(Deps.check)
+  deps_install(Deps.check)
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests

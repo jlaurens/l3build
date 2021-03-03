@@ -24,7 +24,7 @@ for those people who are interested.
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
-local dep_install = l3b_aux.dep_install
+local deps_install = l3b_aux.deps_install
 
 ---@type utlib_t
 local utlib = require("l3b.utillib")
@@ -116,7 +116,7 @@ end
 ---@param source_dirs string_list_t
 ---@return integer
 local function unpack(sources, source_dirs)
-  local error_level = dep_install(Deps.unpack)
+  local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level
   end
