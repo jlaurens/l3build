@@ -52,6 +52,8 @@ local l3build = require("l3build")
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 local Xtn       = l3b_vars.Xtn
+local Dir       = l3b_vars.Dir
+
 
 ---@alias tag_hook_t fun(tag_name: string, tag_date: string): integer
 
@@ -92,7 +94,7 @@ local function tag(tag_names)
     tag_name = tag_names[1]
   end
   local error_level = 0
-  for dir in unique_items(currentdir, sourcefiledir, docfiledir) do
+  for dir in unique_items(Dir.current, Dir.sourcefile, Dir.docfile) do
     for filetype in entries(tagfiles) do
       for file in values(tree(dir, filetype)) do
         error_level = update_file_tag(file, tag_name, tag_date)

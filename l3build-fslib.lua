@@ -45,7 +45,7 @@ local pairs            = pairs
 
 local lfs              = require("lfs")
 local attributes       = lfs.attributes
-local currentdir       = lfs.currentdir
+local current_dir      = lfs.currentdir
 local chdir            = lfs.chdir
 local lfs_dir          = lfs.dir
 
@@ -107,10 +107,10 @@ end
 ---@param path string
 ---@return string
 local function absolute_path(path)
-  local oldpwd = currentdir()
+  local oldpwd = current_dir()
   local ok, msg = chdir(path)
   if ok then
-    local result = currentdir()
+    local result = current_dir()
     chdir(oldpwd)
     return quoted_path(gsub(result, "\\", "/"))
   end
@@ -205,6 +205,15 @@ local function all_files(path, glob)
   return entries(file_list(path, glob))
 end
 
+local tree_excluder = function (name) return false end
+
+---Set the given function as tree excluder.
+---Can be used to exclude the build directory.
+---@param f fun(path_cwd: string): boolean
+local function set_tree_excluder(f)
+  tree_excluder = f
+end
+
 ---Does what filelist does, but can also glob subdirectories.
 ---In the returned table, the keys are paths relative to the given source path,
 ---the values are their counterparts relative to the current working directory.
@@ -232,13 +241,13 @@ local function tree(dir_path, glob)
     ---@param table table
     local function fill(p_src, p_cwd, table)
       for file in all_files(p_cwd, glob_part) do
-        local p_src_file = p_src .. "/" .. file
-        if file ~= "." and file ~= ".." and
-        p_src_file ~= builddir -- TODO: ensure that `builddir` is properly formatted
-        then
+        if file ~= "." and file ~= ".." then
           local p_cwd_file = p_cwd .. "/" .. file
-          if accept(p_cwd_file) then
-            table[p_src_file] = p_cwd_file
+          if not tree_excluder(p_cwd_file) then
+            local p_src_file = p_src .. "/" .. file
+            if accept(p_cwd_file) then
+              table[p_src_file] = p_cwd_file
+            end
           end
         end
       end
@@ -392,6 +401,7 @@ extend_with(_G, global_symbol_map)
 ---@field locate function
 ---@field file_list function
 ---@field all_files function
+---@field set_tree_excluder function
 ---@field tree function
 ---@field rename function
 ---@field copy_tree function
@@ -410,6 +420,7 @@ return {
   locate = locate,
   file_list = file_list,
   all_files = all_files,
+  set_tree_excluder = set_tree_excluder,
   tree = tree,
   rename = rename,
   copy_tree = copy_tree,

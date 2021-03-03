@@ -68,6 +68,8 @@ local options = l3build.options
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 local Xtn       = l3b_vars.Xtn
+local Dir       = l3b_vars.Dir
+
 
 --@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -111,11 +113,11 @@ local function runcmd(cmd, dir, vars)
   -- Allow for local texmf files
   local env = os_setenv .. " TEXMFCNF=." .. os_pathsep
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
-    localtexmf = os_pathsep .. absolute_path(texmfdir) .. "//"
+  if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
+    localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
   local envpaths = "." .. localtexmf .. os_pathsep
-    .. absolute_path(localdir) .. os_pathsep
+    .. absolute_path(Dir[l3b_vars.LOCAL]) .. os_pathsep
     .. dir .. (typesetsearch and os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and match(envpaths, " ") then
@@ -267,8 +269,8 @@ local function typesetpdf(file, dir)
     return error_level
   end
   local pdf_name = name .. Xtn.pdf
-  remove_tree(_G.docfiledir, pdf_name)
-  return copy_tree(pdf_name, dir, _G.docfiledir)
+  remove_tree(Dir.docfile, pdf_name)
+  return copy_tree(pdf_name, dir, Dir.docfile)
 end
 
 ---Do nothing function
@@ -287,22 +289,22 @@ end
 ---@return integer
 local function docinit()
   -- Set up
-  make_clean_directory(_G.typesetdir)
+  make_clean_directory(Dir.typeset)
   for filetype in items(
     _G.bibfiles, _G.docfiles, _G.typesetfiles, _G.typesetdemofiles
   ) do
     for file in entries(filetype) do
-      copy_tree(file, _G.docfiledir, _G.typesetdir)
+      copy_tree(file, Dir.docfile, Dir.typeset)
     end
   end
   for file in entries(_G.sourcefiles) do
-    copy_tree(file, _G.sourcefiledir, _G.typesetdir)
+    copy_tree(file, Dir.sourcefile, Dir.typeset)
   end
   for file in entries(_G.typesetsuppfiles) do
-    copy_tree(file, _G.supportdir, _G.typesetdir)
+    copy_tree(file, Dir.support, Dir.typeset)
   end
   dep_install(_G.typesetdeps)
-  unpack({ _G.sourcefiles, _G.typesetsourcefiles }, { _G.sourcefiledir, _G.docfiledir })
+  unpack({ _G.sourcefiles, _G.typesetsourcefiles }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
@@ -321,7 +323,7 @@ local function doc(files)
   local done = {}
   for typeset_files in items(_G.typesetdemofiles, _G.typesetfiles) do
     for glob in entries(typeset_files) do
-      for dir in items(_G.typesetdir, _G.unpackdir) do
+      for dir in items(Dir.typeset, Dir.unpack) do
         for p_cwd in values(tree(dir, glob)) do
           local path, srcname = dir_base(p_cwd)
           local name = job_name(srcname)

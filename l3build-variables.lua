@@ -25,56 +25,136 @@ for those people who are interested.
 local status = require("status")
 
 ---@type utlib_t
-local utlib   = require("l3b.utillib")
-local chooser = utlib.chooser
+local utlib     = require("l3b.utillib")
+local chooser   = utlib.chooser
+local first_of  = utlib.first_of
+
+---@type oslib_t
+local oslib       = require("l3b.oslib")
+local quoted_path = oslib.quoted_path
+
+---@type fslib_t
+local fslib             = require("l3b.fslib")
+local set_tree_excluder = fslib.set_tree_excluder
 
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
 -- remove the built-in
-if type(module) == "function" then
+if type("module") ~= "string" then
   module = nil
 end
 
--- Ensure the module and bundle exist
-module = module or ""
-bundle = bundle or ""
+---@class Main_t
+---@field module string
+---@field bundle string
+---@field tdsroot string
+---@field ctanpkg string
 
+---@type Main_t
+local Main = chooser(_G, setmetatable({
+  module  = "",
+  bundle  = "",
+  tdsroot = "latex",
+}, {
+  __index = function (t, k)
+    if k == "ctanpkg" then
+      return  t.bundle ~= ""
+          and t.bundle or t.module
+    end
+  end
+}))
+
+---@class Dir_t
+---@field current     string
+---@field main        string
+---@field docfile     string
+---@field sourcefile  string
+---@field textfile    string
+---@field support     string
+---@field testfile    string
+---@field testsupp    string
+---@field texmf       string
+---@field build       string
+---@field distrib     string
+---@field ctan        string
+---@field tds         string
+---@field local       string
+---@field result      string
+---@field test        string
+---@field typeset     string
+---@field unpack      string
+---@field module      string
+
+local LOCAL = {}
+
+---@type Dir_t
+local default_Dir = setmetatable({
 -- Directory structure for the build system
 -- Use Unix-style path separators
-currentdir = "."
-maindir    = maindir or currentdir
+  current = ".",
+  [LOCAL] = "local",
+  [utlib.DID_CHOOSE] = function (result, k)
+    -- No trailing /
+    -- What about the leading "./"
+    if k:match("dir$") then
+      return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
+    end
+    return result
+  end
+}, {
+  __index = function (t, k)
+    local result
+    if k == "main" then
+      result = t.current
+    elseif k == "docfile" then
+      result = t.current
+    elseif k == "sourcefile" then
+      result = t.current
+    elseif k == "textfile" then
+      result = t.current
+    elseif k == "support" then
+      result = t.main .. "/support"
+    elseif k == "testfile" then
+      result = t.current .. "/testfiles"
+    elseif k == "testsupp" then
+      result = t.testfile .. "/support"
+    elseif k == "texmf" then
+      result = t.main .. "/texmf"
+    -- Structure within a development area
+    elseif k == "build" then
+      result = t.main .. "/build"
+    elseif k == "distrib" then
+      result = t.build .. "/distrib"
+    -- Substructure for CTAN release material
+    elseif k == "ctan" then
+      result = t.distrib .. "/ctan"
+    elseif k == "tds" then
+      result = t.distrib .. "/tds"
+    elseif k == "local" then
+      result = t.build .. "/local"
+    elseif k == "result" then
+      result = t.build .. "/result"
+    elseif k == "test" then
+      result = t.build .. "/test"
+    elseif k == "typeset" then
+      result = t.build .. "/doc"
+    elseif k == "unpack" then
+      result = t.build .. "/unpacked"
+    -- Location for installation on CTAN or in TEXMFHOME
+    elseif k == "module" then
+      result = Main.tdsroot .. "/" .. Main.bundle .. "/" .. Main.module
+      result = first_of(result:gsub("//", "/"))
+    end
+    return result
+  end
+})
 
--- Substructure for file locations
-docfiledir    = docfiledir    or currentdir
-sourcefiledir = sourcefiledir or currentdir
-textfiledir   = textfiledir   or currentdir
-supportdir    = supportdir    or maindir .. "/support"
-testfiledir   = testfiledir   or currentdir .. "/testfiles"
-testsuppdir   = testsuppdir   or testfiledir .. "/support"
-texmfdir      = texmfdir      or maindir .. "/texmf"
+---@type Dir_t
+local Dir = chooser(_G, default_Dir, { suffix = "dir" })
 
--- Structure within a development area
-builddir   = builddir   or maindir .. "/build"
-distribdir = distribdir or builddir .. "/distrib"
-localdir   = localdir   or builddir .. "/local"
-resultdir  = resultdir  or builddir .. "/result"
-testdir    = testdir    or builddir .. "/test"
-typesetdir = typesetdir or builddir .. "/doc"
-unpackdir  = unpackdir  or builddir .. "/unpacked"
-
--- Substructure for CTAN release material
-ctandir = ctandir or distribdir .. "/ctan"
-tdsdir  = tdsdir  or distribdir .. "/tds"
-tdsroot = tdsroot or "latex"
-
--- Location for installation on CTAN or in TEXMFHOME
-if bundle == "" then
-  moduledir = tdsroot .. "/" .. module
-  ctanpkg   = ctanpkg or module
-else
-  moduledir = tdsroot .. "/" .. bundle .. "/" .. module
-  ctanpkg   = ctanpkg or bundle
-end
+set_tree_excluder(function (path)
+  return path ~= Dir.build
+end)
 
 -- File types for various operations
 -- Use Unix-style globs
@@ -186,7 +266,7 @@ end
 asciiengines = asciiengines or { "pdftex" }
 checkruns    = checkruns    or 1
 ctanreadme   = ctanreadme   or "README.md"
-ctanzip      = ctanzip      or ctanpkg .. "-ctan"
+ctanzip      = ctanzip      or Main.ctanpkg .. "-ctan"
 epoch        = epoch        or 1463734800
 if flatten == nil then
   flatten = true
@@ -231,8 +311,14 @@ local Xtn = chooser(_G, {
 
 ---@class l3b_vars_t
 ---@field Xtn Xtn_t
+---@field Main Main_t
+---@field LOCAL any
+---@field Dir Dir_t
 
 return {
   global_symbol_map = {},
   Xtn               = Xtn,
+  Main              = Main,
+  LOCAL             = LOCAL,
+  Dir               = Dir,
 }

@@ -37,26 +37,30 @@ local remove_tree           = fslib.remove_tree
 local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Dir       = l3b_vars.Dir
+
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
 local call    = l3b_aux.call
 
 -- Remove all generated files
 local function clean()
-  -- To make sure that distribdir never contains any stray subdirs,
+  -- To make sure that Dir.distrib never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
   -- all of the files
-  local error_level = remove_directory(distribdir)
-                    + make_directory(distribdir)
-                    + make_clean_directory(localdir)
-                    + make_clean_directory(testdir)
-                    + make_clean_directory(typesetdir)
-                    + make_clean_directory(unpackdir)
+  local error_level = remove_directory(Dir.distrib)
+                    + make_directory(Dir.distrib)
+                    + make_clean_directory(Dir[l3b_vars.LOCAL])
+                    + make_clean_directory(Dir.test)
+                    + make_clean_directory(Dir.typeset)
+                    + make_clean_directory(Dir.unpack)
 
   if error_level ~= 0 then return error_level end
 
   local clean_list = {}
-  for dir in unique_items(maindir, sourcefiledir, docfiledir) do
+  for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
     for glob in entries(cleanfiles) do
       for file in keys(tree(dir, glob)) do
         clean_list[file] = true
@@ -78,11 +82,11 @@ end
 local function bundle_clean()
   local error_level = call(modules, "clean")
   for g in entries(cleanfiles) do
-    error_level = error_level + remove_tree(currentdir, g)
+    error_level = error_level + remove_tree(Dir.current, g)
   end
   return  error_level
-        + remove_directory(ctandir)
-        + remove_directory(tdsdir)
+        + remove_directory(Dir.ctan)
+        + remove_directory(Dir.tds)
 end
 
 -- this is the map to export function symbols to the global space

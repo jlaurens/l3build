@@ -47,6 +47,10 @@ local make_clean_directory  = fslib.make_clean_directory
 local tree                  = fslib.tree
 local absolute_path         = fslib.absolute_path
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Dir       = l3b_vars.Dir
+
 ---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
 ---Split off from the main unpack so it can be used on a bundle and not
@@ -55,18 +59,18 @@ local absolute_path         = fslib.absolute_path
 ---@param sources string_list_t
 ---@return integer
 local function bundleunpack(source_dirs, sources)
-  local error_level = make_directory(localdir)
+  local error_level = make_directory(Dir[l3b_vars.LOCAL])
   if error_level ~=0 then
     return error_level
   end
-  error_level = make_clean_directory(unpackdir)
+  error_level = make_clean_directory(Dir.unpack)
   if error_level ~=0 then
     return error_level
   end
-  for i in entries(source_dirs or { sourcefiledir }) do
+  for i in entries(source_dirs or { Dir.sourcefile }) do
     for j in entries(sources or { sourcefiles }) do
       for k in entries(j) do
-        error_level = copy_tree(k, i, unpackdir)
+        error_level = copy_tree(k, i, Dir.unpack)
         if error_level ~=0 then
           return error_level
         end
@@ -74,21 +78,21 @@ local function bundleunpack(source_dirs, sources)
     end
   end
   for i in entries(unpacksuppfiles) do
-    error_level = copy_tree(i, supportdir, localdir)
+    error_level = copy_tree(i, Dir.support, Dir[l3b_vars.LOCAL])
     if error_level ~=0 then
       return error_level
     end
   end
   for i in entries(unpackfiles) do
-    for j in keys(tree(unpackdir, i)) do
+    for j in keys(tree(Dir.unpack, i)) do
       local dir_path, base_name = dir_base(j)
-      local localdir = absolute_path(localdir)
+      local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
       local success = io.popen(cmd_concat(
-          "cd " .. unpackdir .. "/" .. dir_path,
+          "cd " .. Dir.unpack .. "/" .. dir_path,
           os_setenv .. " TEXINPUTS=." .. os_pathsep
-            .. localdir .. (unpacksearch and os_pathsep or ""),
+            .. local_dir .. (unpacksearch and os_pathsep or ""),
           os_setenv .. " LUAINPUTS=." .. os_pathsep
-            .. localdir .. (unpacksearch and os_pathsep or ""),
+            .. local_dir .. (unpacksearch and os_pathsep or ""),
           unpackexe .. " " .. unpackopts .. " " .. base_name
             .. (options["quiet"] and (" > " .. os_null) or "")
         ), "w"
@@ -118,7 +122,7 @@ local function unpack(sources, source_dirs)
     return error_level
   end
   for g in entries(installfiles) do
-    error_level = copy_tree(g, unpackdir, localdir)
+    error_level = copy_tree(g, Dir.unpack, Dir[l3b_vars.LOCAL])
     if error_level ~= 0 then
       return error_level
     end

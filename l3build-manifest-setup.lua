@@ -58,6 +58,7 @@ local sort = table.sort
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 local Xtn       = l3b_vars.Xtn
+local Dir       = l3b_vars.Dir
 
 ---@class manifest_entry_t
 ---@field subheading          string
@@ -98,7 +99,7 @@ generates the installation files of the package. Additional files included here 
 be installed for processing such as testing.
 ]],
        files   = { sourcefiles },
-       dir     = sourcefiledir or maindir, -- TODO: remove "or maindir" after rebasing onto master
+       dir     = Dir.sourcefile or Dir.main, -- TODO: remove "or Dir.main" after rebasing onto master
     },
     {
        name    = "Typeset documentation source files",
@@ -114,7 +115,7 @@ These files form part of the documentation but are not typeset. Generally they w
 additional input files for the typeset documentation files listed above.
 ]],
        files   = { docfiles },
-       dir     = docfiledir or maindir, -- TODO: remove "or maindir" after rebasing onto master
+       dir     = Dir.docfile or Dir.main, -- TODO: remove "or Dir.main" after rebasing onto master
     },
     {
        name    = "Text files",
@@ -147,7 +148,7 @@ The files created by ‘unpacking’ the package sources. This typically include
 ]],
        files   = { installfiles },
        exclude = { excludefiles, sourcefiles },
-       dir     = unpackdir,
+       dir     = Dir.unpack,
        skipfiledescription = true,
     },
     {
@@ -166,7 +167,7 @@ etc., package files.
 These files are used for unpacking, typesetting, or checking purposes.
 ]],
        files   = { unpacksuppfiles,typesetsuppfiles,checksuppfiles },
-       dir     = supportdir,
+       dir     = Dir.support,
     },
     {
        name    = "Checking-specific support files",
@@ -175,7 +176,7 @@ Support files for checking the test suite.
 ]],
        files   = { "*.*" },
        exclude = { { ".", ".." }, excludefiles },
-       dir     = testsuppdir,
+       dir     = Dir.testsupp,
     },
     {
        name    = "Test files",
@@ -186,7 +187,7 @@ the same output. These output files are sometimes shared and sometime specific f
 different engines (pdfTeX, XeTeX, LuaTeX, etc.).
 ]],
        files   = { "*"..Xtn.lvt, "*"..Xtn.lve, "*"..Xtn.tlg },
-       dir     = testfiledir,
+       dir     = Dir.testfile,
        skipfiledescription = true,
     },
     {
@@ -199,7 +200,7 @@ the package into a TeX distribution.
     {
        name    = "Source files (TDS)",
        description = "All files included in the `"..module.."/source` directory.\n",
-       dir     = tdsdir.."/source/"..moduledir,
+       dir     = Dir.tds.."/source/"..Dir.module,
        files   = { "*.*" },
        exclude = { ".", ".." },
        flag    = false,
@@ -208,7 +209,7 @@ the package into a TeX distribution.
     {
        name    = "TeX files (TDS)",
        description = "All files included in the `"..module.."/tex` directory.\n",
-       dir     = tdsdir.."/tex/"..moduledir,
+       dir     = Dir.tds.."/tex/"..Dir.module,
        files   = { "*.*" },
        exclude = { ".",".." },
        flag    = false,
@@ -217,7 +218,7 @@ the package into a TeX distribution.
     {
        name    = "Doc files (TDS)",
        description = "All files included in the `"..module.."/doc` directory.\n",
-       dir     = tdsdir.."/doc/"..moduledir,
+       dir     = Dir.tds.."/doc/"..Dir.module,
        files   = { "*.*" },
        exclude = { ".",".." },
        flag    = false,
@@ -231,7 +232,7 @@ The following group lists the files included in the CTAN package.
     },
     {
        name    = "CTAN files",
-       dir     = ctandir.."/"..module,
+       dir     = Dir.ctan.."/"..module,
        files   = { "*.*" },
        exclude = { ".", ".." },
        flag    = false,

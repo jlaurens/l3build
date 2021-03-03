@@ -85,6 +85,7 @@ local make_clean_directory  = fslib.make_clean_directory
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 local Xtn       = l3b_vars.Xtn
+local Dir       = l3b_vars.Dir
 
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -129,32 +130,32 @@ end
 -- for saving the test files
 local function checkinit()
   if not options["dirty"] then
-    make_clean_directory(testdir)
-    make_clean_directory(resultdir)
+    make_clean_directory(Dir.test)
+    make_clean_directory(Dir.result)
   end
   dep_install(checkdeps)
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for i in all_files(localdir) do
-    copy_tree(i, localdir, testdir)
+  for i in all_files(Dir[l3b_vars.LOCAL]) do
+    copy_tree(i, Dir[l3b_vars.LOCAL], Dir.test)
   end
-  bundleunpack({ sourcefiledir, testfiledir })
+  bundleunpack({ Dir.sourcefile, Dir.testfile })
   for i in entries(installfiles) do
-    copy_tree(i, unpackdir, testdir)
+    copy_tree(i, Dir.unpack, Dir.test)
   end
   for i in entries(checkfiles) do
-    copy_tree(i, unpackdir, testdir)
+    copy_tree(i, Dir.unpack, Dir.test)
   end
-  if directory_exists(testsuppdir) then
-    for i in all_files(testsuppdir) do
-      copy_tree(i, testsuppdir, testdir)
+  if directory_exists(Dir.testsupp) then
+    for i in all_files(Dir.testsupp) do
+      copy_tree(i, Dir.testsupp, Dir.test)
     end
   end
   for i in entries(checksuppfiles) do
-    copy_tree(i, supportdir, testdir)
+    copy_tree(i, Dir.support, Dir.test)
   end
-  execute(os_ascii .. ">" .. testdir .. "/ascii.tcx")
+  execute(os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
   return (_G.checkinit_hook or checkinit_hook)()
 end
 
@@ -670,7 +671,7 @@ local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
 
--- Look for a test: could be in the testfiledir or the unpackdir
+-- Look for a test: could be in the Dir.testfile or the Dir.unpack
 ---comment
 ---@param test string
 ---@return string
@@ -680,7 +681,7 @@ local function test_exists(test)
   for i, kind in ipairs(Vars.test_order) do
     file_names[i] = test .. Vars.test_types[kind].test
   end
-  local found = locate({ testfiledir, unpackdir }, file_names)
+  local found = locate({ Dir.testfile, Dir.unpack }, file_names)
   if found then
     for i, kind in ipairs(Vars.test_order) do
       local file_name = file_names[i]
@@ -699,9 +700,9 @@ end
 ---@return integer
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
-  local diff_file = testdir .. "/" .. test_name .. test_type.generated .. os_diffext
-  local gen_file  = testdir .. "/" .. test_name .. test_type.generated
-  local ref_file  = locate({ testdir }, {
+  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. os_diffext
+  local gen_file  = Dir.test .. "/" .. test_name .. test_type.generated
+  local ref_file  = locate({ Dir.test }, {
     test_name .. test_type.reference,
     name .. test_type.reference })
   if not ref_file then
@@ -721,10 +722,10 @@ end
 
 local function show_failed_log(name)
   print("\nCheck failed with log file")
-  for i in all_files(testdir, name..".log") do
-    print("  - " .. testdir .. "/" .. i)
+  for i in all_files(Dir.test, name..".log") do
+    print("  - " .. Dir.test .. "/" .. i)
     print("")
-    local fh = open(testdir .. "/" .. i, "r")
+    local fh = open(Dir.test .. "/" .. i, "r")
     local content = fh:read("a")
     fh:close()
     print("-----------------------------------------------------------------------------------")
@@ -735,10 +736,10 @@ end
 
 local function show_failed_diff()
   print("\nCheck failed with difference file")
-  for i in all_files(testdir, "*" .. os_diffext) do
-    print("  - " .. testdir .. "/" .. i)
+  for i in all_files(Dir.test, "*" .. os_diffext) do
+    print("  - " .. Dir.test .. "/" .. i)
     print("")
-    local fh = open(testdir .. "/" .. i, "r")
+    local fh = open(Dir.test .. "/" .. i, "r")
     local content = fh:read("a")
     fh:close()
     print("-----------------------------------------------------------------------------------")
@@ -769,10 +770,10 @@ end
 local function run_test(name, engine, hide, ext, test_type, breakout)
   local lvt_file = name .. (ext or Xtn.lvt)
   copy_tree(lvt_file,
-    file_exists(testfiledir .. "/" .. lvt_file)
-      and testfiledir
-      or unpackdir,
-    testdir)
+    file_exists(Dir.testfile .. "/" .. lvt_file)
+      and Dir.testfile
+      or Dir.unpack,
+    Dir.test)
   local check_opts = checkopts
   engine = engine or stdengine
   local binary = engine
@@ -805,7 +806,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     end
   end
 
-  local base_name = testdir .. "/" .. name
+  local base_name = Dir.test .. "/" .. name
   local gen_file = base_name .. test_type.generated
   local new_file = base_name .. "." .. engine .. test_type.generated
   local ascii_opt = ""
@@ -817,19 +818,19 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Clean out any dynamic files
   for filetype in entries(dynamicfiles) do
-    remove_tree(testdir, filetype)
+    remove_tree(Dir.test, filetype)
   end
   -- Ensure there is no stray .log file
-  remove_file(testdir, name .. Xtn.log)
+  remove_file(Dir.test, name .. Xtn.log)
   local errlevels = {}
   local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
-    localtexmf = os_pathsep .. absolute_path(texmfdir) .. "//"
+  if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
+    localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, checkruns do
     errlevels[run_number] = run(
-      testdir, cmd_concat(
-        -- No use of localdir here as the files get copied to testdir:
+      Dir.test, cmd_concat(
+        -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
         os_setenv .. " TEXINPUTS=." .. localtexmf
           .. (checksearch and os_pathsep or ""),
@@ -852,8 +853,8 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     -- Break the loop if the result is stable
     if breakout and run_number < checkruns then
       if test_type.generated == Xtn.pdf then
-        if file_exists(testdir .. "/" .. name .. Xtn.dvi) then
-          dvitopdf(name, testdir, engine, hide)
+        if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
+          dvitopdf(name, Dir.test, engine, hide)
         end
       end
       test_type.rewrite(gen_file, new_file, engine, errlevels)
@@ -863,22 +864,22 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     end
   end
   if test_type.generated == Xtn.pdf then
-    if file_exists(testdir .. "/" .. name .. Xtn.dvi) then
-      dvitopdf(name, testdir, engine, hide)
+    if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
+      dvitopdf(name, Dir.test, engine, hide)
     end
-    copy_tree(name .. Xtn.pdf, testdir, resultdir)
-    rename(resultdir, name .. Xtn.pdf, name .. "." .. engine .. Xtn.pdf)
+    copy_tree(name .. Xtn.pdf, Dir.test, Dir.result)
+    rename(Dir.result, name .. Xtn.pdf, name .. "." .. engine .. Xtn.pdf)
   end
   test_type.rewrite(gen_file, new_file, engine, errlevels)
   -- Store secondary files for this engine
   for filetype in entries(auxfiles) do
-    for file in all_files(testdir, filetype) do
+    for file in all_files(Dir.test, filetype) do
       if match(file, "^" .. name .. "%.[^.]+$") then
         local newname = gsub(file, "(%.[^.]+)$", "." .. engine .. "%1")
-        if file_exists(testdir .. "/" .. newname) then
-          remove_file(testdir, newname)
+        if file_exists(Dir.test .. "/" .. newname) then
+          remove_file(Dir.test, newname)
         end
-        rename(testdir, file, newname)
+        rename(Dir.test, file, newname)
       end
     end
   end
@@ -894,7 +895,7 @@ local function setup_check(name, engine)
   for kind in entries(Vars.test_order) do
     local reference_ext = Vars.test_types[kind].reference
     local reference_file = locate(
-      { testfiledir, unpackdir },
+      { Dir.testfile, Dir.unpack },
       { test_name .. reference_ext, name .. reference_ext }
     )
     if reference_file then
@@ -903,7 +904,7 @@ local function setup_check(name, engine)
       copy_tree(
         match(reference_file, ".*/(.*)"),
         match(reference_file, "(.*)/.*"),
-        testdir
+        Dir.test
       )
     end
   end
@@ -915,13 +916,13 @@ local function setup_check(name, engine)
     local test_type = Vars.test_types[kind]
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
-      { testfiledir, unpackdir },
+      { Dir.testfile, Dir.unpack },
       { name .. exp_ext }
     )
     if expectation_file then
       found = true
       run_test(name, engine, true, exp_ext, test_type)
-      rename(testdir,
+      rename(Dir.test,
         test_name .. test_type.generated,
         test_name .. test_type.reference)
     end
@@ -1009,11 +1010,11 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   then
     local lua_log_file
     if cleanup then
-      lua_log_file = testdir .. "/" .. test_name .. ".tmp" .. Xtn.log
+      lua_log_file = Dir.test .. "/" .. test_name .. ".tmp" .. Xtn.log
     else
       lua_log_file = log_file
     end
-    local lua_tlg_file = testdir .. "/" .. test_name .. Xtn.tlg
+    local lua_tlg_file = Dir.test .. "/" .. test_name .. Xtn.tlg
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
     error_level = execute(os_diffexe .. " "
@@ -1035,8 +1036,8 @@ end
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
   print("\n  Check failed with difference files")
-  for i in all_files(testdir, "*" .. os_diffext) do
-    print("  - " .. testdir .. "/" .. i)
+  for i in all_files(Dir.test, "*" .. os_diffext) do
+    print("  - " .. Dir.test .. "/" .. i)
   end
   print("")
 end
@@ -1067,7 +1068,7 @@ dflt = {
 ---@return integer
 local function check(names)
   local errorlevel = 0
-  if testfiledir ~= "" and directory_exists(testfiledir) then
+  if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     if not options["rerun"] then
       checkinit()
     end
@@ -1087,7 +1088,7 @@ local function check(names)
           excludepatterns[num_exclude] = glob_to_pattern(glob .. ext)
         end
         for glob in entries(includetests) do
-          for name in all_files(testfiledir, glob .. ext) do
+          for name in all_files(Dir.testfile, glob .. ext) do
             local exclude
             for i = 1, num_exclude do
               if match(name, excludepatterns[i]) then
@@ -1099,7 +1100,7 @@ local function check(names)
               append(names, job_name(name))
             end
           end
-          for name in all_files(unpackdir, glob .. ext) do
+          for name in all_files(Dir.unpack, glob .. ext) do
             local exclude
             for i = 1, num_exclude do
               if not match(name, excludepatterns[i]) then
@@ -1108,7 +1109,7 @@ local function check(names)
               end
             end
             if not exclude then
-              if file_exists(testfiledir .. "/" .. name) then
+              if file_exists(Dir.testfile .. "/" .. name) then
                 return 1
               end
               append(names, job_name(name))
@@ -1190,7 +1191,7 @@ local function save(names)
       return 1
     end
     local test_type = Vars.test_types[kind]
-    if locate({ unpackdir, testfiledir }, { name .. test_type.expectation }) then
+    if locate({ Dir.unpack, Dir.testfile }, { name .. test_type.expectation }) then
       print("Saved " .. test_type.test .. " file would override a "
         .. test_type.expectation .. " file of the same name")
       return 1
@@ -1201,9 +1202,9 @@ local function save(names)
       local gen_file = name .. "." .. engine .. test_type.generated
       print("Creating and copying " .. out_file)
       run_test(name, engine, false, test_type.test, test_type)
-      rename(testdir, gen_file, out_file)
-      copy_tree(out_file, testdir, testfiledir)
-      if file_exists(unpackdir .. "/" .. test_type.reference) then
+      rename(Dir.test, gen_file, out_file)
+      copy_tree(out_file, Dir.test, Dir.testfile)
+      if file_exists(Dir.unpack .. "/" .. test_type.reference) then
         print("Saved " .. test_type.reference
           .. " file overrides unpacked version of the same name")
         return 1

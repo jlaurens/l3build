@@ -53,6 +53,13 @@ local copy_tree       = fslib.copy_tree
 local rename          = fslib.rename
 local remove_directory  = fslib.remove_directory
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+---@type Main_t
+local Main      = l3b_vars.Main
+---@type Dir_t
+local Dir       = l3b_vars.Dir
+
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
 local call    = l3b_aux.call
@@ -63,17 +70,18 @@ local install_files = l3b_install.install_files
 
 -- Copy files to the main CTAN release directory
 local function copy_ctan()
-  make_directory(ctandir .. "/" .. ctanpkg)
+  local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
+  make_directory(ctanpkg_dir)
   local function copyfiles(files, source)
-    if source == currentdir or flatten then
+    if source == Dir.current or flatten then
       for filetype in entries(files) do
-        copy_tree(filetype, source, ctandir .. "/" .. ctanpkg)
+        copy_tree(filetype, source, ctanpkg_dir)
       end
     else
       for filetype in entries(files) do
         for file in values(tree(source, filetype)) do
           local path = dir_name(file)
-          local ctantarget = ctandir .. "/" .. ctanpkg .. "/" .. path
+          local ctantarget = ctanpkg_dir .. "/" .. path
           make_directory(ctantarget)
           copy_tree(file, source, ctantarget)
         end
@@ -84,18 +92,18 @@ local function copy_ctan()
     bibfiles, demofiles, docfiles,
     pdffiles, scriptmanfiles, typesetlist
   ) do
-    copyfiles(tab, docfiledir)
+    copyfiles(tab, Dir.docfile)
   end
-  copyfiles(sourcefiles, sourcefiledir)
+  copyfiles(sourcefiles, Dir.sourcefile)
   for file in entries(textfiles) do
-    copy_tree(file, textfiledir, ctandir .. "/" .. ctanpkg)
+    copy_tree(file, Dir.textfile, ctanpkg_dir)
   end
 end
 
 ---comment
 ---@return integer
 local function bundle_ctan()
-  local errorlevel = install_files(tdsdir, true)
+  local errorlevel = install_files(Dir.tds, true)
   if errorlevel ~=0 then return errorlevel end
   copy_ctan()
   return 0
@@ -139,12 +147,12 @@ function ctan()
     error_level = call(modules, "bundlecheck")
   end
   if error_level == 0 then
-    remove_directory(ctandir)
-    make_directory(ctandir .. "/" .. ctanpkg)
-    remove_directory(tdsdir)
-    make_directory(tdsdir)
+    remove_directory(Dir.ctan)
+    make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
+    remove_directory(Dir.tds)
+    make_directory(Dir.tds)
     if standalone then
-      error_level = install_files(tdsdir, true)
+      error_level = install_files(Dir.tds, true)
       if error_level ~=0 then return error_level end
       copy_ctan()
     else
@@ -158,17 +166,17 @@ function ctan()
   end
   if error_level == 0 then
     for i in entries(textfiles) do
-      for j in items(unpackdir, textfiledir) do
-        copy_tree(i, j, ctandir .. "/" .. ctanpkg)
-        copy_tree(i, j, tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle)
+      for j in items(Dir.unpack, Dir.textfile) do
+        copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
+        copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle)
       end
     end
     -- Rename README if necessary
     if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
       local newfile = "README." .. match(ctanreadme, "%.(%w+)$")
       for dir in items(
-        ctandir .. "/" .. ctanpkg,
-        tdsdir .. "/doc/" .. tdsroot .. "/" .. bundle
+        Dir.ctan .. "/" .. Main.ctanpkg,
+        Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle
       ) do
         if file_exists(dir .. "/" .. ctanreadme) then
           remove_tree(dir, newfile)
@@ -176,12 +184,12 @@ function ctan()
         end
       end
     end
-    dirzip(tdsdir, ctanpkg .. ".tds")
+    dirzip(Dir.tds, Main.ctanpkg .. ".tds")
     if packtdszip then
-      copy_tree(ctanpkg .. ".tds.zip", tdsdir, ctandir)
+      copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
     end
-    dirzip(ctandir, ctanzip)
-    copy_tree(ctanzip .. ".zip", ctandir, currentdir)
+    dirzip(Dir.ctan, ctanzip)
+    copy_tree(ctanzip .. ".zip", Dir.ctan, Dir.current)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

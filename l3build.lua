@@ -46,10 +46,10 @@ kpse.set_program_name("kpsewhich")
 
 -- # Start of the booting process
 
+assert(not _G.l3build, "No self call")
+
 local is_main  -- Whether the script is called first
 local work_dir -- the directory containing "build.lua" and friends
-
-assert(not _G.l3build, "No self call")
 
 ---@alias flag_table_t table<string, boolean>
 
@@ -67,9 +67,11 @@ assert(not _G.l3build, "No self call")
 ---@field launch_dir string where "l3build.lua" and friends live
 ---@field start_dir string the current directory at load time
 ---@field options table
+---@field flags table
 
 local l3build = { -- global data available as package.
-  debug = {} -- storage for special debug flags (private UI)
+  debug = {}, -- storage for special debug flags (private UI)
+  flags = {}, -- various shared flags
 }
 
 do
@@ -134,7 +136,7 @@ do
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
   local function on_debug(f) end
-  
+
   for _, o in ipairs(arg) do
     if match(o, "^%-%-debug") then
       function on_debug(f)
@@ -244,14 +246,14 @@ end
 local utlib   = require("l3b.utillib")
 local entries = utlib.entries
 
----@type oslib_t
-local oslib       = require("l3b.oslib")
-local quoted_path = oslib.quoted_path
-
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
 local all_files   = fslib.all_files
 local file_exists = fslib.file_exists
+
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Dir       = l3b_vars.Dir
 
 ---@type l3b_arguments_t
 local arguments = require("l3b.arguments")
@@ -302,25 +304,6 @@ if is_main then
   dofile(work_dir .. "build.lua")
 end
 
--- Load standard settings for variables:
--- comes after any user versions
-require("l3b.variables")
-
--- Ensure that directories are 'space safe'
-maindir       = quoted_path(maindir)
-docfiledir    = quoted_path(docfiledir)
-sourcefiledir = quoted_path(sourcefiledir)
-supportdir    = quoted_path(supportdir)
-testfiledir   = quoted_path(testfiledir)
-testsuppdir   = quoted_path(testsuppdir)
-builddir      = quoted_path(builddir)
-distribdir    = quoted_path(distribdir)
-localdir      = quoted_path(localdir)
-resultdir     = quoted_path(resultdir)
-testdir       = quoted_path(testdir)
-typesetdir    = quoted_path(typesetdir)
-unpackdir     = quoted_path(unpackdir)
-
 -- Tidy up the epoch setting
 -- Force an epoch if set at the command line
 -- Must be done after loading variables, etc.
@@ -366,12 +349,12 @@ if options["target"] == "check" then
       for config in entries(failed) do
         print("Failed tests for configuration " .. config .. ":")
         print("\n  Check failed with difference files")
-        local testdir = testdir
+        local test_dir = Dir.test
         if config ~= "build" then
-          testdir = testdir .. "-" .. config
+          test_dir = test_dir .. "-" .. config
         end
-        for i in all_files(testdir, "*" .. os_diffext) do
-          print("  - " .. testdir .. "/" .. i)
+        for name in all_files(test_dir, "*" .. os_diffext) do
+          print("  - " .. test_dir .. "/" .. name)
         end
         print("")
       end
@@ -386,21 +369,19 @@ local config_1 = checkconfigs[1]
 if #checkconfigs == 1 and
    config_1 ~= "build" and
    (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-   local config = work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
-   if file_exists(config) then
-     local savedtestfiledir = testfiledir
-     dofile(config)
-     testdir = testdir .. "-" .. config_1
-     -- Reset testsuppdir if required
-     if savedtestfiledir ~= testfiledir and
-       testsuppdir == savedtestfiledir .. "/support" then
-       testsuppdir = testfiledir .. "/support"
-     end
+   local config_path = work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
+   if file_exists(config_path) then
+     dofile(config_path)
+     Dir.test = Dir.test .. "-" .. config_1
+     -- Reset Dir.testsupp if required
    else
      print("Error: Cannot find configuration " .. config_1)
      exit(1)
    end
 end
+
+-- From now on, we can cache results in choosers
+utlib.flags.cache_chosen = true
 
 -- Call the main function
 main(options["target"], options["names"])

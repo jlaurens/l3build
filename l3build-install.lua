@@ -64,6 +64,10 @@ local make_clean_directory  = fslib.make_clean_directory
 local make_directory        = fslib.make_directory
 local rename                = fslib.rename
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Dir       = l3b_vars.Dir
+
 ---@type l3b_unpack_t
 local l3b_unpack  = require("l3b.unpack")
 local unpack      = l3b_unpack.unpack
@@ -84,25 +88,25 @@ end
 
 local function uninstall()
   local function zapdir(dir)
-    local installdir = gethome() .. "/" .. dir
+    local install_dir = gethome() .. "/" .. dir
     if options["dry-run"] then
-      local files = file_list(installdir)
+      local files = file_list(install_dir)
       if next(files) then
-        print("\n" .. "For removal from " .. installdir .. ":")
-        for file in entries(installdir) do
+        print("\n" .. "For removal from " .. install_dir .. ":")
+        for file in entries(install_dir) do
           print("- " .. file)
         end
       end
       return 0
     else
-      if directory_exists(installdir) then
-        return remove_directory(installdir)
+      if directory_exists(install_dir) then
+        return remove_directory(install_dir)
       end
     end
     return 0
   end
   local function uninstall_files(dir, subdir)
-    subdir = subdir or moduledir
+    subdir = subdir or Dir.module
     dir = dir .. "/" .. subdir
     return zapdir(dir)
   end
@@ -110,15 +114,15 @@ local function uninstall()
   -- Any script man files need special handling
   local manfiles = {}
   for glob in entries(scriptmanfiles) do
-    for file in keys(tree(docfiledir, glob)) do
+    for file in keys(tree(Dir.docfile, glob)) do
       -- Man files should have a single-digit extension: the type
-      local installdir = gethome() .. "/doc/man/man"  .. match(file, ".$")
-      if file_exists(installdir .. "/" .. file) then
+      local install_dir = gethome() .. "/doc/man/man"  .. match(file, ".$")
+      if file_exists(install_dir .. "/" .. file) then
         if options["dry-run"] then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
            select(2, dir_base(file)))
         else
-          error_level = error_level + remove_tree(installdir, file)
+          error_level = error_level + remove_tree(install_dir, file)
         end
       end
     end
@@ -155,7 +159,7 @@ local function install_files(target, full, dry_run)
   local installmap = {}
 
   local function create_install_map(source, dir, files, subdir)
-    subdir = subdir or moduledir
+    Dir.sub = subdir or Dir.module
     -- For material associated with secondary tools (BibTeX, MakeIndex)
     -- the structure needed is slightly different from those items going
     -- into the tex/doc/source trees
@@ -230,7 +234,7 @@ local function install_files(target, full, dry_run)
 
     -- Creates a 'controlled' list of files
     local function create_file_list(dir, include, exclude)
-      dir = dir or currentdir
+      dir = dir or Dir.current
       include = include or {}
       exclude = exclude or {}
       local excludelist = {}
@@ -252,7 +256,7 @@ local function install_files(target, full, dry_run)
       return result
     end
 
-  local installlist = create_file_list(unpackdir, installfiles, { scriptfiles })
+  local installlist = create_file_list(Dir.unpack, installfiles, { scriptfiles })
 
   if full then
     errorlevel = doc()
@@ -271,25 +275,25 @@ local function install_files(target, full, dry_run)
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = create_file_list(docfiledir, typesetfiles, { sourcefiles })
-    sourcelist = create_file_list(sourcefiledir, sourcefiles,
+    typesetlist = create_file_list(Dir.docfile, typesetfiles, { sourcefiles })
+    sourcelist = create_file_list(Dir.sourcefile, sourcefiles,
       { bstfiles, installfiles, makeindexfiles, scriptfiles })
  
   if dry_run then
     print("\nFor installation inside " .. target .. ":")
   end 
     
-    errorlevel = create_install_map(sourcefiledir, "source", { sourcelist })
-      + create_install_map(docfiledir, "doc",
+    errorlevel = create_install_map(Dir.sourcefile, "source", { sourcelist })
+      + create_install_map(Dir.docfile, "doc",
           { bibfiles, demofiles, docfiles, pdffiles, textfiles, typesetlist })
     if errorlevel ~= 0 then return errorlevel end
 
     -- Rename README if necessary
     if not dry_run then
       if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
-        local installdir = target .. "/doc/" .. moduledir
-        if file_exists(installdir .. "/" .. ctanreadme) then
-          rename(installdir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
+        local install_dir = target .. "/doc/" .. Dir.module
+        if file_exists(install_dir .. "/" .. ctanreadme) then
+          rename(install_dir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
         end
       end
     end
@@ -297,15 +301,15 @@ local function install_files(target, full, dry_run)
     -- Any script man files need special handling
     local manfiles = {}
     for glob in entries(scriptmanfiles) do
-      for file in keys(tree(docfiledir, glob)) do
+      for file in keys(tree(Dir.docfile, glob)) do
         if dry_run then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
             select(2, dir_base(file)))
         else
           -- Man files should have a single-digit extension: the type
-          local installdir = target .. "/doc/man/man"  .. match(file, ".$")
-          errorlevel = errorlevel + make_directory(installdir)
-          errorlevel = errorlevel + copy_tree(file, docfiledir, installdir)
+          local install_dir = target .. "/doc/man/man"  .. match(file, ".$")
+          errorlevel = errorlevel + make_directory(install_dir)
+          errorlevel = errorlevel + copy_tree(file, Dir.docfile, install_dir)
         end
       end
     end
@@ -318,10 +322,10 @@ local function install_files(target, full, dry_run)
 
   if errorlevel ~= 0 then return errorlevel end
 
-  errorlevel = create_install_map(unpackdir, "tex", { installlist })
-    + create_install_map(unpackdir, "bibtex/bst", { bstfiles }, module)
-    + create_install_map(unpackdir, "makeindex", { makeindexfiles }, module)
-    + create_install_map(unpackdir, "scripts", { scriptfiles }, module)
+  errorlevel = create_install_map(Dir.unpack, "tex", { installlist })
+    + create_install_map(Dir.unpack, "bibtex/bst", { bstfiles }, module)
+    + create_install_map(Dir.unpack, "makeindex", { makeindexfiles }, module)
+    + create_install_map(Dir.unpack, "scripts", { scriptfiles }, module)
 
   if errorlevel ~= 0 then return errorlevel end
 

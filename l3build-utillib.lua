@@ -201,39 +201,65 @@ local function deep_copy(original)
   return f(original)
 end
 
+-- Unique key
+local DID_CHOOSE = {}
+
+---@class flags_t
+---@field cache_chosen boolean
+
+---@type_t flags_t
+local flags = {}
+
+---@class chooser_kv_t
+---@field prefix string|nil -- prepend this prefix to the key for G, not for dflt
+---@field suffix string|nil -- append this prefix to the key for G, not for dflt
+
 ---Return an object that picks its attributes from G or dflt
 ---Central method in variables management.
+---If `dflt` defines a function for key `DID_CHOOSE`,
+---it will be used to apply a post treatment to the result.
+---This function has signature fun(result: any, k: string): any
+---For example, return directory paths may normalized that way.
 ---@param G       any, used with _G
 ---@param dflt    any
----@param prefix  string -- add this prefix to the key for G, not for dflt
+---@param kv      chooser_kv_t
 ---@return fun(t: table, k: any): any
-local function chooser(G, dflt, prefix)
+local function chooser(G, dflt, kv)
   local function __index(t, k)        -- will end in a metatable
     local dflt_k = dflt[k]            -- default candidate
     if dflt_k == nil then return end  -- unknown key, stop here
     local result
-    local G_k = G[prefix and prefix .. k or k] -- global candidate
-    if not G_k then
+    local kk = k
+    if kv then -- modify the global key
+      if kv.prefix then kk = kv.prefix .. k end
+      if kv.suffix then kk = k .. kv.suffix end
+    end
+    local G_kk = G[kk] -- global candidate
+    if not G_kk then
       result = dflt_k                 -- choose the default
     else
-      local type_G_k = type(G_k)
+      local type_G_kk = type(G_kk)
       local type_dflt_k = type(dflt_k)
-      if type_G_k ~= type_dflt_k then   -- global is not acceptable
-        error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_k)
+      if type_G_kk ~= type_dflt_k then   -- global is not acceptable
+        error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
       end
-      result = type_G_k == "table"
-        and chooser(G_k, dflt_k)
-        or  G_k
+      result = type_G_kk == "table"
+        and chooser(G_kk, dflt_k)
+        or  G_kk
+    end
+    -- post treatment
+    local did_choose = dflt[DID_CHOOSE]
+    if did_choose then
+      result = did_choose(result, k)
     end
     -- cache the result if any such that next time, __index is not called
-    if result ~= nil then
+    if flags.cache_chosen and result ~= nil then
       t[k] = result
     end
     return result
   end
-  return setmetatable({}, {
-    __index = __index
-  })
+
+  return setmetatable({}, { __index = __index })
 end
 
 ---@class utlib_t
@@ -251,6 +277,8 @@ end
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field file_contents     fun(file_pat: string): string|nil
 ---@field deep_copy         fun(original: any): any
+---@field DID_CHOOSE        any
+---@field flags             flags_t
 ---@field chooser           fun(G: table, dflt: table): fun(t: table, k: any): any
 
 return {
@@ -268,5 +296,7 @@ return {
   extend_with       = extend_with,
   file_contents     = file_contents,
   deep_copy         = deep_copy,
+  flags             = flags,
+  DID_CHOOSE        = DID_CHOOSE,
   chooser           = chooser,
 }

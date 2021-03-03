@@ -254,7 +254,7 @@ function MT:upload(tag_names)
 
   if options["debug"] then
     self.append_request(' https://httpbin.org/post')
-    local response = send(self.request)
+    local response = self:send_request("")
     print('\n\nCURL COMMAND:')
     print(self.request)
     print("\n\nHTTP RESPONSE:")

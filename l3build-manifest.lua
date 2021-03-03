@@ -46,6 +46,11 @@ local fslib      = require("l3b.fslib")
 local all_files = fslib.all_files
 local file_list = fslib.file_list
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+local Main      = l3b_vars.Main
+local Dir       = l3b_vars.Dir
+
 ---@type l3b_manifest_setup_t
 local stp = require("l3b.manifest-setup")
 
@@ -59,7 +64,7 @@ local Mnfst = chooser(_G, {
   write_group_heading     = stp.write_heading,
   write_group_file_descr  = stp.write_group_file_descr,
   write_group_file        = stp.write_group_file,
-}, "manifest_")
+}, { prefix = "manifest_" })
 
 local Vars = chooser(_G, {
   -- Manifest options
@@ -105,7 +110,7 @@ function MT:build_init(entry)
   local defaults = {
     skipfiledescription  = false            ,
     rename               = false            ,
-    dir                  = maindir          ,
+    dir                  = Dir.main          ,
     exclude              = { excludefiles } ,
     flag                 = true             ,
   }
@@ -149,7 +154,7 @@ function MT:build_list(entry)
     -- build list of excluded files
     for glob_list in entries(entry.exclude) do
       for this_glob in entries(glob_list) do
-        for this_file in all_files(maindir, this_glob) do
+        for this_file in all_files(Dir.main, this_glob) do
           entry.excludes[this_file] = true
         end
       end
@@ -252,12 +257,12 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_files(ctandir.."/"..ctanpkg, "*.*") do
+  for f in all_files(Dir.ctan.."/".. Main.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_files(tdsdir..subdir..moduledir, "*.*") do
+    for f in all_files(Dir.tds..subdir..Dir.module, "*.*") do
       self.tds_files[f] = true
     end
   end
