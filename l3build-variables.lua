@@ -228,9 +228,6 @@ local Xtn = chooser(_G, {
   tlg = ".tlg",
   tpf = ".tpf",
 })
--- Manifest options
-manifestfile = manifestfile or "MANIFEST.md"
-
 -- Non-standard installation locations
 tdslocations = tdslocations or {}
 

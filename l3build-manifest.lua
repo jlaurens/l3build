@@ -35,6 +35,7 @@ for those people who are interested.
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
+local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
 local keys        = utlib.keys
@@ -55,6 +56,11 @@ local write_heading           = stp.write_heading
 local write_group_file_descr  = stp.write_group_file_descr
 local write_group_file        = stp.write_group_file
 local setup                   = stp.setup
+
+local Vars = chooser(_G, {
+  -- Manifest options
+  manifestfile = "MANIFEST.md"
+})
 
 local MT = {}
 ---comment
@@ -203,9 +209,7 @@ function MT:write_group(fh, entry)
       end
       writer(fh, file, descr, param)
     end
-
   else
-
     writer = _G.manifest_write_group_file or write_group_file
     for ii, file in ipairs(entry.files_ordered) do
       local param = {
@@ -225,15 +229,13 @@ function MT:write_group(fh, entry)
 			end
       writer(fh, file, param)
     end
-
   end
-
 end
 
 ---comment
 ---@param manifest_entries table
 function MT:write(manifest_entries)
-  local fh = assert(io.open(manifestfile, "w"))
+  local fh = assert(io.open(Vars.manifestfile, "w"))
   write_opening(fh)
   local wrt_subheading = _G.manifest_write_subheading or write_heading
   for entry in entries(manifest_entries) do
@@ -267,7 +269,7 @@ function MT:manifest()
 
   self:write(manifest_entries)
 
-  local footer = "Manifest written to " .. manifestfile
+  local footer = "Manifest written to " .. Vars.manifestfile
   local alt_footer = footer:gsub(".", "*")
   print(alt_footer)
   print(footer)
