@@ -83,9 +83,9 @@ end
 -- Performs the task named target given modules in a bundle.
 ---A module is the path of a directory relative to the main one.
 ---Uses `run` to launch a command.
----@param modules table List of modules.
----@param target string
----@param opts table
+---@param modules string_list_t List of modules.
+---@param target  string
+---@param opts    table
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public

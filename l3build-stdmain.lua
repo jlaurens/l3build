@@ -57,6 +57,12 @@ local l3b_aux       = require("l3b.aux")
 local call          = l3b_aux.call
 local deps_install  = l3b_aux.deps_install
 
+---@type l3b_check_t
+local l3b_check       = require("l3b.check")
+local l3b_check_vars  = l3b_check.Vars
+
+local sanitize_engines = l3b_check.sanitize_engines
+
 local help          = require("l3b.help").help
 local check         = require("l3b.check").check
 local save          = require("l3b.check").save
@@ -196,6 +202,9 @@ local target_list =
 -- The overall main function
 --
 
+---comment
+---@param target  string
+---@param names   string_list_t
 local function main(target, names)
   -- Deal with unknown targets up-front
   if not target_list[target] then
@@ -233,7 +242,9 @@ end
 
 ---comment
 local function multi_check()
+  local options = l3build.options
   if options["target"] == "check" then
+    local checkconfigs = l3b_check_vars.checkconfigs
     if #checkconfigs > 1 then
       local error_level = 0
       local opts = deep_copy(options) -- TODO: remove this shallow copy
@@ -272,6 +283,8 @@ local function multi_check()
 end
 
 local function prepare_config()
+  local checkconfigs = l3b_check_vars.checkconfigs
+  local options = l3build.options
   local config_1 = checkconfigs[1]
   if #checkconfigs == 1 and
     config_1 ~= "build" and
