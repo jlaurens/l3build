@@ -231,16 +231,28 @@ local Deps = chooser(_G, {
 -- Executable names plus following options
 
 ---@class Exe_t
----@field typeset string
----@field unpack  string
----@field zip     string
+---@field typeset   string
+---@field unpack    string
+---@field zip       string
+---@field biber     string
+---@field bibtex    string
+---@field makeindex string
 
 ---@type Exe_t
 local Exe = chooser(_G, {
-  typeset = "pdflatex",
-  unpack  = "pdftex",
-  zip     = "zip",
+  typeset   = "pdflatex",
+  unpack    = "pdftex",
+  zip       = "zip",
+  biber     = "biber",
+  bibtex    = "bibtex8",
+  makeindex = "makeindex",
 }, { suffix = "exe" })
+
+-- Supporting binaries and options
+biberopts     = biberopts     or ""
+bibtexopts    = bibtexopts    or "-W"
+makeindexopts = makeindexopts or ""
+
 
 checkopts   = checkopts   or "-interaction=nonstopmode"
 typesetopts = typesetopts or "-interaction=nonstopmode"
@@ -293,14 +305,6 @@ end
 glossarystyle = glossarystyle or "gglo.ist"
 indexstyle    = indexstyle    or "gind.ist"
 specialtypesetting = specialtypesetting or {}
-
--- Supporting binaries and options
-biberexe      = biberexe      or "biber"
-biberopts     = biberopts     or ""
-bibtexexe     = bibtexexe     or "bibtex8"
-bibtexopts    = bibtexopts    or "-W"
-makeindexexe  = makeindexexe  or "makeindex"
-makeindexopts = makeindexopts or ""
 
 -- Forcing epoch
 if forcecheckepoch == nil then

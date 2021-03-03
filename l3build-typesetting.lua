@@ -142,7 +142,7 @@ local MT = {}
 function MT.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return
-      runcmd(biberexe .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
+      runcmd(Exe.biber .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
         and 0 or 1
   end
   return 0
@@ -170,7 +170,7 @@ function MT.bibtex(name, dir)
         os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
           .. os_null
       ) == 0 then
-      return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name, dir,
+      return runcmd(Exe.bibtex .. " " .. bibtexopts .. " " .. name, dir,
         { "BIBINPUTS", "BSTINPUTS" }) and 0 or 1
     end
   end
@@ -189,7 +189,7 @@ function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
-    return runcmd(makeindexexe .. " " .. makeindexopts
+    return runcmd(Exe.makeindex .. " " .. makeindexopts
       .. " -o " .. name .. out_ext
       .. (style and (" -s " .. style) or "")
       .. " -t " .. name .. log_ext .. " "  .. name .. in_ext,
@@ -213,6 +213,7 @@ function MT.tex(file, dir, cmd)
 end
 
 -- Ctrl.foo is _G.foo if it is a function, 
+-- TODO: Use chooser here
 local Ctrl = setmetatable({}, {
   __index = function (t, k)
     local MT_k = MT[k]
