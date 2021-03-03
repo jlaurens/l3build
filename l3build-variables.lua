@@ -248,16 +248,27 @@ local Exe = chooser(_G, {
   makeindex = "makeindex",
 }, { suffix = "exe" })
 
+---@class Opts_t
+---@field check     string
+---@field typeset   string
+---@field unpack    string
+---@field zip       string
+---@field biber     string
+---@field bibtex    string
+---@field makeindex string
+
+---@type Opts_t
+local Opts  = chooser(_G, {
+  check     = "-interaction=nonstopmode",
+  typeset   = "-interaction=nonstopmode",
+  unpack    = "",
+  zip       = "-v -r -X",
+  biber     = "",
+  bibtex    = "-W",
+  makeindex = "",
+}, { suffix = "opts" })
 -- Supporting binaries and options
-biberopts     = biberopts     or ""
-bibtexopts    = bibtexopts    or "-W"
-makeindexopts = makeindexopts or ""
 
-
-checkopts   = checkopts   or "-interaction=nonstopmode"
-typesetopts = typesetopts or "-interaction=nonstopmode"
-unpackopts  = unpackopts  or ""
-zipopts     = zipopts     or "-v -r -X"
 
 -- Engines for testing
 checkengines = checkengines or { "pdftex", "xetex", "luatex" }
@@ -369,6 +380,7 @@ local Xtn = chooser(_G, {
 ---@field Files Files_t
 ---@field Deps  Deps_t
 ---@field Exe   Exe_t
+---@field Opts  Opts_t
 
 return {
   global_symbol_map = {},
@@ -379,4 +391,5 @@ return {
   Files             = Files,
   Deps              = Deps,
   Exe               = Exe,
+  Opts              = Opts,
 }

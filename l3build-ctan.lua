@@ -63,6 +63,8 @@ local Dir       = l3b_vars.Dir
 local Files     = l3b_vars.Files
 ---@type Exe_t
 local Exe       = l3b_vars.Exe
+---@type Opts_t
+local Opts      = l3b_vars.Opts
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
@@ -126,7 +128,7 @@ function ctan()
     -- First, zip up all of the text files
     run(
       dir,
-      Exe.zip .. " " .. zipopts .. " -ll ".. zipname .. " " .. "."
+      Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " " .. "."
         .. (
           (binfiles or exclude) and (" -x" .. binfiles .. " " .. exclude)
           or ""
@@ -135,7 +137,7 @@ function ctan()
     -- Then add the binary ones
     run(
       dir,
-      Exe.zip .. " " .. zipopts .. " -g ".. zipname .. " " .. ". -i" ..
+      Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " " .. ". -i" ..
         binfiles .. (exclude and (" -x" .. exclude) or "")
     )
   end

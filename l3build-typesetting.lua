@@ -73,6 +73,8 @@ local Xtn       = l3b_vars.Xtn
 local Dir       = l3b_vars.Dir
 ---@type Exe_t
 local Exe       = l3b_vars.Exe
+---@type Opts_t
+local Opts      = l3b_vars.Opts
 
 
 --@type l3b_aux_t
@@ -142,7 +144,7 @@ local MT = {}
 function MT.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return
-      runcmd(Exe.biber .. " " .. biberopts .. " " .. name, dir, { "BIBINPUTS" })
+      runcmd(Exe.biber .. " " .. Opts.biber .. " " .. name, dir, { "BIBINPUTS" })
         and 0 or 1
   end
   return 0
@@ -170,7 +172,7 @@ function MT.bibtex(name, dir)
         os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
           .. os_null
       ) == 0 then
-      return runcmd(Exe.bibtex .. " " .. bibtexopts .. " " .. name, dir,
+      return runcmd(Exe.bibtex .. " " .. Opts.bibtex .. " " .. name, dir,
         { "BIBINPUTS", "BSTINPUTS" }) and 0 or 1
     end
   end
@@ -189,7 +191,7 @@ function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
-    return runcmd(Exe.makeindex .. " " .. makeindexopts
+    return runcmd(Exe.makeindex .. " " .. Opts.makeindex
       .. " -o " .. name .. out_ext
       .. (style and (" -s " .. style) or "")
       .. " -t " .. name .. log_ext .. " "  .. name .. in_ext,
@@ -206,7 +208,7 @@ end
 ---@return integer
 function MT.tex(file, dir, cmd)
   dir = dir or "."
-  cmd = cmd or Exe.typeset .. typesetopts
+  cmd = cmd or Exe.typeset .. Opts.typeset
   return runcmd(cmd .. " \"" .. typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
@@ -262,7 +264,7 @@ local function typesetpdf(file, dir)
   local name = job_name(file)
   print("Typesetting " .. name)
   local func = Ctrl.typeset
-  local cmd = _G.typesetexe .. " " .. _G.typesetopts
+  local cmd = _G.typesetexe .. " " .. _G.Opts.typeset
   local special = _G.specialtypesetting and _G.specialtypesetting[file]
   if special then
     func = special.func or func

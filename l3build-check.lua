@@ -92,6 +92,8 @@ local Dir       = l3b_vars.Dir
 local Files     = l3b_vars.Files
 ---@type Deps_t
 local Deps      = l3b_vars.Deps
+---@type Opts_t
+local Opts      = l3b_vars.Opts
 
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -780,7 +782,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
       and Dir.testfile
       or Dir.unpack,
     Dir.test)
-  local check_opts = checkopts
+  local check_opts = Opts.check
   engine = engine or stdengine
   local binary = engine
   local format = gsub(engine, "tex$", checkformat)
