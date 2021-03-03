@@ -305,7 +305,7 @@ local function docinit()
   for file in entries(_G.Files.typesetsupp) do
     copy_tree(file, Dir.support, Dir.typeset)
   end
-  dep_install(_G.typesetdeps)
+  dep_install(_G.Deps.typeset)
   unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()

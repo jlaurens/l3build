@@ -33,6 +33,11 @@ local append = table.insert
 local utlib = require("l3b.utillib")
 local extend_with = utlib.extend_with
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3b.variables")
+---@type Deps_t
+local Deps      = l3b_vars.Deps
+
 ---@type l3b_aux_t
 local l3b_aux     = require("l3b.aux")
 local call        = l3b_aux.call
@@ -92,7 +97,7 @@ local target_list =
       {
         func = bundleunpack,
         pre  = function()
-          return dep_install(unpackdeps)
+          return dep_install(Deps.unpack)
         end
       },
     -- Public targets

@@ -270,9 +270,9 @@ local function install_files(target, full, dry_run)
     end
 
     -- Find PDF files
-    pdffiles = {}
+    _G.pdffiles = {} -- SHARED
     for glob in entries(typeset_files) do
-      insert(pdffiles, first_of(gsub(glob, "%.%w+$", ".pdf")))
+      insert(_G.pdffiles, first_of(gsub(glob, "%.%w+$", ".pdf")))
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
@@ -286,7 +286,7 @@ local function install_files(target, full, dry_run)
     
     errorlevel = create_install_map(Dir.sourcefile, "source", { sourcelist })
       + create_install_map(Dir.docfile, "doc",
-          { Files.bib, Files.demo, Files.doc, pdffiles, Files.text, typesetlist })
+          { Files.bib, Files.demo, Files.doc, _G.pdffiles, Files.text, typesetlist })
     if errorlevel ~= 0 then return errorlevel end
 
     -- Rename README if necessary

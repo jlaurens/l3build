@@ -214,10 +214,20 @@ local Files = chooser(_G, {
   unpacksupp    = {},
 }, { suffix = "files" })
 
+
 -- Roots which should be unpacked to support unpacking/testing/typesetting
-checkdeps   = checkdeps   or {}
-typesetdeps = typesetdeps or {}
-unpackdeps  = unpackdeps  or {}
+
+---@class Deps_t
+---@field check   string
+---@field typeset string
+---@field unpack  string
+
+---@type Deps_t
+local Deps = chooser(_G, {
+  check = {},
+  typeset = {},
+  unpack = {},
+}, { suffix = "deps" })
 
 -- Executable names plus following options
 typesetexe = typesetexe or "pdflatex"
@@ -340,11 +350,12 @@ local Xtn = chooser(_G, {
 })
 
 ---@class l3b_vars_t
----@field Xtn Xtn_t
----@field Main Main_t
+---@field Xtn   Xtn_t
+---@field Main  Main_t
 ---@field LOCAL any
----@field Dir Dir_t
+---@field Dir   Dir_t
 ---@field Files Files_t
+---@field Deps  Deps_t
 
 return {
   global_symbol_map = {},
@@ -353,4 +364,5 @@ return {
   LOCAL             = LOCAL,
   Dir               = Dir,
   Files             = Files,
+  Deps              = Deps,
 }

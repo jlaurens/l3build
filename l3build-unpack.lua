@@ -50,9 +50,11 @@ local absolute_path         = fslib.absolute_path
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Dir_t
-local Dir   = l3b_vars.Dir
+local Dir       = l3b_vars.Dir
 ---@type Files_t
-local Files = l3b_vars.Files
+local Files     = l3b_vars.Files
+---@type Deps_t
+local Deps      = l3b_vars.Deps
 
 ---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
@@ -114,7 +116,7 @@ end
 ---@param source_dirs string_list_t
 ---@return integer
 local function unpack(sources, source_dirs)
-  local error_level = dep_install(unpackdeps)
+  local error_level = dep_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level
   end

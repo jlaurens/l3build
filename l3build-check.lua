@@ -90,6 +90,8 @@ local Xtn       = l3b_vars.Xtn
 local Dir       = l3b_vars.Dir
 ---@type Files_t
 local Files     = l3b_vars.Files
+---@type Deps_t
+local Deps      = l3b_vars.Deps
 
 ---@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -137,7 +139,7 @@ local function checkinit()
     make_clean_directory(Dir.test)
     make_clean_directory(Dir.result)
   end
-  dep_install(checkdeps)
+  dep_install(Deps.check)
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
