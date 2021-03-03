@@ -48,18 +48,22 @@ local file_list = fslib.file_list
 
 ---@type l3b_manifest_setup_t
 local stp = require("l3b.manifest-setup")
-local extract_filedesc        = stp.extract_filedesc
-local sort_within_match       = stp.sort_within_match
-local sort_within_group       = stp.sort_within_group
-local write_opening           = stp.write_opening
-local write_heading           = stp.write_heading
-local write_group_file_descr  = stp.write_group_file_descr
-local write_group_file        = stp.write_group_file
-local setup                   = stp.setup
+
+local Mnfst = chooser(_G, {
+  setup  = stp.setup,
+  extract_filedesc        = stp.extract_filedesc,
+  write_subheading        = stp.write_heading,
+  sort_within_match       = stp.sort_within_match,
+  sort_within_group       = stp.sort_within_group,
+  write_opening           = stp.write_opening,
+  write_group_heading     = stp.write_heading,
+  write_group_file_descr  = stp.write_group_file_descr,
+  write_group_file        = stp.write_group_file,
+}, "manifest_")
 
 local Vars = chooser(_G, {
   -- Manifest options
-  manifestfile = "MANIFEST.md"
+  manifestfile    = "MANIFEST.md",
 })
 
 local MT = {}
@@ -80,8 +84,7 @@ function MT:build_file(entry, this_file)
     end
     if not entry.skipfiledescription then
       local fh = assert(io.open(entry.dir .. "/" .. this_file, "r"))
-      local extractor = _G.manifest_extract_filedesc or extract_filedesc
-      local this_descr = extractor(fh, this_file)
+      local this_descr = Mnfst.extract_filedesc(fh, this_file)
       fh:close()
       if this_descr and this_descr ~= "" then
         entry.descr[this_file] = this_descr
@@ -152,16 +155,14 @@ function MT:build_list(entry)
       end
     end
     -- build list of matched files
-    local match_sort = _G.manifest_sort_within_match or sort_within_match
-    local group_sort = _G.manifest_sort_within_group or sort_within_group
     for glob_list in entries(entry.files) do
       for this_glob in entries(glob_list) do
         local these_files = file_list(entry.dir, this_glob)
-        these_files = match_sort(these_files)
+        these_files = Mnfst.sort_within_match(these_files)
         for this_file in entries(these_files) do
           entry = self:build_file(entry, this_file)
         end
-        entry.files_ordered = group_sort(entry.files_ordered)
+        entry.files_ordered = Mnfst.sort_within_group(entry.files_ordered)
       end
     end
 	end
@@ -172,10 +173,10 @@ end
 ---@param fh table
 ---@param entry table
 function MT:write_group(fh, entry)
-  local writer = _G.manifest_write_group_heading or write_heading
+  local writer = Mnfst.write_group_heading
   writer(fh, entry.name, entry.description)
   if entry.ND > 0 then
-    writer = _G.manifest_write_group_file_descr or write_group_file_descr
+    writer = Mnfst.write_group_file_descr
     for ii, file in ipairs(entry.files_ordered) do
       local descr = entry.descr[file] or ""
       ---@type manifest_param_t
@@ -184,15 +185,15 @@ function MT:write_group(fh, entry)
         count       = ii                ,
         filemaxchar = entry.Nchar_file  ,
         descmaxchar = entry.Nchar_descr ,
-        ctanfile    = self.ctanfiles[file]   ,
-        tdsfile     = self.tdsfiles[file]    ,
+        ctanfile    = self.ctan_files[file]   ,
+        tdsfile     = self.tds_files[file]    ,
         flag        = false             ,
       }
       if entry.flag then
         param.flag = "    "
-	  		if self.tdsfiles[file] and not self.ctanfiles[file] then
+	  		if self.tds_files[file] and not self.ctan_files[file] then
 	  			param.flag = "†   "
-	  		elseif self.ctanfiles[file] then
+	  		elseif self.ctan_files[file] then
 	  			param.flag = "‡   "
 	  		end
 			end
@@ -210,20 +211,20 @@ function MT:write_group(fh, entry)
       writer(fh, file, descr, param)
     end
   else
-    writer = _G.manifest_write_group_file or write_group_file
+    writer = Mnfst.write_group_file
     for ii, file in ipairs(entry.files_ordered) do
       local param = {
         dir         = entry.dir         ,
       	count       = ii                ,
       	filemaxchar = entry.Nchar_file  ,
-        ctanfile    = self.ctanfiles[file]   ,
-        tdsfile     = self.tdsfiles[file]    ,
+        ctanfile    = self.ctan_files[file]   ,
+        tdsfile     = self.tds_files[file]    ,
       }
       if entry.flag then
         param.flag = ""
-	  		if self.tdsfiles[file] and not self.ctanfiles[file] then
+	  		if self.tds_files[file] and not self.ctan_files[file] then
 	  			param.flag = "†"
-	  		elseif self.ctanfiles[file] then
+	  		elseif self.ctan_files[file] then
 	  			param.flag = "‡"
 	  		end
 			end
@@ -236,8 +237,8 @@ end
 ---@param manifest_entries table
 function MT:write(manifest_entries)
   local fh = assert(io.open(Vars.manifestfile, "w"))
-  write_opening(fh)
-  local wrt_subheading = _G.manifest_write_subheading or write_heading
+  Mnfst.write_opening(fh)
+  local wrt_subheading = Mnfst.write_subheading
   for entry in entries(manifest_entries) do
     if entry.subheading then
       wrt_subheading(fh, entry.subheading, entry.description) -- TODO BAD API: remove that fh!
@@ -250,18 +251,18 @@ end
 
 function MT:manifest()
   -- build list of ctan files
-  self.ctanfiles = {}
+  self.ctan_files = {}
   for f in all_files(ctandir.."/"..ctanpkg, "*.*") do
-    self.ctanfiles[f] = true
+    self.ctan_files[f] = true
   end
-  self.tdsfiles = {}
+  self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
     for f in all_files(tdsdir..subdir..moduledir, "*.*") do
-      self.tdsfiles[f] = true
+      self.tds_files[f] = true
     end
   end
 
-  local manifest_entries = (_G.manifest_setup or setup)()
+  local manifest_entries = Mnfst.setup()
 
   for ii in keys(manifest_entries) do
     manifest_entries[ii] = self:build_list(manifest_entries[ii])

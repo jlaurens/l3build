@@ -203,15 +203,16 @@ end
 
 ---Return an object that picks its attributes from G or dflt
 ---Central method in variables management.
----@param G any, used with _G
----@param dflt any
+---@param G       any, used with _G
+---@param dflt    any
+---@param prefix  string -- add this prefix to the key for G, not for dflt
 ---@return fun(t: table, k: any): any
-local function chooser(G, dflt)
+local function chooser(G, dflt, prefix)
   local function __index(t, k)        -- will end in a metatable
     local dflt_k = dflt[k]            -- default candidate
     if dflt_k == nil then return end  -- unknown key, stop here
     local result
-    local G_k = G[k]                  -- global candidate
+    local G_k = G[prefix and prefix .. k or k] -- global candidate
     if not G_k then
       result = dflt_k                 -- choose the default
     else

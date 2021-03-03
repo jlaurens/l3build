@@ -80,7 +80,7 @@ local Xtn       = l3b_vars.Xtn
 
 ---comment
 ---@return table<integer, manifest_entry_t>
-local function setup()
+local function manifest_setup()
   local groups = {
     {
        subheading = "Repository manifest",
@@ -371,7 +371,7 @@ end
 
 return {
   global_symbol_map  = {},
-  setup              = setup,
+  setup              = manifest_setup,
   sort_within_match  = sort_within_match,
   sort_within_group  = sort_within_group,
   write_opening      = write_opening,
