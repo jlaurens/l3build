@@ -36,6 +36,7 @@ local insert = table.insert
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
+local chooser     = utlib.chooser
 local entries     = utlib.entries
 local keys        = utlib.keys
 local first_of    = utlib.first_of
@@ -70,6 +71,11 @@ local unpack      = l3b_unpack.unpack
 ---@type l3b_typesetting_t
 local l3b_typesetting = require("l3b.typesetting")
 local doc             = l3b_typesetting.doc
+
+local Vars = chooser(_G, {
+  -- Non-standard installation locations
+  tdslocations = {}
+})
 
 local function gethome()
   set_program("latex")
@@ -132,7 +138,7 @@ local function uninstall()
          + error_level
   if error_level ~= 0 then return error_level end
   -- Finally, clean up special locations
-  for location in entries(tdslocations) do
+  for location in entries(Vars.tdslocations) do
     local path = dir_name(location)
     error_level = zapdir(path)
     if error_level ~= 0 then return error_level end
@@ -175,7 +181,7 @@ local function install_files(target, full, dry_run)
             if not flattentds then sourcepath = path .. "/" end
           end
           local matched = false
-          for location in entries(tdslocations) do
+          for location in entries(Vars.tdslocations) do
             local l_dir, l_glob = dir_base(location)
             local pattern = glob_to_pattern(l_glob)
             if match(filename, pattern) then

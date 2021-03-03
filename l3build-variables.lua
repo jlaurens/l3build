@@ -228,8 +228,6 @@ local Xtn = chooser(_G, {
   tlg = ".tlg",
   tpf = ".tpf",
 })
--- Non-standard installation locations
-tdslocations = tdslocations or {}
 
 ---@class l3b_vars_t
 ---@field Xtn Xtn_t
