@@ -39,6 +39,7 @@ local str_rep = string.rep
 
 ---@type utlib_t
 local utlib         = require("l3b.utillib")
+local chooser       = utlib.chooser
 local entries       = utlib.entries
 local trim_space    = utlib.trim
 local file_contents = utlib.file_contents
@@ -50,30 +51,40 @@ local l3build = require("l3build")
 local debug   = l3build.debug
 local options = l3build.options
 
--- UPLOAD()
---
--- takes a package configuration table and an optional boolean
---
--- if the upload parameter is not supplied or is not true, only package validation
--- is used, if upload is true then package upload will be attempted if validation
--- succeeds.
+--[=[
 
--- fields are given as a string, or optionally for fields allowing multiple
--- values, as a table of strings.
+UPLOAD()
 
--- Mandatory fields are checked in Lua
--- Maximum string lengths are checked.
+takes a package configuration table and an optional boolean
 
--- Currently string values are not checked, eg licence names, or URL syntax.
+if the upload parameter is not supplied or is not true, only package validation
+is used, if upload is true then package upload will be attempted if validation
+succeeds.
 
--- The input form could be used to construct a post body but
--- luasec is not included in texlua. Instead an external program is used to post.
--- As Windows (since April 2018) includes curl now use curl.
--- A version using ctan-o-mat is available in the ctan-post github repo.
+fields are given as a string, or optionally for fields allowing multiple
+values, as a table of strings.
 
--- the main interface is
---     upload()
--- with a configuration table `uploadconfig`
+Mandatory fields are checked in Lua
+Maximum string lengths are checked.
+
+Currently string values are not checked, eg licence names, or URL syntax.
+
+The input form could be used to construct a post body but
+luasec is not included in texlua. Instead an external program is used to post.
+As Windows (since April 2018) includes curl now use curl.
+A version using ctan-o-mat is available in the ctan-post github repo.
+
+the main interface is
+    upload()
+with a configuration table `uploadconfig`
+
+--]=]
+
+local Vars = chooser(_G, {
+  curlexe = "curl",
+  curl_debug = false,
+  uploadconfig = {}
+})
 
 -- function for interactive multiline fields
 local function input_multi_line_field (name)
@@ -188,7 +199,7 @@ function MT:prepare(version)
   -- For now, this is undocumented. I think I would prefer to keep it always set to ask for the time being.
   
   -- Keep data local, JL: what does it mean?
-  self.config = deep_copy(_G.uploadconfig)
+  self.config = deep_copy(Vars.uploadconfig)
   local config = self.config
 
   -- try a sensible default for the package name:
@@ -239,7 +250,7 @@ function MT:upload(tag_names)
   curlopt:write(self.request)
   curlopt:close()
 
-  self.request = _G.curlexe .. " --config " .. curlopt_file
+  self.request = Vars.curlexe .. " --config " .. curlopt_file
 
   if options["debug"] then
     self.append_request(' https://httpbin.org/post')
@@ -258,8 +269,8 @@ function MT:upload(tag_names)
   local response = ""
   -- use popen not execute so get the return body local exit_status = os.execute(self.ctan_post .. "validate")
 
-  if _G.curl_debug or debug.no_curl_posting then
-    local reason = _G.curl_debug
+  if Vars.curl_debug or debug.no_curl_posting then
+    local reason = Vars.curl_debug
       and "curl_debug==true"
       or  "--debug-no-curl-posting"
     response = "WARNING: ".. reason ..": posting disabled"

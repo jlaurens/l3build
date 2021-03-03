@@ -231,10 +231,6 @@ local Xtn = chooser(_G, {
 -- Non-standard installation locations
 tdslocations = tdslocations or {}
 
--- Upload settings
-curlexe  = curlexe  or "curl"
-uploadconfig = uploadconfig or {}
-
 ---@class l3b_vars_t
 ---@field Xtn Xtn_t
 
