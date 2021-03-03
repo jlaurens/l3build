@@ -24,30 +24,27 @@ for those people who are interested.
 
 -- local safety guards and shortcuts
 
-local match = string.match
-
 local pairs = pairs
 local print = print
 
-local os_time = os.time
-
 ---@type utlib_t
-local utlib = require("l3b.utillib")
-local entries = utlib.entries
+local utlib       = require("l3b.utillib")
+local entries     = utlib.entries
 local extend_with = utlib.extend_with
 
 ---@type wklib_t
-local wklib = require("l3b.walklib")
-local dir_base = wklib.dir_base
+local wklib     = require("l3b.walklib")
+local dir_base  = wklib.dir_base
 
 ---@type oslib_t
-local oslib = require("l3b.oslib")
-local cmd_concat = oslib.cmd_concat
-local run = oslib.run
+local oslib       = require("l3b.oslib")
+local cmd_concat  = oslib.cmd_concat
+local run         = oslib.run
 
 ---@type fslib_t
-local fslib = require("l3b.fslib")
+local fslib         = require("l3b.fslib")
 local absolute_path = fslib.absolute_path
+
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -55,30 +52,6 @@ local l3build = require("l3build")
 --
 -- Auxiliary functions which are used by more than one main function
 --
-
----Convert the given `epoch` to a number.
----@param epoch string
----@return number
----@see l3build.lua
----@usage private?
-local function normalise_epoch(epoch)
-  assert(epoch, 'normalize_epoch argument must not be nil')
-  -- If given as an ISO date, turn into an epoch number
-  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
-  if y then
-    return os_time({
-        year = y, month = m, day   = d,
-        hour = 0, sec = 0, isdst = nil
-      }) - os_time({
-        year = 1970, month = 1, day = 1,
-        hour = 0, sec = 0, isdst = nil
-      })
-  elseif match(epoch, "^%d+$") then
-    return tonumber(epoch)
-  else
-    return 0
-  end
-end
 
 ---Returns the CLI command to set the epoch
 ---when forcecheckepoch is true, a void string otherwise.
@@ -183,6 +156,9 @@ local function deps_install(deps)
   return 0
 end
 
+local function do_config(config_1)
+end
+
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
   call = call,
@@ -193,15 +169,15 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_aux_t
----@field normalise_epoch function
 ---@field deps_install function
 ---@field call function
----@field set_epoch_cmd function
+---@field set_epoch_cmd fun(epoch: string, force: boolean): string
+---@field do_config     fun(cfg: string)
 
 return {
   global_symbol_map = global_symbol_map,
-  normalise_epoch = normalise_epoch,
   deps_install = deps_install,
   call = call,
   set_epoch_cmd = set_epoch_cmd,
+  do_config = do_config,
 }

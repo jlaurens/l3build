@@ -48,8 +48,8 @@ local file_list = fslib.file_list
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
----@type Shrd_t
-local Shrd  = l3b_vars.Shrd
+---@type Main_t
+local Main  = l3b_vars.Main
 ---@type Dir_t
 local Dir   = l3b_vars.Dir
 ---@type Files_t
@@ -261,7 +261,7 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_files(Dir.ctan.."/".. Shrd.ctanpkg, "*.*") do
+  for f in all_files(Dir.ctan.."/".. Main.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}

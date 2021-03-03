@@ -68,8 +68,8 @@ local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
----@type Shrd_t
-local Shrd      = l3b_vars.Shrd
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
@@ -96,6 +96,7 @@ local unpack      = l3b_unpack.unpack
 ---@field glossarystyle string
 ---@field indexstyle    string
 ---@field specialtypesetting table
+---@field forcedocepoch string
 
 ---@type l3b_tpst_vars_t
 local Vars = chooser(_G, {
@@ -109,6 +110,17 @@ local Vars = chooser(_G, {
   glossarystyle = "gglo.ist",
   indexstyle    = "gind.ist",
   specialtypesetting = {},
+  forcedocepoch   = false,
+  [utlib.DID_CHOOSE] = function (result, k)
+    -- No trailing /
+    -- What about the leading "./"
+    if k == "forcedocepoch" then
+      if options["epoch"] then
+        return true
+      end
+    end
+    return result
+  end,
 })
 
 ---dvitopdf
@@ -120,10 +132,10 @@ local Vars = chooser(_G, {
 local function dvitopdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
-      set_epoch_cmd(epoch, Shrd.forcecheckepoch),
+      set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. os_null) or ""),
-      "ps2pdf " .. ps2pdfopt .. name .. Xtn.ps
+      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. os_null) or "")
     ) and 0 or 1
   )
@@ -149,7 +161,7 @@ local function runcmd(cmd, dir, vars)
   end
   local envpaths = "." .. localtexmf .. os_pathsep
     .. absolute_path(Dir[l3b_vars.LOCAL]) .. os_pathsep
-    .. dir .. (typesetsearch and os_pathsep or "")
+    .. dir .. (Vars.typesetsearch and os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and match(envpaths, " ") then
     envpaths = first_of(gsub(envpaths, '"', '')) -- no '"' in windows!!!
@@ -157,7 +169,7 @@ local function runcmd(cmd, dir, vars)
   for var in entries(vars) do
     env = cmd_concat(env, os_setenv .. " " .. var .. "=" .. envpaths)
   end
-  return run(dir, cmd_concat(set_epoch_cmd(epoch, forcedocepoch), env, cmd))
+  return run(dir, cmd_concat(set_epoch_cmd(Main.epoch, Vars.forcedocepoch), env, cmd))
 end
 
 local MT = {}
@@ -337,7 +349,7 @@ local function docinit()
   end
   deps_install(_G.Deps.typeset)
   unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
-  -- Shrd loop for doc creation
+  -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
     return error_level

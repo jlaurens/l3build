@@ -33,11 +33,8 @@ release_date = "2020-06-04"
 
 local assert  = assert
 local ipairs  = ipairs
-local append  = table.insert
 local match   = string.match
 local gmatch  = string.gmatch
-local gsub    = string.gsub
-local next    = next
 local print   = print
 local exit    = os.exit
 
@@ -242,23 +239,8 @@ do
 end
 --[=[ end of booting process ]=]
 
----@type utlib_t
-local utlib     = require("l3b.utillib")
-local entries   = utlib.entries
-local deep_copy = utlib.deep_copy
-
----@type fslib_t
-local fslib       = require("l3b.fslib")
-local all_files   = fslib.all_files
-local file_exists = fslib.file_exists
-
----@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
----@type Dir_t
-local Dir       = l3b_vars.Dir
-
 ---@type l3b_arguments_t
-local arguments = require("l3b.arguments")
+local arguments     = require("l3b.arguments")
 _G.options          = arguments.parse(arg)
 l3build.options     = _G.options
 
@@ -269,29 +251,7 @@ local version   = l3b_help.version
 
 require("l3b.typesetting")
 
----@type l3b_aux_t
-local l3b_aux         = require("l3b.aux")
-local normalise_epoch = l3b_aux.normalise_epoch
-local call            = l3b_aux.call
-
 require("l3b.clean")
-
----@type l3b_check_t
-local l3b_check   = require("l3b.check")
----@type l3b_check_vars_t
-local check_vars  = l3b_check.Vars
-local sanitize_engines = l3b_check.sanitize_engines
-
-require("l3b.ctan")
-require("l3b.install")
-require("l3b.unpack")
-require("l3b.manifest")
-require("l3b.manifest-setup")
-require("l3b.tagging")
-require("l3b.upload")
-
----@type l3b_main_t
-local l3b_main = require("l3b.stdmain")
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -303,6 +263,11 @@ elseif options["target"] == "version" then
   exit(0)
 end
 
+---@type l3b_main_t
+local l3b_main        = require("l3b.stdmain")
+local multi_check     = l3b_main.multi_check
+local prepare_config  = l3b_main.prepare_config
+
 -- Allow main function to be disabled 'higher up'
 _G.main = _G.main or l3b_main.main
 
@@ -312,15 +277,9 @@ if is_main then
   dofile(work_dir .. "build.lua")
 end
 
--- Tidy up the epoch setting
--- Force an epoch if set at the command line
--- Must be done after loading variables, etc.
-if options["epoch"] then
-  epoch           = options["epoch"]
-  forcecheckepoch = true
-  forcedocepoch   = true
-end
-epoch = normalise_epoch(epoch)
+---@type l3b_check_t
+local l3b_check   = require("l3b.check")
+local sanitize_engines = l3b_check.sanitize_engines
 
 -- Sanity check
 sanitize_engines()
@@ -329,67 +288,15 @@ sanitize_engines()
 -- Deal with multiple configs for tests
 --
 
--- When we have specific files to deal with, only use explicit configs
--- (or just the std one)
-local checkconfigs
-if options["names"] then
-  checkconfigs = options["config"] or { _G.stdconfig }
-else
-  checkconfigs = options["config"] or check_vars.checkconfigs
-end
+multi_check() -- check with many configs, may exit here
 
-if options["target"] == "check" then
-  if #checkconfigs > 1 then
-    local error_level = 0
-    local opts = deep_copy(options) -- TODO: remove this shallow copy
-    local failed = {}
-    for config in entries(checkconfigs) do
-      opts["config"] = { config }
-      error_level = call({ "." }, "check", opts)
-      if error_level ~= 0 then
-        if options["halt-on-error"] then
-          exit(1)
-        else
-          append(failed, config)
-        end
-      end
-    end
-    if next(failed) then
-      for config in entries(failed) do
-        print("Failed tests for configuration " .. config .. ":")
-        print("\n  Check failed with difference files")
-        local test_dir = Dir.test
-        if config ~= "build" then
-          test_dir = test_dir .. "-" .. config
-        end
-        for name in all_files(test_dir, "*" .. os_diffext) do
-          print("  - " .. test_dir .. "/" .. name)
-        end
-        print("")
-      end
-      exit(1)
-    else
-      -- Avoid running the 'main' set of tests twice
-      exit(0)
-    end
-  end
-end
-local config_1 = checkconfigs[1]
-if #checkconfigs == 1 and
-   config_1 ~= "build" and
-   (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-   local config_path = work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
-   if file_exists(config_path) then
-     dofile(config_path)
-     Dir.test = Dir.test .. "-" .. config_1
-   else
-     print("Error: Cannot find configuration " .. config_1)
-     exit(1)
-   end
-end
+prepare_config()
+
+---@type utlib_t
+local utlib = require("l3b.utillib")
 
 -- From now on, we can cache results in choosers
 utlib.flags.cache_chosen = true
 
 -- Call the main function
-main(options["target"], options["names"])
+_G.main(options["target"], options["names"])

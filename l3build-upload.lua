@@ -53,8 +53,8 @@ local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars = require("l3b.variables")
----@type Shrd_t
-local Shrd = l3b_vars.Shrd
+---@type Main_t
+local Main = l3b_vars.Main
 
 --[=[
 
@@ -190,7 +190,7 @@ end
 function MT:prepare(version)
 
   -- avoid lower level error from post command if zip file missing
-  self.upload_file = Shrd.ctanzip ..".zip"
+  self.upload_file = Main.ctanzip ..".zip"
   local zip = open(trim_space(tostring(self.upload_file)), "r")
   if zip then
     close(zip)
@@ -230,7 +230,7 @@ function MT:prepare(version)
     config.update = true
     self.override_update_check = true
   end
-  self.ctanzip = Shrd.ctanzip
+  self.ctanzip = Main.ctanzip
 
 end
 

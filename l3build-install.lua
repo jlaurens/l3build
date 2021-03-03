@@ -68,8 +68,8 @@ local rename                = fslib.rename
 local l3b_vars  = require("l3b.variables")
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
----@type Shrd_t
-local Shrd      = l3b_vars.Shrd
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Files_t
 local Files     = l3b_vars.Files
 
@@ -187,7 +187,7 @@ local function install_files(target, full, dry_run)
           else
             path = gsub(path, "^%.", "")
             sourcepaths[filename] = source .. path
-            if not flattentds then sourcepath = path .. "/" end
+            if not Main.flattentds then sourcepath = path .. "/" end
           end
           local matched = false
           for location in entries(Vars.tdslocations) do
@@ -295,7 +295,7 @@ local function install_files(target, full, dry_run)
 
     -- Rename README if necessary
     if not dry_run then
-      local readme = Shrd.ctanreadme
+      local readme = Main.ctanreadme
       if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
         local install_dir = target .. "/doc/" .. Dir.module
         if file_exists(install_dir .. "/" .. readme) then

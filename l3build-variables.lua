@@ -22,6 +22,9 @@ for those people who are interested.
 
 --]]
 
+local match   = string.match
+local os_time = os["time"]
+
 ---@type utlib_t
 local utlib     = require("l3b.utillib")
 local chooser   = utlib.chooser
@@ -42,7 +45,31 @@ if type("module") ~= "string" then
   module = nil
 end
 
----@class Shrd_t
+---Convert the given `epoch` to a number.
+---@param epoch string
+---@return number
+---@see l3build.lua
+---@usage private?
+local function normalise_epoch(epoch)
+  assert(epoch, 'normalize_epoch argument must not be nil')
+  -- If given as an ISO date, turn into an epoch number
+  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  if y then
+    return os_time({
+        year = y, month = m, day   = d,
+        hour = 0, sec = 0, isdst = nil
+      }) - os_time({
+        year = 1970, month = 1, day = 1,
+        hour = 0, sec = 0, isdst = nil
+      })
+  elseif match(epoch, "^%d+$") then
+    return tonumber(epoch)
+  else
+    return 0
+  end
+end
+
+---@class Main_t
 ---@field module        string
 ---@field bundle        string
 ---@field tdsroot       string
@@ -51,21 +78,35 @@ end
 ---@field checkengines  string_list_t
 ---@field ctanreadme    string
 ---@field forcecheckepoch boolean
----@field forcedocepoch string
 ---@field epoch         integer
 ---@field flattentds    boolean
 
----@type Shrd_t
-local Shrd = chooser(_G, setmetatable({
+---@type Main_t
+local Main = chooser(_G, setmetatable({
   module  = "",
   bundle  = "",
   tdsroot = "latex",
   checkengines = { "pdftex", "xetex", "luatex" },
   ctanreadme   = "README.md",
   forcecheckepoch = true,
-  forcedocepoch   = false,
   epoch           = 1463734800,
   flattentds      = true,
+  [utlib.DID_CHOOSE] = function (result, k)
+    -- No trailing /
+    -- What about the leading "./"
+    if k == "forcecheckepoch" then
+      if options["epoch"] then
+        return true
+      end
+    end
+    if k == "epoch" then
+      if options["epoch"] then
+        result = options["epoch"]
+      end
+      return normalise_epoch(result)
+    end
+    return result
+  end,
 }, {
   __index = function (t, k)
     if k == "ctanpkg" then
@@ -155,7 +196,7 @@ local default_Dir = setmetatable({
       result = t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
     elseif k == "module" then
-      result = Shrd.tdsroot .. "/" .. Shrd.bundle .. "/" .. Shrd.module
+      result = Main.tdsroot .. "/" .. Main.bundle .. "/" .. Main.module
       result = first_of(result:gsub("//", "/"))
     end
     return result
@@ -311,7 +352,7 @@ local Xtn = chooser(_G, {
 
 ---@class l3b_vars_t
 ---@field Xtn   Xtn_t
----@field Shrd  Shrd_t
+---@field Main  Main_t
 ---@field LOCAL any
 ---@field Dir   Dir_t
 ---@field Files Files_t
@@ -321,7 +362,7 @@ local Xtn = chooser(_G, {
 
 return {
   global_symbol_map = {},
-  Shrd              = Shrd,
+  Main              = Main,
   Xtn               = Xtn,
   LOCAL             = LOCAL,
   Dir               = Dir,

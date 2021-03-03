@@ -87,8 +87,8 @@ local l3build = require("l3build")
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
----@type Shrd_t
-local Shrd      = l3b_vars.Shrd
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
@@ -865,7 +865,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
         os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
         os_setenv .. " TEXMFCNF=." .. os_pathsep,
-        set_epoch_cmd(epoch, Shrd.forcecheckepoch),
+        set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
         -- Ensure lines are of a known length
         os_setenv .. " max_print_line=" .. Vars.maxprintline,
         binary .. format
@@ -995,7 +995,7 @@ local function run_check(test_name, hide)
     print("Failed to find input for test " .. test_name)
     return 1
   end
-  local check_engines = Shrd.checkengines
+  local check_engines = Main.checkengines
   if options["engine"] then
     check_engines = options["engine"]
   end
@@ -1088,7 +1088,6 @@ dflt = {
   test_order    = { "log", "pdf" },
   checkformat   = "latex",
   stdengine     = "pdftex",
-  checkconfigs  = { "build" },
   includetests  = { "*" },
   excludetests  = {},
   recordstatus  = false,
@@ -1096,6 +1095,22 @@ dflt = {
   checkruns     = 1,
   maxprintline  = 79,
   checksearch   = true,
+  checkconfigs  = { "build" },
+  [utlib.DID_CHOOSE] = function (result, k)
+    -- No trailing /
+    -- What about the leading "./"
+    if k == "checkconfigs" then
+      -- When we have specific files to deal with, only use explicit configs
+      -- (or just the std one)
+      -- TODO: Justify this...
+      if options["names"] then
+        return options["config"] or { _G.stdconfig }
+      else
+        return options["config"] or result
+      end
+    end
+    return result
+  end,
 }
 
 dflt.specialformats = {
@@ -1281,14 +1296,14 @@ local function sanitize_engines()
   if options["engine"] and not options["force"] then
      -- Make a lookup table
      local t = {}
-    for engine in entries(Shrd.checkengines) do
+    for engine in entries(Main.checkengines) do
       t[engine] = true
     end
     for engine in entries(options["engine"]) do
       if not t[engine] then
         print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
-        for engine in entries(Shrd.checkengines) do
+        for engine in entries(Main.checkengines) do
           print("  - " .. engine)
         end
         print("")

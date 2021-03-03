@@ -22,26 +22,40 @@ for those people who are interested.
 
 --]]
 
-local lfs = require("lfs")
-local lfs_dir = lfs.dir
-local attributes = lfs.attributes
+local gsub        = string.gsub
 
-local exit   = os.exit
-local append = table.insert
+local exit        = os.exit
+local append      = table.insert
+
+local lfs         = require("lfs")
+local lfs_dir     = lfs.dir
+local attributes  = lfs.attributes
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
+local utlib       = require("l3b.utillib")
 local extend_with = utlib.extend_with
+local entries     = utlib.entries
+local deep_copy   = utlib.deep_copy
+
+---@type fslib_t
+local fslib       = require("l3b.fslib")
+local all_files   = fslib.all_files
+local file_exists = fslib.file_exists
+
+---@type l3build_t
+local l3build = require("l3build")
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Deps_t
 local Deps      = l3b_vars.Deps
+---@type Dir_t
+local Dir       = l3b_vars.Dir
 
 ---@type l3b_aux_t
-local l3b_aux     = require("l3b.aux")
-local call        = l3b_aux.call
-local deps_install = l3b_aux.deps_install
+local l3b_aux       = require("l3b.aux")
+local call          = l3b_aux.call
+local deps_install  = l3b_aux.deps_install
 
 local help          = require("l3b.help").help
 local check         = require("l3b.check").check
@@ -143,7 +157,7 @@ local target_list =
       {
         bundle_func = function(names)
             local modules = modules or listmodules()
-            local errorlevel = call(modules,"tag")
+            local errorlevel = call(modules, "tag")
             -- Deal with any files in the bundle dir itself
             if errorlevel == 0 then
               errorlevel = tag(names)
@@ -217,9 +231,64 @@ local function main(target, names)
   end
 end
 
+---comment
+local function multi_check()
+  if options["target"] == "check" then
+    if #checkconfigs > 1 then
+      local error_level = 0
+      local opts = deep_copy(options) -- TODO: remove this shallow copy
+      local failed_configs = {}
+      for config in entries(checkconfigs) do
+        opts["config"] = { config }
+        error_level = call({ "." }, "check", opts)
+        if error_level ~= 0 then
+          if options["halt-on-error"] then
+            exit(1)
+          else
+            append(failed_configs, config)
+          end
+        end
+      end
+      if next(failed_configs) then
+        for config in entries(failed_configs) do
+          print("Failed tests for configuration " .. config .. ":")
+          print("\n  Check failed with difference files")
+          local test_dir = Dir.test
+          if config ~= "build" then
+            test_dir = test_dir .. "-" .. config
+          end
+          for name in all_files(test_dir, "*" .. os_diffext) do
+            print("  - " .. test_dir .. "/" .. name)
+          end
+          print("")
+        end
+        exit(1)
+      else
+        -- Avoid running the 'main' set of tests twice
+        exit(0)
+      end
+    end
+  end
+end
+
+local function prepare_config()
+  local config_1 = checkconfigs[1]
+  if #checkconfigs == 1 and
+    config_1 ~= "build" and
+    (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
+      local config_path = l3build.work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
+      if file_exists(config_path) then
+        dofile(config_path)
+        Dir.test = Dir.test .. "-" .. config_1
+      else
+        print("Error: Cannot find configuration " .. config_1)
+        exit(1)
+      end
+  end
+end
+
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
-  call = call,
   target_list = target_list,
 }
 
@@ -228,11 +297,15 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_main_t
----@field main function
----@field target_list table<string, table>
+---@field main            fun()
+---@field target_list     table<string, table>
+---@field multi_check     fun()
+---@field prepare_config  fun()
 
 return {
   global_symbol_map = global_symbol_map,
   main              = main,
   target_list       = target_list,
+  multi_check       = multi_check,
+  prepare_config    = prepare_config,
 }

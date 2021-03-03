@@ -41,8 +41,8 @@ local entries = utlib.entries
 
 ---@type l3b_vars_t
 local l3b_vars   = require("l3b.variables")
----@type Shrd_t
-local Shrd      = l3b_vars.Shrd
+---@type Main_t
+local Main      = l3b_vars.Main
 
 -- Parse command line options
 
