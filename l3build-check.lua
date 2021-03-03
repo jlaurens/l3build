@@ -82,8 +82,13 @@ local directory_exists      = fslib.directory_exists
 local absolute_path         = fslib.absolute_path
 local make_clean_directory  = fslib.make_clean_directory
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Shrd_t
+local Shrd      = l3b_vars.Shrd
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
@@ -114,14 +119,26 @@ local dvitopdf        = l3b_typesetting.dvitopdf
 ---@field log table<string, string|function>
 ---@field pdf table<string, string|function>
 
----@class check_vars_t
----@field test_types test_types_t
----@field test_order string_list_t
+---@class l3b_check_vars_t
+---@field test_types  test_types_t
+---@field test_order  string_list_t
+---@field checkformat string
+---@field stdengine string
+-- Configs for testing
+---@field checkconfigs table
+---@field includetests string_list_t
+---@field excludetests string_list_t
+---@field recordstatus boolean
+---@field asciiengines string_list_t
+---@field checkruns    integer
+---@field specialformats table
+---@field maxprintline  integer
+---@field checksearch   boolean
 
----@type check_vars_t
+---@type l3b_check_vars_t
 local dflt -- define below
 
----@type check_vars_t
+---@type l3b_check_vars_t
 local Vars = chooser(_G, dflt)
 
 --
@@ -190,7 +207,7 @@ end
 ---@param errlevels table
 ---@return string
 local function normalize_log(content, engine, errlevels)
-  local max_print_line = maxprintline
+  local max_print_line = Vars.maxprintline
   if match(engine, "^lua") or match(engine, "^harf") then
     max_print_line = max_print_line + 1 -- Deal with an out-by-one error
   end
@@ -306,7 +323,7 @@ local function normalize_log(content, engine, errlevels)
     if match(line, "^> \\box%d+=$") or match(line, "^> \\box%d+=(void)$") then
       line = gsub(line, "%d+=", "...=")
     end
-    if not match(stdengine, "^e?u?ptex$") then
+    if not match(Vars.stdengine, "^e?u?ptex$") then
       -- Remove 'normal' direction information on boxes with (u)pTeX
       line = gsub(line, ",? yoko direction,?", "")
       line = gsub(line, ",? yoko%(math%) direction,?", "")
@@ -358,7 +375,7 @@ local function normalize_log(content, engine, errlevels)
                       "<lua data reference ...>")
     -- Unicode engines display chars in the upper half of the 8-bit range:
     -- tidy up to match pdfTeX if an ASCII engine is in use
-    if next(asciiengines) then
+    if next(Vars.asciiengines) then
       for i = 128, 255 do
         line = gsub(line, utf8_char(i), "^^" .. str_format("%02x", i))
       end
@@ -388,9 +405,9 @@ local function normalize_log(content, engine, errlevels)
       end
     end
   end
-  if recordstatus then
+  if Vars.recordstatus then
     new_content = new_content .. '***************' .. os_newline
-    for i = 1, checkruns do
+    for i = 1, Vars.checkruns do
       if errlevels[i] == nil then
         new_content = new_content
           .. 'Compilation ' .. i .. ' of test file skipped ' .. os_newline
@@ -583,7 +600,7 @@ local function normalize_lua_log(content, is_luatex)
     -- Wrap some cases that can be picked out
     -- In some places LuaTeX does use max_print_line, then we
     -- get into issues with different wrapping approaches
-    local max_print_line = maxprintline
+    local max_print_line = Vars.maxprintline
     if len(line) == max_print_line then
       return "", last_line .. line
     elseif len(last_line) == max_print_line then
@@ -783,11 +800,11 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
       or Dir.unpack,
     Dir.test)
   local check_opts = Opts.check
-  engine = engine or stdengine
+  engine = engine or Vars.stdengine
   local binary = engine
-  local format = gsub(engine, "tex$", checkformat)
+  local format = gsub(engine, "tex$", Vars.checkformat)
   -- Special binary/format combos
-  local special_check = specialformats[checkformat]
+  local special_check = Vars.specialformats[Vars.checkformat]
   if special_check and next(special_check) then
     local engine_info = special_check[engine]
     if engine_info then
@@ -806,7 +823,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Special casing for ConTeXt
   local setup
-  if match(checkformat, "^context$") then
+  if match(Vars.checkformat, "^context$") then
     function setup(file) return ' "' .. file .. '" '  end
   else
     function setup(file)
@@ -818,7 +835,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local gen_file = base_name .. test_type.generated
   local new_file = base_name .. "." .. engine .. test_type.generated
   local ascii_opt = ""
-  for i in entries(asciiengines) do
+  for i in entries(Vars.asciiengines) do
     if binary == i then
       ascii_opt = "-translate-file ./ascii.tcx "
       break
@@ -835,22 +852,22 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
     localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
-  for run_number = 1, checkruns do
+  for run_number = 1, Vars.checkruns do
     errlevels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
         os_setenv .. " TEXINPUTS=." .. localtexmf
-          .. (checksearch and os_pathsep or ""),
+          .. (Vars.checksearch and os_pathsep or ""),
         os_setenv .. " LUAINPUTS=." .. localtexmf
-          .. (checksearch and os_pathsep or ""),
+          .. (Vars.checksearch and os_pathsep or ""),
         -- Avoid spurious output from (u)pTeX
         os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
         os_setenv .. " TEXMFCNF=." .. os_pathsep,
-        set_epoch_cmd(epoch, forcecheckepoch),
+        set_epoch_cmd(epoch, Shrd.forcecheckepoch),
         -- Ensure lines are of a known length
-        os_setenv .. " max_print_line=" .. maxprintline,
+        os_setenv .. " max_print_line=" .. Vars.maxprintline,
         binary .. format
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
@@ -859,7 +876,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
       )
     )
     -- Break the loop if the result is stable
-    if breakout and run_number < checkruns then
+    if breakout and run_number < Vars.checkruns then
       if test_type.generated == Xtn.pdf then
         if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
           dvitopdf(name, Dir.test, engine, hide)
@@ -978,7 +995,7 @@ local function run_check(test_name, hide)
     print("Failed to find input for test " .. test_name)
     return 1
   end
-  local check_engines = checkengines
+  local check_engines = Shrd.checkengines
   if options["engine"] then
     check_engines = options["engine"]
   end
@@ -1014,7 +1031,7 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
   if (match(engine, "^lua") or match(engine, "^harf"))
   and not match(tlg_file, "%.luatex" .. "%" .. Xtn.tlg)
-  and not match(stdengine, "^lua")
+  and not match(Vars.stdengine, "^lua")
   then
     local lua_log_file
     if cleanup then
@@ -1068,8 +1085,44 @@ dflt = {
       rewrite = rewrite_pdf,
     },
   },
-  test_order = { "log", "pdf" },
+  test_order    = { "log", "pdf" },
+  checkformat   = "latex",
+  stdengine     = "pdftex",
+  checkconfigs  = { "build" },
+  includetests  = { "*" },
+  excludetests  = {},
+  recordstatus  = false,
+  asciiengines  = { "pdftex" },
+  checkruns     = 1,
+  maxprintline  = 79,
+  checksearch   = true,
 }
+
+dflt.specialformats = {
+  context = {
+    luatex = { binary = "context", format = "" },
+    pdftex = { binary = "texexec", format = "" },
+    xetex  = { binary = "texexec", format = "", options = "--xetex" }
+  },
+  latex = {
+    etex  = { format = "latex" },
+    ptex  = { binary = "eptex" },
+    uptex = { binary = "euptex" }
+  }
+}
+
+if not string.find(status.banner," 2019") then
+  dflt.specialformats.latex.luatex = {
+    binary = "luahbtex",
+    format = "lualatex"
+  }
+  dflt.specialformats["latex-dev"] = {
+    luatex = {
+      binary ="luahbtex",
+      format = "lualatex-dev"
+    }
+  }
+end
 
 ---Check
 ---@param names string_list_t
@@ -1091,11 +1144,11 @@ local function check(names)
         local ext = Vars.test_types[kind].test
         local excludepatterns = {}
         local num_exclude = 0
-        for glob in entries(excludetests) do
+        for glob in entries(Vars.excludetests) do
           num_exclude = num_exclude+1
           excludepatterns[num_exclude] = glob_to_pattern(glob .. ext)
         end
-        for glob in entries(includetests) do
+        for glob in entries(Vars.includetests) do
           for name in all_files(Dir.testfile, glob .. ext) do
             local exclude
             for i = 1, num_exclude do
@@ -1187,7 +1240,7 @@ end
 ---@return integer
 local function save(names)
   checkinit()
-  local engines = options["engine"] or { stdengine }
+  local engines = options["engine"] or { Vars.stdengine }
   if names == nil then
     print("Arguments are required for the save command")
     return 1
@@ -1205,7 +1258,7 @@ local function save(names)
       return 1
     end
     for engine in entries(engines) do
-      local testengine = engine == stdengine and "" or ("." .. engine)
+      local testengine = engine == Vars.stdengine and "" or ("." .. engine)
       local out_file = name .. testengine .. test_type.reference
       local gen_file = name .. "." .. engine .. test_type.generated
       print("Creating and copying " .. out_file)
@@ -1222,6 +1275,29 @@ local function save(names)
   return 0
 end
 
+-- Sanity check
+local function sanitize_engines()
+  local options = l3build.options
+  if options["engine"] and not options["force"] then
+     -- Make a lookup table
+     local t = {}
+    for engine in entries(Shrd.checkengines) do
+      t[engine] = true
+    end
+    for engine in entries(options["engine"]) do
+      if not t[engine] then
+        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
+        print("\n  Valid values are:")
+        for engine in entries(Shrd.checkengines) do
+          print("  - " .. engine)
+        end
+        print("")
+        exit(1)
+      end
+    end
+  end
+end
+
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
   runtest_tasks   = runtest_tasks,
@@ -1234,11 +1310,15 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_check_t
----@field check function
----@field save function
+---@field check             function
+---@field save              function
+---@field Vars              l3b_check_vars_t
+---@field sanitize_engines  function
 
 return {
   global_symbol_map = global_symbol_map,
-  check = check,
-  save = save,
+  Vars              = Vars,
+  check             = check,
+  save              = save,
+  sanitize_engines  = sanitize_engines,
 }

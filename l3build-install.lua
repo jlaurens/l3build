@@ -66,7 +66,11 @@ local rename                = fslib.rename
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Dir_t
 local Dir       = l3b_vars.Dir
+---@type Shrd_t
+local Shrd      = l3b_vars.Shrd
+---@type Files_t
 local Files     = l3b_vars.Files
 
 ---@type l3b_unpack_t
@@ -291,10 +295,11 @@ local function install_files(target, full, dry_run)
 
     -- Rename README if necessary
     if not dry_run then
-      if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
+      local readme = Shrd.ctanreadme
+      if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
         local install_dir = target .. "/doc/" .. Dir.module
-        if file_exists(install_dir .. "/" .. ctanreadme) then
-          rename(install_dir, ctanreadme, "README." .. match(ctanreadme, "%.(%w+)$"))
+        if file_exists(install_dir .. "/" .. readme) then
+          rename(install_dir, readme, "README." .. match(readme, "%.(%w+)$"))
         end
       end
     end

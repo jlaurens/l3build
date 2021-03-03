@@ -29,6 +29,7 @@ local match = string.match
 
 ---@type utlib_t
 local utlib    = require("l3b.utillib")
+local chooser = utlib.chooser
 local entries = utlib.entries
 local items   = utlib.items
 local values  = utlib.values
@@ -55,8 +56,8 @@ local remove_directory  = fslib.remove_directory
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type Shrd_t
+local Shrd      = l3b_vars.Shrd
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
 ---@type Files_t
@@ -74,12 +75,22 @@ local call    = l3b_aux.call
 local l3b_install = require("l3b.install")
 local install_files = l3b_install.install_files
 
+---@class l3b_ctan_vars_t
+---@field packtdszip boolean
+---@field flatten boolean
+
+---@type l3b_ctan_vars_t
+local Vars = chooser(_G, {
+  packtdszip = false,
+  flatten = true,
+})
+
 -- Copy files to the main CTAN release directory
 local function copy_ctan()
-  local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
+  local ctanpkg_dir = Dir.ctan .. "/" .. Shrd.ctanpkg
   make_directory(ctanpkg_dir)
   local function copyfiles(files, source)
-    if source == Dir.current or flatten then
+    if source == Dir.current or Vars.flatten then
       for filetype in entries(files) do
         copy_tree(filetype, source, ctanpkg_dir)
       end
@@ -154,7 +165,7 @@ function ctan()
   end
   if error_level == 0 then
     remove_directory(Dir.ctan)
-    make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
+    make_directory(Dir.ctan .. "/" .. Shrd.ctanpkg)
     remove_directory(Dir.tds)
     make_directory(Dir.tds)
     if standalone then
@@ -173,29 +184,30 @@ function ctan()
   if error_level == 0 then
     for i in entries(Files.text) do
       for j in items(Dir.unpack, Dir.textfile) do
-        copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
-        copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle)
+        copy_tree(i, j, Dir.ctan .. "/" .. Shrd.ctanpkg)
+        copy_tree(i, j, Dir.tds .. "/doc/" .. Shrd.tdsroot .. "/" .. bundle)
       end
     end
     -- Rename README if necessary
-    if ctanreadme ~= "" and not match(lower(ctanreadme), "^readme%.%w+") then
-      local newfile = "README." .. match(ctanreadme, "%.(%w+)$")
+    local readme = Shrd.ctanreadme
+    if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
+      local newfile = "README." .. match(readme, "%.(%w+)$")
       for dir in items(
-        Dir.ctan .. "/" .. Main.ctanpkg,
-        Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle
+        Dir.ctan .. "/" .. Shrd.ctanpkg,
+        Dir.tds .. "/doc/" .. Shrd.tdsroot .. "/" .. bundle
       ) do
-        if file_exists(dir .. "/" .. ctanreadme) then
+        if file_exists(dir .. "/" .. readme) then
           remove_tree(dir, newfile)
-          rename(dir, ctanreadme, newfile)
+          rename(dir, readme, newfile)
         end
       end
     end
-    dirzip(Dir.tds, Main.ctanpkg .. ".tds")
-    if packtdszip then
-      copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
+    dirzip(Dir.tds, Shrd.ctanpkg .. ".tds")
+    if Vars.packtdszip then
+      copy_tree(Shrd.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
     end
-    dirzip(Dir.ctan, ctanzip)
-    copy_tree(ctanzip .. ".zip", Dir.ctan, Dir.current)
+    dirzip(Dir.ctan, Shrd.ctanzip)
+    copy_tree(Shrd.ctanzip .. ".zip", Dir.ctan, Dir.current)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

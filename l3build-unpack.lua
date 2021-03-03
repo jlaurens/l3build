@@ -27,9 +27,10 @@ local l3b_aux = require("l3b.aux")
 local deps_install = l3b_aux.deps_install
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
+local utlib   = require("l3b.utillib")
+local chooser = utlib.chooser
 local entries = utlib.entries
-local keys = utlib.keys
+local keys    = utlib.keys
 
 ---@type wklib_t
 local wklib             = require("l3b.walklib")
@@ -60,6 +61,15 @@ local Exe       = l3b_vars.Exe
 ---@type Opts_t
 local Opts      = l3b_vars.Opts
 
+---@class l3b_unpack_vars_t
+---@field unpacksearch boolean
+
+---@type l3b_unpack_vars_t
+local Vars = chooser(_G, {
+  -- Enable access to trees outside of the repo
+  -- As these may be set false, a more elaborate test than normal is needed
+  unpacksearch = true
+})
 ---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
 ---Split off from the main unpack so it can be used on a bundle and not
@@ -99,9 +109,9 @@ local function bundleunpack(source_dirs, sources)
       local success = io.popen(cmd_concat(
           "cd " .. Dir.unpack .. "/" .. dir_path,
           os_setenv .. " TEXINPUTS=." .. os_pathsep
-            .. local_dir .. (unpacksearch and os_pathsep or ""),
+            .. local_dir .. (Vars.unpacksearch and os_pathsep or ""),
           os_setenv .. " LUAINPUTS=." .. os_pathsep
-            .. local_dir .. (unpacksearch and os_pathsep or ""),
+            .. local_dir .. (Vars.unpacksearch and os_pathsep or ""),
           Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
             .. (options["quiet"] and (" > " .. os_null) or "")
         ), "w"

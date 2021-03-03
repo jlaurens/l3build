@@ -35,6 +35,7 @@ local os_type = os["type"]
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
+local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
 local values      = utlib.values
@@ -67,6 +68,8 @@ local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Shrd_t
+local Shrd      = l3b_vars.Shrd
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
@@ -75,7 +78,6 @@ local Dir       = l3b_vars.Dir
 local Exe       = l3b_vars.Exe
 ---@type Opts_t
 local Opts      = l3b_vars.Opts
-
 
 --@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -86,6 +88,29 @@ local deps_install  = l3b_aux.deps_install
 local l3b_unpack  = require("l3b.unpack")
 local unpack      = l3b_unpack.unpack
 
+---@class l3b_tpst_vars_t
+---@field typesetruns   integer
+---@field typesetcmds   string
+---@field ps2pdfopt     string
+---@field typesetsearch boolean
+---@field glossarystyle string
+---@field indexstyle    string
+---@field specialtypesetting table
+
+---@type l3b_tpst_vars_t
+local Vars = chooser(_G, {
+  typesetruns = 3,
+  typesetcmds = "",
+  ps2pdfopt = "",
+  -- Enable access to trees outside of the repo
+  -- As these may be set false, a more elaborate test than normal is needed
+  typesetsearch = true,
+  -- Additional settings to fine-tune typesetting
+  glossarystyle = "gglo.ist",
+  indexstyle    = "gind.ist",
+  specialtypesetting = {},
+})
+
 ---dvitopdf
 ---@param name string
 ---@param dir string
@@ -95,7 +120,7 @@ local unpack      = l3b_unpack.unpack
 local function dvitopdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
-      set_epoch_cmd(epoch, forcecheckepoch),
+      set_epoch_cmd(epoch, Shrd.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. os_null) or ""),
       "ps2pdf " .. ps2pdfopt .. name .. Xtn.ps
@@ -209,7 +234,7 @@ end
 function MT.tex(file, dir, cmd)
   dir = dir or "."
   cmd = cmd or Exe.typeset .. Opts.typeset
-  return runcmd(cmd .. " \"" .. typesetcmds
+  return runcmd(cmd .. " \"" .. Vars.typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
@@ -246,9 +271,9 @@ function MT.typeset(file, dir, cmd)
   if error_level ~= 0 then
     return error_level
   end
-  for i = 2, typesetruns do
-    error_level = Ctrl.makeindex(name, dir, ".glo", ".gls", ".glg", glossarystyle)
-                + Ctrl.makeindex(name, dir, ".idx", ".ind", ".ilg", indexstyle)
+  for i = 2, Vars.typesetruns do
+    error_level = Ctrl.makeindex(name, dir, ".glo", ".gls", ".glg", Vars.glossarystyle)
+                + Ctrl.makeindex(name, dir, ".idx", ".ind", ".ilg", Vars.indexstyle)
                 + Ctrl.tex(file, dir, cmd)
     if error_level ~= 0 then break end
   end
@@ -312,7 +337,7 @@ local function docinit()
   end
   deps_install(_G.Deps.typeset)
   unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
-  -- Main loop for doc creation
+  -- Shrd loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
     return error_level

@@ -39,6 +39,11 @@ local l3build = require("l3build")
 local utlib   = require("l3b.utillib")
 local entries = utlib.entries
 
+---@type l3b_vars_t
+local l3b_vars   = require("l3b.variables")
+---@type Shrd_t
+local Shrd      = l3b_vars.Shrd
+
 -- Parse command line options
 
 option_list =
@@ -304,34 +309,9 @@ local function parse()
   return result
 end
 
--- Sanity check
-local function check_engines()
-  local options = l3build.options
-  if options["engine"] and not options["force"] then
-     -- Make a lookup table
-     local t = {}
-    for engine in entries(checkengines) do
-      t[engine] = true
-    end
-    for engine in entries(options["engine"]) do
-      if not t[engine] then
-        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
-        print("\n  Valid values are:")
-        for engine in entries(checkengines) do
-          print("  - " .. engine)
-        end
-        print("")
-        exit(1)
-      end
-    end
-  end
-end
-
 ---@class l3b_arguments_t
 ---@field parse function
----@field check_engines function
 
 return {
   parse = parse,
-  check_engines = check_engines,
 }

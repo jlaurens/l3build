@@ -22,8 +22,6 @@ for those people who are interested.
 
 --]]
 
-local status = require("status")
-
 ---@type utlib_t
 local utlib     = require("l3b.utillib")
 local chooser   = utlib.chooser
@@ -44,22 +42,37 @@ if type("module") ~= "string" then
   module = nil
 end
 
----@class Main_t
----@field module string
----@field bundle string
----@field tdsroot string
----@field ctanpkg string
+---@class Shrd_t
+---@field module        string
+---@field bundle        string
+---@field tdsroot       string
+---@field ctanpkg       string
+---@field ctanzip       string
+---@field checkengines  string_list_t
+---@field ctanreadme    string
+---@field forcecheckepoch boolean
+---@field forcedocepoch string
+---@field epoch         integer
+---@field flattentds    boolean
 
----@type Main_t
-local Main = chooser(_G, setmetatable({
+---@type Shrd_t
+local Shrd = chooser(_G, setmetatable({
   module  = "",
   bundle  = "",
   tdsroot = "latex",
+  checkengines = { "pdftex", "xetex", "luatex" },
+  ctanreadme   = "README.md",
+  forcecheckepoch = true,
+  forcedocepoch   = false,
+  epoch           = 1463734800,
+  flattentds      = true,
 }, {
   __index = function (t, k)
     if k == "ctanpkg" then
       return  t.bundle ~= ""
           and t.bundle or t.module
+    elseif k == "ctanzip" then
+      return t.ctanpkg .. "-ctan"
     end
   end
 }))
@@ -142,7 +155,7 @@ local default_Dir = setmetatable({
       result = t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
     elseif k == "module" then
-      result = Main.tdsroot .. "/" .. Main.bundle .. "/" .. Main.module
+      result = Shrd.tdsroot .. "/" .. Shrd.bundle .. "/" .. Shrd.module
       result = first_of(result:gsub("//", "/"))
     end
     return result
@@ -267,82 +280,6 @@ local Opts  = chooser(_G, {
   bibtex    = "-W",
   makeindex = "",
 }, { suffix = "opts" })
--- Supporting binaries and options
-
-
--- Engines for testing
-checkengines = checkengines or { "pdftex", "xetex", "luatex" }
-checkformat  = checkformat  or "latex"
-specialformats = specialformats or {}
-specialformats.context = specialformats.context or {
-    luatex = { binary = "context", format = "" },
-    pdftex = { binary = "texexec", format = "" },
-    xetex  = { binary = "texexec", format = "", options = "--xetex" }
-  }
-specialformats.latex = specialformats.latex or {
-    etex  = { format = "latex" },
-    ptex  = { binary = "eptex" },
-    uptex = { binary = "euptex" }
-  }
-if not string.find(status.banner," 2019") then
-  specialformats.latex.luatex = specialformats.latex.luatex or
-    { binary = "luahbtex", format = "lualatex" }
-  specialformats["latex-dev"] = specialformats["latex-dev"] or
-    { luatex = { binary="luahbtex", format = "lualatex-dev" }}
-end
-
-stdengine    = stdengine    or "pdftex"
-
--- The tests themselves
-includetests = includetests or { "*" }
-excludetests = excludetests or {}
-
--- Configs for testing
-checkconfigs = checkconfigs or { "build" }
-
--- Enable access to trees outside of the repo
--- As these may be set false, a more elaborate test than normal is needed
-if checksearch == nil then
-  checksearch = true
-end
-if typesetsearch == nil then
-  typesetsearch = true
-end
-if unpacksearch == nil then
-  unpacksearch = true
-end
-
--- Additional settings to fine-tune typesetting
-glossarystyle = glossarystyle or "gglo.ist"
-indexstyle    = indexstyle    or "gind.ist"
-specialtypesetting = specialtypesetting or {}
-
--- Forcing epoch
-if forcecheckepoch == nil then
-  forcecheckepoch = true
-end
-if forcedocepoch == nil then
-  forcedocepoch = false
-end
-
--- Other required settings
-asciiengines = asciiengines or { "pdftex" }
-checkruns    = checkruns    or 1
-ctanreadme   = ctanreadme   or "README.md"
-ctanzip      = ctanzip      or Main.ctanpkg .. "-ctan"
-epoch        = epoch        or 1463734800
-if flatten == nil then
-  flatten = true
-end
-if flattentds == nil then
-  flattentds = true
-end
-maxprintline = maxprintline or 79
-packtdszip   = packtdszip   or false
-ps2pdfopt    = ps2pdfopt    or ""
-typesetcmds  = typesetcmds  or ""
-typesetruns  = typesetruns  or 3
-recordstatus = recordstatus or false
 
 -- Extensions for various file types: used to abstract out stuff a bit
 
@@ -374,7 +311,7 @@ local Xtn = chooser(_G, {
 
 ---@class l3b_vars_t
 ---@field Xtn   Xtn_t
----@field Main  Main_t
+---@field Shrd  Shrd_t
 ---@field LOCAL any
 ---@field Dir   Dir_t
 ---@field Files Files_t
@@ -384,8 +321,8 @@ local Xtn = chooser(_G, {
 
 return {
   global_symbol_map = {},
+  Shrd              = Shrd,
   Xtn               = Xtn,
-  Main              = Main,
   LOCAL             = LOCAL,
   Dir               = Dir,
   Files             = Files,

@@ -243,8 +243,9 @@ end
 --[=[ end of booting process ]=]
 
 ---@type utlib_t
-local utlib   = require("l3b.utillib")
-local entries = utlib.entries
+local utlib     = require("l3b.utillib")
+local entries   = utlib.entries
+local deep_copy = utlib.deep_copy
 
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
@@ -274,7 +275,13 @@ local normalise_epoch = l3b_aux.normalise_epoch
 local call            = l3b_aux.call
 
 require("l3b.clean")
-require("l3b.check")
+
+---@type l3b_check_t
+local l3b_check   = require("l3b.check")
+---@type l3b_check_vars_t
+local check_vars  = l3b_check.Vars
+local sanitize_engines = l3b_check.sanitize_engines
+
 require("l3b.ctan")
 require("l3b.install")
 require("l3b.unpack")
@@ -316,7 +323,7 @@ end
 epoch = normalise_epoch(epoch)
 
 -- Sanity check
-arguments.check_engines()
+sanitize_engines()
 
 --
 -- Deal with multiple configs for tests
@@ -324,16 +331,17 @@ arguments.check_engines()
 
 -- When we have specific files to deal with, only use explicit configs
 -- (or just the std one)
+local checkconfigs
 if options["names"] then
   checkconfigs = options["config"] or { _G.stdconfig }
 else
-  checkconfigs = options["config"] or checkconfigs
+  checkconfigs = options["config"] or check_vars.checkconfigs
 end
 
 if options["target"] == "check" then
   if #checkconfigs > 1 then
     local error_level = 0
-    local opts = options -- TODO: remove this shallow copy
+    local opts = deep_copy(options) -- TODO: remove this shallow copy
     local failed = {}
     for config in entries(checkconfigs) do
       opts["config"] = { config }
@@ -374,7 +382,6 @@ if #checkconfigs == 1 and
    if file_exists(config_path) then
      dofile(config_path)
      Dir.test = Dir.test .. "-" .. config_1
-     -- Reset Dir.testsupp if required
    else
      print("Error: Cannot find configuration " .. config_1)
      exit(1)
