@@ -68,9 +68,11 @@ local options = l3build.options
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Xtn_t
-local Xtn   = l3b_vars.Xtn
+local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
-local Dir   = l3b_vars.Dir
+local Dir       = l3b_vars.Dir
+---@type Exe_t
+local Exe       = l3b_vars.Exe
 
 
 --@type l3b_aux_t
@@ -204,7 +206,7 @@ end
 ---@return integer
 function MT.tex(file, dir, cmd)
   dir = dir or "."
-  cmd = cmd or typesetexe .. typesetopts
+  cmd = cmd or Exe.typeset .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1

@@ -55,6 +55,8 @@ local Dir       = l3b_vars.Dir
 local Files     = l3b_vars.Files
 ---@type Deps_t
 local Deps      = l3b_vars.Deps
+---@type Exe_t
+local Exe       = l3b_vars.Exe
 
 ---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
 
@@ -98,7 +100,7 @@ local function bundleunpack(source_dirs, sources)
             .. local_dir .. (unpacksearch and os_pathsep or ""),
           os_setenv .. " LUAINPUTS=." .. os_pathsep
             .. local_dir .. (unpacksearch and os_pathsep or ""),
-          unpackexe .. " " .. unpackopts .. " " .. base_name
+          Exe.unpack .. " " .. unpackopts .. " " .. base_name
             .. (options["quiet"] and (" > " .. os_null) or "")
         ), "w"
       ):write(string.rep("y\n", 300)):close()
