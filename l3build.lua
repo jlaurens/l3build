@@ -241,8 +241,7 @@ end
 
 ---@type l3b_arguments_t
 local arguments     = require("l3b.arguments")
-_G.options          = arguments.parse(arg)
-l3build.options     = _G.options
+l3build.options     = arguments.parse(arg)
 
 ---@type l3b_help_t
 local l3b_help  = require("l3b.help")

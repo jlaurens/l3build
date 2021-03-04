@@ -89,16 +89,21 @@ local function to_host(cmd)
   return cmd
 end
 
-local function make_directory(dir)
+---Make a directory at the given path
+---@param path string
+---@return boolean? suc
+---@return exitcode? "exit"|"signal"
+---@return integer? code
+local function make_directory(path)
   if os_type == "windows" then
     -- Windows (with the extensions) will automatically make directory trees
     -- but issues a warning if the dir already exists: avoid by including a test
-    dir = unix_to_win(dir)
+    path = unix_to_win(path)
     return execute(
-      "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
+      "if not exist "  .. path .. "\\nul " .. "mkdir " .. path
     )
   else
-    return execute("mkdir -p " .. dir)
+    return execute("mkdir -p " .. path)
   end
 end
 
@@ -154,8 +159,8 @@ local function file_exists(path)
 end
 
 ---Look for files, directory by directory, and return the first existing
----@param dirs any
----@param names any
+---@param dirs  string_list_t
+---@param names string_list_t
 ---@return string
 local function locate(dirs, names)
   for i in entries(dirs) do
@@ -347,27 +352,29 @@ local function remove_tree(source, glob)
   return 0
 end
 
--- For cleaning out a directory, which also ensures that it exists
-local function make_clean_directory(dir)
-  local errorlevel = make_directory(dir)
-  if errorlevel ~= 0 then
-    return errorlevel
+---For cleaning out a directory, which also ensures that it exists
+---@param path string
+---@return integer
+local function make_clean_directory(path)
+  local error_level = make_directory(path)
+  if error_level ~= 0 then
+    return error_level
   end
-  return remove_tree(dir, "**")
+  return remove_tree(path, "**")
 end
 
 ---Remove a directory tree.
----@param dir string Must be properly escaped.
+---@param path string Must be properly escaped.
 ---@return boolean?  suc
 ---@return exitcode? exitcode
 ---@return integer?  code
-local function remove_directory(dir)
+local function remove_directory(path)
   -- First, make sure it exists to avoid any errors
   if os_type == "windows" then
-    make_directory(dir)
-    return execute("rmdir /s /q " .. unix_to_win(dir))
+    make_directory(path)
+    return execute("rmdir /s /q " .. unix_to_win(path))
   else
-    return execute("rm -rf " .. dir)
+    return execute("rm -rf " .. path)
   end
 end
 
@@ -393,22 +400,22 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class fslib_t
----@field to_host function
----@field absolute_path function
----@field make_directory function
----@field directory_exists function
----@field file_exists function
----@field locate function
----@field file_list function
----@field all_files function
----@field set_tree_excluder function
----@field tree function
----@field rename function
----@field copy_tree function
----@field make_clean_directory function
----@field remove_file function
----@field remove_tree function
----@field remove_directory function
+---@field to_host           fun(cmd: string):   string
+---@field absolute_path     fun(path: string):  string
+---@field make_directory    fun(path: string):  boolean, exitcode, integer
+---@field directory_exists  fun(path: string): boolean
+---@field file_exists       fun(path: string): boolean
+---@field locate      fun(dirs: string_list_t, names: string_list_t): string
+---@field file_list   fun(dir_path: string, glob: string|nil): string_list_t
+---@field all_files   fun(path: string, glob: string): fun(): string
+---@field set_tree_excluder fun(f: fun(path_cwd: string): boolean)
+---@field tree        fun(dir_path: string, glob: string): table<string, string>)
+---@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field copy_tree   fun(glob: string, source: string, dest: string): integer
+---@field make_clean_directory fun(path: string): integer
+---@field remove_file fun(dir_path: string, name: string): integer
+---@field remove_tree fun(source: string, glob: string): integer
+---@field remove_directory fun(path: string): boolean?, exitcode?, integer?
 
 return {
   global_symbol_map = global_symbol_map,

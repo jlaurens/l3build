@@ -22,7 +22,7 @@ for those people who are interested.
 
 --]]
 
-local insert = table.insert
+local append = table.insert
 local match  = string.match
 local rep    = string.rep
 local sort   = table.sort
@@ -46,14 +46,14 @@ local function help()
   local function setup_list(list)
     local longest = 0
     for k in keys(list) do
-      if k:len() > longest then
-        longest = k:len()
+      if #k > longest then
+        longest = #k
       end
     end
     -- Sort the options
     local t = {}
     for k in keys(list) do
-      insert(t, k)
+      append(t, k)
     end
     sort(t)
     return longest,t
@@ -76,9 +76,9 @@ local function help()
   end
   print("")
   print("Valid options are:")
-  longest, t = setup_list(option_list)
+  longest, t = setup_list(_G.option_list)
   for k in entries(t) do
-    local opt = option_list[k]
+    local opt = _G.option_list[k]
     local filler = rep(" ", longest - k:len() + 1)
     if opt["desc"] then
       if opt["short"] then

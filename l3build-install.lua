@@ -64,6 +64,9 @@ local make_clean_directory  = fslib.make_clean_directory
 local make_directory        = fslib.make_directory
 local rename                = fslib.rename
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Dir_t
@@ -88,12 +91,16 @@ local Vars = chooser(_G, {
 
 local function gethome()
   set_program("latex")
-  return (options["texmfhome"] or var_value("TEXMFHOME"))
+  local options = l3build.options
+  return options["texmfhome"] or var_value("TEXMFHOME")
 end
 
+---Uninstall
+---@return integer
 local function uninstall()
   local function zapdir(dir)
     local install_dir = gethome() .. "/" .. dir
+    local options = l3build.options
     if options["dry-run"] then
       local files = file_list(install_dir)
       if next(files) then
@@ -123,6 +130,7 @@ local function uninstall()
       -- Man files should have a single-digit extension: the type
       local install_dir = gethome() .. "/doc/man/man"  .. match(file, ".$")
       if file_exists(install_dir .. "/" .. file) then
+        local options = l3build.options
         if options["dry-run"] then
           insert(manfiles, "man" .. match(file, ".$") .. "/" ..
            select(2, dir_base(file)))
@@ -155,6 +163,11 @@ local function uninstall()
   return 0
 end
 
+---Install files
+---@param target string
+---@param full boolean
+---@param dry_run boolean
+---@return integer
 local function install_files(target, full, dry_run)
 
   -- Needed so paths are only cleaned out once
@@ -280,8 +293,8 @@ local function install_files(target, full, dry_run)
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = create_file_list(Dir.docfile, Files.typeset, { Files.source })
-    sourcelist = create_file_list(Dir.sourcefile, Files.source,
+    _G.typesetlist = create_file_list(Dir.docfile, Files.typeset, { Files.source })
+    _G.sourcelist = create_file_list(Dir.sourcefile, Files.source,
       { Files.bst, Files.install, Files.makeindex, Files.script })
  
   if dry_run then
@@ -346,6 +359,7 @@ local function install_files(target, full, dry_run)
 end
 
 local function install()
+  local options = l3build.options
   return install_files(gethome(), options["full"], options["dry-run"])
 end
 
@@ -362,9 +376,9 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_install_t
----@field uninstall function
----@field install_files function
----@field install function
+---@field uninstall     fun(): integer
+---@field install_files fun(target: string, full: boolean, dry_run: boolean): integer
+---@field install       fun(): integer
 
 return {
   global_symbol_map = global_symbol_map,

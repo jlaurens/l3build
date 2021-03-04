@@ -84,6 +84,7 @@ local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3build_t
 local l3build = require("l3build")
+local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
@@ -975,6 +976,7 @@ local function check_and_diff(name, engine, hide, ext, type)
   if error_level == 0 then
     return error_level
   end
+  local options = l3build.options
   if options["show-log-on-error"] then
     show_failed_log(name)
   end
@@ -1325,10 +1327,10 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_check_t
----@field check             function
----@field save              function
+---@field check             fun(names: string_list_t): integer
+---@field save              fun(names: string_list_t): integer
 ---@field Vars              l3b_check_vars_t
----@field sanitize_engines  function
+---@field sanitize_engines  fun()
 
 return {
   global_symbol_map = global_symbol_map,

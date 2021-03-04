@@ -60,22 +60,25 @@ local deps_install  = l3b_aux.deps_install
 ---@type l3b_check_t
 local l3b_check       = require("l3b.check")
 local l3b_check_vars  = l3b_check.Vars
-
-local sanitize_engines = l3b_check.sanitize_engines
+local check           = l3b_check.check
+local save            = l3b_check.save
 
 local help          = require("l3b.help").help
-local check         = require("l3b.check").check
-local save          = require("l3b.check").save
-local bundlectan    = require("l3b.ctan").bundlectan
-local bundleunpack  = require("l3b.unpack").bundleunpack
-local clean         = require("l3b.clean").clean
-local bundleclean   = require("l3b.clean").bundleclean
+local l3b_ctan      = require("l3b.ctan")
+local ctan          = l3b_ctan.ctan
+local bundlectan    = l3b_ctan.bundlectan
+local l3b_unpack    = require("l3b.unpack")
+local unpack        = l3b_unpack.unpack
+local bundleunpack  = l3b_unpack.bundleunpack
+local l3b_clean     = require("l3b.clean")
+local clean         = l3b_clean.clean
+local bundleclean   = l3b_clean.bundleclean
 local doc           = require("l3b.doc").doc
-local install       = require("l3b.install").install
-local uninstall     = require("l3b.install").uninstall
+local l3b_install   = require("l3b.install")
+local install       = l3b_install.install
+local uninstall     = l3b_install.uninstall
 local manifest      = require("l3b.manifest").manifest
 local tag           = require("l3b.tagging").manifest
-local unpack        = require("l3b.unpack").unpack
 local upload        = require("l3b.upload").upload
 
 -- List all modules
@@ -213,7 +216,7 @@ local function main(target, names)
   end
   local error_level = 0
   if module == "" then
-    modules = modules or listmodules()
+    _G.modules = _G.modules or listmodules()
     if target_list[target].bundle_func then
       error_level = target_list[target].bundle_func(names)
     else
@@ -221,7 +224,7 @@ local function main(target, names)
       if target_list[target].bundle_target then
         target = "bundle" .. target
       end
-      error_level = call(modules, target)
+      error_level = call(_G.modules, target)
     end
   else
     if target_list[target].pre then

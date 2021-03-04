@@ -38,6 +38,10 @@ local quoted_path = oslib.quoted_path
 local fslib             = require("l3b.fslib")
 local set_tree_excluder = fslib.set_tree_excluder
 
+---@type l3build_t
+local l3build = require("l3build")
+local options = l3build.options
+
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
 -- remove the built-in

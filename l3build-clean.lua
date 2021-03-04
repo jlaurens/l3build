@@ -83,7 +83,7 @@ local function clean()
 end
 
 local function bundle_clean()
-  local error_level = call(modules, "clean")
+  local error_level = call(_G.modules, "clean")
   for g in entries(Files.clean) do
     error_level = error_level + remove_tree(Dir.current, g)
   end

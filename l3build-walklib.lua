@@ -31,7 +31,7 @@ local dir_name  = wklib.dir_name
 local job_name  = wklib.job_name
 --]=]
 
-local match            = string.match
+local match       = string.match
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
@@ -55,16 +55,23 @@ local function dir_base(path)
   end
 end
 
--- Arguably clearer names
-local function base_name(file)
-  return second_of(dir_base(file))
+---Arguably clearer names
+---@param path string
+---@return string
+local function base_name(path)
+  return second_of(dir_base(path))
 end
 
-local function dir_name(file)
-  return first_of(dir_base(file))
+---Arguably clearer names
+---@param path string
+---@return string
+local function dir_name(path)
+  return first_of(dir_base(path))
 end
 
--- Strip the extension from a file name (if present)
+---Strip the extension from a file name (if present)
+---@param file string
+---@return string
 local function job_name(file)
   local name = match(base_name(file), "^(.*)%.")
   return name or file
@@ -73,9 +80,9 @@ end
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
   splitpath = dir_base,
-  basename = base_name,
-  dirname = dir_name,
-  jobname = job_name,
+  basename  = base_name,
+  dirname   = dir_name,
+  jobname   = job_name,
 }
 
 --[=[ Export function symbols ]=]
@@ -83,10 +90,10 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class wklib_t
----@field dir_base function
----@field dir_name function
----@field base_name function
----@field job_name function
+---@field dir_base  fun(path: string): string, string
+---@field dir_name  fun(path: string): string
+---@field base_name fun(path: string): string
+---@field job_name  fun(path: string): string
 
 return {
   global_symbol_map = global_symbol_map,

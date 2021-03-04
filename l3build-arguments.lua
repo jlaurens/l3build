@@ -32,21 +32,9 @@ local sub              = string.sub
 
 local insert           = table.insert
 
----@type l3build_t
-local l3build = require("l3build")
-
----@type utlib_t
-local utlib   = require("l3b.utillib")
-local entries = utlib.entries
-
----@type l3b_vars_t
-local l3b_vars   = require("l3b.variables")
----@type Main_t
-local Main      = l3b_vars.Main
-
 -- Parse command line options
 
-option_list =
+_G.option_list =
   {
     config =
       {
@@ -176,7 +164,7 @@ local function parse()
   local long_options =  {}
   local short_options = {}
   -- Turn long/short options into two lookup tables
-  for k, v in pairs(option_list) do
+  for k, v in pairs(_G.option_list) do
     if v["short"] then
       short_options[v["short"]] = k
     end
@@ -248,7 +236,7 @@ local function parse()
       local optname = opts[opt]
       if optname then
         -- Tidy up arguments
-        if option_list[optname]["type"] == "boolean" then
+        if _G.option_list[optname]["type"] == "boolean" then
           if optarg then
             local opt = "-" .. (match(a, "^%-%-") and "-" or "") .. opt
             stderr:write("Value not allowed for option " .. opt .."\n")
@@ -284,7 +272,7 @@ local function parse()
       end
       -- Store the result
       if optarg then
-        if option_list[optname]["type"] == "string" then
+        if _G.option_list[optname]["type"] == "string" then
           result[optname] = optarg
         else
           local opts = result[optname] or {}
@@ -310,7 +298,7 @@ local function parse()
 end
 
 ---@class l3b_arguments_t
----@field parse function
+---@field parse fun()
 
 return {
   parse = parse,

@@ -58,9 +58,13 @@ local Dir   = l3b_vars.Dir
 ---@type Files_t
 local Files   = l3b_vars.Files
 
-
 ---@alias tag_hook_t fun(tag_name: string, tag_date: string): integer
 
+---Update the tag.
+---@param file_path string
+---@param tag_name string
+---@param tag_date string
+---@return integer
 local function update_file_tag(file_path, tag_name, tag_date)
   local file_name = base_name(file_path)
   print("Tagging  ".. file_name)
@@ -123,7 +127,7 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_tagging_t
----@field tag function
+---@field tag fun(tag_names: string_list_t): integer
 
 return {
   global_symbol_map = global_symbol_map,

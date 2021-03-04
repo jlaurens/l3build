@@ -54,6 +54,9 @@ local copy_tree       = fslib.copy_tree
 local rename          = fslib.rename
 local remove_directory  = fslib.remove_directory
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Main_t
@@ -107,7 +110,7 @@ local function copy_ctan()
   end
   for tab in items(
     Files.bib, Files.demo, Files.doc,
-    _G.pdffiles, Files.scriptman, typesetlist
+    _G.pdffiles, Files.scriptman, _G.typesetlist
   ) do
     copyfiles(tab, Dir.docfile)
   end
@@ -128,8 +131,9 @@ end
 
 ---comment
 ---@return integer
-function ctan()
+local function ctan()
   -- Always run tests for all engines
+  local options = l3build.options
   options["engine"] = nil
   local function dirzip(dir, name)
     local zipname = name .. ".zip"
@@ -154,14 +158,14 @@ function ctan()
   end
   local error_level
   local standalone = false
-  if bundle == "" then
+  if Main.bundle == "" then
     standalone = true
   end
   if standalone then
     error_level = call({ "." }, "check")
-    bundle = module
+    Main.bundle = module
   else
-    error_level = call(modules, "bundlecheck")
+    error_level = call(_G.modules, "bundlecheck")
   end
   if error_level == 0 then
     remove_directory(Dir.ctan)
@@ -173,7 +177,7 @@ function ctan()
       if error_level ~=0 then return error_level end
       copy_ctan()
     else
-      error_level = call(modules, "bundlectan")
+      error_level = call(_G.modules, "bundlectan")
     end
   else
     print("\n====================")
@@ -185,7 +189,7 @@ function ctan()
     for i in entries(Files.text) do
       for j in items(Dir.unpack, Dir.textfile) do
         copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
-        copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle)
+        copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
       end
     end
     -- Rename README if necessary
@@ -194,7 +198,7 @@ function ctan()
       local newfile = "README." .. match(readme, "%.(%w+)$")
       for dir in items(
         Dir.ctan .. "/" .. Main.ctanpkg,
-        Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. bundle
+        Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle
       ) do
         if file_exists(dir .. "/" .. readme) then
           remove_tree(dir, newfile)
@@ -227,11 +231,11 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_ctan_t
----@field ctan function
----@field bundle_ctan function
+---@field ctan        fun(): integer
+---@field bundle_ctan fun(): integer
 
 return {
   global_symbol_map = global_symbol_map,
-  ctan = ctan,
-  bundle_ctan = bundle_ctan,
+  ctan              = ctan,
+  bundle_ctan       = bundle_ctan,
 }

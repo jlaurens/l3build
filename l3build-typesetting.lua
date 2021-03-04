@@ -78,6 +78,10 @@ local Dir       = l3b_vars.Dir
 local Exe       = l3b_vars.Exe
 ---@type Opts_t
 local Opts      = l3b_vars.Opts
+---@type Files_t
+local Files     = l3b_vars.Files
+---@type Deps_t
+local Deps      = l3b_vars.Deps
 
 --@type l3b_aux_t
 local l3b_aux       = require("l3b.aux")
@@ -300,8 +304,8 @@ local function typesetpdf(file, dir)
   dir = dir or "."
   local name = job_name(file)
   print("Typesetting " .. name)
-  local func = Ctrl.typeset
-  local cmd = _G.typesetexe .. " " .. _G.Opts.typeset
+  local func  = Ctrl.typeset
+  local cmd   = Exe.typeset .. " " .. Opts.typeset
   local special = _G.specialtypesetting and _G.specialtypesetting[file]
   if special then
     func = special.func or func
@@ -335,20 +339,20 @@ local function docinit()
   -- Set up
   make_clean_directory(Dir.typeset)
   for filetype in items(
-    _G.Files.bib, _G.Files.doc, _G.Files.typeset, _G.Files.typesetdemo
+    Files.bib, Files.doc, Files.typeset, Files.typesetdemo
   ) do
     for file in entries(filetype) do
       copy_tree(file, Dir.docfile, Dir.typeset)
     end
   end
-  for file in entries(_G.Files.source) do
+  for file in entries(Files.source) do
     copy_tree(file, Dir.sourcefile, Dir.typeset)
   end
-  for file in entries(_G.Files.typesetsupp) do
+  for file in entries(Files.typesetsupp) do
     copy_tree(file, Dir.support, Dir.typeset)
   end
-  deps_install(_G.Deps.typeset)
-  unpack({ _G.Files.source, _G.Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
+  deps_install(Deps.typeset)
+  unpack({ Files.source, Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = Ctrl.typeset_demo_tasks()
   if error_level ~= 0 then
@@ -365,7 +369,7 @@ local function doc(files)
   local error_level = docinit()
   if error_level ~= 0 then return error_level end
   local done = {}
-  for typeset_files in items(_G.Files.typesetdemo, _G.Files.typeset) do
+  for typeset_files in items(Files.typesetdemo, Files.typeset) do
     for glob in entries(typeset_files) do
       for dir in items(Dir.typeset, Dir.unpack) do
         for p_cwd in values(tree(dir, glob)) do

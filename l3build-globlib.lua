@@ -67,6 +67,10 @@ local extend_with = utlib.extend_with
   (end license)
 
 --]]
+
+---Make a glob into a pattern
+---@param glob string
+---@return string
 local function glob_to_pattern(glob)
 
   local pattern = "^" -- pattern being built
@@ -117,7 +121,7 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class gblib_t
----@field glob_to_pattern   function
+---@field glob_to_pattern   fun(glob: string): string
 
 return {
   global_symbol_map = global_symbol_map,

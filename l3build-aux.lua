@@ -91,11 +91,11 @@ end
 ---@usage Public
 local function call(modules, target, opts)
   -- Turn the option table into a CLI option string
-  opts = opts or options
+  opts = opts or l3build.options
   local cli_opts = ""
   for k, v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases, TODO enhance the design to remove the need for this comment
-      local t = option_list[k] or {}
+      local t = _G.option_list[k] or {}
       local value = ""
       if t["type"] == "string" then
         value = value .. "=" .. v
@@ -156,9 +156,6 @@ local function deps_install(deps)
   return 0
 end
 
-local function do_config(config_1)
-end
-
 -- this is the map to export function symbols to the global space
 local global_symbol_map = {
   call = call,
@@ -169,15 +166,13 @@ extend_with(_G, global_symbol_map)
 -- [=[ ]=]
 
 ---@class l3b_aux_t
----@field deps_install function
----@field call function
+---@field deps_install  fun(deps: table): number
+---@field call          fun(modules: string_list_t, target: string, opts: table): number
 ---@field set_epoch_cmd fun(epoch: string, force: boolean): string
----@field do_config     fun(cfg: string)
 
 return {
   global_symbol_map = global_symbol_map,
   deps_install = deps_install,
   call = call,
   set_epoch_cmd = set_epoch_cmd,
-  do_config = do_config,
 }
