@@ -110,7 +110,7 @@ local function copy_ctan()
   end
   for tab in items(
     Files.bib, Files.demo, Files.doc,
-    _G.pdffiles, Files.scriptman, _G.typesetlist
+    Files.scriptman, _G.pdffiles, _G.typesetlist
   ) do
     copyfiles(tab, Dir.docfile)
   end

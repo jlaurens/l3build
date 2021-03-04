@@ -39,7 +39,7 @@ local deep_copy   = utlib.deep_copy
 
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
-local all_files   = fslib.all_files
+local all_names   = fslib.all_names
 local file_exists = fslib.file_exists
 
 ---@type l3build_t
@@ -271,7 +271,7 @@ local function multi_check()
           if config ~= "build" then
             test_dir = test_dir .. "-" .. config
           end
-          for name in all_files(test_dir, "*" .. os_diffext) do
+          for name in all_names(test_dir, "*" .. os_diffext) do
             print("  - " .. test_dir .. "/" .. name)
           end
           print("")

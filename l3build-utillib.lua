@@ -175,7 +175,8 @@ end
 ---if filename is non nil and file readable return contents otherwise nil
 ---@param file_path string
 ---@param is_binary boolean
----@return string|nil
+---@return string? the content of the file
+---@return string? an error message
 local function read_content(file_path, is_binary)
   if file_path then
     local fh = open(file_path, is_binary and "rb" or "r")

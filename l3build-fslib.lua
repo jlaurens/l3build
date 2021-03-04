@@ -32,12 +32,12 @@ local directory_exists      = fslib.directory_exists
 local file_exists           = fslib.file_exists
 local locate                = fslib.locate
 local file_list             = fslib.file_list
-local all_files             = fslib.all_files
+local all_names             = fslib.all_names
 local tree                  = fslib.tree
 local rename                = fslib.rename
 local copy_tree             = fslib.copy_tree
 local make_clean_directory  = fslib.make_clean_directory
-local remove_file           = fslib.remove_file
+local remove_name           = fslib.remove_name
 local remove_tree           = fslib.remove_tree
 local remove_directory      = fslib.remove_directory
 --]=]
@@ -67,8 +67,8 @@ local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type gblib_t
-local gblib           = require("l3b.globlib")
-local glob_to_pattern = gblib.glob_to_pattern
+local gblib         = require("l3b.globlib")
+local glob_matcher  = gblib.glob_matcher
 
 ---@type oslib_t
 local oslib       = require("l3b.oslib")
@@ -182,20 +182,15 @@ end
 ---@return string_list_t
 local function file_list(dir_path, glob)
   local files = {}
-  local pattern
-  if glob then
-    pattern = glob_to_pattern(glob)
-  end
+  local accept = glob_matcher(glob)
   if directory_exists(dir_path) then
     for entry in lfs_dir(dir_path) do
-      if pattern then
-        if match(entry, pattern) then
+      if accept then
+        if accept(entry) then
           append(files, entry)
         end
-      else
-        if entry ~= "." and entry ~= ".." then
-          append(files, entry)
-        end
+      elseif entry ~= "." and entry ~= ".." then
+        append(files, entry)
       end
     end
   end
@@ -206,7 +201,7 @@ end
 ---@param path string
 ---@param glob string
 ---@return fun(): string
-local function all_files(path, glob)
+local function all_names(path, glob)
   return entries(file_list(path, glob))
 end
 
@@ -245,7 +240,7 @@ local function tree(dir_path, glob)
     ---@param p_cwd string path counterpart relative to the current working directory
     ---@param table table
     local function fill(p_src, p_cwd, table)
-      for file in all_files(p_cwd, glob_part) do
+      for file in all_names(p_cwd, glob_part) do
         if file ~= "." and file ~= ".." then
           local p_cwd_file = p_cwd .. "/" .. file
           if not tree_excluder(p_cwd_file) then
@@ -296,15 +291,9 @@ local function rename(dir_path, source, dest)
   end
 end
 
----Copy files 'quietly'.
----@param glob string
----@param source string
----@param dest string
----@return integer
-local function copy_tree(glob, source, dest)
-  local errorlevel
-  for p_src, p_cwd in pairs(tree(source, glob)) do
-    -- p_src is a path relative to `source` whereas
+local function copy_core(dest, p_src, p_cwd)
+  local error_level
+      -- p_src is a path relative to `source` whereas
     -- p_cwd is the counterpart relative to the current working directory
     if os_type == "windows" then
       if attributes(p_cwd, "mode") == "directory" then
@@ -324,17 +313,42 @@ local function copy_tree(glob, source, dest)
     if errorlevel ~=0 then
       return errorlevel
     end
+
+end
+
+---Copy files 'quietly'.
+---@param name string base name
+---@param source string path of the source directory
+---@param dest string path of the destination directory
+---@return error_level_t
+local function copy_name(name, source, dest)
+  local p_src = source  .."/".. name
+  local p_cwd = dest    .."/".. name
+  return copy_core(dest, p_src, p_cwd)
+end
+
+---Copy files 'quietly'.
+---@param glob string
+---@param source string
+---@param dest string
+---@return integer
+local function copy_tree(glob, source, dest)
+  local error_level
+  for p_src, p_cwd in pairs(tree(source, glob)) do
+    error_level = copy_core(dest, p_src, p_cwd)
+    if error_level ~=0 then
+      return error_level
+    end
   end
   return 0
 end
 
----Remove the file with the given name at the given location.
+---Remove the file or void directory with the given name at the given location.
 ---@param dir_path string
 ---@param name string
 ---@return error_level_t
-local function remove_file(dir_path, name)
+local function remove_name(dir_path, name)
   remove(dir_path .. "/" .. name)
-  -- os.remove doesn't give a sensible errorlevel
   -- TODO: Is it an error to remove a file that does not exist?
   return 0
 end
@@ -346,7 +360,7 @@ end
 ---@return error_level_t
 local function remove_tree(source, glob)
   for i in keys(tree(source, glob)) do
-    remove_file(source, i)
+    remove_name(source, i)
   end
   -- os.remove doesn't give a sensible errorlevel
   return 0
@@ -386,13 +400,14 @@ end
 ---@field file_exists       fun(path: string): boolean
 ---@field locate      fun(dirs: string_list_t, names: string_list_t): string
 ---@field file_list   fun(dir_path: string, glob: string|nil): string_list_t
----@field all_files   fun(path: string, glob: string): fun(): string
+---@field all_names   fun(path: string, glob: string): fun(): string
 ---@field set_tree_excluder fun(f: fun(path_cwd: string): boolean)
 ---@field tree        fun(dir_path: string, glob: string): table<string, string>)
 ---@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field copy_name   fun(file: string, source: string, dest: string): integer
 ---@field copy_tree   fun(glob: string, source: string, dest: string): integer
 ---@field make_clean_directory fun(path: string): integer
----@field remove_file fun(dir_path: string, name: string): integer
+---@field remove_name fun(dir_path: string, name: string): integer
 ---@field remove_tree fun(source: string, glob: string): integer
 ---@field remove_directory fun(path: string): boolean?, exitcode?, integer?
 
@@ -404,13 +419,14 @@ return {
   file_exists = file_exists,
   locate = locate,
   file_list = file_list,
-  all_files = all_files,
+  all_names = all_names,
   set_tree_excluder = set_tree_excluder,
   tree = tree,
   rename = rename,
+  copy_name = copy_name,
   copy_tree = copy_tree,
   make_clean_directory = make_clean_directory,
-  remove_file = remove_file,
+  remove_name = remove_name,
   remove_tree = remove_tree,
   remove_directory = remove_directory,
 }

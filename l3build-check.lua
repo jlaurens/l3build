@@ -58,8 +58,8 @@ local read_content    = utlib.read_content
 local write_content   = utlib.write_content
 
 ---@type gblib_t
-local gblib             = require("l3b.globlib")
-local glob_to_pattern   = gblib.glob_to_pattern
+local gblib         = require("l3b.globlib")
+local glob_matcher  = gblib.glob_matcher
 
 ---@type wklib_t
 local wklib     = require("l3b.walklib")
@@ -72,14 +72,15 @@ local run         = oslib.run
 
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
-local all_files   = fslib.all_files
+local all_names   = fslib.all_names
+local copy_name   = fslib.copy_name
 local copy_tree   = fslib.copy_tree
 local file_exists = fslib.file_exists
 local locate      = fslib.locate
 local rename      = fslib.rename
 local to_host     = fslib.to_host
 local remove_tree = fslib.remove_tree
-local remove_file = fslib.remove_file
+local remove_name = fslib.remove_name
 local directory_exists      = fslib.directory_exists
 local absolute_path         = fslib.absolute_path
 local make_clean_directory  = fslib.make_clean_directory
@@ -137,6 +138,7 @@ local dvitopdf        = l3b_typesetting.dvitopdf
 ---@field maxprintline  integer
 ---@field checksearch   boolean
 ---@field runtest_tasks fun(test_name: string, run_number: integer): string
+---@field checkinit_hook fun(): error_level_t
 
 ---@type l3b_check_vars_t
 local dflt = {} -- define below
@@ -166,7 +168,7 @@ local function checkinit()
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for i in all_files(Dir[l3b_vars.LOCAL]) do
+  for i in all_names(Dir[l3b_vars.LOCAL]) do
     copy_tree(i, Dir[l3b_vars.LOCAL], Dir.test)
   end
   bundleunpack({ Dir.sourcefile, Dir.testfile })
@@ -177,7 +179,7 @@ local function checkinit()
     copy_tree(i, Dir.unpack, Dir.test)
   end
   if directory_exists(Dir.testsupp) then
-    for i in all_files(Dir.testsupp) do
+    for i in all_names(Dir.testsupp) do
       copy_tree(i, Dir.testsupp, Dir.test)
     end
   end
@@ -185,7 +187,7 @@ local function checkinit()
     copy_tree(i, Dir.support, Dir.test)
   end
   execute(os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
-  return (_G.checkinit_hook or checkinit_hook)()
+  return Vars.checkinit_hook()
 end
 
 ---Apply the `translator` to the content at `path_in`
@@ -195,7 +197,10 @@ end
 ---@param translator fun(content: string, ...): string
 ---@vararg any
 local function rewrite(path_in, path_out, translator, ...)
-  local content = assert(read_content(path_in, true))
+  local content = read_content(path_in, true)
+  if not content then
+    error("No content available at ".. path_in)
+  end
   content = gsub(content .. "\n", "\r\n", "\n")
   content = translator(content, ...)
   write_content(path_out, content)
@@ -748,7 +753,7 @@ end
 
 local function show_failed_log(name)
   print("\nCheck failed with log file")
-  for i in all_files(Dir.test, name..".log") do
+  for i in all_names(Dir.test, name..".log") do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
     print("-----------------------------------------------------------------------------------")
@@ -759,7 +764,7 @@ end
 
 local function show_failed_diff()
   print("\nCheck failed with difference file")
-  for i in all_files(Dir.test, "*" .. os_diffext) do
+  for i in all_names(Dir.test, "*" .. os_diffext) do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
     print("-----------------------------------------------------------------------------------")
@@ -841,7 +846,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     remove_tree(Dir.test, filetype)
   end
   -- Ensure there is no stray .log file
-  remove_file(Dir.test, name .. Xtn.log)
+  remove_name(Dir.test, name .. Xtn.log)
   local errlevels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
@@ -893,11 +898,11 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   test_type.rewrite(gen_file, new_file, engine, errlevels)
   -- Store secondary files for this engine
   for filetype in entries(Files.aux) do
-    for file in all_files(Dir.test, filetype) do
+    for file in all_names(Dir.test, filetype) do
       if match(file, "^" .. name .. "%.[^.]+$") then
         local newname = gsub(file, "(%.[^.]+)$", "." .. engine .. "%1")
         if file_exists(Dir.test .. "/" .. newname) then
-          remove_file(Dir.test, newname)
+          remove_name(Dir.test, newname)
         end
         rename(Dir.test, file, newname)
       end
@@ -1058,7 +1063,7 @@ end
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
   print("\n  Check failed with difference files")
-  for i in all_files(Dir.test, "*" .. os_diffext) do
+  for i in all_names(Dir.test, "*" .. os_diffext) do
     print("  - " .. Dir.test .. "/" .. i)
   end
   print("")
@@ -1093,6 +1098,7 @@ extend_with(dflt, {
   maxprintline  = 79,
   checksearch   = true,
   checkconfigs  = { "build" },
+  checkinit_hook  = checkinit_hook,
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
     -- What about the leading "./"
@@ -1157,34 +1163,34 @@ local function check(names)
     if not next(names) then
       for kind in entries(Vars.test_order) do
         local ext = Vars.test_types[kind].test
-        local excludepatterns = {}
+        local exclude_matchers = {}
         local num_exclude = 0
         for glob in entries(Vars.excludetests) do
           num_exclude = num_exclude+1
-          excludepatterns[num_exclude] = glob_to_pattern(glob .. ext)
+          exclude_matchers[num_exclude] = glob_matcher(glob .. ext)
         end
         for glob in entries(Vars.includetests) do
-          for name in all_files(Dir.testfile, glob .. ext) do
-            local exclude
-            for i = 1, num_exclude do
-              if match(name, excludepatterns[i]) then
-                exclude = true
+          for name in all_names(Dir.testfile, glob .. ext) do
+            local is_excluded
+            for accept in entries(exclude_matchers) do
+              if accept(name) then
+                is_excluded = true
                 break
               end
             end
-            if not exclude then
+            if not is_excluded then
               append(names, job_name(name))
             end
           end
-          for name in all_files(Dir.unpack, glob .. ext) do
-            local exclude
-            for i = 1, num_exclude do
-              if not match(name, excludepatterns[i]) then
-                exclude = true
+          for name in all_names(Dir.unpack, glob .. ext) do
+            local is_excluded
+            for accept in entries(exclude_matchers) do
+              if not accept(name) then
+                is_excluded = true
                 break
               end
             end
-            if not exclude then
+            if not is_excluded then
               if file_exists(Dir.testfile .. "/" .. name) then
                 return 1
               end
@@ -1254,13 +1260,13 @@ end
 ---@param names string_list_t
 ---@return error_level_t
 local function save(names)
-  local options = l3build.options
-  checkinit()
-  local engines = options["engine"] or { Vars.stdengine }
   if names == nil then
     print("Arguments are required for the save command")
     return 1
   end
+  checkinit()
+  local options = l3build.options
+  local engines = options["engine"] or { Vars.stdengine }
   for name in entries(names) do
     local test_filename, kind = test_exists(name)
     if not test_filename then
@@ -1274,13 +1280,13 @@ local function save(names)
       return 1
     end
     for engine in entries(engines) do
-      local testengine = engine == Vars.stdengine and "" or ("." .. engine)
-      local out_file = name .. testengine .. test_type.reference
+      local test_engine = engine == Vars.stdengine and "" or ("." .. engine)
+      local out_file = name .. test_engine .. test_type.reference
       local gen_file = name .. "." .. engine .. test_type.generated
       print("Creating and copying " .. out_file)
       run_test(name, engine, false, test_type.test, test_type)
       rename(Dir.test, gen_file, out_file)
-      copy_tree(out_file, Dir.test, Dir.testfile)
+      copy_name(out_file, Dir.test, Dir.testfile)
       if file_exists(Dir.unpack .. "/" .. test_type.reference) then
         print("Saved " .. test_type.reference
           .. " file overrides unpacked version of the same name")
@@ -1295,14 +1301,14 @@ end
 local function sanitize_engines()
   local options = l3build.options
   if options["engine"] and not options["force"] then
-     -- Make a lookup table
-     local t = {}
+    -- Make a lookup table
+    local t = {}
     for engine in entries(Main.checkengines) do
       t[engine] = true
     end
-    for engine in entries(options["engine"]) do
-      if not t[engine] then
-        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
+    for opt_engine in entries(options["engine"]) do
+      if not t[opt_engine] then
+        print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
         for engine in entries(Main.checkengines) do
           print("  - " .. engine)

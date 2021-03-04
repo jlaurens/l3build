@@ -23,11 +23,14 @@ for those people who are interested.
 --]]
 
 local match   = string.match
+local gsub    = string.gsub
+local append  = table.insert
 local os_time = os["time"]
 
 ---@type utlib_t
 local utlib     = require("l3b.utillib")
 local chooser   = utlib.chooser
+local entries   = utlib.entries
 local first_of  = utlib.first_of
 
 ---@type oslib_t
@@ -239,13 +242,15 @@ end)
 ---@field text          string_list_t
 ---@field typesetdemo   string_list_t
 ---@field typeset       string_list_t
+---@field _all_typeset  string_list_t
+---@field _all_pdffiles string_list_t
 ---@field typesetsupp   string_list_t
 ---@field typesetsource string_list_t
 ---@field unpack        string_list_t
 ---@field unpacksupp    string_list_t
 
 ---@type Files_t
-local Files = chooser(_G, {
+local Files = chooser(_G, setmetatable({
   aux           = { "*.aux", "*.lof", "*.lot", "*.toc" },
   bib           = { "*.bib" },
   binary        = { "*.pdf", "*.zip" },
@@ -270,7 +275,23 @@ local Files = chooser(_G, {
   typesetsource = {},
   unpack        = { "*.ins" },
   unpacksupp    = {},
-}, { suffix = "files" })
+}, {
+  __index = function (t, k)
+    if k == "_all_typeset" then
+      local result = t.typeset
+      for glob in entries(t.typesetdemo) do
+        append(result, glob)
+      end
+      return result
+    elseif k == "_all_pdffiles" then
+      local result = {}
+      for glob in entries(t.all_typeset_files) do
+        append(result, first_of(gsub(glob, "%.%w+$", ".pdf")))
+      end
+      return result
+    end
+  end
+}), { suffix = "files" })
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
 

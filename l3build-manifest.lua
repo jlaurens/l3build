@@ -43,7 +43,7 @@ local extend_with = utlib.extend_with
 
 ---@type fslib_t
 local fslib      = require("l3b.fslib")
-local all_files = fslib.all_files
+local all_names = fslib.all_names
 local file_list = fslib.file_list
 
 ---@type l3b_vars_t
@@ -158,7 +158,7 @@ function MT:build_list(entry)
     -- build list of excluded files
     for glob_list in entries(entry.exclude) do
       for this_glob in entries(glob_list) do
-        for this_file in all_files(Dir.main, this_glob) do
+        for this_file in all_names(Dir.main, this_glob) do
           entry.excludes[this_file] = true
         end
       end
@@ -261,12 +261,12 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_files(Dir.ctan.."/".. Main.ctanpkg, "*.*") do
+  for f in all_names(Dir.ctan.."/".. Main.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_files(Dir.tds..subdir..Dir.module, "*.*") do
+    for f in all_names(Dir.tds..subdir..Dir.module, "*.*") do
       self.tds_files[f] = true
     end
   end

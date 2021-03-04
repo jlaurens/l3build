@@ -78,8 +78,8 @@ local function glob_to_pattern(glob)
   local char -- char at index i in glob
 
   -- escape pattern char
-  local function escape(char)
-    return match(char, "^%w$") and char or "%" .. char
+  local function escape(c)
+    return match(c, "^%w$") and c or "%" .. c
   end
 
   -- Convert tokens.
@@ -111,9 +111,23 @@ local function glob_to_pattern(glob)
   return pattern
 end
 
+---Glob matcher
+---@param glob any
+---@return function?
+---@usage local accept = glob_matcher(...); if accept(...) then ... end
+local function glob_matcher(glob)
+  if not glob then return end
+  local pattern = glob_to_pattern(glob)
+  return function (str)
+    return match(str, pattern)
+  end
+end
+
 ---@class gblib_t
----@field glob_to_pattern   fun(glob: string): string
+---@field glob_to_pattern fun(glob: string): string
+---@field glob_matcher    fun(glob: string): fun(name: string): boolean
 
 return {
-  glob_to_pattern   = glob_to_pattern,
+  glob_to_pattern  = glob_to_pattern,
+  glob_matcher     = glob_matcher,
 }
