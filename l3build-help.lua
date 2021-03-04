@@ -96,22 +96,11 @@ local function help()
   print("Copyright (C) 2014-2020 The LaTeX Project")
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  version = version,  -- dtx
-  help    = help,     -- dtx
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_help_t
 ---@field version fun()
 ---@field help    fun()
 
 return {
-  global_symbol_map = global_symbol_map,
   version = version,
   help = help,
 }

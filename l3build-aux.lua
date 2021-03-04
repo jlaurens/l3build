@@ -156,22 +156,12 @@ local function deps_install(deps)
   return 0
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  call = call,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_aux_t
 ---@field deps_install  fun(deps: table): number
 ---@field call          fun(modules: string_list_t, target: string, opts: table): number
 ---@field set_epoch_cmd fun(epoch: string, force: boolean): string
 
 return {
-  global_symbol_map = global_symbol_map,
   deps_install = deps_install,
   call = call,
   set_epoch_cmd = set_epoch_cmd,

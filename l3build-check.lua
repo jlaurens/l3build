@@ -84,7 +84,6 @@ local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3build_t
 local l3build = require("l3build")
-local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
@@ -155,6 +154,7 @@ end
 -- Set up the check system files: needed for checking one or more tests and
 -- for saving the test files
 local function checkinit()
+  local options = l3build.options
   if not options["dirty"] then
     make_clean_directory(Dir.test)
     make_clean_directory(Dir.result)
@@ -992,6 +992,7 @@ end
 ---@param hide boolean
 ---@return integer
 local function run_check(test_name, hide)
+  local options = l3build.options
   local file_name, kind = test_exists(test_name)
   if not file_name then
     print("Failed to find input for test " .. test_name)
@@ -1102,6 +1103,7 @@ dflt = {
     -- No trailing /
     -- What about the leading "./"
     if k == "checkconfigs" then
+      local options = l3build.options
       -- When we have specific files to deal with, only use explicit configs
       -- (or just the std one)
       -- TODO: Justify this...
@@ -1147,6 +1149,7 @@ end
 local function check(names)
   local errorlevel = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
+    local options = l3build.options
     if not options["rerun"] then
       checkinit()
     end
@@ -1256,6 +1259,7 @@ end
 ---@param names string_list_t
 ---@return integer
 local function save(names)
+  local options = l3build.options
   checkinit()
   local engines = options["engine"] or { Vars.stdengine }
   if names == nil then
@@ -1315,17 +1319,6 @@ local function sanitize_engines()
   end
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  runtest_tasks   = runtest_tasks,
-  check           = check,
-  save            = save,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_check_t
 ---@field check             fun(names: string_list_t): integer
 ---@field save              fun(names: string_list_t): integer
@@ -1333,7 +1326,6 @@ extend_with(_G, global_symbol_map)
 ---@field sanitize_engines  fun()
 
 return {
-  global_symbol_map = global_symbol_map,
   Vars              = Vars,
   check             = check,
   save              = save,

@@ -126,23 +126,12 @@ local function quoted_path(path)
   end
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  run = run,
-  escapepath = quoted_path,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class oslib_t
 ---@field cmd_concat  fun(...): string
 ---@field run         fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
 ---@field quoted_path fun(path: string): string
 
 return {
-  global_symbol_map = global_symbol_map,
   cmd_concat        = cmd_concat,
   run               = run,
   quoted_path       = quoted_path,

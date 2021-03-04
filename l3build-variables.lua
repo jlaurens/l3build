@@ -40,7 +40,6 @@ local set_tree_excluder = fslib.set_tree_excluder
 
 ---@type l3build_t
 local l3build = require("l3build")
-local options = l3build.options
 
 -- "module" is a deprecated function in Lua 5.2: as we want the name
 -- for other purposes, and it should eventually be 'free', simply
@@ -98,6 +97,7 @@ local Main = chooser(_G, setmetatable({
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
     -- What about the leading "./"
+    local options = l3build.options
     if k == "forcecheckepoch" then
       if options["epoch"] then
         return true
@@ -365,7 +365,6 @@ local Xtn = chooser(_G, {
 ---@field Opts  Opts_t
 
 return {
-  global_symbol_map = {},
   Main              = Main,
   Xtn               = Xtn,
   LOCAL             = LOCAL,

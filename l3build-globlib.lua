@@ -111,19 +111,9 @@ local function glob_to_pattern(glob)
   return pattern
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  glob_to_pattern = glob_to_pattern,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class gblib_t
 ---@field glob_to_pattern   fun(glob: string): string
 
 return {
-  global_symbol_map = global_symbol_map,
   glob_to_pattern   = glob_to_pattern,
 }

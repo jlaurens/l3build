@@ -117,19 +117,9 @@ local function tag(tag_names)
   return tag_hook and tag_hook(tag_name, tag_date) or 0
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  tag = tag,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_tagging_t
 ---@field tag fun(tag_names: string_list_t): integer
 
 return {
-  global_symbol_map = global_symbol_map,
   tag = tag,
 }

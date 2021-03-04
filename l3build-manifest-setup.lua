@@ -375,7 +375,6 @@ end
 ---@field extract_filedesc function
 
 return {
-  global_symbol_map  = {},
   setup              = manifest_setup,
   sort_within_match  = sort_within_match,
   sort_within_group  = sort_within_group,

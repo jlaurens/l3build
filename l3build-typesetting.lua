@@ -64,7 +64,6 @@ local tree              = fslib.tree
 
 --@type l3build_t
 local l3build = require("l3build")
-local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
@@ -119,6 +118,7 @@ local Vars = chooser(_G, {
     -- No trailing /
     -- What about the leading "./"
     if k == "forcedocepoch" then
+      local options = l3build.options
       if options["epoch"] then
         return true
       end
@@ -263,7 +263,8 @@ local Ctrl = setmetatable({}, {
     if MT_k ~= nil then -- only keys interactive MT are recognized
       local _G_k = _G[k]
       local result = type(_G_k) == "function" and _G_k or MT_k
-      if not options.__disable_engine_cache then -- disable engine cache from the command line
+        local options = l3build.options
+        if not options.__disable_engine_cache then -- disable engine cache from the command line
         t[k] = result
       end
       return result
@@ -404,24 +405,21 @@ local function doc(files)
   return 0
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  runcmd = runcmd, -- dtx
-  doc = doc,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_typesetting_t
 ---@field dvitopdf  fun(name: string, dir: string, engine: string, hide: boolean): integer
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
 ---@field doc       fun(files: string_list_t): integer
+---@field bibtex    fun(name: string, dir: string): integer
+---@field biber     fun(name: string, dir: string): integer
+---@field tex       fun(name: string, dir: string, cmd: string): integer
+---@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): integer
 
 return {
-  global_symbol_map = global_symbol_map,
   dvitopdf          = dvitopdf,
   runcmd            = runcmd,
   doc               = doc,
+  bibtex            = Ctrl.bibtex,
+  biber             = Ctrl.biber,
+  tex               = Ctrl.tex,
+  makeindex         = Ctrl.makeindex,
 }

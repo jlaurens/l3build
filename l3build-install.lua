@@ -363,25 +363,12 @@ local function install()
   return install_files(gethome(), options["full"], options["dry-run"])
 end
 
-
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  uninstall     = uninstall,
-  install_files = install_files,
-  install       = install,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_install_t
 ---@field uninstall     fun(): integer
 ---@field install_files fun(target: string, full: boolean, dry_run: boolean): integer
 ---@field install       fun(): integer
 
 return {
-  global_symbol_map = global_symbol_map,
   uninstall     = uninstall,
   install_files = install_files,
   install       = install,

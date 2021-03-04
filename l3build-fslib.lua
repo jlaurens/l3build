@@ -378,27 +378,6 @@ local function remove_directory(path)
   end
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  abspath = absolute_path,
-  direxists = directory_exists,
-  fileexists = file_exists,
-  locate = locate,
-  filelist = file_list,
-  ren = rename,
-  cp = copy_tree,
-  mkdir = make_directory,
-  cleandir = make_clean_directory,
-  -- tree = tree,
-  rmfile = remove_file,
-  rm = remove_tree,
-  rmdir = remove_directory,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class fslib_t
 ---@field to_host           fun(cmd: string):   string
 ---@field absolute_path     fun(path: string):  string
@@ -418,7 +397,6 @@ extend_with(_G, global_symbol_map)
 ---@field remove_directory fun(path: string): boolean?, exitcode?, integer?
 
 return {
-  global_symbol_map = global_symbol_map,
   to_host = to_host,
   absolute_path = absolute_path,
   make_directory = make_directory,

@@ -49,7 +49,6 @@ local deep_copy     = utlib.deep_copy
 local l3build = require("l3build")
 ---@type l3build_debug_t
 local debug   = l3build.debug
-local options = l3build.options
 
 ---@type l3b_vars_t
 local l3b_vars = require("l3b.variables")
@@ -207,6 +206,8 @@ function MT:prepare(version)
   self.config = deep_copy(Vars.uploadconfig)
   local config = self.config
 
+  local options = l3build.options
+
   -- try a sensible default for the package name:
   config.pkg = config.pkg or _G.ctanpkg or nil
 
@@ -256,7 +257,7 @@ function MT:upload(tag_names)
   curlopt:close()
 
   self.request = Vars.curlexe .. " --config " .. curlopt_file
-
+  local options = l3build.options
   if options["debug"] then
     self.append_request(' https://httpbin.org/post')
     local response = self:send_request("")
@@ -399,6 +400,5 @@ end
 ---@field upload fun(tag_names: string_list_t): string
 
 return {
-  global_symbol_map = {},
   upload            = upload,
 }

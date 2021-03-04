@@ -158,7 +158,6 @@ end
 ---@field unpack        bundleunpack_f
 
 return {
-  global_symbol_map = {},
   unpack            = unpack,
   bundleunpack      = bundleunpack,
 }

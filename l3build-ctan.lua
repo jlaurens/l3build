@@ -220,22 +220,11 @@ local function ctan()
   return error_level
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  ctan       = ctan,
-  bundlectan = bundle_ctan,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_ctan_t
 ---@field ctan        fun(): integer
 ---@field bundle_ctan fun(): integer
 
 return {
-  global_symbol_map = global_symbol_map,
   ctan              = ctan,
   bundle_ctan       = bundle_ctan,
 }

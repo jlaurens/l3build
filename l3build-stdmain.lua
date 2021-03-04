@@ -73,7 +73,7 @@ local bundleunpack  = l3b_unpack.bundleunpack
 local l3b_clean     = require("l3b.clean")
 local clean         = l3b_clean.clean
 local bundleclean   = l3b_clean.bundleclean
-local doc           = require("l3b.doc").doc
+local doc           = require("l3b.typesetting").doc
 local l3b_install   = require("l3b.install")
 local install       = l3b_install.install
 local uninstall     = l3b_install.uninstall
@@ -303,15 +303,6 @@ local function prepare_config()
   end
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  target_list = target_list,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_main_t
 ---@field main            fun()
 ---@field target_list     table<string, table>
@@ -319,7 +310,6 @@ extend_with(_G, global_symbol_map)
 ---@field prepare_config  fun()
 
 return {
-  global_symbol_map = global_symbol_map,
   main              = main,
   target_list       = target_list,
   multi_check       = multi_check,

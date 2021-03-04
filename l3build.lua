@@ -55,6 +55,29 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field call boolean
 ---@field no_curl_posting boolean
 
+---@class l3build_data_t
+
+---@class l3build_options_t
+---@field config    table
+---@field date      string
+---@field dirty     boolean
+---@field dry_run   boolean
+---@field email     string
+---@field engine    table
+---@field epoch     string
+---@field file      string
+---@field first     boolean
+---@field force     boolean
+---@field full      boolean
+---@field halt_on_error boolean -- variant name "halt_on_error"
+---@field help      boolean
+---@field message   string
+---@field names     table
+---@field quiet     boolean
+---@field rerun     boolean
+---@field shuffle   boolean
+---@field texmfhome string
+
 ---@class l3build_t
 ---@field debug flag_table_t the special --debug-foo CLI arguments
 ---@field PACKAGE string "l3build", `package.loaded` key
@@ -63,12 +86,15 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field work_dir string where the "build.lua" lives
 ---@field launch_dir string where "l3build.lua" and friends live
 ---@field start_dir string the current directory at load time
----@field options table
----@field flags table
+---@field options l3build_options_t
+---@field flags table<string, boolean>
+---@field data l3build_data_t
+
 
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)
   flags = {}, -- various shared flags
+  data = {};  -- shared data
 }
 
 do
@@ -142,7 +168,7 @@ do
       break
     end
   end
-  
+
   -- work_dir:
   if cmd_base == "build.lua" then
     work_dir = cmd_dir
@@ -242,6 +268,7 @@ end
 ---@type l3b_arguments_t
 local arguments     = require("l3b.arguments")
 l3build.options     = arguments.parse(arg)
+local options       = l3build.options
 
 ---@type l3b_help_t
 local l3b_help  = require("l3b.help")

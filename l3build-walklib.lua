@@ -77,18 +77,6 @@ local function job_name(file)
   return name or file
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  splitpath = dir_base,
-  basename  = base_name,
-  dirname   = dir_name,
-  jobname   = job_name,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class wklib_t
 ---@field dir_base  fun(path: string): string, string
 ---@field dir_name  fun(path: string): string
@@ -96,9 +84,8 @@ extend_with(_G, global_symbol_map)
 ---@field job_name  fun(path: string): string
 
 return {
-  global_symbol_map = global_symbol_map,
-  dir_base = dir_base,
-  dir_name = dir_name,
+  dir_base  = dir_base,
+  dir_name  = dir_name,
   base_name = base_name,
-  job_name = job_name,
+  job_name  = job_name,
 }

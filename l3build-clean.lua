@@ -92,22 +92,11 @@ local function bundle_clean()
         + remove_directory(Dir.tds)
 end
 
--- this is the map to export function symbols to the global space
-local global_symbol_map = {
-  clean       = clean,
-  bundleclean = bundle_clean,
-}
-
---[=[ Export function symbols ]=]
-extend_with(_G, global_symbol_map)
--- [=[ ]=]
-
 ---@class l3b_clean_t
 ---@field clean         fun(): integer
 ---@field bundle_clean  fun(): integer
 
 return {
-  global_symbol_map = global_symbol_map,
   clean             = clean,
   bundle_clean      = bundle_clean,
 }
