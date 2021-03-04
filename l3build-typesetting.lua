@@ -132,7 +132,7 @@ local Vars = chooser(_G, {
 ---@param dir string
 ---@param engine string
 ---@param hide boolean
----@return integer
+---@return error_level_t
 local function dvitopdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
@@ -181,7 +181,7 @@ local MT = {}
 ---biber
 ---@param name string
 ---@param dir string
----@return integer
+---@return error_level_t
 function MT.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return
@@ -194,7 +194,7 @@ end
 ---comment
 ---@param name string
 ---@param dir string
----@return integer
+---@return error_level_t
 function MT.bibtex(name, dir)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. ".aux") then
@@ -227,7 +227,7 @@ end
 ---@param out_ext string
 ---@param log_ext string
 ---@param style string
----@return integer
+---@return error_level_t
 function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. in_ext) then
@@ -246,7 +246,7 @@ end
 ---@param file string
 ---@param dir string
 ---@param cmd string
----@return integer
+---@return error_level_t
 function MT.tex(file, dir, cmd)
   dir = dir or "."
   cmd = cmd or Exe.typeset .. Opts.typeset
@@ -276,7 +276,7 @@ local Ctrl = setmetatable({}, {
 ---@param file string
 ---@param dir string
 ---@param cmd string
----@return integer
+---@return error_level_t
 function MT.typeset(file, dir, cmd)
   dir = dir or "."
   local error_level = Ctrl.tex(file, dir, cmd)
@@ -300,7 +300,7 @@ end
 ---Local helper
 ---@param file string
 ---@param dir string
----@return integer
+---@return error_level_t
 local function typesetpdf(file, dir)
   dir = dir or "."
   local name = job_name(file)
@@ -323,19 +323,19 @@ local function typesetpdf(file, dir)
 end
 
 ---Do nothing function
----@return integer
+---@return error_level_t
 function MT.typeset_demo_tasks()
   return 0
 end
 
 ---Do nothing function
----@return integer
+---@return error_level_t
 function MT.docinit_hook()
   return 0
 end
 
 ---comment
----@return integer
+---@return error_level_t
 local function docinit()
   -- Set up
   make_clean_directory(Dir.typeset)
@@ -365,7 +365,7 @@ end
 ---Typeset all required documents
 ---Uses a set of dedicated auxiliaries that need to be available to others
 ---@param files string_list_t
----@return integer
+---@return error_level_t
 local function doc(files)
   local error_level = docinit()
   if error_level ~= 0 then return error_level end

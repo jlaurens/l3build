@@ -331,7 +331,7 @@ end
 ---Remove the file with the given name at the given location.
 ---@param dir_path string
 ---@param name string
----@return integer
+---@return error_level_t
 local function remove_file(dir_path, name)
   remove(dir_path .. "/" .. name)
   -- os.remove doesn't give a sensible errorlevel
@@ -343,7 +343,7 @@ end
 ---Empties directories but do not remove them.
 ---@param source string
 ---@param glob string
----@return integer
+---@return error_level_t
 local function remove_tree(source, glob)
   for i in keys(tree(source, glob)) do
     remove_file(source, i)
@@ -354,7 +354,7 @@ end
 
 ---For cleaning out a directory, which also ensures that it exists
 ---@param path string
----@return integer
+---@return error_level_t
 local function make_clean_directory(path)
   local error_level = make_directory(path)
   if error_level ~= 0 then

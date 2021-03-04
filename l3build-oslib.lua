@@ -97,7 +97,17 @@ local function cmd_concat(...)
       append(t, item)
     end
   end
-  return concat(t, os_concat)
+  local result
+  local success = pcall (function()
+    result = concat(t, os_concat)
+  end)
+  if not success then
+    for i in require("l3b.utillib").entries(t) do
+      print(i)
+    end
+    print(debug.traceback())
+  end
+  return result
 end
 
 ---Run a command in a given directory

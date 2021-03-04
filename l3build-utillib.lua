@@ -43,6 +43,8 @@ local next = next
 local concat = table.concat
 local open = io.open
 
+---@alias error_level_t integer
+
 ---Turn the string list into quoted items separated by a sep
 ---@param table table
 ---@param separator string|nil defaults to " "
@@ -164,7 +166,7 @@ end
 ---@return table holder
 local function extend_with(holder, addendum, can_overwrite)
   for key, value in pairs(addendum) do
-    assert(can_overwrite or not holder[key], "Conflicting symbol ".. key)
+    assert(can_overwrite or not holder[key], "Conflicting symbol ".. tostring(key))
     holder[key] = value
   end
   return holder
@@ -172,16 +174,32 @@ end
 
 ---if filename is non nil and file readable return contents otherwise nil
 ---@param file_path string
+---@param is_binary boolean
 ---@return string|nil
-local function file_contents(file_path)
+local function read_content(file_path, is_binary)
   if file_path then
-    local fh = open(file_path, "r")
+    local fh = open(file_path, is_binary and "rb" or "r")
     if not fh then return nil end
     local contents = fh:read("a")
     fh:close()
     return contents
   end
 end
+
+---if filename is non nil and file readable return contents otherwise nil
+---@param file_path string
+---@param content string
+---@return error_level_t
+local function write_content(file_path, content)
+  if file_path then
+    local fh, err = assert(open(file_path, "w"))
+    if not fh then return 1 end
+    local error_level = fh:write(content) and 0 or 1
+    fh:close()
+    return error_level
+  end
+end
+
 --https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
 ---Make a deep copy of the given object
 ---@param original any
@@ -189,13 +207,11 @@ end
 local function deep_copy(original)
   local seen = {}
   local function f(obj)
-    -- Handle non-tables and previously-seen tables.
-    if type(obj) ~= 'table' then return obj end
-    if seen[obj] then return seen[obj] end
-    -- New table; mark it as seen an copy recursively.
-    local res = {}
-    seen[obj] = res
-    for k, v in next, obj do res[f(k)] = f(v) end
+    if type(obj) ~= 'table' then return obj end   -- return as is
+    if seen[obj] then return seen[obj] end        -- return already see if any
+    local res = {}                                -- make a new table
+    seen[obj] = res                               -- mark it as seen
+    for k, v in next, obj do res[f(k)] = f(v) end -- copy recursively
     return setmetatable(res, getmetatable(obj))
   end
   return f(original)
@@ -218,29 +234,29 @@ local flags = {}
 ---Central method in variables management.
 ---If `dflt` defines a function for key `DID_CHOOSE`,
 ---it will be used to apply a post treatment to the result.
----This function has signature fun(result: any, k: string): any
----For example, return directory paths may normalized that way.
----@param G       any, used with _G
+---This postflight function has signature fun(result: any, k: string): any
+---For example, returned directory paths may be normalized that way.
+---@param G       any, in general _G
 ---@param dflt    any
 ---@param kv      chooser_kv_t
 ---@return fun(t: table, k: any): any
 local function chooser(G, dflt, kv)
-  local function __index(t, k)        -- will end in a metatable
+  local function __index(t, k)        -- will end in a metatable just below
     local dflt_k = dflt[k]            -- default candidate
     if dflt_k == nil then return end  -- unknown key, stop here
     local result
     local kk = k
-    if kv then -- modify the global key
+    if kv and type(k) == "string" then -- modify the global key
       if kv.prefix then kk = kv.prefix .. k end
       if kv.suffix then kk = k .. kv.suffix end
     end
-    local G_kk = G[kk] -- global candidate
+    local G_kk = G[kk]                -- global candidate
     if not G_kk then
-      result = dflt_k                 -- choose the default
+      result = dflt_k                 -- choose the default candidate
     else
       local type_G_kk = type(G_kk)
       local type_dflt_k = type(dflt_k)
-      if type_G_kk ~= type_dflt_k then   -- global is not acceptable
+      if type_G_kk ~= type_dflt_k then   -- wrong type, global candidate is not acceptable
         error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
       end
       result = type_G_kk == "table"
@@ -275,7 +291,8 @@ end
 ---@field second_of         fun(...): any
 ---@field trim              fun(in: string): string
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
----@field file_contents     fun(file_pat: string): string|nil
+---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
+---@field write_content     fun(file_pat: string, content: string): error_level_t
 ---@field deep_copy         fun(original: any): any
 ---@field DID_CHOOSE        any
 ---@field flags             flags_t
@@ -294,7 +311,8 @@ return {
   second_of         = second_of,
   trim              = trim,
   extend_with       = extend_with,
-  file_contents     = file_contents,
+  read_content      = read_content,
+  write_content     = write_content,
   deep_copy         = deep_copy,
   flags             = flags,
   DID_CHOOSE        = DID_CHOOSE,

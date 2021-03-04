@@ -32,8 +32,9 @@ local utlib         = require("l3b.utillib")
 local entries       = utlib.entries
 local values        = utlib.keys
 local unique_items  = utlib.unique_items
-local first_of    = utlib.first_of
-local extend_with   = utlib.extend_with
+local first_of      = utlib.first_of
+local read_content  = utlib.read_content
+local write_content = utlib.write_content
 
 ---@type wklib_t
 local wklib       = require("l3b.walklib")
@@ -64,13 +65,11 @@ local Files   = l3b_vars.Files
 ---@param file_path string
 ---@param tag_name string
 ---@param tag_date string
----@return integer
+---@return error_level_t
 local function update_file_tag(file_path, tag_name, tag_date)
   local file_name = base_name(file_path)
   print("Tagging  ".. file_name)
-  local fh = assert(open(file_path, "rb"))
-  local content = fh:read("a")
-  fh:close()
+  local content = assert(read_content(file_path, true))
   -- Deal with Unix/Windows line endings
   content = gsub(content .. (match(content, "\n$") and "" or "\n"),
     "\r\n", "\n")
@@ -82,18 +81,15 @@ local function update_file_tag(file_path, tag_name, tag_date)
   end
   local dir_path = dir_name(file_path)
   rename(dir_path, file_name, file_name .. Xtn.bak)
-  fh = assert(open(file_path, "w"))
   -- Convert line ends back if required during write
-  -- Watch for the second return value!
-  fh:write(first_of(gsub(updated_content, "\n", os_newline)))
-  fh:close()
+  write_content(file_path, first_of(gsub(updated_content, "\n", os_newline)))
   remove_tree(dir_path, file_name .. Xtn.bak)
   return 0
 end
 
 ---Target tag
 ---@param tag_names table
----@return integer
+---@return error_level_t
 local function tag(tag_names)
   local options = l3build.options
   local tag_date = options["date"] or os_date("%Y-%m-%d")

@@ -154,7 +154,7 @@ local default_Dir = setmetatable({
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
     -- What about the leading "./"
-    if k:match("dir$") then
+    if k.match and k:match("dir$") then
       return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
     end
     return result

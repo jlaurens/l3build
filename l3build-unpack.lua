@@ -22,9 +22,11 @@ for those people who are interested.
 
 --]]
 
+local popen = io.popen
+
 ---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
-local deps_install = l3b_aux.deps_install
+local l3b_aux       = require("l3b.aux")
+local deps_install  = l3b_aux.deps_install
 
 ---@type utlib_t
 local utlib   = require("l3b.utillib")
@@ -79,7 +81,7 @@ local Vars = chooser(_G, {
 ---leave only one modules files
 ---@param source_dirs string_list_t
 ---@param sources string_list_t
----@return integer
+---@return error_level_t
 local function bundleunpack(source_dirs, sources)
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
@@ -110,7 +112,7 @@ local function bundleunpack(source_dirs, sources)
     for j in keys(tree(Dir.unpack, i)) do
       local dir_path, base_name = dir_base(j)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
-      local success = io.popen(cmd_concat(
+      local success = popen(cmd_concat(
           "cd " .. Dir.unpack .. "/" .. dir_path,
           os_setenv .. " TEXINPUTS=." .. os_pathsep
             .. local_dir .. (Vars.unpacksearch and os_pathsep or ""),
@@ -132,7 +134,7 @@ end
 ---a copy of the 'basic' DocStrip program, which is used then removed
 ---@param sources     string_list_t
 ---@param source_dirs string_list_t
----@return integer
+---@return error_level_t
 local function unpack(sources, source_dirs)
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then

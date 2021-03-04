@@ -121,7 +121,7 @@ local function copy_ctan()
 end
 
 ---comment
----@return integer
+---@return error_level_t
 local function bundle_ctan()
   local errorlevel = install_files(Dir.tds, true)
   if errorlevel ~=0 then return errorlevel end
@@ -130,7 +130,7 @@ local function bundle_ctan()
 end
 
 ---comment
----@return integer
+---@return error_level_t
 local function ctan()
   -- Always run tests for all engines
   local options = l3build.options

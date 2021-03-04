@@ -42,7 +42,8 @@ local utlib         = require("l3b.utillib")
 local chooser       = utlib.chooser
 local entries       = utlib.entries
 local trim_space    = utlib.trim
-local file_contents = utlib.file_contents
+local read_content  = utlib.read_content
+local write_content = utlib.write_content
 local deep_copy     = utlib.deep_copy
 
 ---@type l3build_t
@@ -51,9 +52,9 @@ local l3build = require("l3build")
 local debug   = l3build.debug
 
 ---@type l3b_vars_t
-local l3b_vars = require("l3b.variables")
+local l3b_vars  = require("l3b.variables")
 ---@type Main_t
-local Main = l3b_vars.Main
+local Main      = l3b_vars.Main
 
 --[=[
 
@@ -85,13 +86,13 @@ with a configuration table `uploadconfig`
 --]=]
 
 local Vars = chooser(_G, {
-  curlexe = "curl",
-  curl_debug = false,
-  uploadconfig = {}
+  curlexe       = "curl",
+  curl_debug    = false,
+  uploadconfig  = {}
 })
 
 -- function for interactive multiline fields
-local function input_multi_line_field (name)
+local function input_multi_line_field(name)
   print("Enter " .. name .. "  three <return> or ctrl-D to stop")
   local field = ""
   local answer_line
@@ -185,7 +186,7 @@ end
 
 ---Prepare the context
 ---@param version string
----@return integer
+---@return error_level_t
 function MT:prepare(version)
 
   -- avoid lower level error from post command if zip file missing
@@ -214,15 +215,15 @@ function MT:prepare(version)
   -- Get data from command line if appropriate
   do
     local message = options["message"]
-        or file_contents(options["file"])
-        or file_contents(config.announcement_file)
+        or read_content(options["file"])
+        or read_content(config.announcement_file)
     assert(message)
     config.announcement = message
   end
 
   config.email = options["email"] or config.email
 
-  config.note = config.note or file_contents(config.note_file)
+  config.note = config.note or read_content(config.note_file)
 
   config.version = version or config.version
 
@@ -237,14 +238,14 @@ end
 
 ---Append the given text to the current request
 ---@param str string
----@return integer
+---@return error_level_t
 function MT:append_request(str)
   self.request = self.request .. str
 end
 
 ---comment
 ---@param tag_names string_list_t
----@return integer
+---@return error_level_t
 function MT:upload(tag_names)
 
   self:construct_request()
@@ -252,9 +253,7 @@ function MT:upload(tag_names)
   local config = self.config
 -- curl file version
   local curlopt_file = config.curlopt_file or (self.ctanzip .. ".curlopt")
-  local curlopt = open(curlopt_file, "w")
-  curlopt:write(self.request)
-  curlopt:close()
+  write_content(curlopt_file, self.request)
 
   self.request = Vars.curlexe .. " --config " .. curlopt_file
   local options = l3build.options

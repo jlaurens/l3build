@@ -96,7 +96,7 @@ local function gethome()
 end
 
 ---Uninstall
----@return integer
+---@return error_level_t
 local function uninstall()
   local function zapdir(dir)
     local install_dir = gethome() .. "/" .. dir
@@ -167,7 +167,7 @@ end
 ---@param target string
 ---@param full boolean
 ---@param dry_run boolean
----@return integer
+---@return error_level_t
 local function install_files(target, full, dry_run)
 
   -- Needed so paths are only cleaned out once

@@ -54,6 +54,8 @@ local chooser         = utlib.chooser
 local entries         = utlib.entries
 local first_of        = utlib.first_of
 local extend_with     = utlib.extend_with
+local read_content    = utlib.read_content
+local write_content   = utlib.write_content
 
 ---@type gblib_t
 local gblib             = require("l3b.globlib")
@@ -134,9 +136,10 @@ local dvitopdf        = l3b_typesetting.dvitopdf
 ---@field specialformats table
 ---@field maxprintline  integer
 ---@field checksearch   boolean
+---@field runtest_tasks fun(test_name: string, run_number: integer): string
 
 ---@type l3b_check_vars_t
-local dflt -- define below
+local dflt = {} -- define below
 
 ---@type l3b_check_vars_t
 local Vars = chooser(_G, dflt)
@@ -146,7 +149,7 @@ local Vars = chooser(_G, dflt)
 --
 
 ---Default function that can be overwritten
----@return integer
+---@return error_level_t
 local function checkinit_hook()
   return 0
 end
@@ -192,13 +195,10 @@ end
 ---@param translator fun(content: string, ...): string
 ---@vararg any
 local function rewrite(path_in, path_out, translator, ...)
-  local fh = assert(open(path_in, "rb")) -- "b" for pdf files
-  local content = gsub(fh:read("a") .. "\n", "\r\n", "\n")
-  fh:close()
+  local content = assert(read_content(path_in, true))
+  content = gsub(content .. "\n", "\r\n", "\n")
   content = translator(content, ...)
-  fh = open(path_out, "w")
-  fh:write(content)
-  fh:close()
+  write_content(path_out, content)
 end
 
 ---Convert the raw log file into one for comparison/storage: keeps only
@@ -723,7 +723,7 @@ end
 ---@param name string
 ---@param engine string
 ---@param cleanup boolean
----@return integer
+---@return error_level_t
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
   local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. os_diffext
@@ -751,11 +751,8 @@ local function show_failed_log(name)
   for i in all_files(Dir.test, name..".log") do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
-    local fh = open(Dir.test .. "/" .. i, "r")
-    local content = fh:read("a")
-    fh:close()
     print("-----------------------------------------------------------------------------------")
-    print(content)
+    print(read_content(Dir.test .. "/" .. i))
     print("-----------------------------------------------------------------------------------")
   end
 end
@@ -765,11 +762,8 @@ local function show_failed_diff()
   for i in all_files(Dir.test, "*" .. os_diffext) do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
-    local fh = open(Dir.test .. "/" .. i, "r")
-    local content = fh:read("a")
-    fh:close()
     print("-----------------------------------------------------------------------------------")
-    print(content)
+    print(read_content(Dir.test .. "/" .. i))
     print("-----------------------------------------------------------------------------------")
   end
 end
@@ -792,7 +786,7 @@ end
 ---@param ext string
 ---@param test_type table
 ---@param breakout any
----@return integer
+---@return error_level_t
 local function run_test(name, engine, hide, ext, test_type, breakout)
   local lvt_file = name .. (ext or Xtn.lvt)
   copy_tree(lvt_file,
@@ -873,7 +867,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
           .. (hide and (" > " .. os_null) or ""),
-        (_G.runtest_tasks or runtest_tasks)(job_name(lvt_file), run_number)
+        Vars.runtest_tasks(job_name(lvt_file), run_number)
       )
     )
     -- Break the loop if the result is stable
@@ -969,7 +963,7 @@ end
 ---@param hide boolean
 ---@param ext string extension
 ---@param type string test type
----@return integer
+---@return error_level_t
 local function check_and_diff(name, engine, hide, ext, type)
   run_test(name, engine, hide, ext, type, true)
   local error_level = base_compare(type, name, engine)
@@ -990,7 +984,7 @@ end
 ---Should create a difference file for each failed test
 ---@param test_name string
 ---@param hide boolean
----@return integer
+---@return error_level_t
 local function run_check(test_name, hide)
   local options = l3build.options
   local file_name, kind = test_exists(test_name)
@@ -1026,7 +1020,7 @@ end
 ---@param cleanup boolean
 ---@param name string
 ---@param engine string
----@return integer
+---@return error_level_t
 local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   local error_level
   local test_name = name .. "." .. engine
@@ -1071,7 +1065,7 @@ local function check_diff()
 end
 
 -- define the default once the required object are properly defined
-dflt = {
+extend_with(dflt, {
   test_types = {
     log = {
       test = Xtn.lvt,
@@ -1115,7 +1109,8 @@ dflt = {
     end
     return result
   end,
-}
+  runtest_tasks = runtest_tasks,
+})
 
 dflt.specialformats = {
   context = {
@@ -1145,7 +1140,7 @@ end
 
 ---Check
 ---@param names string_list_t
----@return integer
+---@return error_level_t
 local function check(names)
   local errorlevel = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
@@ -1257,7 +1252,7 @@ end
 
 ---Prepare material for a forthcoming check.
 ---@param names string_list_t
----@return integer
+---@return error_level_t
 local function save(names)
   local options = l3build.options
   checkinit()
