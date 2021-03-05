@@ -126,6 +126,7 @@ local Main = chooser(_G, setmetatable({
 }))
 
 ---@class Dir_t
+---@field work        string
 ---@field current     string
 ---@field main        string
 ---@field docfile     string
@@ -152,7 +153,7 @@ local LOCAL = {}
 local default_Dir = setmetatable({
 -- Directory structure for the build system
 -- Use Unix-style path separators
-  current = ".",
+  work = ".",
   [LOCAL] = "local",
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
@@ -165,18 +166,20 @@ local default_Dir = setmetatable({
 }, {
   __index = function (t, k)
     local result
-    if k == "main" then
-      result = t.current
+    if k == "current" then -- deprecate, not equal to the current directory.
+      result = t.work
+    elseif k == "main" then
+      result = t.work
     elseif k == "docfile" then
-      result = t.current
+      result = t.work
     elseif k == "sourcefile" then
-      result = t.current
+      result = t.work
     elseif k == "textfile" then
-      result = t.current
+      result = t.work
     elseif k == "support" then
       result = t.main .. "/support"
     elseif k == "testfile" then
-      result = t.current .. "/testfiles"
+      result = t.work .. "/testfiles"
     elseif k == "testsupp" then
       result = t.testfile .. "/support"
     elseif k == "texmf" then

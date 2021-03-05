@@ -87,7 +87,7 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field launch_dir string where "l3build.lua" and friends live
 ---@field start_dir string the current directory at load time
 ---@field options l3build_options_t
----@field flags table<string, boolean>
+---@field flags flag_table_t
 ---@field data l3build_data_t
 
 

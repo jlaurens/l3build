@@ -127,10 +127,10 @@ local function uninstall()
       print("- " .. v)
     end
   end
-  local function zap_dir(dir)
-    local install_dir = get_textmf_home() .. "/" .. dir
-    local options = l3build.options
-    if options["dry-run"] then
+  local options = l3build.options
+  local zap_dir = options["dry-run"]
+    and function (dir)
+      local install_dir = get_textmf_home() .. "/" .. dir
       local files = file_list(install_dir)
       if not_empty(files) then
         print("\n" .. "For removal from " .. install_dir .. ":")
@@ -139,11 +139,14 @@ local function uninstall()
         end
       end
       return 0
-    elseif directory_exists(install_dir) then
-      return remove_directory(install_dir)
     end
-    return 0
-  end
+    or function (dir)
+      local install_dir = get_textmf_home() .. "/" .. dir
+      if directory_exists(install_dir) then
+        return remove_directory(install_dir)
+      end
+      return 0
+    end
   local function uninstall_files(dir, subdir)
     return zap_dir(dir .. "/" .. (subdir or Dir.tds_module))
   end
@@ -171,7 +174,7 @@ end
 ---@return error_level_t
 local function install_files(root_install_dir, full, dry_run)
   -- Needed so paths are only cleaned out once
-  ---@type table<string, boolean>
+  ---@type flag_table_t
   local already_cleaned = {}
 
   -- Collect up all file paths before copying:
@@ -198,13 +201,13 @@ local function install_files(root_install_dir, full, dry_run)
       for glob in entries(glob_list) do
         for file in keys(tree(src_dir, glob)) do
           local dir, name = dir_base(file)
-          local src_path = "/"
+          local src_path_end = "/"
           local source_dir = src_dir
           if dir ~= "." then
             dir = gsub(dir, "^%.", "")
             source_dir = src_dir .. dir
             if not Main.flattentds then
-              src_path = dir .. "/"
+              src_path_end = dir .. "/"
             end
           end
           local matched = false
@@ -215,7 +218,7 @@ local function install_files(root_install_dir, full, dry_run)
               append(candidates, {
                 name        = name,
                 source      = source_dir,
-                dest        = l_dir .. src_path,
+                dest        = l_dir .. src_path_end,
                 install_dir = root_install_dir .."/".. type_module, -- for cleanup
               })
               matched = true
@@ -226,7 +229,7 @@ local function install_files(root_install_dir, full, dry_run)
             append(candidates, {
               name        = name,
               source      = source_dir,
-              dest        =  type_module .. src_path,
+              dest        =  type_module .. src_path_end,
               install_dir = root_install_dir .."/".. type_module, -- for cleanup
             })
           end
@@ -260,12 +263,12 @@ local function install_files(root_install_dir, full, dry_run)
   if error_level ~= 0 then return error_level end
 
   -- Creates a 'controlled' list of files
-  local function create_file_list(dir, include, exclude)
-    dir = dir or Dir.current
-    include = include or {}
-    exclude = exclude or {}
+  local function create_file_list(dir, includes, excludes)
+    dir = dir or Dir.work
+    includes = includes or {}
+    excludes = excludes or {}
     local excludelist = {}
-    for glob_table in entries(exclude) do
+    for glob_table in entries(excludes) do
       for glob in entries(glob_table) do
         for file in keys(tree(dir, glob)) do
           excludelist[file] = true
@@ -273,7 +276,7 @@ local function install_files(root_install_dir, full, dry_run)
       end
     end
     local result = {}
-    for glob in entries(include) do
+    for glob in entries(includes) do
       for file in keys(tree(dir, glob)) do
         if not excludelist[file] then
           append(result, file)

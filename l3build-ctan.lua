@@ -93,7 +93,7 @@ local function copy_ctan()
   local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
   make_directory(ctanpkg_dir)
   local function copyfiles(files, source)
-    if source == Dir.current or Vars.flatten then
+    if source == Dir.work or Vars.flatten then
       for filetype in entries(files) do
         copy_tree(filetype, source, ctanpkg_dir)
       end
@@ -211,7 +211,7 @@ local function ctan()
       copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
     end
     dirzip(Dir.ctan, Main.ctanzip)
-    copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir.current)
+    copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir.work)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

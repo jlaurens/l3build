@@ -237,7 +237,7 @@ local flags = {}
 ---it will be used to apply a post treatment to the result.
 ---This postflight function has signature fun(result: any, k: string): any
 ---For example, returned directory paths may be normalized that way.
----If the key starts with "_", `_G` is ignored (key is private).
+---If the key starts with "_", `G` is ignored (key is private).
 ---@param G       any, in general _G
 ---@param dflt    any
 ---@param kv      chooser_kv_t

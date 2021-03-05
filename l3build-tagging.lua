@@ -98,7 +98,7 @@ local function tag(tag_names)
     tag_name = tag_names[1]
   end
   local error_level = 0
-  for dir in unique_items(Dir.current, Dir.sourcefile, Dir.docfile) do
+  for dir in unique_items(Dir.work, Dir.sourcefile, Dir.docfile) do
     for filetype in entries(Files.tag) do
       for file in values(tree(dir, filetype)) do
         error_level = update_file_tag(file, tag_name, tag_date)
