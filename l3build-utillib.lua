@@ -39,9 +39,10 @@ local values = utlib.values
 ---@alias string_list_t table<integer, string>
 -- local safety guards and shortcuts
 
-local next = next
-local concat = table.concat
-local open = io.open
+local next    = next
+local concat  = table.concat
+local open    = io.open
+local os_type = os["type"]
 
 ---@alias error_level_t integer
 
@@ -172,7 +173,8 @@ local function extend_with(holder, addendum, can_overwrite)
   return holder
 end
 
----if filename is non nil and file readable return contents otherwise nil
+---if filename is non nil and file readable return contents otherwise nil.
+---The content is converted to unix line ending when not binary.
 ---@param file_path string
 ---@param is_binary boolean
 ---@return string? the content of the file
@@ -181,20 +183,26 @@ local function read_content(file_path, is_binary)
   if file_path then
     local fh = open(file_path, is_binary and "rb" or "r")
     if not fh then return nil end
-    local contents = fh:read("a")
+    local content = fh:read("a")
     fh:close()
-    return contents
+    return not is_binary and os_type == "windows"
+      and content:gsub("\r\n?", "\n")
+      or  content
   end
 end
 
 ---if filename is non nil and file readable return contents otherwise nil
+---Before write, the content is converted to host line ending.
 ---@param file_path string
 ---@param content string
 ---@return error_level_t
 local function write_content(file_path, content)
   if file_path then
-    local fh, err = assert(open(file_path, "w"))
+    local fh = assert(open(file_path, "w"))
     if not fh then return 1 end
+    if os_type == "windows" then
+      content = content:gsub("\n", os_newline)
+    end
     local error_level = fh:write(content) and 0 or 1
     fh:close()
     return error_level

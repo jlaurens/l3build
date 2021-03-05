@@ -29,6 +29,7 @@ local gsub    = string.gsub
 
 ---@type utlib_t
 local utlib         = require("l3b.utillib")
+local chooser       = utlib.chooser
 local entries       = utlib.entries
 local values        = utlib.keys
 local unique_items  = utlib.unique_items
@@ -53,13 +54,25 @@ local l3build = require("l3build")
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
 ---@type Xtn_t
-local Xtn   = l3b_vars.Xtn
+local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
-local Dir   = l3b_vars.Dir
+local Dir       = l3b_vars.Dir
 ---@type Files_t
-local Files   = l3b_vars.Files
+local Files     = l3b_vars.Files
 
----@alias tag_hook_t fun(tag_name: string, tag_date: string): integer
+---@class l3b_tagging_vars_t
+---@field tag_hook    fun(tag_name: string, tag_date: string): error_level_t
+---@field update_tag  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
+
+---@type l3b_tagging_vars_t
+local Vars = chooser(_G, {
+  tag_hook = function (tag_name, tag_date)
+    return 0
+  end,
+  update_tag = function(file_name, content, tag_name, tag_date)
+    return content
+  end,
+})
 
 ---Update the tag.
 ---@param file_path string
@@ -71,36 +84,29 @@ local function update_file_tag(file_path, tag_name, tag_date)
   print("Tagging  ".. file_name)
   local content = assert(read_content(file_path, true))
   -- Deal with Unix/Windows line endings
-  content = gsub(content .. (match(content, "\n$") and "" or "\n"),
-    "\r\n", "\n")
-  local updated_content = _G.update_tag
-    and _G.update_tag(file_name, content, tag_name, tag_date)
-    or content
+  content = content .. (match(content, "\n$") and "" or "\n")
+  local updated_content = Vars.update_tag(file_name, content, tag_name, tag_date)
   if content == updated_content then
     return 0
   end
   local dir_path = dir_name(file_path)
   rename(dir_path, file_name, file_name .. Xtn.bak)
-  -- Convert line ends back if required during write
-  write_content(file_path, first_of(gsub(updated_content, "\n", os_newline)))
+  write_content(file_path, updated_content)
   remove_tree(dir_path, file_name .. Xtn.bak)
   return 0
 end
 
 ---Target tag
----@param tag_names table
+---@param tag_names? string_list_t
 ---@return error_level_t
 local function tag(tag_names)
   local options = l3build.options
   local tag_date = options["date"] or os_date("%Y-%m-%d")
-  local tag_name = nil
-  if tag_names then
-    tag_name = tag_names[1]
-  end
+  local tag_name = tag_names and tag_names[1]
   local error_level = 0
   for dir in unique_items(Dir._work, Dir.sourcefile, Dir.docfile) do
-    for filetype in entries(Files.tag) do
-      for file in values(tree(dir, filetype)) do
+    for glob in entries(Files.tag) do
+      for file in values(tree(dir, glob)) do
         error_level = update_file_tag(file, tag_name, tag_date)
         if error_level ~= 0 then
           return error_level
@@ -108,9 +114,7 @@ local function tag(tag_names)
       end
     end
   end
-  ---@type tag_hook_t
-  local tag_hook = _G.tag_hook
-  return tag_hook and tag_hook(tag_name, tag_date) or 0
+  return Vars.tag_hook(tag_name, tag_date)
 end
 
 ---@class l3b_tagging_t

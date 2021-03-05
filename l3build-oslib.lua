@@ -48,7 +48,6 @@ local concat          = table.concat
 local utlib       = require("l3b.utillib")
 local items       = utlib.items
 local first_of    = utlib.first_of
-local extend_with = utlib.extend_with
 
 -- Detect the operating system in use
 -- Support items are defined here for cases where a single string can cover

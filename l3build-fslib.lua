@@ -67,8 +67,8 @@ local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type gblib_t
-local gblib         = require("l3b.globlib")
-local glob_matcher  = gblib.glob_matcher
+local gblib           = require("l3b.globlib")
+local to_glob_match = gblib.to_glob_match
 
 ---@type oslib_t
 local oslib       = require("l3b.oslib")
@@ -183,10 +183,10 @@ end
 local function file_list(dir_path, glob)
   local files = {}
   if directory_exists(dir_path) then
-    local accept = glob_matcher(glob)
-    if accept then
+    local glob_match = to_glob_match(glob)
+    if glob_match then
       for entry in lfs_dir(dir_path) do
-        if accept(entry) then
+        if glob_match(entry) then
           append(files, entry)
         end
       end

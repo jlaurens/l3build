@@ -166,7 +166,7 @@ local function ctan()
     error_level = call({ "." }, "check")
     Main.bundle = module
   else
-    error_level = call(_G.modules, "bundlecheck")
+    error_level = call(Main.modules, "bundlecheck")
   end
   if error_level == 0 then
     remove_directory(Dir.ctan)
@@ -178,7 +178,7 @@ local function ctan()
       if error_level ~=0 then return error_level end
       copy_ctan()
     else
-      error_level = call(_G.modules, "bundlectan")
+      error_level = call(Main.modules, "bundlectan")
     end
   else
     print("\n====================")

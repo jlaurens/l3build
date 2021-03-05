@@ -46,6 +46,8 @@ local l3build = require("l3build")
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Deps_t
 local Deps      = l3b_vars.Deps
 ---@type Dir_t
@@ -79,22 +81,6 @@ local uninstall     = l3b_install.uninstall
 local manifest      = require("l3b.manifest").manifest
 local tag           = require("l3b.tagging").manifest
 local upload        = require("l3b.upload").upload
-
--- List all modules
-local function listmodules()
-  local modules = {}
-  local exclmodules = _G.exclmodules or {}
-  for entry in lfs_dir(".") do
-    if entry ~= "." and entry ~= ".." then
-      if attributes(entry, "mode") == "directory" then
-        if not exclmodules[entry] then
-          append(modules, entry)
-        end
-      end
-    end
-  end
-  return modules
-end
 
 local target_list =
   {
@@ -164,13 +150,13 @@ local target_list =
     tag =
       {
         bundle_func = function(names)
-            local modules = modules or listmodules()
-            local errorlevel = call(modules, "tag")
+            local modules = Main.modules
+            local error_level = call(modules, "tag")
             -- Deal with any files in the bundle dir itself
-            if errorlevel == 0 then
-              errorlevel = tag(names)
+            if error_level == 0 then
+              error_level = tag(names)
             end
-            return errorlevel
+            return error_level
           end,
         desc = "Updates release tags in files",
         func = tag,
@@ -215,7 +201,7 @@ local function main(target, names)
   end
   local error_level = 0
   if module == "" then
-    _G.modules = _G.modules or listmodules()
+    local modules = Main.modules
     if target_list[target].bundle_func then
       error_level = target_list[target].bundle_func(names)
     else
@@ -223,7 +209,7 @@ local function main(target, names)
       if target_list[target].bundle_target then
         target = "bundle" .. target
       end
-      error_level = call(_G.modules, target)
+      error_level = call(modules, target)
     end
   else
     if target_list[target].pre then
@@ -291,7 +277,7 @@ local function prepare_config()
   if #checkconfigs == 1 and
     config_1 ~= "build" and
     (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-      local config_path = l3build._work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
+      local config_path = l3build.work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
       if file_exists(config_path) then
         dofile(config_path)
         Dir.test = Dir.test .. "-" .. config_1

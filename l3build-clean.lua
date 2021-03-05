@@ -39,6 +39,8 @@ local remove_directory      = fslib.remove_directory
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
 ---@type Files_t
@@ -62,6 +64,7 @@ local function clean()
 
   if error_level ~= 0 then return error_level end
 
+  ---@type flag_table_t
   local clean_list = {}
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
     for glob in entries(Files.clean) do
@@ -83,7 +86,7 @@ local function clean()
 end
 
 local function bundle_clean()
-  local error_level = call(_G.modules, "clean")
+  local error_level = call(Main.modules, "clean")
   for g in entries(Files.clean) do
     error_level = error_level + remove_tree(Dir._work, g)
   end

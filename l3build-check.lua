@@ -58,8 +58,8 @@ local read_content    = utlib.read_content
 local write_content   = utlib.write_content
 
 ---@type gblib_t
-local gblib         = require("l3b.globlib")
-local glob_matcher  = gblib.glob_matcher
+local gblib           = require("l3b.globlib")
+local to_glob_match = gblib.to_glob_match
 
 ---@type wklib_t
 local wklib     = require("l3b.walklib")
@@ -114,7 +114,7 @@ local bundleunpack  = l3b_unpack.bundleunpack
 
 ---@type l3b_typesetting_t
 local l3b_typesetting = require("l3b.typesetting")
-local dvitopdf        = l3b_typesetting.dvitopdf
+local dvi2pdf        = l3b_typesetting.dvi2pdf
 
 -- Variables
 
@@ -710,6 +710,7 @@ end
 ---@return string
 ---@return string
 local function test_exists(test)
+  ---@type string_list_t
   local file_names = {}
   for i, kind in ipairs(Vars.test_order) do
     file_names[i] = test .. Vars.test_types[kind].test
@@ -849,13 +850,14 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Ensure there is no stray .log file
   remove_name(Dir.test, name .. Xtn.log)
-  local errlevels = {}
+  ---@type table<integer, error_level_t>
+  local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
     localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, Vars.checkruns do
-    errlevels[run_number] = run(
+    err_levels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
@@ -881,10 +883,10 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     if breakout and run_number < Vars.checkruns then
       if test_type.generated == Xtn.pdf then
         if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
-          dvitopdf(name, Dir.test, engine, hide)
+          dvi2pdf(name, Dir.test, engine, hide)
         end
       end
-      test_type.rewrite(gen_file, new_file, engine, errlevels)
+      test_type.rewrite(gen_file, new_file, engine, err_levels)
       if base_compare(test_type, name, engine, true) == 0 then
         break
       end
@@ -892,12 +894,12 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   if test_type.generated == Xtn.pdf then
     if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
-      dvitopdf(name, Dir.test, engine, hide)
+      dvi2pdf(name, Dir.test, engine, hide)
     end
     copy_tree(name .. Xtn.pdf, Dir.test, Dir.result)
     rename(Dir.result, name .. Xtn.pdf, name .. "." .. engine .. Xtn.pdf)
   end
-  test_type.rewrite(gen_file, new_file, engine, errlevels)
+  test_type.rewrite(gen_file, new_file, engine, err_levels)
   -- Store secondary files for this engine
   for filetype in entries(Files.aux) do
     for file in all_names(Dir.test, filetype) do
@@ -1166,17 +1168,18 @@ local function check(names)
     if not next(names) then
       for kind in entries(Vars.test_order) do
         local ext = Vars.test_types[kind].test
-        local exclude_matchers = {}
+        ---@type table<integer, glob_match_f>
+        local exclude_glob_matches = {}
         local num_exclude = 0
         for glob in entries(Vars.excludetests) do
           num_exclude = num_exclude+1
-          exclude_matchers[num_exclude] = glob_matcher(glob .. ext)
+          exclude_glob_matches[num_exclude] = to_glob_match(glob .. ext)
         end
         for glob in entries(Vars.includetests) do
           for name in all_names(Dir.testfile, glob .. ext) do
             local is_excluded
-            for accept in entries(exclude_matchers) do
-              if accept(name) then
+            for glob_match in entries(exclude_glob_matches) do
+              if glob_match(name) then
                 is_excluded = true
                 break
               end
@@ -1187,8 +1190,8 @@ local function check(names)
           end
           for name in all_names(Dir.unpack, glob .. ext) do
             local is_excluded
-            for accept in entries(exclude_matchers) do
-              if not accept(name) then
+            for glob_match in entries(exclude_glob_matches) do
+              if not glob_match(name) then
                 is_excluded = true
                 break
               end

@@ -69,7 +69,7 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field first     boolean
 ---@field force     boolean
 ---@field full      boolean
----@field halt_on_error boolean -- variant name "halt_on_error"
+---@field halt_on_error boolean -- real name "halt-on-error"
 ---@field help      boolean
 ---@field message   string
 ---@field names     table
@@ -84,6 +84,7 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field NAME string "l3build", display name
 ---@field PATH string synonym of `launch_dir` .. "/l3build.lua"
 ---@field work_dir string where the "build.lua" lives
+---@field root_dir string where the topmost "build.lua" lives
 ---@field launch_dir string where "l3build.lua" and friends live
 ---@field start_dir string the current directory at load time
 ---@field options l3build_options_t
@@ -133,11 +134,12 @@ do
   ---@param base string relative file or directory name
   ---@return string|nil dir ends with '/' when non nil
   local function container(dir, base)
-    for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do
+    for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
       if os.rename(p, p) then return dir end -- true iff file or dir at the given path
       -- synonym of previous line:
       -- if package.searchpath("?", p, "", "") then return dir end
+      -- if lfs.atributes(p, "mode") then return dir end
       dir = dir .. "../"
     end
   end
@@ -155,6 +157,7 @@ do
   else
     launch_dir = container('./', "l3build.lua") or kpse_dir
   end
+
 
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()

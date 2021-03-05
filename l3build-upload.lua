@@ -88,7 +88,27 @@ with a configuration table `uploadconfig`
 --]=]
 
 ---@class l3b_upload_config_t
----@field pkg string Name of the CTAN package (defaults to Main.ctanpkg)
+---@field announcement  string        Announcement text
+---@field author        string        Author name (semicolon-separated for multiple)
+---@field ctanPath      string        CTAN path
+---@field email         string        Email address of uploader
+---@field license       string|string_list_t Package license(s)\footnote{See \url{https://ctan.org/license}}
+---@field pkg           string        Name of the CTAN package (defaults to Main.ctanpkg)
+---@field summary       string        One-line summary
+---@field uploader      string        Name of uploader
+---@field version       string        Package version
+---@field bugtracker    string|string_list_t URL(s) of bug tracker
+---@field description   string        Short description/abstract
+---@field development   string|string_list_t URL(s) of development channels
+---@field home          string|string_list_t URL(s) of home page
+---@field note          string        Internal note to CTAN
+---@field repository    string|string_list_t URL(s) of source repositories
+---@field support       string|string_list_t URL(s) of support channels
+---@field topic         string|string_list_t Topic(s)\footnote{See \url{https://ctan.org/topics/highscore}}
+---@field update        string        Boolean \texttt{true} for an update, \texttt{false} for a new package
+---@field announcement_file string    Announcement text  file
+---@field note_file     string        Note text file
+---@field curlopt_file  string        The filename containing the options passed to curl
 
 
 ---@class l3b_upload_vars_t
@@ -166,9 +186,9 @@ local function single_field(name, value, max, desc, mandatory)
       if max > 0 and len(vs) > max then
         error("The field " .. name .. " is longer than " .. max)
       end
-      vs =  vs:gsub('"', '\\"')
-              :gsub('`', '\\`')
-              :gsub('\n', '\\n')
+      vs =  vs:gsub('"', '"')
+              :gsub('`', '`')
+              :gsub('\n', 'n')
 -- for strings on commandline version      self.ctan_post=self.ctan_post .. ' --form "' .. fname .. "=" .. vs .. '"'
       return '\nform="' .. name .. '=' .. vs .. '"'
     end

@@ -114,8 +114,8 @@ end
 ---Glob matcher
 ---@param glob any
 ---@return function?
----@usage local accept = glob_matcher(...); if accept(...) then ... end
-local function glob_matcher(glob)
+---@usage local accept = to_glob_match(...); if accept(...) then ... end
+local function to_glob_match(glob)
   if not glob then return end
   local pattern = glob_to_pattern(glob)
   return function (str)
@@ -123,11 +123,12 @@ local function glob_matcher(glob)
   end
 end
 
+---@alias glob_match_f fun(name: string): boolean
 ---@class gblib_t
 ---@field glob_to_pattern fun(glob: string): string
----@field glob_matcher    fun(glob: string): fun(name: string): boolean
+---@field to_glob_match fun(glob: string): glob_match_f
 
 return {
-  glob_to_pattern  = glob_to_pattern,
-  glob_matcher     = glob_matcher,
+  glob_to_pattern = glob_to_pattern,
+  to_glob_match = to_glob_match,
 }

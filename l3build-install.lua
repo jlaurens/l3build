@@ -42,8 +42,8 @@ local entries     = utlib.entries
 local keys        = utlib.keys
 
 ---@type gblib_t
-local gblib         = require("l3b.globlib")
-local glob_matcher  = gblib.glob_matcher
+local gblib           = require("l3b.globlib")
+local to_glob_match = gblib.to_glob_match
 
 ---@type wklib_t
 local wklib           = require("l3b.walklib")
@@ -70,10 +70,10 @@ local l3build = require("l3build")
 
 ---@type l3b_vars_t
 local l3b_vars  = require("l3b.variables")
----@type Dir_t
-local Dir       = l3b_vars.Dir
 ---@type Main_t
 local Main      = l3b_vars.Main
+---@type Dir_t
+local Dir       = l3b_vars.Dir
 ---@type Files_t
 local Files     = l3b_vars.Files
 
@@ -226,8 +226,8 @@ local function install_files(root_install_dir, full, dry_run)
           local matched = false
           for location in entries(Main.tdslocations) do
             local l_dir, l_glob = dir_base(location)
-            local accept = glob_matcher(l_glob)
-            if accept(name) then
+            local glob_match = to_glob_match(l_glob)
+            if glob_match(name) then
               append(candidates, {
                 name        = name,
                 source      = source_dir,

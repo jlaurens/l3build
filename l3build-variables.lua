@@ -144,7 +144,7 @@ local Main = chooser(_G, setmetatable({
 }))
 
 ---@class Dir_t
----@field work        string
+---@field _work       string
 ---@field current     string
 ---@field main        string Top level directory for the module/bundle
 ---@field docfile     string Directory containing documentation files
@@ -354,7 +354,6 @@ local Exe = chooser(_G, {
 }, { suffix = "exe" })
 
 ---@class Opts_t
----@field ps2pdf    string Options for \texttt{ps2pdf}
 ---@field check     string Options passed to engine when running checks
 ---@field typeset   string Options passed to engine when typesetting
 ---@field unpack    string Options passed to engine when unpacking
@@ -365,7 +364,6 @@ local Exe = chooser(_G, {
 
 ---@type Opts_t
 local Opts  = chooser(_G, {
-  ps2pdf    = "",
   check     = "-interaction=nonstopmode",
   typeset   = "-interaction=nonstopmode",
   unpack    = "",

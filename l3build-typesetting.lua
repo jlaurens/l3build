@@ -26,10 +26,11 @@ for those people who are interested.
 -- Auxiliary functions for typesetting: need to be generally available
 --
 
-local print  = print
+local print     = print
 
-local gsub  = string.gsub
-local match = string.match
+local not_empty = next
+local gsub      = string.gsub
+local match     = string.match
 
 local os_type = os["type"]
 
@@ -57,7 +58,8 @@ local fslib             = require("l3b.fslib")
 local directory_exists  = fslib.directory_exists
 local absolute_path     = fslib.absolute_path
 local file_exists       = fslib.file_exists
-local remove_tree       = fslib.remove_tree
+local remove_name       = fslib.remove_name
+local copy_name         = fslib.copy_name
 local copy_tree         = fslib.copy_tree
 local make_clean_directory = fslib.make_clean_directory
 local tree              = fslib.tree
@@ -99,20 +101,22 @@ local unpack      = l3b_unpack.unpack
 ---@field forcedocepoch string  Force epoch when typesetting
 ---@field typesetcmds   string  Instructions to be passed to \TeX{} when doing typesetting
 ---@field typesetruns   integer Number of cycles of typesetting to carry out
+---@field ps2pdfopt     string  Options for \texttt{ps2pdf}
 
 ---@type l3b_tpst_vars_t
 local Vars = chooser(_G, {
-  typesetruns = 3,
-  typesetcmds = "",
+  typesetruns         = 3,
+  typesetcmds         = "",
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
-  typesetsearch = true,
+  typesetsearch       = true,
   -- Additional settings to fine-tune typesetting
-  glossarystyle = "gglo.ist",
-  indexstyle    = "gind.ist",
-  specialtypesetting = {},
-  forcedocepoch   = false,
-  [utlib.DID_CHOOSE] = function (result, k)
+  glossarystyle       = "gglo.ist",
+  indexstyle          = "gind.ist",
+  specialtypesetting  = {},
+  forcedocepoch       = false,
+  ps2pdfopt           = "",
+  [utlib.DID_CHOOSE]  = function (result, k)
     -- No trailing /
     -- What about the leading "./"
     if k == "forcedocepoch" then
@@ -125,19 +129,19 @@ local Vars = chooser(_G, {
   end,
 })
 
----dvitopdf, used while checking
+---dvi2pdf, used while checking
 ---@param name string
 ---@param dir string
 ---@param engine string
 ---@param hide boolean
 ---@return error_level_t
-local function dvitopdf(name, dir, engine, hide)
+local function dvi2pdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
       set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. os_null) or ""),
-      "ps2pdf " .. Opts.ps2pdfopt .. name .. Xtn.ps
+      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. os_null) or "")
     ) and 0 or 1
   )
@@ -191,7 +195,7 @@ end
 
 ---comment
 ---@param name string
----@param dir string
+---@param dir? string
 ---@return error_level_t
 function MT.bibtex(name, dir)
   dir = dir or "."
@@ -220,7 +224,7 @@ end
 
 ---comment
 ---@param name string
----@param dir string
+---@param dir? string
 ---@param in_ext string
 ---@param out_ext string
 ---@param log_ext string
@@ -242,8 +246,8 @@ end
 
 ---TeX
 ---@param file string
----@param dir string
----@param cmd string
+---@param dir? string
+---@param cmd? string
 ---@return error_level_t
 function MT.tex(file, dir, cmd)
   dir = dir or "."
@@ -253,12 +257,12 @@ function MT.tex(file, dir, cmd)
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
 
--- Ctrl.foo is _G.foo if it is a function, 
+-- Ctrl.foo is _G.foo if it is a function,
 -- TODO: Use chooser here
 local Ctrl = setmetatable({}, {
   __index = function (t, k)
     local MT_k = MT[k]
-    if MT_k ~= nil then -- only keys interactive MT are recognized
+    if MT_k ~= nil then -- only keys in MT are recognized
       local _G_k = _G[k]
       local result = type(_G_k) == "function" and _G_k or MT_k
         local options = l3build.options
@@ -272,7 +276,7 @@ local Ctrl = setmetatable({}, {
 
 ---typeset
 ---@param file string
----@param dir string
+---@param dir? string
 ---@param cmd string
 ---@return error_level_t
 function MT.typeset(file, dir, cmd)
@@ -297,7 +301,7 @@ end
 
 ---Local helper
 ---@param file string
----@param dir string
+---@param dir? string
 ---@return error_level_t
 local function typesetpdf(file, dir)
   dir = dir or "."
@@ -316,8 +320,8 @@ local function typesetpdf(file, dir)
     return error_level
   end
   local pdf_name = name .. Xtn.pdf
-  remove_tree(Dir.docfile, pdf_name)
-  return copy_tree(pdf_name, dir, Dir.docfile)
+  remove_name(Dir.docfile, pdf_name)
+  return copy_name(pdf_name, dir, Dir.docfile)
 end
 
 ---Do nothing function
@@ -340,15 +344,15 @@ local function docinit()
   for filetype in items(
     Files.bib, Files.doc, Files.typeset, Files.typesetdemo
   ) do
-    for file in entries(filetype) do
-      copy_tree(file, Dir.docfile, Dir.typeset)
+    for glob in entries(filetype) do
+      copy_tree(glob, Dir.docfile, Dir.typeset)
     end
   end
-  for file in entries(Files.source) do
-    copy_tree(file, Dir.sourcefile, Dir.typeset)
+  for glob in entries(Files.source) do
+    copy_tree(glob, Dir.sourcefile, Dir.typeset)
   end
-  for file in entries(Files.typesetsupp) do
-    copy_tree(file, Dir.support, Dir.typeset)
+  for glob in entries(Files.typesetsupp) do
+    copy_tree(glob, Dir.support, Dir.typeset)
   end
   deps_install(Deps.typeset)
   unpack({ Files.source, Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
@@ -362,22 +366,25 @@ end
 
 ---Typeset all required documents
 ---Uses a set of dedicated auxiliaries that need to be available to others
----@param files string_list_t
+---@param files? string_list_t
 ---@return error_level_t
 local function doc(files)
   local error_level = docinit()
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
+  ---@type flag_table_t
   local done = {}
-  for typeset_files in items(Files.typesetdemo, Files.typeset) do
-    for glob in entries(typeset_files) do
-      for dir in items(Dir.typeset, Dir.unpack) do
-        for p_wrk in values(tree(dir, glob)) do
-          local path, srcname = dir_base(p_wrk)
-          local name = job_name(srcname)
+  for typeset_globs in items(Files.typesetdemo, Files.typeset) do
+    for glob in entries(typeset_globs) do
+      for dir_path in items(Dir.typeset, Dir.unpack) do
+        for p_wrk in values(tree(dir_path, glob)) do
+          local src_dir, src_name = dir_base(p_wrk)
+          local name = job_name(src_name)
           if not done[name] then
             local should_typeset = true
             -- Allow for command line selection of files
-            if files and next(files) then
+            if files and not_empty(files) then
               should_typeset = false
               for file in entries(files) do
                 if name == file then
@@ -388,7 +395,7 @@ local function doc(files)
             end
             -- Now know if we should typeset this source
             if should_typeset then
-              error_level = typesetpdf(srcname, path)
+              error_level = typesetpdf(src_name, src_dir)
               if error_level ~= 0 then
                 return error_level
               else
@@ -404,7 +411,7 @@ local function doc(files)
 end
 
 ---@class l3b_typesetting_t
----@field dvitopdf  fun(name: string, dir: string, engine: string, hide: boolean): integer
+---@field dvi2pdf   fun(name: string, dir: string, engine: string, hide: boolean): integer
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
 ---@field doc       fun(files: string_list_t): integer
 ---@field bibtex    fun(name: string, dir: string): integer
@@ -413,7 +420,7 @@ end
 ---@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): integer
 
 return {
-  dvitopdf          = dvitopdf,
+  dvi2pdf           = dvi2pdf,
   runcmd            = runcmd,
   doc               = doc,
   bibtex            = Ctrl.bibtex,

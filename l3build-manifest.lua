@@ -183,7 +183,7 @@ function MT:build_list(entry)
 end
 
 ---comment
----@param fh table
+---@param fh table file handle
 ---@param entry table
 function MT:write_group(fh, entry)
   local writer = Mnfst.write_group_heading
@@ -265,12 +265,12 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_names(Dir.ctan.."/".. Main.ctanpkg, "*.*") do
+  for f in all_names(Dir.ctan .."/".. Main.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_names(Dir.tds..subdir..Dir.tds_module, "*.*") do
+    for f in all_names(Dir.tds .. subdir .. Dir.tds_module, "*.*") do
       self.tds_files[f] = true
     end
   end
