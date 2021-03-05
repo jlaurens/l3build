@@ -139,12 +139,12 @@ local Main = chooser(_G, setmetatable({
 ---@field distrib     string
 ---@field ctan        string
 ---@field tds         string
----@field local   string
+---@field local       string
 ---@field result      string
 ---@field test        string
 ---@field typeset     string
 ---@field unpack      string
----@field module      string
+---@field tds_module  string
 
 local LOCAL = {}
 

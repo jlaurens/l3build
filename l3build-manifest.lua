@@ -266,7 +266,7 @@ function MT:manifest()
   end
   self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_names(Dir.tds..subdir..Dir.module, "*.*") do
+    for f in all_names(Dir.tds..subdir..Dir.tds_module, "*.*") do
       self.tds_files[f] = true
     end
   end

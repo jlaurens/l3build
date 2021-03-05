@@ -237,6 +237,7 @@ local flags = {}
 ---it will be used to apply a post treatment to the result.
 ---This postflight function has signature fun(result: any, k: string): any
 ---For example, returned directory paths may be normalized that way.
+---If the key starts with "_", `_G` is ignored (key is private).
 ---@param G       any, in general _G
 ---@param dflt    any
 ---@param kv      chooser_kv_t
@@ -245,6 +246,13 @@ local function chooser(G, dflt, kv)
   local function __index(t, k)        -- will end in a metatable just below
     local dflt_k = dflt[k]            -- default candidate
     if dflt_k == nil then return end  -- unknown key, stop here
+    if k:sub(1, 1) == "_" then -- private key
+      -- cache the result if any such that next time, __index is not called
+      if flags.cache_chosen then
+        t[k] = dflt_k
+      end
+      return dflt_k
+    end
     local result
     local kk = k
     if kv and type(k) == "string" then -- modify the global key

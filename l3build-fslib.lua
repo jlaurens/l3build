@@ -209,7 +209,7 @@ local tree_excluder = function (name) return false end
 
 ---Set the given function as tree excluder.
 ---Can be used to exclude the build directory.
----@param f fun(path_cwd: string): boolean
+---@param f fun(path_wrk: string): boolean
 local function set_tree_excluder(f)
   tree_excluder = f
 end
@@ -237,12 +237,12 @@ local function tree(dir_path, glob)
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
     ---@param p_src string path relative to `src_path`
-    ---@param p_cwd string path counterpart relative to the current working directory
+    ---@param p_wrk string path counterpart relative to the current working directory
     ---@param table table
-    local function fill(p_src, p_cwd, table)
-      for file in all_names(p_cwd, glob_part) do
+    local function fill(p_src, p_wrk, table)
+      for file in all_names(p_wrk, glob_part) do
         if file ~= "." and file ~= ".." then
-          local p_cwd_file = p_cwd .. "/" .. file
+          local p_cwd_file = p_wrk .. "/" .. file
           if not tree_excluder(p_cwd_file) then
             local p_src_file = p_src .. "/" .. file
             if accept(p_cwd_file) then
@@ -255,17 +255,17 @@ local function tree(dir_path, glob)
     local new_result = {}
     if glob_part == "**" then
       while true do
-        local p_src, p_cwd = next(result)
+        local p_src, p_wrk = next(result)
         if not p_src then
           break
         end
         result[p_src] = nil
-        new_result[p_src] = p_cwd
-        fill(p_src, p_cwd, result)
+        new_result[p_src] = p_wrk
+        fill(p_src, p_wrk, result)
       end
     else
-      for p_src, p_cwd in pairs(result) do
-        fill(p_src, p_cwd, new_result)
+      for p_src, p_wrk in pairs(result) do
+        fill(p_src, p_wrk, new_result)
       end
     end
     result = new_result
@@ -291,24 +291,24 @@ local function rename(dir_path, source, dest)
   end
 end
 
-local function copy_core(dest, p_src, p_cwd)
+local function copy_core(dest, p_src, p_wrk)
   local error_level
       -- p_src is a path relative to `source` whereas
-    -- p_cwd is the counterpart relative to the current working directory
+    -- p_wrk is the counterpart relative to the current working directory
     if os_type == "windows" then
-      if attributes(p_cwd, "mode") == "directory" then
+      if attributes(p_wrk, "mode") == "directory" then
         errorlevel = execute(
-          'xcopy /y /e /i "' .. unix_to_win(p_cwd) .. '" "'
+          'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
              .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
         )
       else
         errorlevel = execute(
-          'xcopy /y "' .. unix_to_win(p_cwd) .. '" "'
+          'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
              .. unix_to_win(dest .. '/') .. '" > nul'
         )
       end
     else
-      errorlevel = execute("cp -RLf '" .. p_cwd .. "' '" .. dest .. "'")
+      errorlevel = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
     end
     if errorlevel ~=0 then
       return errorlevel
@@ -316,15 +316,23 @@ local function copy_core(dest, p_src, p_cwd)
 
 end
 
+---@class copy_name_kv -- copy_name key/value arguments
+---@field name    string
+---@field source  string
+---@field dest    string
+
 ---Copy files 'quietly'.
----@param name string base name
----@param source string path of the source directory
----@param dest string path of the destination directory
+---@param name string|copy_name_kv base name of kv arguments
+---@param source? string path of the source directory, required when name is not a table
+---@param dest? string path of the destination directory, required when name is not a table
 ---@return error_level_t
 local function copy_name(name, source, dest)
+  if type(name) == "table" then
+    name, source, dest = name.name, name.source, name.dest
+  end
   local p_src = source  .."/".. name
-  local p_cwd = dest    .."/".. name
-  return copy_core(dest, p_src, p_cwd)
+  local p_wrk = dest    .."/".. name
+  return copy_core(dest, p_src, p_wrk)
 end
 
 ---Copy files 'quietly'.
@@ -334,8 +342,8 @@ end
 ---@return integer
 local function copy_tree(glob, source, dest)
   local error_level
-  for p_src, p_cwd in pairs(tree(source, glob)) do
-    error_level = copy_core(dest, p_src, p_cwd)
+  for p_src, p_wrk in pairs(tree(source, glob)) do
+    error_level = copy_core(dest, p_src, p_wrk)
     if error_level ~=0 then
       return error_level
     end
@@ -401,7 +409,7 @@ end
 ---@field locate      fun(dirs: string_list_t, names: string_list_t): string
 ---@field file_list   fun(dir_path: string, glob: string|nil): string_list_t
 ---@field all_names   fun(path: string, glob: string): fun(): string
----@field set_tree_excluder fun(f: fun(path_cwd: string): boolean)
+---@field set_tree_excluder fun(f: fun(path_wrk: string): boolean)
 ---@field tree        fun(dir_path: string, glob: string): table<string, string>)
 ---@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
 ---@field copy_name   fun(file: string, source: string, dest: string): integer

@@ -373,8 +373,8 @@ local function doc(files)
   for typeset_files in items(Files.typesetdemo, Files.typeset) do
     for glob in entries(typeset_files) do
       for dir in items(Dir.typeset, Dir.unpack) do
-        for p_cwd in values(tree(dir, glob)) do
-          local path, srcname = dir_base(p_cwd)
+        for p_wrk in values(tree(dir, glob)) do
+          local path, srcname = dir_base(p_wrk)
           local name = job_name(srcname)
           if not done[name] then
             local should_typeset = true

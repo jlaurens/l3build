@@ -23,6 +23,7 @@ for those people who are interested.
 --]]
 
 local print  = print
+local not_empty = next
 
 local kpse        = require("kpse")
 local set_program = kpse.set_program_name
@@ -89,62 +90,62 @@ local Vars = chooser(_G, {
   tdslocations = {}
 })
 
-local function gethome()
-  set_program("latex")
-  local options = l3build.options
-  return options["texmfhome"] or var_value("TEXMFHOME")
+local textmf_home
+local function get_textmf_home()
+  if not textmf_home then
+    set_program("latex")
+    local options = l3build.options
+    textmf_home = options["texmfhome"] or var_value("TEXMFHOME")
+  end
+  return textmf_home
 end
 
 ---Uninstall
 ---@return error_level_t
 local function uninstall()
-  local function zapdir(dir)
-    local install_dir = gethome() .. "/" .. dir
-    local options = l3build.options
-    if options["dry-run"] then
-      local files = file_list(install_dir)
-      if next(files) then
-        print("\n" .. "For removal from " .. install_dir .. ":")
-        for file in entries(install_dir) do
-          print("- " .. file)
-        end
-      end
-      return 0
-    else
-      if directory_exists(install_dir) then
-        return remove_directory(install_dir)
-      end
-    end
-    return 0
-  end
-  local function uninstall_files(dir, subdir)
-    subdir = subdir or Dir.module
-    dir = dir .. "/" .. subdir
-    return zapdir(dir)
-  end
   local error_level = 0
   -- Any script man files need special handling
-  local manfiles = {}
+  local man_files = {}
   for glob in entries(Files.scriptman) do
     for file in keys(tree(Dir.docfile, glob)) do
       -- Man files should have a single-digit extension: the type
       local man = "man" .. match(file, ".$")
-      local install_dir = gethome() .. "/doc/man/"  .. man
+      local install_dir = get_textmf_home() .. "/doc/man/"  .. man
       if file_exists(install_dir .. "/" .. file) then
         local options = l3build.options
         if options["dry-run"] then
-          append(manfiles, man .. "/" .. base_name(file))
+          append(man_files, man .. "/" .. base_name(file))
         else
           error_level = error_level + remove_tree(install_dir, file)
         end
       end
     end
   end
-  if next(manfiles) then
-    print("\n" .. "For removal from " .. gethome() .. "/doc/man:")
-    for v in entries(manfiles) do
+  if not_empty(man_files) then
+    print("\n" .. "For removal from " .. get_textmf_home() .. "/doc/man:")
+    for v in entries(man_files) do
       print("- " .. v)
     end
+  end
+  local function zap_dir(dir)
+    local install_dir = get_textmf_home() .. "/" .. dir
+    local options = l3build.options
+    if options["dry-run"] then
+      local files = file_list(install_dir)
+      if not_empty(files) then
+        print("\n" .. "For removal from " .. install_dir .. ":")
+        for file in entries(files) do
+          print("- " .. file)
+        end
+      end
+      return 0
+    elseif directory_exists(install_dir) then
+      return remove_directory(install_dir)
+    end
+    return 0
+  end
+  local function uninstall_files(dir, subdir)
+    return zap_dir(dir .. "/" .. (subdir or Dir.tds_module))
   end
   error_level = uninstall_files("doc")
               + uninstall_files("source")
@@ -157,94 +158,98 @@ local function uninstall()
   -- Finally, clean up special locations
   for location in entries(Vars.tdslocations) do
     local path = dir_name(location)
-    error_level = zapdir(path)
+    error_level = zap_dir(path)
     if error_level ~= 0 then return error_level end
   end
   return 0
 end
 
 ---Install files
----@param target string
+---@param root_install_dir string
 ---@param full boolean
 ---@param dry_run boolean
 ---@return error_level_t
-local function install_files(target, full, dry_run)
-
+local function install_files(root_install_dir, full, dry_run)
   -- Needed so paths are only cleaned out once
-  local cleanpaths = {}
-  -- Collect up all file data before copying:
-  -- ensures no files are lost during clean-up
-  local install_map = {}
+  ---@type table<string, boolean>
+  local already_cleaned = {}
 
-  local function feed_install_map(source, dir, files, subdir)
-    subdir = subdir or Dir.module
+  -- Collect up all file paths before copying:
+  -- ensures no files are lost during clean-up
+  ---@type table<integer, copy_name_kv>
+  local to_copy = {}
+
+  local function feed_to_copy(src_dir, type, file_globs, module)
+    module = module or Dir.tds_module
     -- For material associated with secondary tools (BibTeX, MakeIndex)
     -- the structure needed is slightly different from those items going
     -- into the tex/doc/source trees
-    if (dir == "makeindex" or match(dir, "$bibtex")) and Main.module == "base" then -- "base" is latex2e specific
-      subdir = "latex"
+    if (type == "makeindex" or match(type, "^bibtex"))
+      and Main.module == "base" -- "base" is latex2e specific
+    then
+      module = "latex"
     end
-    if subdir then dir = dir .."/".. subdir end
-    local file_names = {}
-    local source_paths = {}
-    local paths = {}
-    -- Generate a file list and include the directory
-    for glob_list in entries(files) do
+    local type_module = type .."/".. module
+    ---@type table<integer, copy_name_kv>
+    local candidates = {}
+    -- Generate a candidates list
+    -- each candidate is a table
+    for glob_list in entries(file_globs) do
       for glob in entries(glob_list) do
-        for file in keys(tree(source, glob)) do
-          local file_dir, file_base = dir_base(file)
-          local source_path = "/"
-          if file_dir == "." then
-            source_paths[file_base] = source
-          else
-            file_dir = gsub(file_dir, "^%.", "")
-            source_paths[file_base] = source .. file_dir
+        for file in keys(tree(src_dir, glob)) do
+          local dir, name = dir_base(file)
+          local src_path = "/"
+          local source_dir = src_dir
+          if dir ~= "." then
+            dir = gsub(dir, "^%.", "")
+            source_dir = src_dir .. dir
             if not Main.flattentds then
-              source_path = file_dir .. "/"
+              src_path = dir .. "/"
             end
           end
           local matched = false
           for location in entries(Vars.tdslocations) do
             local l_dir, l_glob = dir_base(location)
             local accept = glob_matcher(l_glob)
-            if accept(file_base) then
-              append(paths, l_dir)
-              append(file_names, l_dir .. source_path .. file_base)
+            if accept(name) then
+              append(candidates, {
+                name        = name,
+                source      = source_dir,
+                dest        = l_dir .. src_path,
+                install_dir = root_install_dir .."/".. type_module, -- for cleanup
+              })
               matched = true
               break
             end
           end
           if not matched then
-            append(paths, dir)
-            append(file_names, dir .. source_path .. file_base)
+            append(candidates, {
+              name        = name,
+              source      = source_dir,
+              dest        =  type_module .. src_path,
+              install_dir = root_install_dir .."/".. type_module, -- for cleanup
+            })
           end
         end
       end
     end
 
-    local errorlevel = 0
+    local error_level = 0
     -- The target is only created if there are actual files to install
-    if next(file_names) then
-      if not dry_run then
-        for path in entries(paths) do
-          local target_path = target .. "/" .. path
-          if not cleanpaths[target_path] then
-            errorlevel = make_clean_directory(target_path)
-            if errorlevel ~= 0 then return errorlevel end
-          end
-          cleanpaths[target_path] = true
+    if not_empty(candidates) then
+      if dry_run then
+        for entry in entries(candidates) do
+          print("- " .. entry.dest .. entry.base)
         end
-      end
-      for name in entries(file_names) do
-        if dry_run then
-          print("- " .. name)
-        else
-          local path, file = dir_base(name)
-          append(install_map, {
-            file = file,
-            source = source_paths[file],
-            dest = target .. "/" .. path
-          })
+      else
+        for entry in entries(candidates) do
+          local install_dir = entry.install_dir
+          if not already_cleaned[install_dir] then
+            error_level = make_clean_directory(install_dir)
+            if error_level ~= 0 then return error_level end
+            already_cleaned[install_dir] = true
+          end
+          append(to_copy, entry)
         end
       end
     end
@@ -254,29 +259,29 @@ local function install_files(target, full, dry_run)
   local error_level = unpack()
   if error_level ~= 0 then return error_level end
 
-    -- Creates a 'controlled' list of files
-    local function create_file_list(dir, include, exclude)
-      dir = dir or Dir.current
-      include = include or {}
-      exclude = exclude or {}
-      local excludelist = {}
-      for glob_table in entries(exclude) do
-        for glob in entries(glob_table) do
-          for file in keys(tree(dir, glob)) do
-            excludelist[file] = true
-          end
-        end
-      end
-      local result = {}
-      for glob in entries(include) do
+  -- Creates a 'controlled' list of files
+  local function create_file_list(dir, include, exclude)
+    dir = dir or Dir.current
+    include = include or {}
+    exclude = exclude or {}
+    local excludelist = {}
+    for glob_table in entries(exclude) do
+      for glob in entries(glob_table) do
         for file in keys(tree(dir, glob)) do
-          if not excludelist[file] then
-            append(result, file)
-          end
+          excludelist[file] = true
         end
       end
-      return result
     end
+    local result = {}
+    for glob in entries(include) do
+      for file in keys(tree(dir, glob)) do
+        if not excludelist[file] then
+          append(result, file)
+        end
+      end
+    end
+    return result
+  end
 
   local install_list = create_file_list(Dir.unpack, Files.install, { Files.script })
 
@@ -290,12 +295,12 @@ local function install_files(target, full, dry_run)
       { Files.bst, Files.install, Files.makeindex, Files.script })
 
     if dry_run then
-      print("\nFor installation inside " .. target .. ":")
+      print("\nFor installation inside " .. root_install_dir .. ":")
     end
 
     error_level =
-        feed_install_map(Dir.sourcefile, "source", { _G.sourcelist })
-      + feed_install_map(Dir.docfile, "doc", {
+        feed_to_copy(Dir.sourcefile, "source", { _G.sourcelist })
+      + feed_to_copy(Dir.docfile, "doc", {
           Files.bib, Files.demo, Files.doc,
           Files._all_pdffiles [[ For the purposes here,
           any typesetting demo files need to be part of the main typesetting list
@@ -307,7 +312,7 @@ local function install_files(target, full, dry_run)
     if not dry_run then
       local readme = Main.ctanreadme
       if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
-        local install_dir = target .. "/doc/" .. Dir.module
+        local install_dir = root_install_dir .. "/doc/" .. Dir.tds_module
         if file_exists(install_dir .. "/" .. readme) then
           rename(install_dir, readme, "README." .. match(readme, "%.(%w+)$"))
         end
@@ -322,7 +327,7 @@ local function install_files(target, full, dry_run)
           print("- doc/man/" .. man .. "/" .. base_name(name))
         else
           -- Man files should have a single-digit tail: the type
-          local install_dir = target .. "/doc/man/"  .. man
+          local install_dir = root_install_dir .. "/doc/man/"  .. man
           error_level = error_level + make_directory(install_dir)
                                     + copy_name(name, Dir.docfile, install_dir)
         end
@@ -333,17 +338,17 @@ local function install_files(target, full, dry_run)
   if error_level ~= 0 then return error_level end
 
   error_level =
-      feed_install_map(Dir.unpack, "tex", { install_list })
-    + feed_install_map(Dir.unpack, "bibtex/bst", { Files.bst }, Main.module)
-    + feed_install_map(Dir.unpack, "makeindex", { Files.makeindex }, Main.module)
-    + feed_install_map(Dir.unpack, "scripts", { Files.script }, Main.module)
+      feed_to_copy(Dir.unpack, "tex", { install_list })
+    + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst }, Main.module)
+    + feed_to_copy(Dir.unpack, "makeindex", { Files.makeindex }, Main.module)
+    + feed_to_copy(Dir.unpack, "scripts", { Files.script }, Main.module)
 
   if error_level ~= 0 then return error_level end
 
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
-  for v in entries(install_map) do
-    error_level = copy_tree(v.file, v.source, v.dest)
+  for entry in entries(to_copy) do
+    error_level = copy_name(entry.name, entry.source, entry.dest)
     if error_level ~= 0  then return error_level end
   end
 
@@ -352,12 +357,12 @@ end
 
 local function install()
   local options = l3build.options
-  return install_files(gethome(), options["full"], options["dry-run"])
+  return install_files(get_textmf_home(), options["full"], options["dry-run"])
 end
 
 ---@class l3b_install_t
 ---@field uninstall     fun(): integer
----@field install_files fun(target: string, full: boolean, dry_run: boolean): integer
+---@field install_files fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
 ---@field install       fun(): integer
 
 return {

@@ -204,7 +204,7 @@ the package into a TeX distribution.
     {
        name    = "Source files (TDS)",
        description = "All files included in the `"..module.."/source` directory.\n",
-       dir     = Dir.tds.."/source/"..Dir.module,
+       dir     = Dir.tds.."/source/"..Dir.tds_module,
        files   = { "*.*" },
        exclude = { ".", ".." },
        flag    = false,
@@ -213,7 +213,7 @@ the package into a TeX distribution.
     {
        name    = "TeX files (TDS)",
        description = "All files included in the `"..module.."/tex` directory.\n",
-       dir     = Dir.tds.."/tex/"..Dir.module,
+       dir     = Dir.tds.."/tex/"..Dir.tds_module,
        files   = { "*.*" },
        exclude = { ".",".." },
        flag    = false,
@@ -222,7 +222,7 @@ the package into a TeX distribution.
     {
        name    = "Doc files (TDS)",
        description = "All files included in the `"..module.."/doc` directory.\n",
-       dir     = Dir.tds.."/doc/"..Dir.module,
+       dir     = Dir.tds.."/doc/"..Dir.tds_module,
        files   = { "*.*" },
        exclude = { ".",".." },
        flag    = false,
