@@ -92,20 +92,18 @@ local l3b_unpack  = require("l3b.unpack")
 local unpack      = l3b_unpack.unpack
 
 ---@class l3b_tpst_vars_t
----@field typesetruns   integer
----@field typesetcmds   string
----@field ps2pdfopt     string
----@field typesetsearch boolean
----@field glossarystyle string
----@field indexstyle    string
----@field specialtypesetting table
----@field forcedocepoch string
+---@field typesetsearch boolean Switch to search the system \texttt{texmf} for during typesetting
+---@field glossarystyle string  MakeIndex style file for glossary/changes creation
+---@field indexstyle    string  MakeIndex style for index creation
+---@field specialtypesetting table  Non-standard typesetting combinations
+---@field forcedocepoch string  Force epoch when typesetting
+---@field typesetcmds   string  Instructions to be passed to \TeX{} when doing typesetting
+---@field typesetruns   integer Number of cycles of typesetting to carry out
 
 ---@type l3b_tpst_vars_t
 local Vars = chooser(_G, {
   typesetruns = 3,
   typesetcmds = "",
-  ps2pdfopt = "",
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
   typesetsearch = true,
@@ -127,7 +125,7 @@ local Vars = chooser(_G, {
   end,
 })
 
----dvitopdf
+---dvitopdf, used while checking
 ---@param name string
 ---@param dir string
 ---@param engine string
@@ -139,7 +137,7 @@ local function dvitopdf(name, dir, engine, hide)
       set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. os_null) or ""),
-      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
+      "ps2pdf " .. Opts.ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. os_null) or "")
     ) and 0 or 1
   )

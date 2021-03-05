@@ -67,7 +67,7 @@ local Exe       = l3b_vars.Exe
 local Opts      = l3b_vars.Opts
 
 ---@class l3b_unpack_vars_t
----@field unpacksearch boolean
+---@field unpacksearch boolean  Switch to search the system \texttt{texmf} for during unpacking
 
 ---@type l3b_unpack_vars_t
 local Vars = chooser(_G, {

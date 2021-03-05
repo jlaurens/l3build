@@ -70,6 +70,10 @@ local Mnfst = chooser(_G, {
   write_group_file        = stp.write_group_file,
 }, { prefix = "manifest_" })
 
+---@class l3b_manifest_vars_t
+---@field manifestfile string File name to use for the manifest file
+
+---@type l3b_manifest_vars_t
 local Vars = chooser(_G, {
   -- Manifest options
   manifestfile    = "MANIFEST.md",

@@ -27,6 +27,10 @@ local gsub    = string.gsub
 local append  = table.insert
 local os_time = os["time"]
 
+local lfs         = require("lfs")
+local lfs_dir     = lfs.dir
+local attributes  = lfs.attributes
+
 ---@type utlib_t
 local utlib     = require("l3b.utillib")
 local chooser   = utlib.chooser
@@ -40,6 +44,8 @@ local quoted_path = oslib.quoted_path
 ---@type fslib_t
 local fslib             = require("l3b.fslib")
 local set_tree_excluder = fslib.set_tree_excluder
+local directory_exists  = fslib.directory_exists
+local all_names         = fslib.all_names
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -76,27 +82,29 @@ local function normalise_epoch(epoch)
 end
 
 ---@class Main_t
----@field module        string
----@field bundle        string
+---@field module        string The name of the module
+---@field bundle        string The name of the bundle in which the module belongs (where relevant)
+---@field ctanpkg       string Name of the CTAN package matching this module
+---@field exclmodules   string_list_t Directories to be excluded from automatic module detection
+---@field modules       string_list_t The list of all modules in a bundle (when not auto-detecting)
+---@field forcecheckepoch boolean Force epoch when running tests
+---@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
 ---@field tdsroot       string
----@field ctanpkg       string
----@field ctanzip       string
----@field checkengines  string_list_t
----@field ctanreadme    string
----@field forcecheckepoch boolean
----@field epoch         integer
----@field flattentds    boolean
+---@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
+---@field epoch         integer Epoch (Unix date) to set for test runs
+---@field tdslocations  string_list_t For non-standard file installations
 
 ---@type Main_t
 local Main = chooser(_G, setmetatable({
-  module  = "",
-  bundle  = "",
-  tdsroot = "latex",
-  checkengines = { "pdftex", "xetex", "luatex" },
-  ctanreadme   = "README.md",
+  module          = "",
+  bundle          = "",
+  exclmodules     = {},
+  tdsroot         = "latex",
+  ctanreadme      = "README.md",
   forcecheckepoch = true,
   epoch           = 1463734800,
   flattentds      = true,
+  tdslocations    = {},
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
     -- What about the leading "./"
@@ -118,9 +126,19 @@ local Main = chooser(_G, setmetatable({
   __index = function (t, k)
     if k == "ctanpkg" then
       return  t.bundle ~= ""
-          and t.bundle or t.module
+          and t.bundle .."/".. t.module
+          or  t.module
     elseif k == "ctanzip" then
       return t.ctanpkg .. "-ctan"
+    elseif k == "modules" then -- dynamically create the module list
+      local result = {}
+      local exclmodules = t.exclmodules or {}
+      for entry in all_names(require("l3b.fslib").Dir._work) do -- Dir is not yet defined
+        if directory_exists(entry) and not exclmodules[entry] then
+          append(result, entry)
+        end
+      end
+      return result
     end
   end
 }))
@@ -128,25 +146,27 @@ local Main = chooser(_G, setmetatable({
 ---@class Dir_t
 ---@field work        string
 ---@field current     string
----@field main        string
----@field docfile     string
----@field sourcefile  string
----@field textfile    string
----@field support     string
----@field testfile    string
----@field testsupp    string
----@field texmf       string
----@field build       string
----@field distrib     string
----@field ctan        string
----@field tds         string
----@field local       string
----@field result      string
----@field test        string
----@field typeset     string
----@field unpack      string
+---@field main        string Top level directory for the module/bundle
+---@field docfile     string Directory containing documentation files
+---@field sourcefile  string Directory containing source files
+---@field support     string Directory containing general support files
+---@field testfile    string Directory containing test files
+---@field testsupp    string Directory containing test-specific support files
+---@field texmf       string Directory containing support files in tree form
+---@field textfile    string Directory containing plain text files
+---@field build       string Directory for building and testing
+---@field distrib     string Directory for generating distribution structure
+---@field local       string Directory for extracted files in \enquote{sandboxed} \TeX{} runs
+---@field result      string Directory for PDF files when using PDF-based tests
+---@field test        string Directory for running tests
+---@field typeset     string Directory for building documentation
+---@field unpack      string Directory for unpacking sources
+---@field ctan        string Directory for organising files for CTAN
+---@field tds         string Directory for organised files into TDS structure
 ---@field tds_module  string
+--[[
 
+]]
 local LOCAL = {}
 
 ---@type Dir_t
@@ -167,19 +187,19 @@ local default_Dir = setmetatable({
   __index = function (t, k)
     local result
     if k == "current" then -- deprecate, not equal to the current directory.
-      result = t.work
+      result = t._work
     elseif k == "main" then
-      result = t.work
+      result = t._work
     elseif k == "docfile" then
-      result = t.work
+      result = t._work
     elseif k == "sourcefile" then
-      result = t.work
+      result = t._work
     elseif k == "textfile" then
-      result = t.work
+      result = t._work
     elseif k == "support" then
       result = t.main .. "/support"
     elseif k == "testfile" then
-      result = t.work .. "/testfiles"
+      result = t._work .. "/testfiles"
     elseif k == "testsupp" then
       result = t.testfile .. "/support"
     elseif k == "texmf" then
@@ -205,7 +225,7 @@ local default_Dir = setmetatable({
     elseif k == "unpack" then
       result = t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
-    elseif k == "module" then
+    elseif k == "tds_module" then
       result = Main.tdsroot .. "/" .. Main.bundle .. "/" .. Main.module
       result = first_of(result:gsub("//", "/"))
     end
@@ -225,68 +245,69 @@ end)
 -- All of these may be set earlier, so a initialised conditionally
 
 ---@class Files_t
----@field aux           string_list_t
----@field bib           string_list_t
----@field binary        string_list_t
----@field bst           string_list_t
----@field check         string_list_t
----@field checksupp     string_list_t
----@field clean         string_list_t
----@field demo          string_list_t
----@field doc           string_list_t
----@field dynamic       string_list_t
----@field exclude       string_list_t
----@field install       string_list_t
----@field makeindex     string_list_t
----@field script        string_list_t
----@field scriptman     string_list_t
----@field source        string_list_t
----@field tag           string_list_t
----@field text          string_list_t
----@field typesetdemo   string_list_t
----@field typeset       string_list_t
----@field _all_typeset  string_list_t
----@field _all_pdffiles string_list_t
----@field typesetsupp   string_list_t
----@field typesetsource string_list_t
----@field unpack        string_list_t
----@field unpacksupp    string_list_t
+---@field aux           string_list_t Secondary files to be saved as part of running tests
+---@field bib           string_list_t \BibTeX{} database files
+---@field binary        string_list_t Files to be added in binary mode to zip files
+---@field bst           string_list_t \BibTeX{} style files
+---@field check         string_list_t Extra files unpacked purely for tests
+---@field checksupp     string_list_t Files needed for performing regression tests
+---@field clean         string_list_t Files to delete when cleaning
+---@field demo          string_list_t Files which show how to use a module
+---@field doc           string_list_t Files which are part of the documentation but should not be typeset
+---@field dynamic       string_list_t Secondary files to cleared before each test is run
+---@field exclude       string_list_t Files to ignore entirely (default for Emacs backup files)
+---@field install       string_list_t Files to install to the \texttt{tex} area of the \texttt{texmf} tree
+---@field makeindex     string_list_t MakeIndex files to be included in a TDS-style zip
+---@field script        string_list_t Files to install to the \texttt{scripts} area of the \texttt{texmf} tree
+---@field scriptman     string_list_t Files to install to the \texttt{doc/man} area of the \texttt{texmf} tree
+---@field source        string_list_t Files to copy for unpacking
+---@field tag           string_list_t Files for automatic tagging
+---@field text          string_list_t Plain text files to send to CTAN as-is
+---@field typesetdemo   string_list_t Files to typeset before the documentation for inclusion in main documentation files
+---@field typeset       string_list_t Files to typeset for documentation
+---@field typesetsupp   string_list_t Files needed to support typesetting when \enquote{sandboxed}
+---@field typesetsource string_list_t Files to copy to unpacking when typesetting
+---@field unpack        string_list_t Files to run to perform unpacking
+---@field unpacksupp    string_list_t Files needed to support unpacking when \enquote{sandboxed}
+---@field _all_typeset  string_list_t To combine `typeset` files and `typesetdemo` files
+---@field _all_pdf      string_list_t Counterpart of "_all_typeset"
 
+local Files_dflt = {
+  aux             = { "*.aux", "*.lof", "*.lot", "*.toc" },
+  bib             = { "*.bib" },
+  binary          = { "*.pdf", "*.zip" },
+  bst             = { "*.bst" },
+  check           = {},
+  checksuppfiles  = {},
+  clean           = { "*.log", "*.pdf", "*.zip" },
+  demo            = {},
+  doc             = {},
+  dynamic         = {},
+  exclude         = { "*~" },
+  install         = { "*.sty", "*.cls" },
+  makeindex       = { "*.ist" },
+  script          = {},
+  scriptman       = {},
+  source          = { "*.dtx", "*.ins", "*-????-??-??.sty" },
+  tag             = { "*.dtx" },
+  text            = { "*.md", "*.txt" },
+  typesetdemo     = {},
+  typeset         = { "*.dtx" },
+  typesetsupp     = {},
+  typesetsource   = {},
+  unpack          = { "*.ins" },
+  unpacksupp      = {},
+}
 ---@type Files_t
-local Files = chooser(_G, setmetatable({
-  aux           = { "*.aux", "*.lof", "*.lot", "*.toc" },
-  bib           = { "*.bib" },
-  binary        = { "*.pdf", "*.zip" },
-  bst           = { "*.bst" },
-  check         = {},
-  checksupp     = {},
-  clean         = { "*.log", "*.pdf", "*.zip" },
-  demo          = {},
-  doc           = {},
-  dynamic       = {},
-  exclude       = { "*~" },
-  install       = { "*.sty","*.cls" },
-  makeindex     = { "*.ist" },
-  script        = {},
-  scriptman     = {},
-  source        = { "*.dtx", "*.ins", "*-????-??-??.sty" },
-  tag           = { "*.dtx" },
-  text          = { "*.md", "*.txt" },
-  typesetdemo   = {},
-  typeset       = { "*.dtx" },
-  typesetsupp   = {},
-  typesetsource = {},
-  unpack        = { "*.ins" },
-  unpacksupp    = {},
-}, {
+local Files = chooser(_G, setmetatable(Files_dflt, {
   __index = function (t, k)
-    if k == "_all_typeset" then
+    if k == "_all_typeset" then -- dynamic private key to merge typeset and typeset demo
       local result = t.typeset
       for glob in entries(t.typesetdemo) do
         append(result, glob)
       end
       return result
-    elseif k == "_all_pdffiles" then
+    elseif k == "_all_pdf" then -- dynamic private key, counterpart of "_all_typeset"
       local result = {}
       for glob in entries(t.all_typeset_files) do
         append(result, first_of(gsub(glob, "%.%w+$", ".pdf")))
@@ -299,9 +320,9 @@ local Files = chooser(_G, setmetatable({
 -- Roots which should be unpacked to support unpacking/testing/typesetting
 
 ---@class Deps_t
----@field check   table
----@field typeset table
----@field unpack  table
+---@field check   string_list_t -- List of dependencies for running checks
+---@field typeset string_list_t -- List of dependencies for typesetting docs
+---@field unpack  string_list_t -- List of dependencies for unpacking
 
 ---@type Deps_t
 local Deps = chooser(_G, {
@@ -313,12 +334,13 @@ local Deps = chooser(_G, {
 -- Executable names plus following options
 
 ---@class Exe_t
----@field typeset   string
----@field unpack    string
----@field zip       string
----@field biber     string
----@field bibtex    string
----@field makeindex string
+---@field typeset   string Executable for compiling \texttt{doc(s)}
+---@field unpack    string Executable for running \texttt{unpack}
+---@field zip       string Executable for creating archive with \texttt{ctan}
+---@field biber     string Biber executable
+---@field bibtex    string \BibTeX{} executable
+---@field makeindex string MakeIndex executable
+---@field curl      string Curl executable for \texttt{upload}
 
 ---@type Exe_t
 local Exe = chooser(_G, {
@@ -328,19 +350,22 @@ local Exe = chooser(_G, {
   biber     = "biber",
   bibtex    = "bibtex8",
   makeindex = "makeindex",
+  curl      = "curl",
 }, { suffix = "exe" })
 
 ---@class Opts_t
----@field check     string
----@field typeset   string
----@field unpack    string
----@field zip       string
----@field biber     string
----@field bibtex    string
----@field makeindex string
+---@field ps2pdf    string Options for \texttt{ps2pdf}
+---@field check     string Options passed to engine when running checks
+---@field typeset   string Options passed to engine when typesetting
+---@field unpack    string Options passed to engine when unpacking
+---@field zip       string Options passed to zip program
+---@field biber     string Biber options
+---@field bibtex    string \BibTeX{} options
+---@field makeindex string MakeIndex options
 
 ---@type Opts_t
 local Opts  = chooser(_G, {
+  ps2pdf    = "",
   check     = "-interaction=nonstopmode",
   typeset   = "-interaction=nonstopmode",
   unpack    = "",
@@ -353,48 +378,49 @@ local Opts  = chooser(_G, {
 -- Extensions for various file types: used to abstract out stuff a bit
 
 ---@class Xtn_t
----@field bak string
----@field dvi string
----@field log string
----@field lve string
----@field lvt string
----@field pdf string
----@field ps  string
----@field pvt string
----@field tlg string
----@field tpf string
+---@field bak string  Extension of backup files
+---@field dvi string  Extension of DVI files
+---@field lvt string  Extension of log-based test files
+---@field tlg string  Extension of test file output
+---@field tpf string  Extension of PDF-based test output
+---@field lve string  Extension of auto-generating test file output
+---@field log string  Extension of checking output, before processing it into a \texttt{.tlg}
+---@field pvt string  Extension of PDF-based test files
+---@field pdf string  Extension of PDF file for checking and saving
+---@field ps  string  Extension of PostScript files
 
 ---@type Xtn_t
 local Xtn = chooser(_G, {
   bak = ".bak",
   dvi = ".dvi",
-  log = ".log",
-  lve = ".lve",
   lvt = ".lvt",
-  pdf = ".pdf",
-  ps  = ".ps" ,
-  pvt = ".pvt",
   tlg = ".tlg",
   tpf = ".tpf",
+  lve = ".lve",
+  log = ".log",
+  pvt = ".pvt",
+  pdf = ".pdf",
+  ps  = ".ps" ,
 })
 
 ---@class l3b_vars_t
----@field Xtn   Xtn_t
----@field Main  Main_t
 ---@field LOCAL any
+---@field Main  Main_t
 ---@field Dir   Dir_t
 ---@field Files Files_t
 ---@field Deps  Deps_t
 ---@field Exe   Exe_t
 ---@field Opts  Opts_t
+---@field Xtn   Xtn_t
 
 return {
-  Main              = Main,
-  Xtn               = Xtn,
   LOCAL             = LOCAL,
+  Main              = Main,
   Dir               = Dir,
   Files             = Files,
   Deps              = Deps,
   Exe               = Exe,
   Opts              = Opts,
+  Xtn               = Xtn,
 }
+

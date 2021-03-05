@@ -52,7 +52,7 @@
 \def\allluavars{
 \luavarset{module}{""}{The name of the module}
 \luavarset{bundle}{""}{The name of the bundle in which the module belongs (where relevant)}
-\luavarset{ctanpkg}{module/bundle}{Name of the CTAN package matching this module}
+\luavarset{ctanpkg}{bundle/module}{Name of the CTAN package matching this module}
 \luavarseparator
 \luavarset{modules}{\{\}}{The list of all modules in a bundle (when not auto-detecting)}
 \luavarset{exclmodules}{\{\}}{Directories to be excluded from automatic module detection}
@@ -161,7 +161,7 @@
 \luavarset{recordstatus}{false}       {Switch to include error level from test runs in \texttt{.tlg} files}
 \luavarset{manifestfile}        {"MANIFEST.md"} {Filename to use for the manifest file}
 \luavarseparator
-\luavarset{tdslocations}{\{ \}}{Map for non-standard file installations}
+\luavarset{tdslocations}{\{ \}}{For non-standard file installations}
 \luavarseparator
 \luavarset{uploadconfig}        {\meta{table}} {Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})}
 \luavarset{uploadconfig.pkg}{ctanpkg}{Name of the CTAN package}

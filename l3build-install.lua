@@ -85,9 +85,12 @@ local unpack      = l3b_unpack.unpack
 local l3b_typesetting = require("l3b.typesetting")
 local doc             = l3b_typesetting.doc
 
+---@class l3b_install_vars_t
+---@field flattentds  boolean Switch to flatten any source structure when creating a TDS structure
+
+---@type l3b_install_vars_t
 local Vars = chooser(_G, {
-  -- Non-standard installation locations
-  tdslocations = {}
+  flattentds = true
 })
 
 local textmf_home
@@ -159,7 +162,7 @@ local function uninstall()
               + error_level
   if error_level ~= 0 then return error_level end
   -- Finally, clean up special locations
-  for location in entries(Vars.tdslocations) do
+  for location in entries(Main.tdslocations) do
     local path = dir_name(location)
     error_level = zap_dir(path)
     if error_level ~= 0 then return error_level end
@@ -167,9 +170,19 @@ local function uninstall()
   return 0
 end
 
+---@type string_list_t
+local typeset_list
+
+---Get the typeset list, used by ctan target
+---@return string_list_t
+local function get_typeset_list()
+  assert(typeset_list, "Documentation is not installed")
+  return typeset_list
+end
+
 ---Install files
 ---@param root_install_dir string
----@param full boolean
+---@param full boolean, true means with documentation and man pages
 ---@param dry_run boolean
 ---@return error_level_t
 local function install_files(root_install_dir, full, dry_run)
@@ -177,7 +190,7 @@ local function install_files(root_install_dir, full, dry_run)
   ---@type flag_table_t
   local already_cleaned = {}
 
-  -- Collect up all file paths before copying:
+  -- Collect up all file entries before copying:
   -- ensures no files are lost during clean-up
   ---@type table<integer, copy_name_kv>
   local to_copy = {}
@@ -206,12 +219,12 @@ local function install_files(root_install_dir, full, dry_run)
           if dir ~= "." then
             dir = gsub(dir, "^%.", "")
             source_dir = src_dir .. dir
-            if not Main.flattentds then
+            if not Vars.flattentds then
               src_path_end = dir .. "/"
             end
           end
           local matched = false
-          for location in entries(Vars.tdslocations) do
+          for location in entries(Main.tdslocations) do
             local l_dir, l_glob = dir_base(location)
             local accept = glob_matcher(l_glob)
             if accept(name) then
@@ -264,21 +277,21 @@ local function install_files(root_install_dir, full, dry_run)
 
   -- Creates a 'controlled' list of files
   local function create_file_list(dir, includes, excludes)
-    dir = dir or Dir.work
-    includes = includes or {}
-    excludes = excludes or {}
-    local excludelist = {}
+    dir = dir or Dir._work
+    ---@type flag_table_t
+    local exclude_list = {}
     for glob_table in entries(excludes) do
       for glob in entries(glob_table) do
         for file in keys(tree(dir, glob)) do
-          excludelist[file] = true
+          exclude_list[file] = true
         end
       end
     end
+    ---@type string_list_t
     local result = {}
     for glob in entries(includes) do
       for file in keys(tree(dir, glob)) do
-        if not excludelist[file] then
+        if not exclude_list[file] then
           append(result, file)
         end
       end
@@ -286,15 +299,13 @@ local function install_files(root_install_dir, full, dry_run)
     return result
   end
 
-  local install_list = create_file_list(Dir.unpack, Files.install, { Files.script })
-
   if full then
     error_level = doc()
     if error_level ~= 0 then return error_level end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    _G.typesetlist = create_file_list(Dir.docfile, Files.typeset, { Files.source })
-    _G.sourcelist = create_file_list(Dir.sourcefile, Files.source,
+    typeset_list = create_file_list(Dir.docfile, Files.typeset, { Files.source })
+    local source_list = create_file_list(Dir.sourcefile, Files.source,
       { Files.bst, Files.install, Files.makeindex, Files.script })
 
     if dry_run then
@@ -302,12 +313,12 @@ local function install_files(root_install_dir, full, dry_run)
     end
 
     error_level =
-        feed_to_copy(Dir.sourcefile, "source", { _G.sourcelist })
+        feed_to_copy(Dir.sourcefile, "source", { source_list })
       + feed_to_copy(Dir.docfile, "doc", {
           Files.bib, Files.demo, Files.doc,
-          Files._all_pdffiles [[ For the purposes here,
+          Files._all_pdf [[ For the purposes here,
           any typesetting demo files need to be part of the main typesetting list
-        ]], Files.text, _G.typesetlist
+        ]], Files.text, typeset_list
       })
     if error_level ~= 0 then return error_level end
 
@@ -338,6 +349,8 @@ local function install_files(root_install_dir, full, dry_run)
     end
   end
 
+  local install_list = create_file_list(Dir.unpack, Files.install, { Files.script })
+
   if error_level ~= 0 then return error_level end
 
   error_level =
@@ -364,12 +377,14 @@ local function install()
 end
 
 ---@class l3b_install_t
----@field uninstall     fun(): integer
----@field install_files fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
----@field install       fun(): integer
+---@field uninstall         fun(): integer
+---@field install_files     fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
+---@field install           fun(): integer
+---@field get_typeset_list  fun(): string_list_t
 
 return {
-  uninstall     = uninstall,
-  install_files = install_files,
-  install       = install,
+  uninstall         = uninstall,
+  install_files     = install_files,
+  install           = install,
+  get_typeset_list  = get_typeset_list,
 }

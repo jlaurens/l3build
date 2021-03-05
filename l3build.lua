@@ -210,7 +210,7 @@ do
     return pkg
   end
 
-  l3build.work_dir = work_dir
+  l3build._work_dir = work_dir
   l3build.start_dir = start_dir
   l3build.launch_dir = launch_dir
 

@@ -182,15 +182,19 @@ end
 ---@return string_list_t
 local function file_list(dir_path, glob)
   local files = {}
-  local accept = glob_matcher(glob)
   if directory_exists(dir_path) then
-    for entry in lfs_dir(dir_path) do
-      if accept then
+    local accept = glob_matcher(glob)
+    if accept then
+      for entry in lfs_dir(dir_path) do
         if accept(entry) then
           append(files, entry)
         end
-      elseif entry ~= "." and entry ~= ".." then
-        append(files, entry)
+      end
+    else
+      for entry in lfs_dir(dir_path) do
+        if entry ~= "." and entry ~= ".." then
+          append(files, entry)
+        end
       end
     end
   end
@@ -297,21 +301,21 @@ local function copy_core(dest, p_src, p_wrk)
     -- p_wrk is the counterpart relative to the current working directory
     if os_type == "windows" then
       if attributes(p_wrk, "mode") == "directory" then
-        errorlevel = execute(
+        error_level = execute(
           'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
              .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
         )
       else
-        errorlevel = execute(
+        error_level = execute(
           'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
              .. unix_to_win(dest .. '/') .. '" > nul'
         )
       end
     else
-      errorlevel = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
+      error_level = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
     end
-    if errorlevel ~=0 then
-      return errorlevel
+    if error_level ~=0 then
+      return error_level
     end
 
 end

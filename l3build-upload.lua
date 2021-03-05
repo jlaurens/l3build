@@ -55,6 +55,8 @@ local debug   = l3build.debug
 local l3b_vars  = require("l3b.variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
+---@type Exe_t
+local Exe       = l3b_vars.Exe
 
 --[=[
 
@@ -85,10 +87,23 @@ with a configuration table `uploadconfig`
 
 --]=]
 
+---@class l3b_upload_config_t
+---@field pkg string Name of the CTAN package (defaults to Main.ctanpkg)
+
+
+---@class l3b_upload_vars_t
+---@field curl_debug boolean
+---@field uploadconfig l3b_upload_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
+
 local Vars = chooser(_G, {
-  curlexe       = "curl",
   curl_debug    = false,
-  uploadconfig  = {}
+  uploadconfig  = setmetatable({}, {
+    __index = function (t, k)
+      if k == "pkg" then
+        return Main.ctanpkg
+      end
+    end
+  })
 })
 
 -- function for interactive multiline fields
@@ -255,7 +270,7 @@ function MT:upload(tag_names)
   local curlopt_file = config.curlopt_file or (self.ctanzip .. ".curlopt")
   write_content(curlopt_file, self.request)
 
-  self.request = Vars.curlexe .. " --config " .. curlopt_file
+  self.request = Exe.curl .. " --config " .. curlopt_file
   local options = l3build.options
   if options["debug"] then
     self.append_request(' https://httpbin.org/post')

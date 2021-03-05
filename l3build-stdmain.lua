@@ -33,7 +33,6 @@ local attributes  = lfs.attributes
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
-local extend_with = utlib.extend_with
 local entries     = utlib.entries
 local deep_copy   = utlib.deep_copy
 
@@ -292,7 +291,7 @@ local function prepare_config()
   if #checkconfigs == 1 and
     config_1 ~= "build" and
     (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
-      local config_path = l3build.work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
+      local config_path = l3build._work_dir .. gsub(config_1, ".lua$", "") .. ".lua"
       if file_exists(config_path) then
         dofile(config_path)
         Dir.test = Dir.test .. "-" .. config_1

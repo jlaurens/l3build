@@ -77,15 +77,16 @@ local call    = l3b_aux.call
 ---@type l3b_install_t
 local l3b_install = require("l3b.install")
 local install_files = l3b_install.install_files
+local get_typeset_list = l3b_install.get_typeset_list
 
 ---@class l3b_ctan_vars_t
----@field packtdszip boolean
----@field flatten boolean
+---@field flatten boolean Switch to flatten any source structure when sending to CTAN
+---@field packtdszip boolean Switch to build a TDS-style zip file for CTAN
 
 ---@type l3b_ctan_vars_t
 local Vars = chooser(_G, {
-  packtdszip = false,
   flatten = true,
+  packtdszip = false,
 })
 
 -- Copy files to the main CTAN release directory
@@ -93,7 +94,7 @@ local function copy_ctan()
   local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
   make_directory(ctanpkg_dir)
   local function copyfiles(files, source)
-    if source == Dir.work or Vars.flatten then
+    if source == Dir._work or Vars.flatten then
       for filetype in entries(files) do
         copy_tree(filetype, source, ctanpkg_dir)
       end
@@ -110,7 +111,7 @@ local function copy_ctan()
   end
   for tab in items(
     Files.bib, Files.demo, Files.doc,
-    Files.scriptman, _G.pdffiles, _G.typesetlist
+    Files.scriptman, Files._all_pdf, get_typeset_list()
   ) do
     copyfiles(tab, Dir.docfile)
   end
@@ -211,7 +212,7 @@ local function ctan()
       copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
     end
     dirzip(Dir.ctan, Main.ctanzip)
-    copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir.work)
+    copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir._work)
   else
     print("\n====================")
     print("Typesetting failed, zip stage skipped!")

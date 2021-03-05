@@ -221,10 +221,10 @@ end
 -- Unique key
 local DID_CHOOSE = {}
 
----@class flags_t
+---@class ut_flags_t
 ---@field cache_chosen boolean
 
----@type_t flags_t
+---@type_t ut_flags_t
 local flags = {}
 
 ---@class chooser_kv_t
@@ -304,7 +304,7 @@ end
 ---@field write_content     fun(file_pat: string, content: string): error_level_t
 ---@field deep_copy         fun(original: any): any
 ---@field DID_CHOOSE        any
----@field flags             flags_t
+---@field flags             ut_flags_t
 ---@field chooser           fun(G: table, dflt: table): fun(t: table, k: any): any
 
 return {

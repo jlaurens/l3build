@@ -123,20 +123,22 @@ local dvitopdf        = l3b_typesetting.dvitopdf
 ---@field pdf table<string, string|function>
 
 ---@class l3b_check_vars_t
----@field test_types  test_types_t
----@field test_order  string_list_t
----@field checkformat string
----@field stdengine string
+---@field checkengines  string_list_t Engines to check with \texttt{check} by default
+---@field stdengine     string  Engine to generate \texttt{.tlg} file from
+---@field checkformat   string  Format to use for tests
+---@field specialformats table  Non-standard engine/format combinations
+---@field test_types    test_types_t  Custom test variants
+---@field test_order    string_list_t Which kinds of tests to evaluate
+--
 -- Configs for testing
----@field checkconfigs table
----@field includetests string_list_t
----@field excludetests string_list_t
----@field recordstatus boolean
----@field asciiengines string_list_t
----@field checkruns    integer
----@field specialformats table
----@field maxprintline  integer
----@field checksearch   boolean
+---@field checkconfigs  table   Configurations to use for tests
+---@field includetests  string_list_t Test names to include when checking
+---@field excludetests  string_list_t Test names to exclude when checking
+---@field recordstatus  boolean Switch to include error level from test runs in \texttt{.tlg} files
+---@field asciiengines  string_list_t Engines which should log as pure ASCII
+---@field checkruns     integer Number of runs to complete for a test before comparing the log
+---@field checksearch   boolean Switch to search the system \texttt{texmf} for during checking
+---@field maxprintline  integer Length of line to use in log files
 ---@field runtest_tasks fun(test_name: string, run_number: integer): string
 ---@field checkinit_hook fun(): error_level_t
 
@@ -997,7 +999,7 @@ local function run_check(test_name, hide)
     print("Failed to find input for test " .. test_name)
     return 1
   end
-  local check_engines = Main.checkengines
+  local check_engines = Vars.checkengines
   if options["engine"] then
     check_engines = options["engine"]
   end
@@ -1071,6 +1073,9 @@ end
 
 -- define the default once the required object are properly defined
 extend_with(dflt, {
+  checkengines    = { "pdftex", "xetex", "luatex" },
+  stdengine     = "pdftex",
+  checkformat   = "latex",
   test_types = {
     log = {
       test = Xtn.lvt,
@@ -1088,8 +1093,6 @@ extend_with(dflt, {
     },
   },
   test_order    = { "log", "pdf" },
-  checkformat   = "latex",
-  stdengine     = "pdftex",
   includetests  = { "*" },
   excludetests  = {},
   recordstatus  = false,
@@ -1303,14 +1306,14 @@ local function sanitize_engines()
   if options["engine"] and not options["force"] then
     -- Make a lookup table
     local t = {}
-    for engine in entries(Main.checkengines) do
+    for engine in entries(Vars.checkengines) do
       t[engine] = true
     end
     for opt_engine in entries(options["engine"]) do
       if not t[opt_engine] then
         print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
-        for engine in entries(Main.checkengines) do
+        for engine in entries(Vars.checkengines) do
           print("  - " .. engine)
         end
         print("")

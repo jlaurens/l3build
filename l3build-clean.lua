@@ -85,7 +85,7 @@ end
 local function bundle_clean()
   local error_level = call(_G.modules, "clean")
   for g in entries(Files.clean) do
-    error_level = error_level + remove_tree(Dir.work, g)
+    error_level = error_level + remove_tree(Dir._work, g)
   end
   return  error_level
         + remove_directory(Dir.ctan)
