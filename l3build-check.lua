@@ -1173,7 +1173,6 @@ end
 ---@param names string_list_t
 ---@return error_level_t
 local function check(names)
-  l3b_vars.finalize()
   local error_level = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     local options = l3build.options
@@ -1285,7 +1284,6 @@ end
 ---@param names string_list_t
 ---@return error_level_t
 local function save(names)
-  l3b_vars.finalize()
   if names == nil then
     print("Arguments are required for the save command")
     return 1
@@ -1325,7 +1323,6 @@ end
 
 -- Sanity check
 local function sanitize_engines()
-  l3b_vars.finalize()
   local options = l3build.options
   if options["engine"] and not options["force"] then
     -- Make a lookup table

@@ -100,7 +100,6 @@ end
 ---@param tag_names? string_list_t
 ---@return error_level_t
 local function tag(tag_names)
-  l3b_vars.finalize()
   local options = l3build.options
   local tag_date = options["date"] or os_date("%Y-%m-%d")
   local tag_name = tag_names and tag_names[1]

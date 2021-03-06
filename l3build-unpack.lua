@@ -83,7 +83,6 @@ local Vars = chooser(_G, {
 ---@param sources string_list_t
 ---@return error_level_t
 local function bundleunpack(source_dirs, sources)
-  l3b_vars.finalize()
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
   if error_level ~=0 then
@@ -138,7 +137,6 @@ end
 ---@param source_dirs string_list_t
 ---@return error_level_t
 local function unpack(sources, source_dirs)
-  l3b_vars.finalize()
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level

@@ -113,41 +113,50 @@ local Main_dflt = {
         return true
       end
     elseif k == "epoch" then
-      if options["epoch"] then
-        result = options["epoch"]
-      end
       return normalise_epoch(result)
-    elseif k == "bundle" then
-      if result == "" then
-        return Main.module -- This is why Main must be declared before being defined
-      end
     end
     return result
   end,  
 }
 
-setmetatable(Main_dflt, {
-  __index = function (t, k)
-    if k == "ctanpkg" then
-      return  Main._standalone
-          and Main.module
-          or  Main.bundle .."/".. Main.module
-    elseif k == "ctanzip" then
-      return Main.ctanpkg .. "-ctan"
-    elseif k == "modules" then -- dynamically create the module list
-      local result = {}
-      local exclmodules = Main.exclmodules or {}
-      for entry in all_names(require("l3b.variables").Dir.work) do -- Dir is not yet defined
-        if directory_exists(entry) and not exclmodules[entry] then
-          append(result, entry)
-        end
+---This will be called at the beginning of the __index function.
+---@param t table
+---@param k any
+---@return any
+local function chooser_index(t, k)
+  if k == "_standalone" then
+    return not _G.bundle or _G.bundle == ""
+  elseif k == "bundle" then
+    return t._standalone and t.module or _G.bundle
+  elseif k == "ctanpkg" then
+    return  t._standalone
+        and t.module
+        or  t.bundle .."/".. t.module
+  elseif k == "ctanzip" then
+    return t.ctanpkg .. "-ctan"
+  elseif k == "modules" then -- dynamically create the module list
+    local result = {}
+    local exclmodules = t.exclmodules or {}
+    for entry in all_names(require("l3b.variables").Dir.work) do -- Dir is not yet defined
+      if directory_exists(entry) and not exclmodules[entry] then
+        append(result, entry)
       end
-      return result
     end
+    return result
   end
-})
+  local options = l3build.options
+  if k == "forcecheckepoch" then
+    if options["epoch"] then
+      return true -- overwrite any global setting
+    end
+  elseif k == "epoch" then
+    return options["epoch"] or _G["epoch"]
+  end
+end
 
-Main = chooser(_G, Main_dflt)
+Main = chooser(_G, Main_dflt, {
+  index = chooser_index
+})
 
 ---@class Dir_t
 ---@field work        string
@@ -307,11 +316,30 @@ local Files_dflt  = {
   unpack        = { "*.ins" },
   unpacksupp    = {},
 }
----@type Files_t
-local Files = chooser(_G, setmetatable(Files_dflt, {
-  __index = function (t, k)
+
+local function Files_index(t, k)
+  local tt = {}
+  if k == "_all_typeset" then
+    for glob in entries(t.typeset) do
+      append(tt, glob)
+    end
+    for glob in entries(t.typesetdemo) do
+      append(tt, glob)
+    end
+    return tt
+  elseif k == "_all_pdf" then
+    for glob in entries(t._all_typeset) do
+      append(tt, first_of(gsub(glob, "%.%w+$", ".pdf")))
+    end
+    return tt
   end
-}), { suffix = "files" })
+end
+
+---@type Files_t
+local Files = chooser(_G, Files_dflt, {
+  suffix = "files",
+  index = Files_index,
+})
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
 
@@ -406,9 +434,8 @@ local Xtn = chooser(_G, {
 ---@field Exe   Exe_t
 ---@field Opts  Opts_t
 ---@field Xtn   Xtn_t
----@field finalize fun()
 
-local M = {
+return {
   LOCAL     = LOCAL,
   Main      = Main,
   Dir       = Dir,
@@ -418,30 +445,3 @@ local M = {
   Opts      = Opts,
   Xtn       = Xtn,
 }
----Finalize variables before use
-function M.finalize()
-  M.finalize = function() end
-  if not _G.bundle or _G.bundle == "" then
-    Main._standalone = true
-    Main.bundle = Main.module
-  else
-    Main._standalone = false
-  end
-  -- "_all_typeset" dynamic private key to merge typeset and typeset demo
-  local t = {}
-  for glob in entries(Files.typeset) do
-    append(t, glob)
-  end
-  for glob in entries(Files.typesetdemo) do
-    append(t, glob)
-  end
-  Files._all_typeset = t
-  -- "_all_pdf" dynamic counterpart of "_all_typeset"
-  local tt = {}
-  for glob in entries(t) do
-    append(tt, first_of(gsub(glob, "%.%w+$", ".pdf")))
-  end
-  Files._all_pdf = tt
-end
-
-return M

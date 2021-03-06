@@ -245,7 +245,7 @@ local function deep_copy(original)
 end
 
 -- Unique keys
-local KEY_chooser, KEY_did_choose = {}, {}
+local KEY_did_choose = {}
 
 ---@class ut_flags_t
 ---@field cache_chosen boolean
@@ -257,8 +257,9 @@ local flags = {}
 ---@alias did_choose_f fun(t: table, k: any, result: any): any
 
 ---@class chooser_kv_t
----@field prefix string|nil -- prepend this prefix to the key for G, not for dflt
----@field suffix string|nil -- append this prefix to the key for G, not for dflt
+---@field prefix  string|nil -- prepend this prefix to the key for G, not for dflt
+---@field suffix  string|nil -- append this prefix to the key for G, not for dflt
+---@field index   fun(t: table, k: any): any
 
 --[=[
 The purpose of the next chooser function is to allow the customization of a tree from the global domain.
@@ -281,7 +282,6 @@ local c = chooser(G, dflt)
 
 ---See above
 ---There must be only one default set of values per user.
----Each dflt table is linked to its chooser by its `[KEY_chooser]` field.
 ---@param G     table
 ---@param dflt  table
 ---@param kv    chooser_kv_t
@@ -294,14 +294,36 @@ do
   local chooser_MT = {
     __index = function (t --[[:table]], k --[[:any]])
       local dflt = t[KEY_dflt]
+      ---@type chooser_kv_t
+      local kv = t[KEY_kv]
+      local result
+      local function before_return ()
+        -- post treatment
+        ---@type did_choose_f
+        local did_choose = dflt[KEY_did_choose]
+        if did_choose then
+          result = did_choose(t, k, result) -- result *is* used
+        end
+        -- cache the result if any such that next time, __index is not called
+        if flags.cache_chosen and result ~= nil then
+          t[k] = result
+        end
+        return result
+      end
+      if kv then
+        local index = kv.index
+        if index then
+          result = index(t, k)
+          if result then
+            return before_return()
+          end
+        end
+      end
       local dflt_k = dflt[k]  -- default candidate
       if dflt_k == nil then   -- unknown key, stop here
         return
       end
-      local result
       local kk = k
-      ---@type chooser_kv_t
-      local kv = t[KEY_kv]
       if type(k) == "string" then
         if Vars.debug.chooser then
           print("DEBUG chooser", k)
@@ -341,26 +363,16 @@ do
           result = G_kk
         end
       end
-      -- post treatment
-      ---@type did_choose_f
-      local did_choose = dflt[KEY_did_choose]
-      if did_choose then
-        result = did_choose(t, k, result) -- result *is* used
-      end
-      -- cache the result if any such that next time, __index is not called
-      if flags.cache_chosen and result ~= nil then
-        t[k] = result
-      end
-      return result
+      return before_return()
     end
   }
   chooser = function (G, dflt, kv)
+    assert(G and dflt) -- unless stack overflow
     local result = setmetatable({
       [KEY_G]     = G,
       [KEY_dflt]  = dflt,
-      [KEY_kv]    = kv,
+      [KEY_kv]    = kv or {}, -- ~= nil, unless stack overflow
     }, chooser_MT)
-    dflt[KEY_chooser] = result
     return result
   end
 end
@@ -382,7 +394,6 @@ end
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
 ---@field write_content     fun(file_pat: string, content: string): error_level_t
 ---@field deep_copy         fun(original: any): any
----@field KEY_chooser       any
 ---@field KEY_did_choose    any
 ---@field flags             ut_flags_t
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
@@ -405,7 +416,6 @@ return {
   write_content     = write_content,
   deep_copy         = deep_copy,
   flags             = flags,
-  KEY_chooser       = KEY_chooser,
   KEY_did_choose    = KEY_did_choose,
   chooser           = chooser,
 }

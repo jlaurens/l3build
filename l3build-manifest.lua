@@ -292,7 +292,6 @@ function MT:manifest()
 end
 
 local function manifest()
-  l3b_vars.finalize()
   ---Create a wrapper to shared data
   local helper = setmetatable({}, MT)
   helper:manifest()

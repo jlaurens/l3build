@@ -124,7 +124,6 @@ end
 ---comment
 ---@return error_level_t
 local function bundle_ctan()
-  l3b_vars.finalize()
   local error_level = install_files(Dir.tds, true)
   if error_level ~=0 then
     return error_level
@@ -136,7 +135,6 @@ end
 ---comment
 ---@return error_level_t
 local function ctan()
-  l3b_vars.finalize()
   -- Always run tests for all engines
   local options = l3build.options
   options["engine"] = nil

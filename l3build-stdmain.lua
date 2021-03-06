@@ -190,7 +190,6 @@ local target_list =
 ---@param target  string
 ---@param names?  string_list_t
 local function main(target, names)
-  l3b_vars.finalize()
   -- Deal with unknown targets up-front
   if not target_list[target] then
     help()
@@ -229,7 +228,6 @@ end
 
 ---comment
 local function multi_check()
-  l3b_vars.finalize()
   local options = l3build.options
   if options["target"] == "check" then
     local checkconfigs = l3b_check_vars.checkconfigs
@@ -273,7 +271,6 @@ local function multi_check()
 end
 
 local function prepare_config()
-  l3b_vars.finalize()
   local checkconfigs = l3b_check_vars.checkconfigs
   local options = l3build.options
   local config_1 = checkconfigs[1]

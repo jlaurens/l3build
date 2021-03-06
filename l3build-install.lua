@@ -106,7 +106,6 @@ end
 ---Uninstall
 ---@return error_level_t
 local function uninstall()
-  l3b_vars.finalize()
   local error_level = 0
   -- Any script man files need special handling
   local man_files = {}
@@ -191,7 +190,6 @@ end
 ---@param dry_run boolean
 ---@return error_level_t
 local function install_files(root_install_dir, full, dry_run)
-  l3b_vars.finalize()
   -- Needed so paths are only cleaned out once
   ---@type flag_table_t
   local already_cleaned = {}
@@ -392,7 +390,6 @@ local function install_files(root_install_dir, full, dry_run)
 end
 
 local function install()
-  l3b_vars.finalize()
   local options = l3build.options
   return install_files(get_textmf_home(), options["full"], options["dry-run"])
 end

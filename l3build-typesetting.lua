@@ -136,7 +136,6 @@ local Vars = chooser(_G, {
 ---@param hide boolean
 ---@return error_level_t
 local function dvi2pdf(name, dir, engine, hide)
-  l3b_vars.finalize()
   return run(
     dir, cmd_concat(
       set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
@@ -157,7 +156,6 @@ end
 ---@return exitcode? exitcode
 ---@return integer?  code
 local function runcmd(cmd, dir, vars)
-  l3b_vars.finalize()
   dir = dir or "."
   dir = absolute_path(dir)
   vars = vars or {}
@@ -233,7 +231,7 @@ end
 ---@param style string
 ---@return error_level_t
 function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
-  dir = dir or "."
+  dir = dir or "." -- Why is it optional ?
   if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
     return runcmd(Exe.makeindex .. " " .. Opts.makeindex
@@ -245,6 +243,29 @@ function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   end
   return 0
 end
+
+-- The engine controller:
+---@class Ngn_t
+---@field tex                 fun(file: string, dir?: string, cmd?: string): error_level_t
+---@field typeset             fun(file: string, dir?: string, cmd?: string): error_level_t
+---@field typeset_demo_tasks  fun(): error_level_t
+---@field doc_init_hook       fun(): error_level_t
+---@field bibtex              fun(file: string, dir?: string, cmd?: string): error_level_t
+---@field biber               fun(file: string, dir?: string, cmd?: string): error_level_t
+---@field makeindex           fun(name: string, dir?: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_t
+
+-- Ngn.foo is _G.foo if it is a function, MF.foo otherwise.
+-- Only fo known keys
+---@type Ngn_t
+local Ngn = chooser(_G, MT, {
+  index = function (t, k)
+    if k == "tex" then --- tex is already a table in texlua.
+      if type(_G[k]) == "table" then
+        return MT[k]
+      end
+    end
+  end
+})
 
 ---TeX
 ---@param file string
@@ -259,27 +280,6 @@ function MT.tex(file, dir, cmd)
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
 
--- Ctrl.foo is _G.foo if it is a function,
--- TODO: Use chooser here
-local Ctrl = setmetatable({}, {
-  __index = function (t, k)
-    local MT_k = MT[k]
-    if MT_k ~= nil then -- only keys in MT are recognized
-      local _G_k = _G[k]
-      local result = type(_G_k) == "function" and _G_k or MT_k
-        result = function (...)
-          l3b_vars.finalize()
-          return result(...)
-        end
-      local options = l3build.options
-      if not options.__disable_engine_cache then -- disable engine cache from the command line
-        t[k] = result
-      end
-      return result
-    end
-  end
-})
-
 ---typeset
 ---@param file string
 ---@param dir? string
@@ -287,19 +287,19 @@ local Ctrl = setmetatable({}, {
 ---@return error_level_t
 function MT.typeset(file, dir, cmd)
   dir = dir or "."
-  local error_level = Ctrl.tex(file, dir, cmd)
+  local error_level = Ngn.tex(file, dir, cmd)
   if error_level ~= 0 then
     return error_level
   end
   local name = job_name(file)
-  error_level = Ctrl.biber(name, dir) + Ctrl.bibtex(name, dir)
+  error_level = Ngn.biber(name, dir) + Ngn.bibtex(name, dir)
   if error_level ~= 0 then
     return error_level
   end
   for i = 2, Vars.typesetruns do
-    error_level = Ctrl.makeindex(name, dir, ".glo", ".gls", ".glg", Vars.glossarystyle)
-                + Ctrl.makeindex(name, dir, ".idx", ".ind", ".ilg", Vars.indexstyle)
-                + Ctrl.tex(file, dir, cmd)
+    error_level = Ngn.makeindex(name, dir, ".glo", ".gls", ".glg", Vars.glossarystyle)
+                + Ngn.makeindex(name, dir, ".idx", ".ind", ".ilg", Vars.indexstyle)
+                + Ngn.tex(file, dir, cmd)
     if error_level ~= 0 then break end
   end
   return error_level
@@ -313,7 +313,7 @@ local function typesetpdf(file, dir)
   dir = dir or "."
   local name = job_name(file)
   print("Typesetting " .. name)
-  local func  = Ctrl.typeset
+  local func  = Ngn.typeset
   local cmd   = Exe.typeset .. " " .. Opts.typeset
   local special = _G.specialtypesetting and _G.specialtypesetting[file]
   if special then
@@ -326,7 +326,12 @@ local function typesetpdf(file, dir)
     return error_level
   end
   local pdf_name = name .. Xtn.pdf
+  print("REMOVE COPY: ", pdf_name, dir, Dir.docfile)
+  print(lfs.attribute(dir .."/".. pdf_name, "mode"))
+  print(lfs.attribute(Dir.docfile .."/".. pdf_name, "mode"))
   remove_name(Dir.docfile, pdf_name)
+  print(lfs.attribute(dir .."/".. pdf_name, "mode"))
+  print(lfs.attribute(Dir.docfile .."/".. pdf_name, "mode"))
   return copy_name(pdf_name, dir, Dir.docfile)
 end
 
@@ -363,11 +368,11 @@ local function docinit()
   deps_install(Deps.typeset)
   unpack({ Files.source, Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
-  local error_level = Ctrl.typeset_demo_tasks()
+  local error_level = Ngn.typeset_demo_tasks()
   if error_level ~= 0 then
     return error_level
   end
-  return Ctrl.docinit_hook()
+  return Ngn.docinit_hook()
 end
 
 ---Typeset all required documents
@@ -375,7 +380,6 @@ end
 ---@param files? string_list_t
 ---@return error_level_t
 local function doc(files)
-  l3b_vars.finalize()
   local error_level = docinit()
   if error_level ~= 0 then
     return error_level
@@ -386,6 +390,7 @@ local function doc(files)
     for glob in entries(typeset_globs) do
       for dir_path in items(Dir.typeset, Dir.unpack) do
         for p_wrk in values(tree(dir_path, glob)) do
+          print("==============================\nDEBUG p_wrk", p_wrk)
           local src_dir, src_name = dir_base(p_wrk)
           local name = job_name(src_name)
           if not done[name] then
@@ -405,15 +410,15 @@ local function doc(files)
               error_level = typesetpdf(src_name, src_dir)
               if error_level ~= 0 then
                 return error_level
-              else
-                done[name] = true
               end
+              done[name] = true
             end
           end
         end
       end
     end
   end
+  print("------------------------\nDEBUG DONE")
   return 0
 end
 
@@ -430,8 +435,8 @@ return {
   dvi2pdf           = dvi2pdf,
   runcmd            = runcmd,
   doc               = doc,
-  bibtex            = Ctrl.bibtex,
-  biber             = Ctrl.biber,
-  tex               = Ctrl.tex,
-  makeindex         = Ctrl.makeindex,
+  bibtex            = Ngn.bibtex,
+  biber             = Ngn.biber,
+  tex               = Ngn.tex,
+  makeindex         = Ngn.makeindex,
 }
