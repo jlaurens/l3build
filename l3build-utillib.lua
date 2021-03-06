@@ -182,7 +182,7 @@ end
 local function read_content(file_path, is_binary)
   if file_path then
     local fh = open(file_path, is_binary and "rb" or "r")
-    if not fh then return nil end
+    if not fh then return end
     local content = fh:read("a")
     fh:close()
     return not is_binary and os_type == "windows"
@@ -235,64 +235,98 @@ local DID_CHOOSE = {}
 ---@type_t ut_flags_t
 local flags = {}
 
+---@alias chooser_t table
+
 ---@class chooser_kv_t
 ---@field prefix string|nil -- prepend this prefix to the key for G, not for dflt
 ---@field suffix string|nil -- append this prefix to the key for G, not for dflt
 
----Return an object that picks its attributes from G or dflt
----Central method in variables management.
----If `dflt` defines a function for key `DID_CHOOSE`,
----it will be used to apply a post treatment to the result.
----This postflight function has signature fun(result: any, k: string): any
----For example, returned directory paths may be normalized that way.
----If the key starts with "_", `G` is ignored (key is private).
----@param G       any, in general _G
----@param dflt    any
----@param kv      chooser_kv_t
----@return fun(t: table, k: any): any
-local function chooser(G, dflt, kv)
-  local function __index(t, k)        -- will end in a metatable just below
-    local dflt_k = dflt[k]            -- default candidate
-    if dflt_k == nil then return end  -- unknown key, stop here
-    if k:sub(1, 1) == "_" then -- private key
-      -- cache the result if any such that next time, __index is not called
-      if flags.cache_chosen then
-        t[k] = dflt_k
-      end
-      return dflt_k
-    end
-    local result
-    local kk = k
-    if kv and type(k) == "string" then -- modify the global key
-      if kv.prefix then kk = kv.prefix .. k end
-      if kv.suffix then kk = k .. kv.suffix end
-    end
-    local G_kk = G[kk]                -- global candidate
-    if not G_kk then
-      result = dflt_k                 -- choose the default candidate
-    else
-      local type_G_kk = type(G_kk)
-      local type_dflt_k = type(dflt_k)
-      if type_G_kk ~= type_dflt_k then   -- wrong type, global candidate is not acceptable
-        error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
-      end
-      result = type_G_kk == "table"
-        and chooser(G_kk, dflt_k)
-        or  G_kk
-    end
-    -- post treatment
-    local did_choose = dflt[DID_CHOOSE]
-    if did_choose then
-      result = did_choose(result, k)
-    end
-    -- cache the result if any such that next time, __index is not called
-    if flags.cache_chosen and result ~= nil then
-      t[k] = result
-    end
-    return result
-  end
+--[=[
+The purpose of the next chooser function is to allow the customization of a tree from the global domain.
+A tree starts at some variable. If the variable is a table with no metatable,
+this is a node, otherwise it is a leaf. This applies recursively to the fields.
+Then for
+```
+local c = chooser(G, dflt)
+```
+`c.foo.bar` is
+- nil if no `dflt.foo.bar` exists
+- `dflt.foo.bar` if no `G.foo.bar` exists
+- `dflt.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have different type
+- `G.foo.bar` if it is not a table
+- `G.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have the same non nil metatable
+- chooser(G.foo.bar, dflt.foo.bar) otherwise
+--]=]
 
-  return setmetatable({}, { __index = __index })
+local chooser
+
+do
+  local key_G, key_dflt, key_kv = {}, {}, {} -- unique keys
+  -- shared indexer
+  local chooser_MT = {
+    __index = function (t, k)
+      local dflt = t[key_dflt]
+      local dflt_k = dflt[k]            -- default candidate
+      if dflt_k == nil then return end  -- unknown key, stop here
+      local k_is_string = type(k) == "string"
+      if k_is_string and k:sub(1, 1) == "_" then -- private key
+        -- cache the result if any such that next time, __index is not called
+        if flags.cache_chosen then
+          t[k] = dflt_k
+        end
+        return dflt_k
+      end
+      local result
+      local kk = k
+      local kv = t[key_kv]
+      if kv and k_is_string then -- modify the global key
+        if kv.prefix then kk = kv.prefix .. k end
+        if kv.suffix then kk = k .. kv.suffix end
+      end
+      local G = t[key_G]
+      local G_kk = G[kk]                -- global candidate
+      if not G_kk then
+        result = dflt_k                 -- choose the default candidate
+      else
+        local type_dflt_k = type(dflt_k)
+        local type_G_kk   = type(G_kk)
+        if type_G_kk ~= type_dflt_k then   -- wrong type, global candidate is not acceptable
+          error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
+        end
+        if type_dflt_k == "table" then
+          local MT = getmetatable(dflt_k)
+          if MT then
+            if MT ~= getmetatable(G_kk) then
+              error("Incompatible objects with different metatables")
+            end
+            result = G_kk
+          else
+            result = chooser(G_kk, dflt_k)
+          end
+        else
+          result = G_kk
+        end
+      end
+      -- post treatment
+      local did_choose = dflt[DID_CHOOSE]
+      if did_choose then
+        result = did_choose(result, k)
+      end
+      -- cache the result if any such that next time, __index is not called
+      if flags.cache_chosen and result ~= nil then
+        t[k] = result
+      end
+      return result
+    end
+
+  }
+  chooser = function (G, dflt, kv)
+    return setmetatable({
+      [key_G]     = G,
+      [key_dflt]  = dflt,
+      [key_kv]    = kv,
+    }, chooser_MT)
+  end
 end
 
 ---@class utlib_t
@@ -313,7 +347,7 @@ end
 ---@field deep_copy         fun(original: any): any
 ---@field DID_CHOOSE        any
 ---@field flags             ut_flags_t
----@field chooser           fun(G: table, dflt: table): fun(t: table, k: any): any
+---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
 
 return {
   to_quoted_string  = to_quoted_string,

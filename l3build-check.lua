@@ -201,6 +201,21 @@ end
 local function rewrite(path_in, path_out, translator, ...)
   local content = read_content(path_in, true)
   if not content then
+    print("STEP1")
+    local file_path = path_in
+    local is_binary = true
+    if file_path then
+      print("STEP2", file_path)
+      local fh = open(file_path, is_binary and "rb" or "r")
+      if fh then
+        print("STEP3")
+        local content = fh:read("a")
+        fh:close()
+        print(not is_binary and os["type"] == "windows"
+          and content:gsub("\r\n?", "\n")
+          or  content)
+      end
+    end
     error("No content available at ".. path_in)
   end
   content = gsub(content .. "\n", "\r\n", "\n")
@@ -690,16 +705,16 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param errlevels table
-local function rewrite_log(path_in, path_out, engine, errlevels)
-  rewrite(path_in, path_out, normalize_log, engine, errlevels)
+---@param err_levels table<integer, error_level_t>
+local function rewrite_log(path_in, path_out, engine, err_levels)
+  rewrite(path_in, path_out, normalize_log, engine, err_levels)
 end
 
 ---Rewrite the pdf
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels table
+---@param err_levels table<integer, error_level_t>
 local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end

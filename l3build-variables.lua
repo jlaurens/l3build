@@ -173,7 +173,7 @@ local LOCAL = {}
 local default_Dir = setmetatable({
 -- Directory structure for the build system
 -- Use Unix-style path separators
-  work = ".",
+  _work = ".",
   [LOCAL] = "local",
   [utlib.DID_CHOOSE] = function (result, k)
     -- No trailing /
