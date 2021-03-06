@@ -31,13 +31,13 @@ release_date = "2020-06-04"
 
 -- Local access to functions
 
-local assert  = assert
-local ipairs  = ipairs
-local match   = string.match
-local gmatch  = string.gmatch
-local print   = print
-local exit    = os.exit
-local rename  = os.rename
+local assert    = assert
+local ipairs    = ipairs
+local match     = string.match
+local gmatch    = string.gmatch
+local print     = print
+local exit      = os.exit
+local os_rename = os.rename
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
@@ -118,7 +118,7 @@ do
   ---@return string dir includes a trailing '/', defaults to "./"
   ---@return string base
   local function to_dir_base(path)
-    local dir, base = match(path, "(.*/)(.*)")
+    local dir, base = path:match("(.*/)(.*)")
     if not dir then dir, base = "./", path end
     return dir, base
   end
@@ -166,7 +166,7 @@ do
   local function on_debug(f) end
 
   for _, o in ipairs(arg) do
-    if match(o, "^%-%-debug") then
+    if o:match("^%-%-debug") then
       function on_debug(f)
         f()
       end
@@ -190,7 +190,7 @@ do
         for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do
           local p = dir .. base
           print(p)
-          if rename(p, p) then -- true iff file or dir at the given path
+          if os_rename(p, p) then -- true iff file or dir at the given path
             return dir
           end
           dir = dir .. "../"
@@ -237,7 +237,7 @@ do
 
   local debug_require
   for _, o in ipairs(arg) do
-    if match(o, "^%-%-debug%-require") then
+    if o:match("^%-%-debug%-require") then
       debug_require = true
       break
     end
@@ -256,7 +256,7 @@ do
     if debug_require then
       print("DEBUG Info: package required ".. pkg_name)
     end
-    local name = match(pkg_name, "^l3b%.(.*)")
+    local name = pkg_name:match("^l3b%.(.*)")
     if name then
       package.loaded[pkg_name] = true
       local path = launch_dir .. "l3build-"..name

@@ -204,14 +204,12 @@ end
 local function rewrite(path_in, path_out, translator, ...)
   local content = read_content(path_in, true)
   if not content then
-    print("STEP1")
+    --[=[ DEBUG CODE TO BE REMOVED ]=]
     local file_path = path_in
     local is_binary = true
     if file_path then
-      print("STEP2", file_path)
       local fh = open(file_path, is_binary and "rb" or "r")
       if fh then
-        print("STEP3")
         local content = fh:read("a")
         fh:close()
         print(not is_binary and os["type"] == "windows"
@@ -219,6 +217,7 @@ local function rewrite(path_in, path_out, translator, ...)
           or  content)
       end
     end
+    --[=[ END OF DEBUG CODE ]=]
     error("No content available at ".. path_in)
   end
   content = gsub(content .. "\n", "\r\n", "\n")
@@ -413,7 +412,7 @@ local function normalize_log(content, engine, errlevels)
   local new_content = ""
   local prestart = true
   local skipping = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     if line == "START-TEST-LOG" then
       prestart = false
     elseif line == "END-TEST-LOG"
@@ -651,7 +650,7 @@ local function normalize_lua_log(content, is_luatex)
   local new_content = ""
   local lastline = ""
   local dropping = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     line, lastline, dropping = normalize(line, lastline, dropping)
     if not match(line, "^ *$") then
       new_content = new_content .. line .. _G.os_newline
@@ -668,7 +667,7 @@ local function normalize_pdf(content)
   local stream_content = ""
   local is_binary = false
   local is_stream = false
-  for line in gmatch(content, "([^\n]*)\n") do
+  for line in content:gmatch("([^\n]*)\n") do
     if is_stream then
       if match(line, "endstream") then
         is_stream = false

@@ -169,8 +169,8 @@ local function runcmd(cmd, dir, vars)
     .. absolute_path(Dir[l3b_vars.LOCAL]) .. _G.os_pathsep
     .. dir .. (Vars.typesetsearch and _G.os_pathsep or "")
   -- Deal with spaces in paths
-  if os_type == "windows" and match(envpaths, " ") then
-    envpaths = first_of(gsub(envpaths, '"', '')) -- no '"' in windows!!!
+  if os_type == "windows" and envpaths:match(" ") then
+    envpaths = first_of(envpaths:gsub( '"', '')) -- no '"' in windows!!!
   end
   for var in entries(vars) do
     env = cmd_concat(env, _G.os_setenv .. " " .. var .. "=" .. envpaths)

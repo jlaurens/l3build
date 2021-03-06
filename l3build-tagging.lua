@@ -84,7 +84,7 @@ local function update_file_tag(file_path, tag_name, tag_date)
   print("Tagging  ".. file_name)
   local content = assert(read_content(file_path, true))
   -- Deal with Unix/Windows line endings
-  content = content .. (match(content, "\n$") and "" or "\n")
+  content = content .. (content:match("\n$") and "" or "\n")
   local updated_content = Vars.update_tag(file_name, content, tag_name, tag_date)
   if content == updated_content then
     return 0

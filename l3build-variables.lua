@@ -61,7 +61,7 @@ end
 local function normalise_epoch(epoch)
   assert(epoch, 'normalize_epoch argument must not be nil')
   -- If given as an ISO date, turn into an epoch number
-  local y, m, d = match(epoch, "^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  local y, m, d = epoch:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
   if y then
     return os_time({
         year = y, month = m, day   = d,
@@ -70,7 +70,7 @@ local function normalise_epoch(epoch)
         year = 1970, month = 1, day = 1,
         hour = 0, sec = 0, isdst = nil
       })
-  elseif match(epoch, "^%d+$") then
+  elseif epoch:match("^%d+$") then
     return tonumber(epoch)
   else
     return 0
@@ -329,7 +329,7 @@ local function Files_index(t, k)
     return tt
   elseif k == "_all_pdf" then
     for glob in entries(t._all_typeset) do
-      append(tt, first_of(gsub(glob, "%.%w+$", ".pdf")))
+      append(tt, first_of(glob:gsub( "%.%w+$", ".pdf")))
     end
     return tt
   end

@@ -63,7 +63,7 @@ local Vars = {
 }
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
-  return first_of(gsub(cmd, "/", "\\"))
+  return first_of(cmd:gsub( "/", "\\"))
 end
 
 ---Convert to host directory separator
@@ -104,7 +104,7 @@ local function absolute_path(path)
   if ok then
     local result = current_dir()
     chdir(oldpwd)
-    return quoted_path(gsub(result, "\\", "/"))
+    return quoted_path(result:gsub( "\\", "/"))
   end
   error(msg)
 end
@@ -216,7 +216,7 @@ local function tree(dir_path, glob)
     print("DEBUG tree", dir_path, glob)
   end
   local function cropdots(path)
-    return first_of(gsub(gsub(path, "^%./", ""), "/%./", "/"))
+    return first_of(gsub(path:gsub( "^%./", ""), "/%./", "/"))
   end
   dir_path = cropdots(dir_path)
   glob = cropdots(glob)
@@ -227,7 +227,7 @@ local function tree(dir_path, glob)
     return attributes(file, "mode") == "directory"
   end
   local result = { ["."] = dir_path }
-  for glob_part, sep in gmatch(glob, "([^/]+)(/?)/*") do
+  for glob_part, sep in glob:gmatch("([^/]+)(/?)/*") do
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
     ---@param p_src string path relative to `src_path`
@@ -294,8 +294,8 @@ end
 local function rename(dir_path, source, dest)
   dir_path = dir_path .. "/"
   if os_type == "windows" then
-    source = gsub(source, "^%./", "")
-    dest = gsub(dest, "^%./", "")
+    source = source:gsub( "^%./", "")
+    dest = dest:gsub( "^%./", "")
     return execute("ren " .. unix_to_win(dir_path) .. source .. " " .. dest)
   else
     return execute("mv " .. dir_path .. source .. " " .. dir_path .. dest)
