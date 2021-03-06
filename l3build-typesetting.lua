@@ -326,12 +326,7 @@ local function typesetpdf(file, dir)
     return error_level
   end
   local pdf_name = name .. Xtn.pdf
-  print("REMOVE COPY: ", pdf_name, dir, Dir.docfile)
-  print(lfs.attribute(dir .."/".. pdf_name, "mode"))
-  print(lfs.attribute(Dir.docfile .."/".. pdf_name, "mode"))
   remove_name(Dir.docfile, pdf_name)
-  print(lfs.attribute(dir .."/".. pdf_name, "mode"))
-  print(lfs.attribute(Dir.docfile .."/".. pdf_name, "mode"))
   return copy_name(pdf_name, dir, Dir.docfile)
 end
 
@@ -390,7 +385,6 @@ local function doc(files)
     for glob in entries(typeset_globs) do
       for dir_path in items(Dir.typeset, Dir.unpack) do
         for p_wrk in values(tree(dir_path, glob)) do
-          print("==============================\nDEBUG p_wrk", p_wrk)
           local src_dir, src_name = dir_base(p_wrk)
           local name = job_name(src_name)
           if not done[name] then
@@ -418,7 +412,6 @@ local function doc(files)
       end
     end
   end
-  print("------------------------\nDEBUG DONE")
   return 0
 end
 

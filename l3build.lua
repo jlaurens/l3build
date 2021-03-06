@@ -138,12 +138,11 @@ do
   local function container(dir, base)
     for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
-      if rename(p, p) then -- true iff file or dir at the given path
+      if lfs.attributes(p, "mode") then -- true iff file or dir at the given path
         return dir
       end
-      -- synonyms of previous line:
+      -- synonym of previous line:
       -- if package.searchpath("?", p, "", "") then return dir end
-      -- if lfs.atributes(p, "mode") then return dir end
       dir = dir .. "../"
     end
   end

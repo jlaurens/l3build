@@ -22,22 +22,23 @@ for those people who are interested.
 
 --]]
 
-local pairs            = pairs
+local pairs       = pairs
 
-local lfs              = require("lfs")
-local attributes       = lfs.attributes
-local current_dir      = lfs.currentdir
-local chdir            = lfs.chdir
-local lfs_dir          = lfs.dir
+local execute     = os.execute
+local remove      = os.remove
+local os_rename   = os.rename
+local os_type     = os["type"]
 
-local execute          = os.execute
-local remove           = os.remove
-local os_type          = os["type"]
+local gmatch      = string.gmatch
+local gsub        = string.gsub
 
-local gmatch           = string.gmatch
-local gsub             = string.gsub
+local append      = table.insert
 
-local append           = table.insert
+local lfs         = require("lfs")
+local attributes  = lfs.attributes
+local current_dir = lfs.currentdir
+local chdir       = lfs.chdir
+local lfs_dir     = lfs.dir
 
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
@@ -323,6 +324,7 @@ local function copy_core(dest, p_src, p_wrk)
   return error_level
 end
 
+
 ---@class copy_name_kv -- copy_name key/value arguments
 ---@field name    string
 ---@field source  string
@@ -337,8 +339,8 @@ local function copy_name(name, source, dest)
   if type(name) == "table" then
     name, source, dest = name.name, name.source, name.dest
   end
-  local p_src = source  .."/".. name
-  local p_wrk = dest    .."/".. name
+  local p_src = name
+  local p_wrk = source .."/".. name
   return copy_core(dest, p_src, p_wrk)
 end
 
