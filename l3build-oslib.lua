@@ -111,17 +111,17 @@ local function cmd_concat(...)
   local success = pcall (function()
     result = concat(t, _G.os_concat)
   end)
-  if not success then
-    for i, v in ipairs({ ... }) do
-      print("i, ...", i, v)
-    end
-    for i, v in ipairs(t) do
-      print("i, v  ", i, v)
-    end
-    print(debug.traceback())
-    error("Cannot build command from components")
+  if success then
+    return result
   end
-  return result
+  for i, v in ipairs({ ... }) do
+    print("i, ...", i, v)
+  end
+  for i, v in ipairs(t) do
+    print("i, v  ", i, v)
+  end
+  print(debug.traceback())
+  error("Cannot build command from components")
 end
 
 ---Run a command in a given directory
@@ -161,8 +161,8 @@ end
 ---@field quoted_path fun(path: string): string
 
 return {
-  Vars              = Vars,
-  cmd_concat        = cmd_concat,
-  run               = run,
-  quoted_path       = quoted_path,
+  Vars        = Vars,
+  cmd_concat  = cmd_concat,
+  run         = run,
+  quoted_path = quoted_path,
 }

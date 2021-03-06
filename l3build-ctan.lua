@@ -94,7 +94,7 @@ local function copy_ctan()
   local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
   make_directory(ctanpkg_dir)
   local function copyfiles(files, source)
-    if source == Dir._work or Vars.flatten then
+    if source == Dir.work or Vars.flatten then
       for filetype in entries(files) do
         copy_tree(filetype, source, ctanpkg_dir)
       end
@@ -124,8 +124,11 @@ end
 ---comment
 ---@return error_level_t
 local function bundle_ctan()
-  local errorlevel = install_files(Dir.tds, true)
-  if errorlevel ~=0 then return errorlevel end
+  l3b_vars.finalize()
+  local error_level = install_files(Dir.tds, true)
+  if error_level ~=0 then
+    return error_level
+  end
   copy_ctan()
   return 0
 end
@@ -133,20 +136,73 @@ end
 ---comment
 ---@return error_level_t
 local function ctan()
+  l3b_vars.finalize()
   -- Always run tests for all engines
   local options = l3build.options
   options["engine"] = nil
+  local error_level
+  local standalone = Main._standalone
+  if standalone then
+    error_level = call({ "." }, "check")
+  else
+    error_level = call(Main.modules, "bundlecheck")
+  end
+  if error_level ~= 0 then
+    print("\n====================")
+    print("Tests failed, zip stage skipped!")
+    print("====================\n")
+    return error_level
+  end
+  remove_directory(Dir.ctan)
+  make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
+  remove_directory(Dir.tds)
+  make_directory(Dir.tds)
+  if standalone then
+    error_level = install_files(Dir.tds, true)
+    if error_level ~=0 then
+      return error_level
+    end
+    copy_ctan()
+  else
+    error_level = call(Main.modules, "bundlectan")
+    if error_level ~= 0 then
+      print("\n====================")
+      print("Typesetting failed, zip stage skipped!")
+      print("====================\n")
+      return error_level
+    end
+  end
+  for i in entries(Files.text) do
+    for j in items(Dir.unpack, Dir.textfile) do
+      copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
+      copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
+    end
+  end
+  -- Rename README if necessary
+  local readme = Main.ctanreadme
+  if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
+    local newfile = "README." .. match(readme, "%.(%w+)$")
+    for dir in items(
+      Dir.ctan .. "/" .. Main.ctanpkg,
+      Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle
+    ) do
+      if file_exists(dir .. "/" .. readme) then
+        remove_tree(dir, newfile)
+        rename(dir, readme, newfile)
+      end
+    end
+  end
   local function dirzip(dir, name)
     local zipname = name .. ".zip"
     -- Convert the tables of files to quoted strings
-    local binfiles = to_quoted_string(Files.binary)
+    local bin_files = to_quoted_string(Files.binary)
     local exclude = to_quoted_string(Files.exclude)
     -- First, zip up all of the text files
     run(
       dir,
       Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " " .. "."
         .. (
-          (binfiles or exclude) and (" -x" .. binfiles .. " " .. exclude)
+          (bin_files or exclude) and (" -x" .. bin_files .. " " .. exclude)
           or ""
         )
     )
@@ -154,70 +210,15 @@ local function ctan()
     run(
       dir,
       Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " " .. ". -i" ..
-        binfiles .. (exclude and (" -x" .. exclude) or "")
+        bin_files .. (exclude and (" -x" .. exclude) or "")
     )
   end
-  local error_level
-  local standalone = false
-  if Main.bundle == "" then
-    standalone = true
+  dirzip(Dir.tds, Main.ctanpkg .. ".tds")
+  if Vars.packtdszip then
+    copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
   end
-  if standalone then
-    error_level = call({ "." }, "check")
-    Main.bundle = module
-  else
-    error_level = call(Main.modules, "bundlecheck")
-  end
-  if error_level == 0 then
-    remove_directory(Dir.ctan)
-    make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
-    remove_directory(Dir.tds)
-    make_directory(Dir.tds)
-    if standalone then
-      error_level = install_files(Dir.tds, true)
-      if error_level ~=0 then return error_level end
-      copy_ctan()
-    else
-      error_level = call(Main.modules, "bundlectan")
-    end
-  else
-    print("\n====================")
-    print("Tests failed, zip stage skipped!")
-    print("====================\n")
-    return error_level
-  end
-  if error_level == 0 then
-    for i in entries(Files.text) do
-      for j in items(Dir.unpack, Dir.textfile) do
-        copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
-        copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
-      end
-    end
-    -- Rename README if necessary
-    local readme = Main.ctanreadme
-    if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
-      local newfile = "README." .. match(readme, "%.(%w+)$")
-      for dir in items(
-        Dir.ctan .. "/" .. Main.ctanpkg,
-        Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle
-      ) do
-        if file_exists(dir .. "/" .. readme) then
-          remove_tree(dir, newfile)
-          rename(dir, readme, newfile)
-        end
-      end
-    end
-    dirzip(Dir.tds, Main.ctanpkg .. ".tds")
-    if Vars.packtdszip then
-      copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
-    end
-    dirzip(Dir.ctan, Main.ctanzip)
-    copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir._work)
-  else
-    print("\n====================")
-    print("Typesetting failed, zip stage skipped!")
-    print("====================\n")
-  end
+  dirzip(Dir.ctan, Main.ctanzip)
+  copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir.work)
   return error_level
 end
 

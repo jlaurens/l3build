@@ -202,6 +202,7 @@ local MT = {}
 ---comment
 ---@param tag_names string_list_t|nil
 local function upload(tag_names)
+  l3b_vars.finalize()
   tag_names = tag_names or {}
   local controller = setmetatable({}, MT)
   controller:prepare(tag_names[1])

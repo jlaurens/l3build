@@ -52,6 +52,7 @@ local call    = l3b_aux.call
 
 -- Remove all generated files
 local function clean()
+  l3b_vars.finalize()
   -- To make sure that Dir.distrib never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
   -- all of the files
@@ -62,7 +63,9 @@ local function clean()
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
 
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
 
   ---@type flag_table_t
   local clean_list = {}
@@ -79,16 +82,19 @@ local function clean()
     end
     for file in keys(clean_list) do
       error_level = remove_tree(dir, file)
-      if error_level ~= 0 then return error_level end
+      if error_level ~= 0 then
+        return error_level
+      end
     end
   end
   return 0
 end
 
 local function bundle_clean()
+  l3b_vars.finalize()
   local error_level = call(Main.modules, "clean")
   for g in entries(Files.clean) do
-    error_level = error_level + remove_tree(Dir._work, g)
+    error_level = error_level + remove_tree(Dir.work, g)
   end
   return  error_level
         + remove_directory(Dir.ctan)

@@ -27,10 +27,6 @@ local gsub    = string.gsub
 local append  = table.insert
 local os_time = os["time"]
 
-local lfs         = require("lfs")
-local lfs_dir     = lfs.dir
-local attributes  = lfs.attributes
-
 ---@type utlib_t
 local utlib     = require("l3b.utillib")
 local chooser   = utlib.chooser
@@ -93,9 +89,12 @@ end
 ---@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
 ---@field epoch         integer Epoch (Unix date) to set for test runs
 ---@field tdslocations  string_list_t For non-standard file installations
+---@field _standalone   boolean True means the module is also the bundle
 
 ---@type Main_t
-local Main = chooser(_G, setmetatable({
+local Main
+
+local Main_dflt = {
   module          = "",
   bundle          = "",
   exclmodules     = {},
@@ -105,7 +104,7 @@ local Main = chooser(_G, setmetatable({
   epoch           = 1463734800,
   flattentds      = true,
   tdslocations    = {},
-  [utlib.DID_CHOOSE] = function (result, k)
+  [utlib.KEY_did_choose] = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     local options = l3build.options
@@ -113,27 +112,32 @@ local Main = chooser(_G, setmetatable({
       if options["epoch"] then
         return true
       end
-    end
-    if k == "epoch" then
+    elseif k == "epoch" then
       if options["epoch"] then
         result = options["epoch"]
       end
       return normalise_epoch(result)
+    elseif k == "bundle" then
+      if result == "" then
+        return Main.module -- This is why Main must be declared before being defined
+      end
     end
     return result
-  end,
-}, {
+  end,  
+}
+
+setmetatable(Main_dflt, {
   __index = function (t, k)
     if k == "ctanpkg" then
-      return  t.bundle ~= ""
-          and t.bundle .."/".. t.module
-          or  t.module
+      return  Main._standalone
+          and Main.module
+          or  Main.bundle .."/".. Main.module
     elseif k == "ctanzip" then
-      return t.ctanpkg .. "-ctan"
+      return Main.ctanpkg .. "-ctan"
     elseif k == "modules" then -- dynamically create the module list
       local result = {}
-      local exclmodules = t.exclmodules or {}
-      for entry in all_names(require("l3b.fslib").Dir._work) do -- Dir is not yet defined
+      local exclmodules = Main.exclmodules or {}
+      for entry in all_names(require("l3b.variables").Dir.work) do -- Dir is not yet defined
         if directory_exists(entry) and not exclmodules[entry] then
           append(result, entry)
         end
@@ -141,10 +145,12 @@ local Main = chooser(_G, setmetatable({
       return result
     end
   end
-}))
+})
+
+Main = chooser(_G, Main_dflt)
 
 ---@class Dir_t
----@field _work       string
+---@field work        string
 ---@field current     string
 ---@field main        string Top level directory for the module/bundle
 ---@field docfile     string Directory containing documentation files
@@ -169,13 +175,14 @@ local Main = chooser(_G, setmetatable({
 ]]
 local LOCAL = {}
 
+local work = "."
+
 ---@type Dir_t
 local default_Dir = setmetatable({
+  work = ".",
 -- Directory structure for the build system
 -- Use Unix-style path separators
-  _work = ".",
-  [LOCAL] = "local",
-  [utlib.DID_CHOOSE] = function (result, k)
+  [utlib.KEY_did_choose] = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k.match and k:match("dir$") then
@@ -187,19 +194,19 @@ local default_Dir = setmetatable({
   __index = function (t, k)
     local result
     if k == "current" then -- deprecate, not equal to the current directory.
-      result = t._work
+      result = work
     elseif k == "main" then
-      result = t._work
+      result = work
     elseif k == "docfile" then
-      result = t._work
+      result = work
     elseif k == "sourcefile" then
-      result = t._work
+      result = work
     elseif k == "textfile" then
-      result = t._work
+      result = work
     elseif k == "support" then
       result = t.main .. "/support"
     elseif k == "testfile" then
-      result = t._work .. "/testfiles"
+      result = work .. "/testfiles"
     elseif k == "testsupp" then
       result = t.testfile .. "/support"
     elseif k == "texmf" then
@@ -214,7 +221,7 @@ local default_Dir = setmetatable({
       result = t.distrib .. "/ctan"
     elseif k == "tds" then
       result = t.distrib .. "/tds"
-    elseif k == "local" then
+    elseif k == LOCAL then
       result = t.build .. "/local"
     elseif k == "result" then
       result = t.build .. "/result"
@@ -236,8 +243,10 @@ local default_Dir = setmetatable({
 ---@type Dir_t
 local Dir = chooser(_G, default_Dir, { suffix = "dir" })
 
+Dir.work = work
+
 set_tree_excluder(function (path)
-  return path ~= Dir.build
+  return path == Dir.build
 end)
 
 -- File types for various operations
@@ -301,19 +310,6 @@ local Files_dflt  = {
 ---@type Files_t
 local Files = chooser(_G, setmetatable(Files_dflt, {
   __index = function (t, k)
-    if k == "_all_typeset" then -- dynamic private key to merge typeset and typeset demo
-      local result = t.typeset
-      for glob in entries(t.typesetdemo) do
-        append(result, glob)
-      end
-      return result
-    elseif k == "_all_pdf" then -- dynamic private key, counterpart of "_all_typeset"
-      local result = {}
-      for glob in entries(t.all_typeset_files) do
-        append(result, first_of(gsub(glob, "%.%w+$", ".pdf")))
-      end
-      return result
-    end
   end
 }), { suffix = "files" })
 
@@ -410,15 +406,42 @@ local Xtn = chooser(_G, {
 ---@field Exe   Exe_t
 ---@field Opts  Opts_t
 ---@field Xtn   Xtn_t
+---@field finalize fun()
 
-return {
-  LOCAL             = LOCAL,
-  Main              = Main,
-  Dir               = Dir,
-  Files             = Files,
-  Deps              = Deps,
-  Exe               = Exe,
-  Opts              = Opts,
-  Xtn               = Xtn,
+local M = {
+  LOCAL     = LOCAL,
+  Main      = Main,
+  Dir       = Dir,
+  Files     = Files,
+  Deps      = Deps,
+  Exe       = Exe,
+  Opts      = Opts,
+  Xtn       = Xtn,
 }
+---Finalize variables before use
+function M.finalize()
+  M.finalize = function() end
+  if not _G.bundle or _G.bundle == "" then
+    Main._standalone = true
+    Main.bundle = Main.module
+  else
+    Main._standalone = false
+  end
+  -- "_all_typeset" dynamic private key to merge typeset and typeset demo
+  local t = {}
+  for glob in entries(Files.typeset) do
+    append(t, glob)
+  end
+  for glob in entries(Files.typesetdemo) do
+    append(t, glob)
+  end
+  Files._all_typeset = t
+  -- "_all_pdf" dynamic counterpart of "_all_typeset"
+  local tt = {}
+  for glob in entries(t) do
+    append(tt, first_of(gsub(glob, "%.%w+$", ".pdf")))
+  end
+  Files._all_pdf = tt
+end
 
+return M

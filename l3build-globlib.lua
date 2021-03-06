@@ -116,7 +116,9 @@ end
 ---@return function?
 ---@usage local accept = to_glob_match(...); if accept(...) then ... end
 local function to_glob_match(glob)
-  if not glob then return end
+  if not glob then
+    return
+  end
   local pattern = glob_to_pattern(glob)
   return function (str)
     return match(str, pattern)

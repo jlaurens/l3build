@@ -100,11 +100,12 @@ end
 ---@param tag_names? string_list_t
 ---@return error_level_t
 local function tag(tag_names)
+  l3b_vars.finalize()
   local options = l3build.options
   local tag_date = options["date"] or os_date("%Y-%m-%d")
   local tag_name = tag_names and tag_names[1]
   local error_level = 0
-  for dir in unique_items(Dir._work, Dir.sourcefile, Dir.docfile) do
+  for dir in unique_items(Dir.work, Dir.sourcefile, Dir.docfile) do
     for glob in entries(Files.tag) do
       for file in values(tree(dir, glob)) do
         error_level = update_file_tag(file, tag_name, tag_date)

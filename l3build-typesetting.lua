@@ -116,7 +116,7 @@ local Vars = chooser(_G, {
   specialtypesetting  = {},
   forcedocepoch       = false,
   ps2pdfopt           = "",
-  [utlib.DID_CHOOSE]  = function (result, k)
+  [utlib.KEY_did_choose]  = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k == "forcedocepoch" then
@@ -136,6 +136,7 @@ local Vars = chooser(_G, {
 ---@param hide boolean
 ---@return error_level_t
 local function dvi2pdf(name, dir, engine, hide)
+  l3b_vars.finalize()
   return run(
     dir, cmd_concat(
       set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
@@ -149,13 +150,14 @@ end
 
 -- An auxiliary used to set up the environmental variables
 ---comment
----@param cmd string
----@param dir string
----@param vars table
+---@param cmd   string
+---@param dir?  string
+---@param vars? table
 ---@return boolean?  suc
 ---@return exitcode? exitcode
 ---@return integer?  code
 local function runcmd(cmd, dir, vars)
+  l3b_vars.finalize()
   dir = dir or "."
   dir = absolute_path(dir)
   vars = vars or {}
@@ -265,8 +267,12 @@ local Ctrl = setmetatable({}, {
     if MT_k ~= nil then -- only keys in MT are recognized
       local _G_k = _G[k]
       local result = type(_G_k) == "function" and _G_k or MT_k
-        local options = l3build.options
-        if not options.__disable_engine_cache then -- disable engine cache from the command line
+        result = function (...)
+          l3b_vars.finalize()
+          return result(...)
+        end
+      local options = l3build.options
+      if not options.__disable_engine_cache then -- disable engine cache from the command line
         t[k] = result
       end
       return result
@@ -369,6 +375,7 @@ end
 ---@param files? string_list_t
 ---@return error_level_t
 local function doc(files)
+  l3b_vars.finalize()
   local error_level = docinit()
   if error_level ~= 0 then
     return error_level

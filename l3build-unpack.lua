@@ -83,6 +83,7 @@ local Vars = chooser(_G, {
 ---@param sources string_list_t
 ---@return error_level_t
 local function bundleunpack(source_dirs, sources)
+  l3b_vars.finalize()
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
   if error_level ~=0 then
@@ -112,16 +113,17 @@ local function bundleunpack(source_dirs, sources)
     for j in keys(tree(Dir.unpack, i)) do
       local dir_path, base_name = dir_base(j)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
-      local success = popen(cmd_concat(
-          "cd " .. Dir.unpack .. "/" .. dir_path,
-          _G.os_setenv .. " TEXINPUTS=." .. _G.os_pathsep
-            .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
-          _G.os_setenv .. " LUAINPUTS=." .. _G.os_pathsep
-            .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
-          Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
-            .. (options["quiet"] and (" > " .. _G.os_null) or "")
-        ), "w"
-      ):write(string.rep("y\n", 300)):close()
+      local cmd = cmd_concat(
+        "cd " .. Dir.unpack .. "/" .. dir_path,
+        _G.os_setenv .. " TEXINPUTS=." .. _G.os_pathsep
+          .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
+        _G.os_setenv .. " LUAINPUTS=." .. _G.os_pathsep
+          .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
+        Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
+          .. (options["quiet"] and (" > " .. _G.os_null) or "")
+      )
+      local success = popen(cmd, "w")
+        :write(string.rep("y\n", 300)):close()
       if not success then
         return 1
       end
@@ -136,6 +138,7 @@ end
 ---@param source_dirs string_list_t
 ---@return error_level_t
 local function unpack(sources, source_dirs)
+  l3b_vars.finalize()
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level

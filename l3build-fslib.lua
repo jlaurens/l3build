@@ -22,25 +22,6 @@ for those people who are interested.
 
 --]]
 
---[=[ Usage:
----@type fslib_t
-local fslib                 = require("l3b.fslib")
-local to_host               = fslib.to_host
-local absolute_path         = fslib.absolute_path
-local make_directory        = fslib.make_directory
-local directory_exists      = fslib.directory_exists
-local file_exists           = fslib.file_exists
-local locate                = fslib.locate
-local file_list             = fslib.file_list
-local all_names             = fslib.all_names
-local tree                  = fslib.tree
-local rename                = fslib.rename
-local copy_tree             = fslib.copy_tree
-local make_clean_directory  = fslib.make_clean_directory
-local remove_name           = fslib.remove_name
-local remove_tree           = fslib.remove_tree
-local remove_directory      = fslib.remove_directory
---]=]
 local pairs            = pairs
 
 local lfs              = require("lfs")
@@ -53,7 +34,6 @@ local execute          = os.execute
 local remove           = os.remove
 local os_type          = os["type"]
 
-local match            = string.match
 local gmatch           = string.gmatch
 local gsub             = string.gsub
 
@@ -64,7 +44,6 @@ local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
 local first_of    = utlib.first_of
-local extend_with = utlib.extend_with
 
 ---@type gblib_t
 local gblib           = require("l3b.globlib")
@@ -74,6 +53,13 @@ local to_glob_match = gblib.to_glob_match
 local oslib       = require("l3b.oslib")
 local quoted_path = oslib.quoted_path
 
+---@class fslib_vars_t
+---@field debug flag_table_t
+
+---@type fslib_vars_t
+local Vars = {
+  debug = {}
+}
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
   return first_of(gsub(cmd, "/", "\\"))
@@ -225,6 +211,9 @@ end
 ---@param glob string
 ---@return table<string, string>
 local function tree(dir_path, glob)
+  if Vars.debug.tree then
+    print("DEBUG tree", dir_path, glob)
+  end
   local function cropdots(path)
     return first_of(gsub(gsub(path, "^%./", ""), "/%./", "/"))
   end
@@ -244,13 +233,30 @@ local function tree(dir_path, glob)
     ---@param p_wrk string path counterpart relative to the current working directory
     ---@param table table
     local function fill(p_src, p_wrk, table)
+      if Vars.debug.tree then
+        print("DEBUG tree fill", p_src, p_wrk)
+      end
       for file in all_names(p_wrk, glob_part) do
+        if Vars.debug.tree then
+          print("DEBUG tree fill all_names", file)
+        end
         if file ~= "." and file ~= ".." then
-          local p_cwd_file = p_wrk .. "/" .. file
-          if not tree_excluder(p_cwd_file) then
+          local p_wrk_file = p_wrk .. "/" .. file
+          if not tree_excluder(p_wrk_file) then
             local p_src_file = p_src .. "/" .. file
-            if accept(p_cwd_file) then
-              table[p_src_file] = p_cwd_file
+            if accept(p_wrk_file) then
+              if Vars.debug.tree then
+                print("DEBUG tree fill ACCEPTED", p_src_file, p_wrk_file)
+              end
+              table[p_src_file] = p_wrk_file
+            else
+              if Vars.debug.tree then
+                print("DEBUG tree fill REFUSED", p_src_file, p_wrk_file)
+              end
+            end
+          else
+            if Vars.debug.tree then
+              print("DEBUG tree fill EXCLUDED", p_wrk_file)
             end
           end
         end
@@ -297,27 +303,24 @@ end
 
 local function copy_core(dest, p_src, p_wrk)
   local error_level
-      -- p_src is a path relative to `source` whereas
-    -- p_wrk is the counterpart relative to the current working directory
-    if os_type == "windows" then
-      if attributes(p_wrk, "mode") == "directory" then
-        error_level = execute(
-          'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
-             .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
-        )
-      else
-        error_level = execute(
-          'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
-             .. unix_to_win(dest .. '/') .. '" > nul'
-        )
-      end
+  -- p_src is a path relative to `source` whereas
+  -- p_wrk is the counterpart relative to the current working directory
+  if os_type == "windows" then
+    if attributes(p_wrk, "mode") == "directory" then
+      error_level = execute(
+        'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
+            .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
+      )
     else
-      error_level = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
+      error_level = execute(
+        'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
+            .. unix_to_win(dest .. '/') .. '" > nul'
+      )
     end
-    if error_level ~=0 then
-      return error_level
-    end
-
+  else
+    error_level = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
+  end
+  return error_level
 end
 
 ---@class copy_name_kv -- copy_name key/value arguments
@@ -405,6 +408,7 @@ local function remove_directory(path)
 end
 
 ---@class fslib_t
+---@field Vars              fslib_vars_t
 ---@field to_host           fun(cmd: string):   string
 ---@field absolute_path     fun(path: string):  string
 ---@field make_directory    fun(path: string):  boolean, exitcode, integer
@@ -424,6 +428,7 @@ end
 ---@field remove_directory fun(path: string): boolean?, exitcode?, integer?
 
 return {
+  Vars = Vars,
   to_host = to_host,
   absolute_path = absolute_path,
   make_directory = make_directory,

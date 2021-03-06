@@ -44,6 +44,14 @@ local concat  = table.concat
 local open    = io.open
 local os_type = os["type"]
 
+---@class utlib_vars_t
+---@field debug flag_table_t
+
+---@type utlib_vars_t
+local Vars = {
+  debug = {}
+}
+
 ---@alias error_level_t integer
 
 ---Turn the string list into quoted items separated by a sep
@@ -107,7 +115,9 @@ local function unique_entries(table)
     while true do
       i = i + 1
       local result = table[i]
-      if not result then return result end -- end of iteration
+      if not result then -- end of iteration
+        return result
+      end
       if not already[result] then
         already[result] = true
         return result
@@ -182,7 +192,9 @@ end
 local function read_content(file_path, is_binary)
   if file_path then
     local fh = open(file_path, is_binary and "rb" or "r")
-    if not fh then return end
+    if not fh then
+      return
+    end
     local content = fh:read("a")
     fh:close()
     return not is_binary and os_type == "windows"
@@ -199,7 +211,9 @@ end
 local function write_content(file_path, content)
   if file_path then
     local fh = assert(open(file_path, "w"))
-    if not fh then return 1 end
+    if not fh then
+      return 1
+    end
     if os_type == "windows" then
       content = content:gsub("\n", _G.os_newline)
     end
@@ -216,8 +230,12 @@ end
 local function deep_copy(original)
   local seen = {}
   local function f(obj)
-    if type(obj) ~= 'table' then return obj end   -- return as is
-    if seen[obj] then return seen[obj] end        -- return already see if any
+    if type(obj) ~= 'table' then  -- return as is
+      return obj
+    end
+    if seen[obj] then             -- return already see if any
+      return seen[obj]
+    end
     local res = {}                                -- make a new table
     seen[obj] = res                               -- mark it as seen
     for k, v in next, obj do res[f(k)] = f(v) end -- copy recursively
@@ -226,8 +244,8 @@ local function deep_copy(original)
   return f(original)
 end
 
--- Unique key
-local DID_CHOOSE = {}
+-- Unique keys
+local KEY_chooser, KEY_did_choose = {}, {}
 
 ---@class ut_flags_t
 ---@field cache_chosen boolean
@@ -236,6 +254,7 @@ local DID_CHOOSE = {}
 local flags = {}
 
 ---@alias chooser_t table
+---@alias did_choose_f fun(t: table, k: any, result: any): any
 
 ---@class chooser_kv_t
 ---@field prefix string|nil -- prepend this prefix to the key for G, not for dflt
@@ -254,36 +273,45 @@ local c = chooser(G, dflt)
 - `dflt.foo.bar` if no `G.foo.bar` exists
 - `dflt.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have different type
 - `G.foo.bar` if it is not a table
+- `G.foo.bar` if `dflt.foo.bar` is a non void sequence
+- `G.foo.bar` if `dflt.foo.bar` is empty
 - `G.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have the same non nil metatable
 - chooser(G.foo.bar, dflt.foo.bar) otherwise
 --]=]
 
+---See above
+---There must be only one default set of values per user.
+---Each dflt table is linked to its chooser by its `[KEY_chooser]` field.
+---@param G     table
+---@param dflt  table
+---@param kv    chooser_kv_t
+---@return chooser_t
 local chooser
 
 do
-  local key_G, key_dflt, key_kv = {}, {}, {} -- unique keys
+  local KEY_G, KEY_dflt, KEY_kv = {}, {}, {} -- unique key
   -- shared indexer
   local chooser_MT = {
-    __index = function (t --[[:table]], k--[[:any]])
-      local dflt = t[key_dflt]
-      local dflt_k = dflt[k]            -- default candidate
-      if dflt_k == nil then return end  -- unknown key, stop here
-      local k_is_string = type(k) == "string"
-      if k_is_string and k:sub(1, 1) == "_" then -- private key
-        -- cache the result if any such that next time, __index is not called
-        if flags.cache_chosen then
-          t[k] = dflt_k
-        end
-        return dflt_k
+    __index = function (t --[[:table]], k --[[:any]])
+      local dflt = t[KEY_dflt]
+      local dflt_k = dflt[k]  -- default candidate
+      if dflt_k == nil then   -- unknown key, stop here
+        return
       end
       local result
       local kk = k
-      local kv = t[key_kv]
-      if kv and k_is_string then -- modify the global key
-        if kv.prefix then kk = kv.prefix .. k end
-        if kv.suffix then kk = k .. kv.suffix end
+      ---@type chooser_kv_t
+      local kv = t[KEY_kv]
+      if type(k) == "string" then
+        if Vars.debug.chooser then
+          print("DEBUG chooser", k)
+        end
+        if kv then -- modify the global key
+          if kv.prefix then kk = kv.prefix .. k end
+          if kv.suffix then kk = k .. kv.suffix end
+        end
       end
-      local G = t[key_G]
+      local G = t[KEY_G]
       local G_kk = G[kk]                -- global candidate
       if not G_kk then
         result = dflt_k                 -- choose the default candidate
@@ -294,23 +322,30 @@ do
           error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
         end
         if type_dflt_k == "table" then
-          local MT = getmetatable(dflt_k)
-          if MT then
-            if MT ~= getmetatable(G_kk) then
-              error("Incompatible objects with different metatables")
-            end
+          if #dflt_k > 0 then
+            result = G_kk
+          elseif not next(dflt_k) then
             result = G_kk
           else
-            result = chooser(G_kk, dflt_k)
+            local MT = getmetatable(dflt_k)
+            if MT then
+              if MT ~= getmetatable(G_kk) then
+                error("Incompatible objects with different metatables")
+              end
+              result = G_kk
+            else
+              result = chooser(G_kk, dflt_k)
+            end
           end
         else
           result = G_kk
         end
       end
       -- post treatment
-      local did_choose = dflt[DID_CHOOSE]
+      ---@type did_choose_f
+      local did_choose = dflt[KEY_did_choose]
       if did_choose then
-        result = did_choose(result, k)
+        result = did_choose(t, k, result) -- result *is* used
       end
       -- cache the result if any such that next time, __index is not called
       if flags.cache_chosen and result ~= nil then
@@ -318,18 +353,20 @@ do
       end
       return result
     end
-
   }
   chooser = function (G, dflt, kv)
-    return setmetatable({
-      [key_G]     = G,
-      [key_dflt]  = dflt,
-      [key_kv]    = kv,
+    local result = setmetatable({
+      [KEY_G]     = G,
+      [KEY_dflt]  = dflt,
+      [KEY_kv]    = kv,
     }, chooser_MT)
+    dflt[KEY_chooser] = result
+    return result
   end
 end
 
 ---@class utlib_t
+---@field Vars              utlib_vars_t
 ---@field to_quoted_string  fun(table: table, separator: string|nil): string
 ---@field indices           fun(table: table): fun(): integer
 ---@field entries           fun(table: table): fun(): any
@@ -345,11 +382,13 @@ end
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
 ---@field write_content     fun(file_pat: string, content: string): error_level_t
 ---@field deep_copy         fun(original: any): any
----@field DID_CHOOSE        any
+---@field KEY_chooser       any
+---@field KEY_did_choose    any
 ---@field flags             ut_flags_t
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
 
 return {
+  Vars              = Vars,
   to_quoted_string  = to_quoted_string,
   indices           = indices,
   entries           = entries,
@@ -366,6 +405,7 @@ return {
   write_content     = write_content,
   deep_copy         = deep_copy,
   flags             = flags,
-  DID_CHOOSE        = DID_CHOOSE,
+  KEY_chooser       = KEY_chooser,
+  KEY_did_choose    = KEY_did_choose,
   chooser           = chooser,
 }

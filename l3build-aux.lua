@@ -95,20 +95,21 @@ local function call(modules, target, opts)
   local cli_opts = ""
   for k, v in pairs(opts) do
     if k ~= "names" and k ~= "target" then -- Special cases, TODO enhance the design to remove the need for this comment
-      local t = _G.option_list[k] or {}
+      local type_v = type(v)
+      local no = ""
       local value = ""
-      if t["type"] == "string" then
-        value = value .. "=" .. v
-      elseif t["type"] == "table" then
-        for a in entries(v) do
-          if value == "" then
-            value = "=" .. a -- Add the initial "=" here
-          else
-            value = value .. "," .. a
-          end
+      if type_v == "boolean" then
+        if not v then
+          no = "no-"
         end
+      elseif type_v == "number" then
+        value = "=" .. tostring(v)
+      elseif type_v == "string" then
+        value = "=" .. v
+      elseif type_v == "table" then
+        value = "=" .. table.concat(v, ",")
       end
-      cli_opts = cli_opts .. " --" .. k .. value
+      cli_opts = cli_opts .." --".. no .. k .. value
     end
   end
   if opts.names then

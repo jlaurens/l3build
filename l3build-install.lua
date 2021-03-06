@@ -106,6 +106,7 @@ end
 ---Uninstall
 ---@return error_level_t
 local function uninstall()
+  l3b_vars.finalize()
   local error_level = 0
   -- Any script man files need special handling
   local man_files = {}
@@ -160,12 +161,16 @@ local function uninstall()
               + uninstall_files("makeindex", Main.module)
               + uninstall_files("scripts", Main.module)
               + error_level
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
   -- Finally, clean up special locations
   for location in entries(Main.tdslocations) do
     local path = dir_name(location)
     error_level = zap_dir(path)
-    if error_level ~= 0 then return error_level end
+    if error_level ~= 0 then
+      return error_level
+    end
   end
   return 0
 end
@@ -186,6 +191,7 @@ end
 ---@param dry_run boolean
 ---@return error_level_t
 local function install_files(root_install_dir, full, dry_run)
+  l3b_vars.finalize()
   -- Needed so paths are only cleaned out once
   ---@type flag_table_t
   local already_cleaned = {}
@@ -262,7 +268,9 @@ local function install_files(root_install_dir, full, dry_run)
           local install_dir = entry.install_dir
           if not already_cleaned[install_dir] then
             error_level = make_clean_directory(install_dir)
-            if error_level ~= 0 then return error_level end
+            if error_level ~= 0 then
+              return error_level
+            end
             already_cleaned[install_dir] = true
           end
           append(to_copy, entry)
@@ -273,11 +281,13 @@ local function install_files(root_install_dir, full, dry_run)
   end
 
   local error_level = unpack()
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
 
   -- Creates a 'controlled' list of files
   local function create_file_list(dir, includes, excludes)
-    dir = dir or Dir._work
+    dir = dir or Dir.work
     ---@type flag_table_t
     local exclude_list = {}
     for glob_table in entries(excludes) do
@@ -301,7 +311,9 @@ local function install_files(root_install_dir, full, dry_run)
 
   if full then
     error_level = doc()
-    if error_level ~= 0 then return error_level end
+    if error_level ~= 0 then
+      return error_level
+    end
 
     -- Set up lists: global as they are also needed to do CTAN releases
     typeset_list = create_file_list(Dir.docfile, Files.typeset, { Files.source })
@@ -320,7 +332,9 @@ local function install_files(root_install_dir, full, dry_run)
           any typesetting demo files need to be part of the main typesetting list
         ]], Files.text, typeset_list
       })
-    if error_level ~= 0 then return error_level end
+    if error_level ~= 0 then
+      return error_level
+    end
 
     -- Rename README if necessary
     if not dry_run then
@@ -351,7 +365,9 @@ local function install_files(root_install_dir, full, dry_run)
 
   local install_list = create_file_list(Dir.unpack, Files.install, { Files.script })
 
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
 
   error_level =
       feed_to_copy(Dir.unpack, "tex", { install_list })
@@ -359,19 +375,24 @@ local function install_files(root_install_dir, full, dry_run)
     + feed_to_copy(Dir.unpack, "makeindex", { Files.makeindex }, Main.module)
     + feed_to_copy(Dir.unpack, "scripts", { Files.script }, Main.module)
 
-  if error_level ~= 0 then return error_level end
+  if error_level ~= 0 then
+    return error_level
+  end
 
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
   for entry in entries(to_copy) do
     error_level = copy_name(entry.name, entry.source, entry.dest)
-    if error_level ~= 0  then return error_level end
+    if error_level ~= 0  then
+      return error_level
+    end
   end
 
   return 0
 end
 
 local function install()
+  l3b_vars.finalize()
   local options = l3build.options
   return install_files(get_textmf_home(), options["full"], options["dry-run"])
 end

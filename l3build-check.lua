@@ -23,6 +23,9 @@ for those people who are interested.
 --]]
 
 -- Local access to functions
+
+local not_empty       = next
+
 local open            = io.open
 
 local rnd             = math.random
@@ -398,7 +401,7 @@ local function normalize_log(content, engine, errlevels)
                       "<lua data reference ...>")
     -- Unicode engines display chars in the upper half of the 8-bit range:
     -- tidy up to match pdfTeX if an ASCII engine is in use
-    if next(Vars.asciiengines) then
+    if not_empty(Vars.asciiengines) then
       for i = 128, 255 do
         line = gsub(line, utf8_char(i), "^^" .. str_format("%02x", i))
       end
@@ -823,7 +826,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local format = gsub(engine, "tex$", Vars.checkformat)
   -- Special binary/format combos
   local special_check = Vars.specialformats[Vars.checkformat]
-  if special_check and next(special_check) then
+  if special_check and not_empty(special_check) then
     local engine_info = special_check[engine]
     if engine_info then
       binary      = engine_info.binary  or binary
@@ -842,7 +845,9 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   -- Special casing for ConTeXt
   local setup
   if match(Vars.checkformat, "^context$") then
-    function setup(file) return ' "' .. file .. '" '  end
+    function setup(file)
+      return ' "' .. file .. '" '
+    end
   else
     function setup(file)
       return " -jobname=" .. name .. " " .. ' "\\input ' .. file .. '" '
@@ -1119,7 +1124,7 @@ extend_with(dflt, {
   checksearch   = true,
   checkconfigs  = { "build" },
   checkinit_hook  = checkinit_hook,
-  [utlib.DID_CHOOSE] = function (result, k)
+  [utlib.KEY_did_choose] = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k == "checkconfigs" then
@@ -1168,27 +1173,26 @@ end
 ---@param names string_list_t
 ---@return error_level_t
 local function check(names)
-  local errorlevel = 0
+  l3b_vars.finalize()
+  local error_level = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     local options = l3build.options
     if not options["rerun"] then
       checkinit()
     end
     local hide = true
-    if names and next(names) then
+    if names and not_empty(names) then
       hide = false
     end
     names = names or {}
     -- No names passed: find all test files
-    if not next(names) then
+    if not not_empty(names) then
       for kind in entries(Vars.test_order) do
         local ext = Vars.test_types[kind].test
         ---@type table<integer, glob_match_f>
         local exclude_glob_matches = {}
-        local num_exclude = 0
         for glob in entries(Vars.excludetests) do
-          num_exclude = num_exclude+1
-          exclude_glob_matches[num_exclude] = to_glob_match(glob .. ext)
+          append(exclude_glob_matches, to_glob_match(glob .. ext))
         end
         for glob in entries(Vars.includetests) do
           for name in all_names(Dir.testfile, glob .. ext) do
@@ -1262,25 +1266,26 @@ local function check(names)
         if options["halt-on-error"] then
           return 1
         else
-          errorlevel = 1
+          error_level = 1
           -- visually show that something has failed
           print("          --> failed\n")
         end
       end
     end
-    if errorlevel ~= 0 then
+    if error_level ~= 0 then
       check_diff()
     else
       print("\n  All checks passed\n")
     end
   end
-  return errorlevel
+  return error_level
 end
 
 ---Prepare material for a forthcoming check.
 ---@param names string_list_t
 ---@return error_level_t
 local function save(names)
+  l3b_vars.finalize()
   if names == nil then
     print("Arguments are required for the save command")
     return 1
@@ -1320,6 +1325,7 @@ end
 
 -- Sanity check
 local function sanitize_engines()
+  l3b_vars.finalize()
   local options = l3build.options
   if options["engine"] and not options["force"] then
     -- Make a lookup table
@@ -1342,9 +1348,9 @@ local function sanitize_engines()
 end
 
 ---@class l3b_check_t
+---@field Vars              l3b_check_vars_t
 ---@field check             fun(names: string_list_t): integer
 ---@field save              fun(names: string_list_t): integer
----@field Vars              l3b_check_vars_t
 ---@field sanitize_engines  fun()
 
 return {

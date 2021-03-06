@@ -27,19 +27,15 @@ local gsub        = string.gsub
 local exit        = os.exit
 local append      = table.insert
 
-local lfs         = require("lfs")
-local lfs_dir     = lfs.dir
-local attributes  = lfs.attributes
-
 ---@type utlib_t
 local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local deep_copy   = utlib.deep_copy
 
 ---@type fslib_t
-local fslib       = require("l3b.fslib")
-local all_names   = fslib.all_names
-local file_exists = fslib.file_exists
+local fslib         = require("l3b.fslib")
+local all_names     = fslib.all_names
+local file_exists   = fslib.file_exists
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -192,15 +188,16 @@ local target_list =
 
 ---comment
 ---@param target  string
----@param names   string_list_t
+---@param names?  string_list_t
 local function main(target, names)
+  l3b_vars.finalize()
   -- Deal with unknown targets up-front
   if not target_list[target] then
     help()
     exit(1)
   end
   local error_level = 0
-  if module == "" then
+  if Main.module == "" then
     local modules = Main.modules
     if target_list[target].bundle_func then
       error_level = target_list[target].bundle_func(names)
@@ -212,13 +209,15 @@ local function main(target, names)
       error_level = call(modules, target)
     end
   else
-    if target_list[target].pre then
-     error_level = target_list[target].pre(names)
+    local info = target_list[target]
+    if info.pre then
+     error_level = info.pre(names)
      if error_level ~= 0 then
        exit(1)
      end
     end
-    error_level = target_list[target].func(names)
+    print("error_level = target_list[target].func(names)", Main.bundle, target)
+    error_level = info.func(names)
   end
   -- All done, finish up
   if error_level ~= 0 then
@@ -230,13 +229,16 @@ end
 
 ---comment
 local function multi_check()
+  l3b_vars.finalize()
   local options = l3build.options
   if options["target"] == "check" then
     local checkconfigs = l3b_check_vars.checkconfigs
     if #checkconfigs > 1 then
       local error_level = 0
-      local opts = deep_copy(options) -- TODO: remove this shallow copy
+      local opts = deep_copy(options)
+      ---@type string_list_t
       local failed_configs = {}
+      utlib.Vars.debug.chooser = true
       for config in entries(checkconfigs) do
         opts["config"] = { config }
         error_level = call({ "." }, "check", opts)
@@ -271,6 +273,7 @@ local function multi_check()
 end
 
 local function prepare_config()
+  l3b_vars.finalize()
   local checkconfigs = l3b_check_vars.checkconfigs
   local options = l3build.options
   local config_1 = checkconfigs[1]
@@ -283,6 +286,7 @@ local function prepare_config()
         Dir.test = Dir.test .. "-" .. config_1
       else
         print("Error: Cannot find configuration " .. config_1)
+        print("l3build.work_dir", l3build.work_dir)
         exit(1)
       end
   end

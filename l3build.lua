@@ -37,6 +37,7 @@ local match   = string.match
 local gmatch  = string.gmatch
 local print   = print
 local exit    = os.exit
+local rename  = os.rename
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
@@ -46,7 +47,8 @@ kpse.set_program_name("kpsewhich")
 assert(not _G.l3build, "No self call")
 
 local is_main  -- Whether the script is called first
-local work_dir -- the directory containing "build.lua" and friends
+local work_dir -- the directory containing the closest "build.lua" and friends
+local main_dir -- the directory containing the topmost "build.lua" and friends
 
 ---@alias flag_table_t table<string, boolean>
 
@@ -79,23 +81,23 @@ local work_dir -- the directory containing "build.lua" and friends
 ---@field texmfhome string
 
 ---@class l3build_t
----@field debug flag_table_t the special --debug-foo CLI arguments
----@field PACKAGE string "l3build", `package.loaded` key
----@field NAME string "l3build", display name
----@field PATH string synonym of `launch_dir` .. "/l3build.lua"
----@field work_dir string where the "build.lua" lives
----@field root_dir string where the topmost "build.lua" lives
----@field launch_dir string where "l3build.lua" and friends live
----@field start_dir string the current directory at load time
----@field options l3build_options_t
----@field flags flag_table_t
----@field data l3build_data_t
+---@field debug       flag_table_t  the special --debug-foo CLI arguments
+---@field PACKAGE     string        "l3build", `package.loaded` key
+---@field NAME        string        "l3build", display name
+---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
+---@field work_dir    string        where the closest "build.lua" lives
+---@field main_dir    string        where the topmost "build.lua" lives
+---@field launch_dir  string        where "l3build.lua" and friends live
+---@field start_dir   string        the current directory at load time
+---@field options     l3build_options_t
+---@field flags       flag_table_t
+---@field data        l3build_data_t
 
 
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)
   flags = {}, -- various shared flags
-  data = {};  -- shared data
+  data = {},  -- shared data
 }
 
 do
@@ -130,14 +132,16 @@ do
   ---The max number of trials is the number of components
   ---of the absolute path of `dir`, which majorated in the for loop
   ---Intermediate directories must exist.
-  ---@param dir string must end with '/'
-  ---@param base string relative file or directory name
+  ---@param dir   string must end with '/'
+  ---@param base  string relative file or directory name
   ---@return string|nil dir ends with '/' when non nil
   local function container(dir, base)
     for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
-      if os.rename(p, p) then return dir end -- true iff file or dir at the given path
-      -- synonym of previous line:
+      if rename(p, p) then -- true iff file or dir at the given path
+        return dir
+      end
+      -- synonyms of previous line:
       -- if package.searchpath("?", p, "", "") then return dir end
       -- if lfs.atributes(p, "mode") then return dir end
       dir = dir .. "../"
@@ -157,7 +161,6 @@ do
   else
     launch_dir = container('./', "l3build.lua") or kpse_dir
   end
-
 
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
@@ -188,21 +191,32 @@ do
         for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do
           local p = dir .. base
           print(p)
-          if os.rename(p, p) then return dir end -- true iff file or dir at the given path
+          if rename(p, p) then -- true iff file or dir at the given path
+            return dir
+          end
           dir = dir .. "../"
         end
       end)
     end
     assert(work_dir, 'Error: Cannot find configuration file "build.lua"')
+    -- main_dir
+    main_dir = work_dir
+    repeat
+      local top = container(main_dir .."../", "build.lua")
+      if top then
+        main_dir = top
+      end
+    until not top
+    assert(main_dir, 'Error: Cannot find main configuration file "build.lua"')
   end
 
   ---Register the given pakage.
   ---Lua's require function return either true or a table.
   ---Here we always return a table.
-  ---@param pkg table|boolean
-  ---@param pkg_name string key in `package.loaded`
-  ---@param name string display name
-  ---@param path string
+  ---@param pkg       table|boolean
+  ---@param pkg_name  string key in `package.loaded`
+  ---@param name      string display name
+  ---@param path      string
   local function register(pkg, pkg_name, name, path)
     if type(pkg) ~= "table" then pkg = {} end
     package.loaded[path] = nil  -- change the registration name
@@ -213,9 +227,10 @@ do
     return pkg
   end
 
-  l3build._work_dir = work_dir
-  l3build.start_dir = start_dir
-  l3build.launch_dir = launch_dir
+  l3build.work_dir    = work_dir -- all these are expected to end with a "/"
+  l3build.main_dir    = main_dir
+  l3build.start_dir   = start_dir
+  l3build.launch_dir  = launch_dir
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
 
@@ -236,7 +251,9 @@ do
   ---@return table|boolean
   function require(pkg_name)
     local result = package.loaded[pkg_name]
-    if result then return result end -- recursive calls will end here
+    if result then
+      return result -- recursive calls will end here
+    end
     if debug_require then
       print("DEBUG Info: package required ".. pkg_name)
     end
@@ -268,14 +285,16 @@ do
 end
 --[=[ end of booting process ]=]
 
+--[=[DEBUG flags]]
 ---@type oslib_t
 local oslib = require("l3b.oslib")
 oslib.Vars.debug.run = true
+--[=[DEBUG flags end]=]
 
 ---@type l3b_arguments_t
-local arguments     = require("l3b.arguments")
-l3build.options     = arguments.parse(arg)
-local options       = l3build.options
+local arguments = require("l3b.arguments")
+l3build.options = arguments.parse(arg)
+local options   = l3build.options
 
 ---@type l3b_help_t
 local l3b_help  = require("l3b.help")
@@ -321,7 +340,7 @@ sanitize_engines()
 -- Deal with multiple configs for tests
 --
 
-multi_check() -- check with many configs, may exit here
+multi_check()   -- check with many configs, may exit here
 
 prepare_config()
 
