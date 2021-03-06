@@ -49,6 +49,9 @@ local utlib       = require("l3b.utillib")
 local items       = utlib.items
 local first_of    = utlib.first_of
 
+---@class oslib_vars_t
+---@field debug flag_table_t
+
 local Vars = setmetatable({
   debug = {}
 }, {
@@ -99,7 +102,7 @@ end
 ---@vararg string ...
 local function cmd_concat(...)
   local t = {}
-  for item in items({ ... }) do
+  for item in items( ... ) do
     if #item > 0 then
       append(t, item)
     end
@@ -109,10 +112,14 @@ local function cmd_concat(...)
     result = concat(t, _G.os_concat)
   end)
   if not success then
-    for i in require("l3b.utillib").entries(t) do
-      print(i)
+    for i, v in ipairs({ ... }) do
+      print("i, ...", i, v)
+    end
+    for i, v in ipairs(t) do
+      print("i, v  ", i, v)
     end
     print(debug.traceback())
+    error("Cannot build command from components")
   end
   return result
 end
@@ -126,7 +133,7 @@ end
 local function run(dir, cmd)
   cmd = cmd_concat("cd " .. dir, cmd)
   if Vars.debug.run then
-    print("run: ".. cmd)
+    print("DEBUG run: ".. cmd)
   end
   return execute(cmd)
 end
@@ -148,6 +155,7 @@ local function quoted_path(path)
 end
 
 ---@class oslib_t
+---@field Vars        oslib_vars_t
 ---@field cmd_concat  fun(...): string
 ---@field run         fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
 ---@field quoted_path fun(path: string): string

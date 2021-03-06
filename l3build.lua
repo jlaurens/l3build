@@ -268,6 +268,10 @@ do
 end
 --[=[ end of booting process ]=]
 
+---@type oslib_t
+local oslib = require("l3b.oslib")
+oslib.Vars.debug.run = true
+
 ---@type l3b_arguments_t
 local arguments     = require("l3b.arguments")
 l3build.options     = arguments.parse(arg)
