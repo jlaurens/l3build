@@ -114,12 +114,12 @@ local function bundleunpack(source_dirs, sources)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
       local success = popen(cmd_concat(
           "cd " .. Dir.unpack .. "/" .. dir_path,
-          os_setenv .. " TEXINPUTS=." .. os_pathsep
-            .. local_dir .. (Vars.unpacksearch and os_pathsep or ""),
-          os_setenv .. " LUAINPUTS=." .. os_pathsep
-            .. local_dir .. (Vars.unpacksearch and os_pathsep or ""),
+          _G.os_setenv .. " TEXINPUTS=." .. _G.os_pathsep
+            .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
+          _G.os_setenv .. " LUAINPUTS=." .. _G.os_pathsep
+            .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
           Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
-            .. (options["quiet"] and (" > " .. os_null) or "")
+            .. (options["quiet"] and (" > " .. _G.os_null) or "")
         ), "w"
       ):write(string.rep("y\n", 300)):close()
       if not success then

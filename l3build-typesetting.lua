@@ -140,9 +140,9 @@ local function dvi2pdf(name, dir, engine, hide)
     dir, cmd_concat(
       set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
-        .. (hide and (" > " .. os_null) or ""),
+        .. (hide and (" > " .. _G.os_null) or ""),
       "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
-        .. (hide and (" > " .. os_null) or "")
+        .. (hide and (" > " .. _G.os_null) or "")
     ) and 0 or 1
   )
 end
@@ -160,20 +160,20 @@ local function runcmd(cmd, dir, vars)
   dir = absolute_path(dir)
   vars = vars or {}
   -- Allow for local texmf files
-  local env = os_setenv .. " TEXMFCNF=." .. os_pathsep
+  local env = _G.os_setenv .. " TEXMFCNF=." .. _G.os_pathsep
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
+    localtexmf = _G.os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
-  local envpaths = "." .. localtexmf .. os_pathsep
-    .. absolute_path(Dir[l3b_vars.LOCAL]) .. os_pathsep
-    .. dir .. (Vars.typesetsearch and os_pathsep or "")
+  local envpaths = "." .. localtexmf .. _G.os_pathsep
+    .. absolute_path(Dir[l3b_vars.LOCAL]) .. _G.os_pathsep
+    .. dir .. (Vars.typesetsearch and _G.os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and match(envpaths, " ") then
     envpaths = first_of(gsub(envpaths, '"', '')) -- no '"' in windows!!!
   end
   for var in entries(vars) do
-    env = cmd_concat(env, os_setenv .. " " .. var .. "=" .. envpaths)
+    env = cmd_concat(env, _G.os_setenv .. " " .. var .. "=" .. envpaths)
   end
   return run(dir, cmd_concat(set_epoch_cmd(Main.epoch, Vars.forcedocepoch), env, cmd))
 end
@@ -209,11 +209,11 @@ function MT.bibtex(name, dir)
      grep = "\\\\\\\\"
     end
     if run(dir,
-        os_grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
-          .. os_null
+        _G.os_grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
+          .. _G.os_null
       ) + run(dir,
-        os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
-          .. os_null
+        _G.os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
+          .. _G.os_null
       ) == 0 then
       return runcmd(Exe.bibtex .. " " .. Opts.bibtex .. " " .. name, dir,
         { "BIBINPUTS", "BSTINPUTS" }) and 0 or 1

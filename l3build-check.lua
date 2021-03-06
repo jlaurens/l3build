@@ -188,7 +188,7 @@ local function checkinit()
   for i in entries(Files.checksupp) do
     copy_tree(i, Dir.support, Dir.test)
   end
-  execute(os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
+  execute(_G.os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
   return Vars.checkinit_hook()
 end
 
@@ -424,20 +424,20 @@ local function normalize_log(content, engine, errlevels)
     elseif not prestart and not skipping then
       line, lastline, drop_fd = normalize(line, lastline, drop_fd)
       if not match(line, "^ *$") and not killcheck(line) then
-        new_content = new_content .. line .. os_newline
+        new_content = new_content .. line .. _G.os_newline
       end
     end
   end
   if Vars.recordstatus then
-    new_content = new_content .. '***************' .. os_newline
+    new_content = new_content .. '***************' .. _G.os_newline
     for i = 1, Vars.checkruns do
       if errlevels[i] == nil then
         new_content = new_content
-          .. 'Compilation ' .. i .. ' of test file skipped ' .. os_newline
+          .. 'Compilation ' .. i .. ' of test file skipped ' .. _G.os_newline
       else
         new_content = new_content ..
           'Compilation ' .. i .. ' of test file completed with exit status ' ..
-          errlevels[i] .. os_newline
+          errlevels[i] .. _G.os_newline
       end
     end
   end
@@ -574,7 +574,7 @@ local function normalize_lua_log(content, is_luatex)
         last_line = gsub(last_line, " %(penalty 50%)$", "")
         -- A normal (TeX90) discretionary:
         -- add with the line break reintroduced
-        return last_line .. os_newline .. line, ""
+        return last_line .. _G.os_newline .. line, ""
       end
     end
     -- Look for another form of \discretionary, replacing a "-"
@@ -588,7 +588,7 @@ local function normalize_lua_log(content, is_luatex)
       elseif dropping then
         return "", ""
       else
-        return last_line .. os_newline .. line, ""
+        return last_line .. _G.os_newline .. line, ""
       end
     end
     -- For \mathon, if the current line is an empty \hbox then
@@ -635,7 +635,7 @@ local function normalize_lua_log(content, is_luatex)
       elseif match(line, "^%}%}%}$") then
         return last_line .. line, ""
       else
-        return last_line .. os_newline .. line, ""
+        return last_line .. _G.os_newline .. line, ""
       end
     -- Return all of the text for a wrapped (multi)line
     elseif len(last_line) > max_print_line then
@@ -651,7 +651,7 @@ local function normalize_lua_log(content, is_luatex)
   for line in gmatch(content, "([^\n]*)\n") do
     line, lastline, dropping = normalize(line, lastline, dropping)
     if not match(line, "^ *$") then
-      new_content = new_content .. line .. os_newline
+      new_content = new_content .. line .. _G.os_newline
     end
   end
   return new_content
@@ -670,9 +670,9 @@ local function normalize_pdf(content)
       if match(line, "endstream") then
         is_stream = false
         if is_binary then
-          new_content = new_content .. "[BINARY STREAM]" .. os_newline
+          new_content = new_content .. "[BINARY STREAM]" .. _G.os_newline
         else
-          new_content = new_content .. stream_content .. line .. os_newline
+          new_content = new_content .. stream_content .. line .. _G.os_newline
         end
         is_binary = false
       else
@@ -683,19 +683,19 @@ local function normalize_pdf(content)
           end
         end
         if not is_binary and not match(line, "^ *$") then
-          stream_content = stream_content .. line .. os_newline
+          stream_content = stream_content .. line .. _G.os_newline
         end
       end
     elseif match(line, "^stream$") then
       is_binary = false
       is_stream = true
-      stream_content = "stream" .. os_newline
+      stream_content = "stream" .. _G.os_newline
     elseif  not match(line, "^ *$")
         and not match(line, "^%%%%Invocation")
         and not match(line, "^%%%%%+")
     then
       line = gsub(line, "%/ID( ?)%[<[^>]+><[^>]+>]", "/ID%1[<ID-STRING><ID-STRING>]")
-      new_content = new_content .. line .. os_newline
+      new_content = new_content .. line .. _G.os_newline
     end
   end
   return new_content
@@ -749,7 +749,7 @@ end
 ---@return error_level_t
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
-  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. os_diffext
+  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. _G.os_diffext
   local gen_file  = Dir.test .. "/" .. test_name .. test_type.generated
   local ref_file  = locate({ Dir.test }, {
     test_name .. test_type.reference,
@@ -761,7 +761,7 @@ local function base_compare(test_type, name, engine, cleanup)
   if compare then
     return compare(diff_file, ref_file, gen_file, cleanup, name, engine)
   end
-  local error_level = execute(os_diffexe .. " "
+  local error_level = execute(_G.os_diffexe .. " "
     .. to_host(ref_file .. " " .. gen_file .. " > " .. diff_file))
   if error_level == 0 or cleanup then
     remove(diff_file)
@@ -782,7 +782,7 @@ end
 
 local function show_failed_diff()
   print("\nCheck failed with difference file")
-  for i in all_names(Dir.test, "*" .. os_diffext) do
+  for i in all_names(Dir.test, "*" .. _G.os_diffext) do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
     print("-----------------------------------------------------------------------------------")
@@ -869,28 +869,28 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    localtexmf = os_pathsep .. absolute_path(Dir.texmf) .. "//"
+    localtexmf = _G.os_pathsep .. absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, Vars.checkruns do
     err_levels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
-        os_setenv .. " TEXINPUTS=." .. localtexmf
-          .. (Vars.checksearch and os_pathsep or ""),
-        os_setenv .. " LUAINPUTS=." .. localtexmf
-          .. (Vars.checksearch and os_pathsep or ""),
+        _G.os_setenv .. " TEXINPUTS=." .. localtexmf
+          .. (Vars.checksearch and _G.os_pathsep or ""),
+        _G.os_setenv .. " LUAINPUTS=." .. localtexmf
+          .. (Vars.checksearch and _G.os_pathsep or ""),
         -- Avoid spurious output from (u)pTeX
-        os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
+        _G.os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
-        os_setenv .. " TEXMFCNF=." .. os_pathsep,
+        _G.os_setenv .. " TEXMFCNF=." .. _G.os_pathsep,
         set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
         -- Ensure lines are of a known length
-        os_setenv .. " max_print_line=" .. Vars.maxprintline,
+        _G.os_setenv .. " max_print_line=" .. Vars.maxprintline,
         binary .. format
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
-          .. (hide and (" > " .. os_null) or ""),
+          .. (hide and (" > " .. _G.os_null) or ""),
         Vars.runtest_tasks(job_name(lvt_file), run_number)
       )
     )
@@ -1063,14 +1063,14 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
     local lua_tlg_file = Dir.test .. "/" .. test_name .. Xtn.tlg
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
-    error_level = execute(os_diffexe .. " "
+    error_level = execute(_G.os_diffexe .. " "
       .. to_host(lua_tlg_file .. " " .. lua_log_file .. " > " .. diff_file))
     if cleanup then
       remove(lua_log_file)
       remove(lua_tlg_file)
     end
   else
-    error_level = execute(os_diffexe .. " "
+    error_level = execute(_G.os_diffexe .. " "
       .. to_host(tlg_file .. " " .. log_file .. " > " .. diff_file))
   end
   if error_level == 0 or cleanup then
@@ -1082,7 +1082,7 @@ end
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
   print("\n  Check failed with difference files")
-  for i in all_names(Dir.test, "*" .. os_diffext) do
+  for i in all_names(Dir.test, "*" .. _G.os_diffext) do
     print("  - " .. Dir.test .. "/" .. i)
   end
   print("")

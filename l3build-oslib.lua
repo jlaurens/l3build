@@ -49,6 +49,14 @@ local utlib       = require("l3b.utillib")
 local items       = utlib.items
 local first_of    = utlib.first_of
 
+local Vars = setmetatable({
+  debug = {}
+}, {
+  __newindex = function (t, k, v)
+    error("`Vars` are readonly")
+  end
+})
+
 -- Detect the operating system in use
 -- Support items are defined here for cases where a single string can cover
 -- both Windows and Unix cases: more complex situations are handled inside
@@ -57,37 +65,37 @@ if os_type == "windows" then
   if tonumber(luatex_version) < 100
   or (tonumber(luatex_version) == 100 and tonumber(luatex_revision) < 4)
   then
-    os_newline = "\r\n"
+    _G.os_newline = "\r\n"
   else
-    os_newline = "\n"
+    _G.os_newline = "\n"
   end
-  os_pathsep = ";"
-  os_concat  = "&"
-  os_null    = "nul"
-  os_ascii   = "@echo."
-  os_cmpexe  = getenv("cmpexe") or "fc /b"
-  os_cmpext  = getenv("Xtn.cmp") or ".cmp"
-  os_diffexe = getenv("diffexe") or "fc /n"
-  os_diffext = getenv("diffext") or ".fc"
-  os_grepexe = "findstr /r"
-  os_setenv  = "set"
-  os_yes     = "for /l %I in (1,1,300) do @echo y"
+  _G.os_pathsep = ";"
+  _G.os_concat  = "&"
+  _G.os_null    = "nul"
+  _G.os_ascii   = "@echo."
+  _G.os_cmpexe  = getenv("cmpexe") or "fc /b"
+  _G.os_cmpext  = getenv("cmpext") or ".cmp"
+  _G.os_diffexe = getenv("diffexe") or "fc /n"
+  _G.os_diffext = getenv("diffext") or ".fc"
+  _G.os_grepexe = "findstr /r"
+  _G.os_setenv  = "set"
+  _G.os_yes     = "for /l %I in (1,1,300) do @echo y"
 else
-  os_pathsep = ":"
-  os_newline = "\n"
-  os_concat  = ";"
-  os_null    = "/dev/null"
-  os_ascii   = "echo \"\""
-  os_cmpexe  = getenv("cmpexe") or "cmp"
-  os_cmpext  = getenv("Xtn.cmp") or ".cmp"
-  os_diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr"
-  os_diffext = getenv("diffext") or ".diff"
-  os_grepexe = "grep"
-  os_setenv  = "export"
-  os_yes     = "printf 'y\\n%.0s' {1..300}"
+  _G.os_pathsep = ":"
+  _G.os_newline = "\n"
+  _G.os_concat  = ";"
+  _G.os_null    = "/dev/null"
+  _G.os_ascii   = "echo \"\""
+  _G.os_cmpexe  = getenv("cmpexe") or "cmp"
+  _G.os_cmpext  = getenv("cmpext") or ".cmp"
+  _G.os_diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr"
+  _G.os_diffext = getenv("diffext") or ".diff"
+  _G.os_grepexe = "grep"
+  _G.os_setenv  = "export"
+  _G.os_yes     = "printf 'y\\n%.0s' {1..300}"
 end
 
----Concat the given string with `os_concat`
+---Concat the given string with `_G.os_concat`
 ---@vararg string ...
 local function cmd_concat(...)
   local t = {}
@@ -98,7 +106,7 @@ local function cmd_concat(...)
   end
   local result
   local success = pcall (function()
-    result = concat(t, os_concat)
+    result = concat(t, _G.os_concat)
   end)
   if not success then
     for i in require("l3b.utillib").entries(t) do
@@ -116,7 +124,11 @@ end
 ---@return exitcode? exitcode
 ---@return integer?  code
 local function run(dir, cmd)
-  return execute(cmd_concat("cd " .. dir, cmd))
+  cmd = cmd_concat("cd " .. dir, cmd)
+  if Vars.debug.run then
+    print("run: ".. cmd)
+  end
+  return execute(cmd)
 end
 
 ---Return a quoted version or properly escaped
@@ -141,6 +153,7 @@ end
 ---@field quoted_path fun(path: string): string
 
 return {
+  Vars              = Vars,
   cmd_concat        = cmd_concat,
   run               = run,
   quoted_path       = quoted_path,

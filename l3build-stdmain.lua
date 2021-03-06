@@ -256,7 +256,7 @@ local function multi_check()
           if config ~= "build" then
             test_dir = test_dir .. "-" .. config
           end
-          for name in all_names(test_dir, "*" .. os_diffext) do
+          for name in all_names(test_dir, "*" .. _G.os_diffext) do
             print("  - " .. test_dir .. "/" .. name)
           end
           print("")

@@ -201,7 +201,7 @@ local function write_content(file_path, content)
     local fh = assert(open(file_path, "w"))
     if not fh then return 1 end
     if os_type == "windows" then
-      content = content:gsub("\n", os_newline)
+      content = content:gsub("\n", _G.os_newline)
     end
     local error_level = fh:write(content) and 0 or 1
     fh:close()
@@ -264,7 +264,7 @@ do
   local key_G, key_dflt, key_kv = {}, {}, {} -- unique keys
   -- shared indexer
   local chooser_MT = {
-    __index = function (t, k)
+    __index = function (t --[[:table]], k--[[:any]])
       local dflt = t[key_dflt]
       local dflt_k = dflt[k]            -- default candidate
       if dflt_k == nil then return end  -- unknown key, stop here

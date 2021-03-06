@@ -63,9 +63,9 @@ local l3build = require("l3build")
 ---@usage private?
 local function set_epoch_cmd(epoch, force)
   return force and cmd_concat(
-    os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
-    os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
-    os_setenv .. " FORCE_SOURCE_DATE=1"
+    _G.os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
+    _G.os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
+    _G.os_setenv .. " FORCE_SOURCE_DATE=1"
   ) or ""
 end
 
