@@ -61,6 +61,9 @@ end
 local function normalise_epoch(epoch)
   assert(epoch, 'normalize_epoch argument must not be nil')
   -- If given as an ISO date, turn into an epoch number
+  if type(epoch) == "number" then
+    return epoch
+  end
   local y, m, d = epoch:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
   if y then
     return os_time({
@@ -242,8 +245,7 @@ local default_Dir = setmetatable({
       result = t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
     elseif k == "tds_module" then
-      result = Main.tdsroot .. "/" .. Main.bundle .. "/" .. Main.module
-      result = first_of(result:gsub("//", "/"))
+      result = Main.tdsroot .. (t._standalone and "/" .. Main.bundle .. "/" or "/") .. Main.module
     end
     return result
   end

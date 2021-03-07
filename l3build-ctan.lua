@@ -198,17 +198,19 @@ local function ctan()
     -- First, zip up all of the text files
     run(
       dir,
-      Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " " .. "."
-        .. (
-          (bin_files or exclude) and (" -x" .. bin_files .. " " .. exclude)
-          or ""
-        )
+      Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " ."
+      .. (
+        (bin_files or exclude)
+        and (" -x " .. bin_files .. " " .. exclude)
+        or ""
+      )
     )
     -- Then add the binary ones
     run(
       dir,
-      Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " " .. ". -i" ..
-        bin_files .. (exclude and (" -x" .. exclude) or "")
+      Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
+      .. " -i " .. bin_files
+      .. (exclude and (" -x " .. exclude) or "")
     )
   end
   dirzip(Dir.tds, Main.ctanpkg .. ".tds")

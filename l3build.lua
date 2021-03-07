@@ -46,9 +46,10 @@ kpse.set_program_name("kpsewhich")
 
 assert(not _G.l3build, "No self call")
 
-local is_main  -- Whether the script is called first
-local work_dir -- the directory containing the closest "build.lua" and friends
-local main_dir -- the directory containing the topmost "build.lua" and friends
+local in_document -- Whether in a tex document or in a package folder
+local is_main     -- Whether the script is called first
+local work_dir    -- the directory containing the closest "build.lua" and friends
+local main_dir    -- the directory containing the topmost "build.lua" and friends
 
 ---@alias flag_table_t table<string, boolean>
 
@@ -62,6 +63,7 @@ local main_dir -- the directory containing the topmost "build.lua" and friends
 ---@class l3build_options_t
 ---@field config    table
 ---@field date      string
+---@field debug     boolean
 ---@field dirty     boolean
 ---@field dry_run   boolean
 ---@field email     string
@@ -85,8 +87,9 @@ local main_dir -- the directory containing the topmost "build.lua" and friends
 ---@field PACKAGE     string        "l3build", `package.loaded` key
 ---@field NAME        string        "l3build", display name
 ---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
----@field work_dir    string        where the closest "build.lua" lives
----@field main_dir    string        where the topmost "build.lua" lives
+---@field in_document boolean       True means no "build.lua"
+---@field work_dir    string|nil    where the closest "build.lua" lives, nil means not in_document
+---@field main_dir    string|nil    where the topmost "build.lua" lives, nil means not in_document
 ---@field launch_dir  string        where "l3build.lua" and friends live
 ---@field start_dir   string        the current directory at load time
 ---@field options     l3build_options_t
@@ -197,16 +200,20 @@ do
         end
       end)
     end
-    assert(work_dir, 'Error: Cannot find configuration file "build.lua"')
-    -- main_dir
-    main_dir = work_dir
-    repeat
-      local top = container(main_dir .."../", "build.lua")
-      if top then
-        main_dir = top
-      end
-    until not top
-    assert(main_dir, 'Error: Cannot find main configuration file "build.lua"')
+    if work_dir then
+      print("Package mode")
+      in_document = false
+      main_dir = work_dir
+      repeat
+        local top = container(main_dir .."../", "build.lua")
+        if top then
+          main_dir = top
+        end
+      until not top
+    else
+      print("Document mode")
+      in_document = true
+    end
   end
 
   ---Register the given pakage.
@@ -226,13 +233,14 @@ do
     return pkg
   end
 
+  l3build.in_document = in_document
   l3build.work_dir    = work_dir -- all these are expected to end with a "/"
   l3build.main_dir    = main_dir
   l3build.start_dir   = start_dir
   l3build.launch_dir  = launch_dir
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
-
+  
   local require_orig = require
 
   local debug_require
@@ -284,6 +292,12 @@ do
 end
 --[=[ end of booting process ]=]
 
+-- Terminate here if in document mode
+if in_document then
+  require("l3b.globals")
+  return l3build
+end
+
 --[=[DEBUG flags]]
 ---@type oslib_t
 local oslib = require("l3b.oslib")
@@ -294,6 +308,12 @@ oslib.Vars.debug.run = true
 local arguments = require("l3b.arguments")
 l3build.options = arguments.parse(arg)
 local options   = l3build.options
+
+if options.debug then
+  if options["debug"] then
+    require("l3b.oslib").Vars.debug.run = true
+  end
+end
 
 ---@type l3b_help_t
 local l3b_help  = require("l3b.help")
@@ -327,6 +347,8 @@ if is_main then
   -- Look for some configuration details
   dofile(work_dir .. "build.lua")
 end
+
+require("l3b.globals")
 
 ---@type l3b_check_t
 local l3b_check   = require("l3b.check")

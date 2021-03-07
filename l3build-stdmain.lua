@@ -215,7 +215,6 @@ local function main(target, names)
        exit(1)
      end
     end
-    print("error_level = target_list[target].func(names)", Main.bundle, target)
     error_level = info.func(names)
   end
   -- All done, finish up

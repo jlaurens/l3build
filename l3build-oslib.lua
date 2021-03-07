@@ -55,7 +55,7 @@ local first_of    = utlib.first_of
 local Vars = setmetatable({
   debug = {}
 }, {
-  __newindex = function (t, k, v)
+  __newindex = function (t, k, v) -- only for new keys
     error("`Vars` are readonly")
   end
 })

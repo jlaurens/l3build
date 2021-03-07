@@ -190,6 +190,7 @@ end
 ---@param dry_run boolean
 ---@return error_level_t
 local function install_files(root_install_dir, full, dry_run)
+
   -- Needed so paths are only cleaned out once
   ---@type flag_table_t
   local already_cleaned = {}
@@ -235,8 +236,8 @@ local function install_files(root_install_dir, full, dry_run)
               append(candidates, {
                 name        = name,
                 source      = source_dir,
-                dest        = l_dir .. src_path_end,
-                install_dir = root_install_dir .."/".. type_module, -- for cleanup
+                dest        = root_install_dir .."/".. l_dir .. src_path_end,
+                install_dir = root_install_dir .."/".. l_dir, -- for cleanup
               })
               matched = true
               break
@@ -246,7 +247,7 @@ local function install_files(root_install_dir, full, dry_run)
             append(candidates, {
               name        = name,
               source      = source_dir,
-              dest        =  type_module .. src_path_end,
+              dest        = root_install_dir .."/".. type_module .. src_path_end,
               install_dir = root_install_dir .."/".. type_module, -- for cleanup
             })
           end
@@ -259,7 +260,7 @@ local function install_files(root_install_dir, full, dry_run)
     if not_empty(candidates) then
       if dry_run then
         for entry in entries(candidates) do
-          print("- " .. entry.dest .. entry.base)
+          print("- " .. entry.dest .. entry.name)
         end
       else
         for entry in entries(candidates) do
@@ -326,7 +327,7 @@ local function install_files(root_install_dir, full, dry_run)
         feed_to_copy(Dir.sourcefile, "source", { source_list })
       + feed_to_copy(Dir.docfile, "doc", {
           Files.bib, Files.demo, Files.doc,
-          Files._all_pdf [[ For the purposes here,
+          Files._all_pdf --[[ For the purposes here,
           any typesetting demo files need to be part of the main typesetting list
         ]], Files.text, typeset_list
       })
@@ -380,7 +381,7 @@ local function install_files(root_install_dir, full, dry_run)
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
   for entry in entries(to_copy) do
-    error_level = copy_name(entry.name, entry.source, entry.dest)
+    error_level = copy_name(entry)
     if error_level ~= 0  then
       return error_level
     end
