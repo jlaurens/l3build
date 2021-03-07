@@ -87,7 +87,7 @@ with a configuration table `uploadconfig`
 
 --]=]
 
----@class l3b_upload_config_t
+---@class l3b_upld_config_t
 ---@field announcement  string        Announcement text
 ---@field author        string        Author name (semicolon-separated for multiple)
 ---@field ctanPath      string        CTAN path
@@ -111,9 +111,9 @@ with a configuration table `uploadconfig`
 ---@field curlopt_file  string        The filename containing the options passed to curl
 
 
----@class l3b_upload_vars_t
----@field curl_debug boolean
----@field uploadconfig l3b_upload_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
+---@class l3b_upld_vars_t
+---@field curl_debug    boolean
+---@field uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
 
 local Vars = chooser(_G, {
   curl_debug    = false,
@@ -430,9 +430,11 @@ function MT:append_request_field(name, max, desc, mandatory, multi)
   end
 end
 
----@class l3b_upload_t
+---@class l3b_upld_t
+---@field Vars l3b_upld_vars_t
 ---@field upload fun(tag_names: string_list_t): string
 
 return {
-  upload            = upload,
+  Vars    = Vars,
+  upload  = upload,
 }

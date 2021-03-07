@@ -57,7 +57,6 @@ local file_list             = fslib.file_list
 local directory_exists      = fslib.directory_exists
 local remove_directory      = fslib.remove_directory
 local copy_name             = fslib.copy_name
-local copy_tree             = fslib.copy_tree
 local file_exists           = fslib.file_exists
 local remove_tree           = fslib.remove_tree
 local tree                  = fslib.tree
@@ -77,18 +76,18 @@ local Dir       = l3b_vars.Dir
 ---@type Files_t
 local Files     = l3b_vars.Files
 
----@type l3b_unpack_t
-local l3b_unpack  = require("l3b.unpack")
-local unpack      = l3b_unpack.unpack
+---@type l3b_unpk_t
+local l3b_unpk  = require("l3b.unpack")
+local unpack    = l3b_unpk.unpack
 
----@type l3b_typesetting_t
-local l3b_typesetting = require("l3b.typesetting")
-local doc             = l3b_typesetting.doc
+---@type l3b_tpst_t
+local l3b_tpst  = require("l3b.typesetting")
+local doc       = l3b_tpst.doc
 
----@class l3b_install_vars_t
+---@class l3b_inst_vars_t
 ---@field flattentds  boolean Switch to flatten any source structure when creating a TDS structure
 
----@type l3b_install_vars_t
+---@type l3b_inst_vars_t
 local Vars = chooser(_G, {
   flattentds = true
 })
@@ -395,13 +394,15 @@ local function install()
   return install_files(get_textmf_home(), options["full"], options["dry-run"])
 end
 
----@class l3b_install_t
+---@class l3b_inst_t
+---@field Vars              l3b_inst_vars_t
 ---@field uninstall         fun(): integer
 ---@field install_files     fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
 ---@field install           fun(): integer
 ---@field get_typeset_list  fun(): string_list_t
 
 return {
+  Vars              = Vars,
   uninstall         = uninstall,
   install_files     = install_files,
   install           = install,

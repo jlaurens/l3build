@@ -82,6 +82,10 @@ end
 ---@return exitcode? "exit"|"signal"
 ---@return integer? code
 local function make_directory(path)
+  if not path then
+    print(debug.traceback())
+    error("MISSING PATH")
+  end
   if os_type == "windows" then
     -- Windows (with the extensions) will automatically make directory trees
     -- but issues a warning if the dir already exists: avoid by including a test

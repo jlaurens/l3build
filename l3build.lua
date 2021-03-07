@@ -87,6 +87,7 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field PACKAGE     string        "l3build", `package.loaded` key
 ---@field NAME        string        "l3build", display name
 ---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
+---@field is_main     boolean       True means "l3build" is the main controller.
 ---@field in_document boolean       True means no "build.lua"
 ---@field work_dir    string|nil    where the closest "build.lua" lives, nil means not in_document
 ---@field main_dir    string|nil    where the topmost "build.lua" lives, nil means not in_document
@@ -233,11 +234,12 @@ do
     return pkg
   end
 
+  l3build.is_main     = is_main
   l3build.in_document = in_document
-  l3build.work_dir    = work_dir -- all these are expected to end with a "/"
-  l3build.main_dir    = main_dir
-  l3build.start_dir   = start_dir
+  l3build.start_dir   = start_dir -- all these are expected to end with a "/"
   l3build.launch_dir  = launch_dir
+  l3build.work_dir    = work_dir -- may be nil
+  l3build.main_dir    = main_dir
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
   
@@ -283,9 +285,12 @@ do
   on_debug(function ()
     print("l3build: A testing and building system for LaTeX")
     print("  start:  ".. start_dir)
-    print("  work:   ".. work_dir)
     print("  kpse:   ".. kpse_dir)
     print("  launch: ".. launch_dir)
+    if not in_document then
+      print("  work:   ".. work_dir)
+      print("  main:   ".. main_dir)
+    end
     print()
   end)
 
@@ -342,13 +347,13 @@ local prepare_config  = l3b_main.prepare_config
 -- Allow main function to be disabled 'higher up'
 _G.main = _G.main or l3b_main.main
 
+require("l3b.globals")
+
 -- Load configuration file if running as a script
 if is_main then
   -- Look for some configuration details
   dofile(work_dir .. "build.lua")
 end
-
-require("l3b.globals")
 
 ---@type l3b_check_t
 local l3b_check   = require("l3b.check")

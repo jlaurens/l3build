@@ -74,10 +74,10 @@ local Opts      = l3b_vars.Opts
 local l3b_aux = require("l3b.aux")
 local call    = l3b_aux.call
 
----@type l3b_install_t
-local l3b_install = require("l3b.install")
-local install_files = l3b_install.install_files
-local get_typeset_list = l3b_install.get_typeset_list
+---@type l3b_inst_t
+local l3b_inst = require("l3b.install")
+local install_files = l3b_inst.install_files
+local get_typeset_list = l3b_inst.get_typeset_list
 
 ---@class l3b_ctan_vars_t
 ---@field flatten boolean Switch to flatten any source structure when sending to CTAN
@@ -223,10 +223,12 @@ local function ctan()
 end
 
 ---@class l3b_ctan_t
+---@field Vars        l3b_ctan_vars_t
 ---@field ctan        fun(): integer
 ---@field bundle_ctan fun(): integer
 
 return {
+  Vars              = Vars,
   ctan              = ctan,
   bundle_ctan       = bundle_ctan,
 }

@@ -36,9 +36,12 @@ are `dofile`d such that both inherit all the global variables
 defined here.
 --]=]
 
+local l3build = require("l3build")
+
 -- Global variables
 
--- utility functions
+_G.options = l3build.options
+
 
 ---@type utlib_t
 local utlib = require("l3b.utillib")
@@ -80,8 +83,6 @@ _G.normalize_path = fslib.to_host
 --X os_pathsep
 --X os_setenv
 
-local l3build = require("l3build")
-
 --components of l3build
 if l3build.in_document then
   for k in items(
@@ -98,24 +99,277 @@ if l3build.in_document then
   return
 end
 
+
 ---@type l3b_aux_t
 local l3b_aux = require("l3b.aux")
 
 _G.call = l3b_aux.call
 
----@type l3b_install_t
-local l3b_install = require("l3b.install")
+---@type l3b_inst_t
+local l3b_inst = require("l3b.install")
 
-_G.install_files = l3b_install.install_files
+_G.install_files = l3b_inst.install_files
 
 -- typesetting functions
 
----@type l3b_typesetting_t
-local l3b_typesetting = require("l3b.typesetting")
+---@type l3b_tpst_t
+local l3b_tpst = require("l3b.typesetting")
 
-_G.biber      = l3b_typesetting.biber
-_G.bibtex     = l3b_typesetting.bibtex
-_G.makeindex  = l3b_typesetting.makeindex
-_G.tex        = l3b_typesetting.tex
+_G.biber      = l3b_tpst.biber
+_G.bibtex     = l3b_tpst.bibtex
+_G.makeindex  = l3b_tpst.makeindex
+_G.tex        = l3b_tpst.tex
 
-_G.runcmd = l3b_typesetting.runcmd
+_G.runcmd     = l3b_tpst.runcmd
+
+-- Global variables
+
+local function export_symbols(from, suffix, ...)
+  if not from then
+    print(debug.traceback())
+    error("Missing from")
+end
+  for item in items(...) do
+    if from[item] == nil then
+      print(debug.traceback())
+      error("Erroneous item: ".. item)
+    end
+    _G[item ..suffix] = from[item]
+  end
+end
+
+---@type l3b_vars_t
+local l3b_vars = require("l3b.variables")
+
+if type(_G.module) == "function" then
+  _G.module = nil
+end
+
+---@type Main_t
+local Main = l3b_vars.Main
+export_symbols(Main, "",
+  "module",
+  "bundle",
+  "ctanpkg",
+  "modules",
+  "exclmodules"
+)
+
+--[=[ ]=]
+local Dir = l3b_vars.Dir
+export_symbols(Dir, "dir",
+  "main",
+  "docfile",
+  "sourcefile",
+  "support",
+  "testfile",
+  "testsupp",
+  "texmf",
+  "textfile",
+  "build",
+  "distrib",
+  --"local",
+  "result",
+  "test",
+  "typeset",
+  "unpack",
+  "ctan",
+  "tds"
+)
+
+_G.localdir = Dir[l3b_vars.LOCAL]
+
+export_symbols(Main, "",
+"tdsroot"
+)
+
+local Files = l3b_vars.Files
+export_symbols(Files, "files",
+  "aux",
+  "bib",
+  "binary",
+  "bst",
+  "check",
+  "checksupp",
+  "clean",
+  "demo",
+  "doc",
+  "dynamic",
+  "exclude",
+  "install",
+  "makeindex",
+  "script",
+  "scriptman",
+  "source",
+  "tag",
+  "text",
+  "typesetdemo",
+  "typeset",
+  "typesetsupp",
+  "typesetsource",
+  "unpack",
+  "unpacksupp"
+)
+
+---@type l3b_check_t
+local l3b_check = require("l3b.check")
+---@type l3b_check_vars_t
+local l3b_check_vars = l3b_check.Vars
+export_symbols(l3b_check_vars, "",
+"includetests",
+"excludetests"
+)
+
+---@type Deps_t
+local Deps = l3b_vars.Deps
+export_symbols(Deps, "deps",
+"check",
+"typeset",
+"unpack"
+)
+
+export_symbols(l3b_check_vars, "",
+  "checkengines",
+  "stdengine",
+  "checkformat",
+  "specialformats",
+  "test_types",
+  "test_order",
+  "checkconfigs"
+)
+
+---@type Exe_t
+local Exe = l3b_vars.Exe
+export_symbols(Exe, "exe",
+  "typeset",
+  "unpack",
+  "zip",
+  "biber",
+  "bibtex",
+  "makeindex",
+  "curl"
+)
+
+local Opts = l3b_vars.Opts
+export_symbols(Opts, "opts",
+  "check",
+  "typeset",
+  "unpack",
+  "zip",
+  "biber",
+  "bibtex",
+  "makeindex"
+)
+
+export_symbols(l3b_check_vars, "",
+  "checksearch"
+)
+
+---@type l3b_tpst_t
+local l3b_tpst = require("l3b.typesetting")
+---@type l3b_tpst_vars_t
+local l3b_tpst_vars = l3b_tpst.Vars
+export_symbols(l3b_tpst_vars, "",
+  "typesetsearch"
+)
+
+---@type l3b_unpk_t
+local l3b_unpk = require("l3b.unpack")
+---@type l3b_unpk_vars_t
+local l3b_unpk_vars = l3b_unpk.Vars
+export_symbols(l3b_unpk_vars, "",
+  "unpacksearch"
+)
+
+export_symbols(l3b_tpst_vars, "",
+  "glossarystyle",
+  "indexstyle",
+  "specialtypesetting",
+  "forcedocepoch"
+)
+
+export_symbols(Main, "",
+  "forcecheckepoch"
+)
+
+export_symbols(l3b_check_vars, "",
+"asciiengines",
+"checkruns"
+)
+
+export_symbols(Main, "",
+  "ctanreadme",
+  "ctanzip",
+  "epoch"
+)
+
+---@type l3b_ctan_t
+local l3b_ctan = require("l3b.ctan")
+---@type l3b_ctan_vars_t
+local l3b_ctan_vars = l3b_ctan.Vars
+export_symbols(l3b_ctan_vars, "",
+  "flatten"
+)
+
+---@type l3b_inst_vars_t
+local l3b_inst_vars = l3b_inst.Vars
+
+export_symbols(l3b_inst_vars, "",
+  "flattentds"
+)
+
+export_symbols(l3b_check_vars, "",
+  "maxprintline"
+)
+
+export_symbols(l3b_ctan_vars, "",
+  "packtdszip"
+)
+
+export_symbols(Opts, "opts",
+  "ps2pdf"
+)
+
+export_symbols(l3b_tpst_vars, "",
+  "typesetcmds"
+)
+
+export_symbols(l3b_check_vars, "",
+  "recordstatus"
+)
+
+---@type l3b_mfst_t
+local l3b_mfst = require("l3b.manifest")
+---@type l3b_mfst_vars_t
+local l3b_mfst_vars = l3b_mfst.Vars
+
+export_symbols(l3b_mfst_vars, "",
+  "manifestfile"
+)
+
+export_symbols(Main, "",
+  "tdslocations"
+)
+
+---@type l3b_upld_t
+local l3b_upld = require("l3b.upload")
+---@type l3b_upld_vars_t
+local l3b_upld_vars = l3b_upld.Vars
+
+export_symbols(l3b_upld_vars, "",
+  "uploadconfig"
+)
+
+local Xtn = l3b_vars.Xtn
+export_symbols(Xtn, "ext",
+  "bak",
+  "dvi",
+  "lvt",
+  "tlg",
+  "tpf",
+  "lve",
+  "log",
+  "pvt",
+  "pdf",
+  "ps"
+)

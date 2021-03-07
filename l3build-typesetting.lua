@@ -89,9 +89,9 @@ local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
 local deps_install  = l3b_aux.deps_install
 
---@type l3b_unpack_t
-local l3b_unpack  = require("l3b.unpack")
-local unpack      = l3b_unpack.unpack
+--@type l3b_unpk_t
+local l3b_unpk  = require("l3b.unpack")
+local unpack      = l3b_unpk.unpack
 
 ---@class l3b_tpst_vars_t
 ---@field typesetsearch boolean Switch to search the system \texttt{texmf} for during typesetting
@@ -415,7 +415,8 @@ local function doc(files)
   return 0
 end
 
----@class l3b_typesetting_t
+---@class l3b_tpst_t
+---@field Vars      l3b_tpst_vars_t
 ---@field dvi2pdf   fun(name: string, dir: string, engine: string, hide: boolean): integer
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
 ---@field doc       fun(files: string_list_t): integer
@@ -425,6 +426,7 @@ end
 ---@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): integer
 
 return {
+  Vars              = Vars,
   dvi2pdf           = dvi2pdf,
   runcmd            = runcmd,
   doc               = doc,

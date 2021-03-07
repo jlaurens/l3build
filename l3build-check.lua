@@ -111,13 +111,13 @@ local l3b_aux       = require("l3b.aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
 local deps_install  = l3b_aux.deps_install
 
----@type l3b_unpack_t
-local l3b_unpack    = require("l3b.unpack")
-local bundleunpack  = l3b_unpack.bundleunpack
+---@type l3b_unpk_t
+local l3b_unpk    = require("l3b.unpack")
+local bundleunpack  = l3b_unpk.bundleunpack
 
----@type l3b_typesetting_t
-local l3b_typesetting = require("l3b.typesetting")
-local dvi2pdf        = l3b_typesetting.dvi2pdf
+---@type l3b_tpst_t
+local l3b_tpst = require("l3b.typesetting")
+local dvi2pdf        = l3b_tpst.dvi2pdf
 
 -- Variables
 
@@ -1094,9 +1094,12 @@ end
 
 -- define the default once the required object are properly defined
 extend_with(dflt, {
+  includetests  = { "*" },
+  excludetests  = {},
   checkengines    = { "pdftex", "xetex", "luatex" },
   stdengine     = "pdftex",
   checkformat   = "latex",
+  -- specialformats is defined below
   test_types = {
     log = {
       test = Xtn.lvt,
@@ -1114,14 +1117,12 @@ extend_with(dflt, {
     },
   },
   test_order    = { "log", "pdf" },
-  includetests  = { "*" },
-  excludetests  = {},
+  checkconfigs  = { "build" },
+  checksearch   = true,
   recordstatus  = false,
   asciiengines  = { "pdftex" },
   checkruns     = 1,
   maxprintline  = 79,
-  checksearch   = true,
-  checkconfigs  = { "build" },
   checkinit_hook  = checkinit_hook,
   [utlib.KEY_did_choose] = function (t, k, result)
     -- No trailing /

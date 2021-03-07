@@ -39,7 +39,6 @@ local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
 local keys        = utlib.keys
-local extend_with = utlib.extend_with
 
 ---@type fslib_t
 local fslib      = require("l3b.fslib")
@@ -55,7 +54,7 @@ local Dir   = l3b_vars.Dir
 ---@type Files_t
 local Files = l3b_vars.Files
 
----@type l3b_manifest_setup_t
+---@type l3b_mfst_setup_t
 local stp = require("l3b.manifest-setup")
 
 local Mnfst = chooser(_G, {
@@ -70,10 +69,10 @@ local Mnfst = chooser(_G, {
   write_group_file        = stp.write_group_file,
 }, { prefix = "manifest_" })
 
----@class l3b_manifest_vars_t
+---@class l3b_mfst_vars_t
 ---@field manifestfile string File name to use for the manifest file
 
----@type l3b_manifest_vars_t
+---@type l3b_mfst_vars_t
 local Vars = chooser(_G, {
   -- Manifest options
   manifestfile    = "MANIFEST.md",
@@ -297,9 +296,11 @@ local function manifest()
   helper:manifest()
 end
 
----@class l3b_manifest_t
+---@class l3b_mfst_t
+---@field Vars      l3b_mfst_vars_t
 ---@field manifest function
 
 return {
-  manifest = manifest,
+  Vars      = Vars,
+  manifest  = manifest,
 }

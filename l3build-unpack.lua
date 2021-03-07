@@ -66,10 +66,10 @@ local Exe       = l3b_vars.Exe
 ---@type Opts_t
 local Opts      = l3b_vars.Opts
 
----@class l3b_unpack_vars_t
+---@class l3b_unpk_vars_t
 ---@field unpacksearch boolean  Switch to search the system \texttt{texmf} for during unpacking
 
----@type l3b_unpack_vars_t
+---@type l3b_unpk_vars_t
 local Vars = chooser(_G, {
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
@@ -156,11 +156,13 @@ local function unpack(sources, source_dirs)
   return 0
 end
 
----@class l3b_unpack_t
+---@class l3b_unpk_t
+---@field Vars          l3b_unpk_vars_t
 ---@field bundleunpack  bundleunpack_f
 ---@field unpack        bundleunpack_f
 
 return {
+  Vars              = Vars,
   unpack            = unpack,
   bundleunpack      = bundleunpack,
 }

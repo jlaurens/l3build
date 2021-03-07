@@ -22,8 +22,6 @@ for those people who are interested.
 
 --]]
 
-local match   = string.match
-local gsub    = string.gsub
 local append  = table.insert
 local os_time = os["time"]
 
@@ -84,8 +82,8 @@ end
 ---@field module        string The name of the module
 ---@field bundle        string The name of the bundle in which the module belongs (where relevant)
 ---@field ctanpkg       string Name of the CTAN package matching this module
----@field exclmodules   string_list_t Directories to be excluded from automatic module detection
 ---@field modules       string_list_t The list of all modules in a bundle (when not auto-detecting)
+---@field exclmodules   string_list_t Directories to be excluded from automatic module detection
 ---@field forcecheckepoch boolean Force epoch when running tests
 ---@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
 ---@field tdsroot       string
@@ -387,6 +385,7 @@ local Exe = chooser(_G, {
 ---@field biber     string Biber options
 ---@field bibtex    string \BibTeX{} options
 ---@field makeindex string MakeIndex options
+---@field ps2pdf    string ps2pdf options
 
 ---@type Opts_t
 local Opts  = chooser(_G, {
@@ -397,6 +396,7 @@ local Opts  = chooser(_G, {
   biber     = "",
   bibtex    = "-W",
   makeindex = "",
+  ps2pdf    = "",
 }, { suffix = "opts" })
 
 -- Extensions for various file types: used to abstract out stuff a bit
