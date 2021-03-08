@@ -180,7 +180,7 @@ local function parse()
     -- No options are allowed in position 1, so filter those out
     if a == "--version" then
       result["target"] = "version"
-    elseif not match(a, "^%-") then
+    elseif not a:match("^%-") then
       result["target"] = a
     end
   end
@@ -213,8 +213,8 @@ local function parse()
     local optarg
     local opts
     -- Look for and option and get it into a variable
-    if match(a, "^%-") then
-      if match(a, "^%-%-") then
+    if a:match("^%-") then
+      if a:match("^%-%-") then
         opts = long_options
         local pos = find(a, "=", 1, true)
         if pos then
@@ -238,7 +238,7 @@ local function parse()
         -- Tidy up arguments
         if _G.option_list[optname]["type"] == "boolean" then
           if optarg then
-            local opt = "-" .. (match(a, "^%-%-") and "-" or "") .. opt
+            local opt = "-" .. (a:match("^%-%-") and "-" or "") .. opt
             stderr:write("Value not allowed for option " .. opt .."\n")
             return { target = "help" }
           end
@@ -254,7 +254,7 @@ local function parse()
         end
       else
         -- Private special debugging options "--debug-<key>"
-        local key = match(a, "^%-%-debug%-(%w[%w%d_-]*)")
+        local key = a:match("^%-%-debug%-(%w[%w%d_-]*)")
         if key then
           ---@type l3build_t
           local l3build = require("l3build")

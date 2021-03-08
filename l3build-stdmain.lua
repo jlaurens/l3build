@@ -64,14 +64,14 @@ local help          = require("l3b.help").help
 local l3b_ctan      = require("l3b.ctan")
 local ctan          = l3b_ctan.ctan
 local bundlectan    = l3b_ctan.bundlectan
-local l3b_unpk    = require("l3b.unpack")
+local l3b_unpk      = require("l3b.unpack")
 local unpack        = l3b_unpk.unpack
-local bundleunpack  = l3b_unpk.bundleunpack
+local bundleunpack  = l3b_unpk.Vars.bundleunpack
 local l3b_clean     = require("l3b.clean")
 local clean         = l3b_clean.clean
 local bundleclean   = l3b_clean.bundleclean
 local doc           = require("l3b.typesetting").doc
-local l3b_inst   = require("l3b.install")
+local l3b_inst      = require("l3b.install")
 local install       = l3b_inst.install
 local uninstall     = l3b_inst.uninstall
 local manifest      = require("l3b.manifest").manifest
@@ -273,9 +273,10 @@ local function prepare_config()
   local checkconfigs = l3b_check_vars.checkconfigs
   local options = l3build.options
   local config_1 = checkconfigs[1]
+  local target = options["target"]
   if #checkconfigs == 1 and
     config_1 ~= "build" and
-    (options["target"] == "check" or options["target"] == "save" or options["target"] == "clean") then
+    (target == "check" or target == "save" or target == "clean") then
       local config_path = l3build.work_dir .. config_1:gsub( ".lua$", "") .. ".lua"
       if file_exists(config_path) then
         dofile(config_path)

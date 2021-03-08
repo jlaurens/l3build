@@ -128,7 +128,7 @@ local function export_symbols(from, suffix, ...)
   if not from then
     print(debug.traceback())
     error("Missing from")
-end
+  end
   for item in items(...) do
     if from[item] == nil then
       print(debug.traceback())
@@ -315,7 +315,8 @@ export_symbols(l3b_ctan_vars, "",
 local l3b_inst_vars = l3b_inst.Vars
 
 export_symbols(l3b_inst_vars, "",
-  "flattentds"
+  "flattentds",
+  "flattenscript"
 )
 
 export_symbols(l3b_check_vars, "",

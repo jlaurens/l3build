@@ -34,7 +34,6 @@ local entries = utlib.entries
 local items   = utlib.items
 local values  = utlib.values
 local to_quoted_string = utlib.to_quoted_string
-local extend_with     = utlib.extend_with
 
 ---@type wklib_t
 local wklib    = require("l3b.walklib")
@@ -77,7 +76,8 @@ local call    = l3b_aux.call
 ---@type l3b_inst_t
 local l3b_inst = require("l3b.install")
 local install_files = l3b_inst.install_files
-local get_typeset_list = l3b_inst.get_typeset_list
+---@type l3b_inst_vars_t
+local l3b_inst_vars = l3b_inst.Vars
 
 ---@class l3b_ctan_vars_t
 ---@field flatten boolean Switch to flatten any source structure when sending to CTAN
@@ -111,7 +111,7 @@ local function copy_ctan()
   end
   for tab in items(
     Files.bib, Files.demo, Files.doc,
-    Files.scriptman, Files._all_pdf, get_typeset_list()
+    Files.scriptman, Files._all_pdf, l3b_inst_vars.typeset_list
   ) do
     copyfiles(tab, Dir.docfile)
   end
@@ -178,8 +178,8 @@ local function ctan()
   end
   -- Rename README if necessary
   local readme = Main.ctanreadme
-  if readme ~= "" and not match(lower(readme), "^readme%.%w+") then
-    local newfile = "README." .. match(readme, "%.(%w+)$")
+  if readme ~= "" and not lower(readme):match("^readme%.%w+") then
+    local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
       Dir.ctan .. "/" .. Main.ctanpkg,
       Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle

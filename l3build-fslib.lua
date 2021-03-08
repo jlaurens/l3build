@@ -26,10 +26,8 @@ local pairs       = pairs
 
 local execute     = os.execute
 local remove      = os.remove
-local os_rename   = os.rename
 local os_type     = os["type"]
 
-local gmatch      = string.gmatch
 local gsub        = string.gsub
 
 local append      = table.insert
@@ -45,6 +43,10 @@ local utlib       = require("l3b.utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
 local first_of    = utlib.first_of
+
+---@type wklib_t
+local wklib           = require("l3b.walklib")
+local dir_base        = wklib.dir_base
 
 ---@type gblib_t
 local gblib           = require("l3b.globlib")
@@ -307,9 +309,16 @@ local function rename(dir_path, source, dest)
 end
 
 local function copy_core(dest, p_src, p_wrk)
+  if Vars.debug.copy_core then
+    print("copy_core", dest, p_src, p_wrk)
+  end
   local error_level
-  -- p_src is a path relative to `source` whereas
-  -- p_wrk is the counterpart relative to the current working directory
+  -- p_src was a path relative to `source` whereas
+  -- p_wrk was the counterpart relative to the current working directory
+  local dir, base = dir_base(p_src)
+  dest = dest ..'/'.. dir
+  p_src = base
+  make_directory(dest)
   if os_type == "windows" then
     if attributes(p_wrk, "mode") == "directory" then
       error_level = execute(
@@ -323,13 +332,17 @@ local function copy_core(dest, p_src, p_wrk)
       )
     end
   else
+    if Vars.debug.copy_core then
+      print("make_directory '" .. dest .. "/'", directory_exists(dest))
+      print("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
+    end
     error_level = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
   end
   return error_level
 end
 
 
----@class copy_name_kv -- copy_name key/value arguments
+---@class copy_name_kv -- copy_file key/value arguments
 ---@field name    string
 ---@field source  string
 ---@field dest    string
@@ -339,7 +352,7 @@ end
 ---@param source? string path of the source directory, required when name is not a table
 ---@param dest? string path of the destination directory, required when name is not a table
 ---@return error_level_t
-local function copy_name(name, source, dest)
+local function copy_file(name, source, dest)
   if type(name) == "table" then
     name, source, dest = name.name, name.source, name.dest
   end
@@ -426,7 +439,7 @@ end
 ---@field set_tree_excluder fun(f: fun(path_wrk: string): boolean)
 ---@field tree        fun(dir_path: string, glob: string): table<string, string>)
 ---@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
----@field copy_name   fun(file: string, source: string, dest: string): integer
+---@field copy_file   fun(file: string, source: string, dest: string): integer
 ---@field copy_tree   fun(glob: string, source: string, dest: string): integer
 ---@field make_clean_directory fun(path: string): integer
 ---@field remove_name fun(dir_path: string, name: string): integer
@@ -446,7 +459,7 @@ return {
   set_tree_excluder = set_tree_excluder,
   tree = tree,
   rename = rename,
-  copy_name = copy_name,
+  copy_file = copy_file,
   copy_tree = copy_tree,
   make_clean_directory = make_clean_directory,
   remove_name = remove_name,

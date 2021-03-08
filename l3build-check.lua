@@ -76,7 +76,7 @@ local run         = oslib.run
 ---@type fslib_t
 local fslib       = require("l3b.fslib")
 local all_names   = fslib.all_names
-local copy_name   = fslib.copy_name
+local copy_file   = fslib.copy_file
 local copy_tree   = fslib.copy_tree
 local file_exists = fslib.file_exists
 local locate      = fslib.locate
@@ -113,7 +113,7 @@ local deps_install  = l3b_aux.deps_install
 
 ---@type l3b_unpk_t
 local l3b_unpk    = require("l3b.unpack")
-local bundleunpack  = l3b_unpk.bundleunpack
+local bundleunpack  = l3b_unpk.Vars.bundleunpack
 
 ---@type l3b_tpst_t
 local l3b_tpst = require("l3b.typesetting")
@@ -149,7 +149,24 @@ local dvi2pdf        = l3b_tpst.dvi2pdf
 local dflt = {} -- define below
 
 ---@type l3b_check_vars_t
-local Vars = chooser(_G, dflt)
+local Vars = chooser(_G, dflt, {
+  did_choose = function (t, k, result)
+    -- No trailing /
+    -- What about the leading "./"
+    if k == "checkconfigs" then
+      local options = l3build.options
+      -- When we have specific files to deal with, only use explicit configs
+      -- (or just the std one)
+      -- TODO: Justify this...
+      if options["names"] then
+        return options["config"] or { _G.stdconfig }
+      else
+        return options["config"] or result
+      end
+    end
+    return result
+  end,
+})
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -1124,22 +1141,6 @@ extend_with(dflt, {
   checkruns     = 1,
   maxprintline  = 79,
   checkinit_hook  = checkinit_hook,
-  [utlib.KEY_did_choose] = function (t, k, result)
-    -- No trailing /
-    -- What about the leading "./"
-    if k == "checkconfigs" then
-      local options = l3build.options
-      -- When we have specific files to deal with, only use explicit configs
-      -- (or just the std one)
-      -- TODO: Justify this...
-      if options["names"] then
-        return options["config"] or { _G.stdconfig }
-      else
-        return options["config"] or result
-      end
-    end
-    return result
-  end,
   runtest_tasks = runtest_tasks,
 })
 
@@ -1310,7 +1311,7 @@ local function save(names)
       print("Creating and copying " .. out_file)
       run_test(name, engine, false, test_type.test, test_type)
       rename(Dir.test, gen_file, out_file)
-      copy_name(out_file, Dir.test, Dir.testfile)
+      copy_file(out_file, Dir.test, Dir.testfile)
       if file_exists(Dir.unpack .. "/" .. test_type.reference) then
         print("Saved " .. test_type.reference
           .. " file overrides unpacked version of the same name")

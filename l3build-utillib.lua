@@ -244,9 +244,6 @@ local function deep_copy(original)
   return f(original)
 end
 
--- Unique keys
-local KEY_did_choose = {}
-
 ---@class ut_flags_t
 ---@field cache_chosen boolean
 
@@ -260,6 +257,7 @@ local flags = {}
 ---@field prefix  string|nil -- prepend this prefix to the key for G, not for dflt
 ---@field suffix  string|nil -- append this prefix to the key for G, not for dflt
 ---@field index   fun(t: table, k: any): any
+---@field did_choose did_choose_f
 
 --[=[
 The purpose of the next chooser function is to allow the customization of a tree from the global domain.
@@ -300,7 +298,7 @@ do
       local function before_return ()
         -- post treatment
         ---@type did_choose_f
-        local did_choose = dflt[KEY_did_choose]
+        local did_choose = kv and kv.did_choose
         if did_choose then
           result = did_choose(t, k, result) -- result *is* used
         end
@@ -314,7 +312,7 @@ do
         local index = kv.index
         if index then
           result = index(t, k)
-          if result then
+          if result ~= nil then
             return before_return()
           end
         end
@@ -335,7 +333,7 @@ do
       end
       local G = t[KEY_G]
       local G_kk = G[kk]                -- global candidate
-      if not G_kk then
+      if G_kk == nil then
         result = dflt_k                 -- choose the default candidate
       else
         local type_dflt_k = type(dflt_k)
@@ -394,7 +392,6 @@ end
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
 ---@field write_content     fun(file_pat: string, content: string): error_level_t
 ---@field deep_copy         fun(original: any): any
----@field KEY_did_choose    any
 ---@field flags             ut_flags_t
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
 
@@ -416,6 +413,5 @@ return {
   write_content     = write_content,
   deep_copy         = deep_copy,
   flags             = flags,
-  KEY_did_choose    = KEY_did_choose,
   chooser           = chooser,
 }

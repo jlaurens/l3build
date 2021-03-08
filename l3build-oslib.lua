@@ -143,7 +143,7 @@ end
 ---@return string
 local function quoted_path(path)
   if os_type == "windows" then
-    if match(path, " ") then
+    if path:match(" ") then
       return '"' .. path .. '"'
     end
     return path

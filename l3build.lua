@@ -60,28 +60,6 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 
 ---@class l3build_data_t
 
----@class l3build_options_t
----@field config    table
----@field date      string
----@field debug     boolean
----@field dirty     boolean
----@field dry_run   boolean
----@field email     string
----@field engine    table
----@field epoch     string
----@field file      string
----@field first     boolean
----@field force     boolean
----@field full      boolean
----@field halt_on_error boolean -- real name "halt-on-error"
----@field help      boolean
----@field message   string
----@field names     table
----@field quiet     boolean
----@field rerun     boolean
----@field shuffle   boolean
----@field texmfhome string
-
 ---@class l3build_t
 ---@field debug       flag_table_t  the special --debug-foo CLI arguments
 ---@field PACKAGE     string        "l3build", `package.loaded` key
@@ -106,7 +84,7 @@ local l3build = { -- global data available as package.
 
 do
   -- the directory containing "l3build.lua" by kpse
-  local kpse_dir = match(kpse.lookup("l3build.lua"), ".*/")
+  local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
 
   -- Setup dirs where require will look for modules.
 
@@ -155,7 +133,7 @@ do
   local cmd_dir, cmd_base = to_dir_base(cmd_path)
 
   is_main = cmd_base == "l3build" or cmd_base == "l3build.lua"
-  assert(is_main == not not (match(arg[0], "l3build$") or match(arg[0], "l3build%.lua$")))
+  assert(is_main == not not (arg[0]:match("l3build$") or arg[0]:match("l3build%.lua$")))
   -- launch_dir:
   if cmd_base == "l3build.lua" then -- `texlua foo/bar/l3build.lua ...`
     launch_dir = cmd_dir
@@ -201,20 +179,20 @@ do
         end
       end)
     end
-    if work_dir then
-      print("Package mode")
-      in_document = false
-      main_dir = work_dir
-      repeat
-        local top = container(main_dir .."../", "build.lua")
-        if top then
-          main_dir = top
-        end
-      until not top
-    else
-      print("Document mode")
-      in_document = true
-    end
+  end
+  if work_dir then
+    print("Package mode")
+    in_document = false
+    main_dir = work_dir
+    repeat
+      local top = container(main_dir .."../", "build.lua")
+      if top then
+        main_dir = top
+      end
+    until not top
+  else
+    print("Document mode")
+    in_document = true
   end
 
   ---Register the given pakage.
@@ -238,8 +216,8 @@ do
   l3build.in_document = in_document
   l3build.start_dir   = start_dir -- all these are expected to end with a "/"
   l3build.launch_dir  = launch_dir
-  l3build.work_dir    = work_dir -- may be nil
-  l3build.main_dir    = main_dir
+  l3build.work_dir    = work_dir  -- may be nil
+  l3build.main_dir    = main_dir  -- may be nil as well
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
   
@@ -348,12 +326,67 @@ local prepare_config  = l3b_main.prepare_config
 _G.main = _G.main or l3b_main.main
 
 require("l3b.globals")
+require("l3blib.options")
 
 -- Load configuration file if running as a script
 if is_main then
   -- Look for some configuration details
   dofile(work_dir .. "build.lua")
 end
+
+--[=[ CUT FROM HERE ]=]
+-- Custom bundleunpack which does not search the localdir
+-- That is needed as texsys.cfg is unpacked in an odd way and
+-- without this will otherwise not be available
+if _G.bundleunpack ~= nil then
+  print("DEBUG: locally defined _G.bundleunpack")
+  function _G.bundleunpack ()
+    print("!!!! DEBUG bundleunpack not is main")
+    print("_G.maindir", _G.maindir, require("l3b.variables").Dir.main)
+    print("_G.localdir", _G.localdir)
+    print("_G.unpackdir", _G.unpackdir)
+    local errorlevel = _G.mkdir(_G.localdir)
+    if errorlevel ~=0 then
+      return errorlevel
+    end
+    errorlevel = _G.cleandir(_G.unpackdir)
+    if errorlevel ~=0 then
+      return errorlevel
+    end
+    for _,i in ipairs (_G.sourcefiles) do
+      errorlevel = cp (i, ".", _G.unpackdir)
+      if errorlevel ~=0 then
+        return errorlevel
+      end
+    end
+    for _,i in ipairs (_G.unpacksuppfiles) do
+      errorlevel = cp (i, _G.supportdir, _G.localdir)
+      if errorlevel ~=0 then
+        return errorlevel
+      end
+    end
+    for _,i in ipairs (_G.unpackfiles) do
+      for _,j in ipairs (_G.filelist (_G.unpackdir, i)) do
+        local cmd = os_setenv .. " TEXINPUTS=" .. _G.unpackdir .. os_concat ..
+        _G.unpackexe .. " " .. _G.unpackopts .. " -output-directory=" .. _G.unpackdir
+          .. " " .. _G.unpackdir .. "/" .. j
+        local success = io.popen (
+            -- Notice that os.execute is used from 'here' as this ensures that
+            -- localdir points to the correct place: running 'inside'
+            -- unpackdir would avoid the need for setting -output-directory
+            -- but at the cost of needing to correct the relative position
+            -- of localdir w.r.t. unpackdir
+            cmd ,"w"
+          ):write(string.rep("y\n", 300)):close()
+        if not success then
+          return 1
+        end
+      end
+    end
+    return 0
+  end
+end
+--[=[ CUT TO HERE ]=]
 
 ---@type l3b_check_t
 local l3b_check   = require("l3b.check")

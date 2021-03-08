@@ -47,7 +47,7 @@ local extend_with = utlib.extend_with
 ---@return string dir is the part before the last '/' if any, "." otherwise.
 ---@return string
 local function dir_base(path)
-  local dir, base = match(path, "^(.*)/([^/]*)$")
+  local dir, base = path:match("^(.*)/([^/]*)$")
   if dir then
     return dir, base
   else
@@ -73,7 +73,7 @@ end
 ---@param file string
 ---@return string
 local function job_name(file)
-  local name = match(base_name(file), "^(.*)%.")
+  local name = base_name(file):match("^(.*)%.")
   return name or file
 end
 

@@ -60,7 +60,7 @@ local function help()
   end
 
   local scriptname = "l3build"
-  if not (match(arg[0], "l3build%.lua$") or match(arg[0],"l3build$")) then
+  if not (arg[0]:match("l3build%.lua$") or match(arg[0],"l3build$")) then
     scriptname = arg[0]
   end
   print("usage: " .. scriptname .. " <target> [<options>] [<names>]")

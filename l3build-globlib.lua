@@ -79,7 +79,7 @@ local function glob_to_pattern(glob)
 
   -- escape pattern char
   local function escape(c)
-    return match(c, "^%w$") and c or "%" .. c
+    return c:match("^%w$") and c or "%" .. c
   end
 
   -- Convert tokens.
@@ -121,7 +121,7 @@ local function to_glob_match(glob)
   end
   local pattern = glob_to_pattern(glob)
   return function (str)
-    return match(str, pattern)
+    return str:match(pattern)
   end
 end
 

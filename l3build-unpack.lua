@@ -66,23 +66,30 @@ local Exe       = l3b_vars.Exe
 ---@type Opts_t
 local Opts      = l3b_vars.Opts
 
+---@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
+
 ---@class l3b_unpk_vars_t
 ---@field unpacksearch boolean  Switch to search the system \texttt{texmf} for during unpacking
+---@field bundleunpack bundleunpack_f  bundle unpack overwrite
 
 ---@type l3b_unpk_vars_t
-local Vars = chooser(_G, {
+local Vars_dft = {
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
   unpacksearch = true
-})
----@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
+}
+---@type l3b_unpk_vars_t
+local Vars = chooser(_G, Vars_dft)
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
 ---@param source_dirs string_list_t
----@param sources string_list_t
+---@param sources     string_list_t
 ---@return error_level_t
-local function bundleunpack(source_dirs, sources)
+function Vars_dft.bundleunpack(source_dirs, sources)
+  if l3build.options.debug then
+    print("DEBUG bundleunpack")
+  end
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
   if error_level ~=0 then
@@ -95,7 +102,19 @@ local function bundleunpack(source_dirs, sources)
   for i in entries(source_dirs or { Dir.sourcefile }) do
     for j in entries(sources or { Files.source }) do
       for k in entries(j) do
+        if l3build.options.debug then
+          print("glob i, k", k, i)
+        end
+        if k:match("l3blib") then
+          fslib.Vars.debug.tree = true
+          fslib.Vars.debug.copy_core = true
+        end
         error_level = copy_tree(k, i, Dir.unpack)
+        if k:match("l3blib") then
+          fslib.Vars.debug.tree = false
+          fslib.Vars.debug.copy_core = false
+          print("DEBUG")
+        end
         if error_level ~=0 then
           return error_level
         end
@@ -121,6 +140,9 @@ local function bundleunpack(source_dirs, sources)
         Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
           .. (options["quiet"] and (" > " .. _G.os_null) or "")
       )
+      if l3build.options.debug then
+        print("DEBUG: ".. cmd)
+      end
       local success = popen(cmd, "w")
         :write(string.rep("y\n", 300)):close()
       if not success then
@@ -141,9 +163,7 @@ local function unpack(sources, source_dirs)
   if error_level ~= 0 then
     return error_level
   end
-  ---@type bundleunpack_f
-  local unpacker = _G.bundleunpack or bundleunpack
-  error_level = unpacker(source_dirs, sources)
+  error_level = Vars.bundleunpack(source_dirs, sources)
   if error_level ~= 0 then
     return error_level
   end
@@ -158,11 +178,9 @@ end
 
 ---@class l3b_unpk_t
 ---@field Vars          l3b_unpk_vars_t
----@field bundleunpack  bundleunpack_f
 ---@field unpack        bundleunpack_f
 
 return {
   Vars              = Vars,
   unpack            = unpack,
-  bundleunpack      = bundleunpack,
 }

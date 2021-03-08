@@ -59,7 +59,7 @@ local directory_exists  = fslib.directory_exists
 local absolute_path     = fslib.absolute_path
 local file_exists       = fslib.file_exists
 local remove_name       = fslib.remove_name
-local copy_name         = fslib.copy_name
+local copy_file         = fslib.copy_file
 local copy_tree         = fslib.copy_tree
 local make_clean_directory = fslib.make_clean_directory
 local tree              = fslib.tree
@@ -116,7 +116,8 @@ local Vars = chooser(_G, {
   specialtypesetting  = {},
   forcedocepoch       = false,
   ps2pdfopt           = "",
-  [utlib.KEY_did_choose]  = function (t, k, result)
+}, {
+  did_choose = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k == "forcedocepoch" then
@@ -274,7 +275,7 @@ local Ngn = chooser(_G, MT, {
 ---@return error_level_t
 function MT.tex(file, dir, cmd)
   dir = dir or "."
-  cmd = cmd or Exe.typeset .. Opts.typeset
+  cmd = cmd or Exe.typeset .." ".. Opts.typeset
   return runcmd(cmd .. " \"" .. Vars.typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
@@ -327,7 +328,7 @@ local function typesetpdf(file, dir)
   end
   local pdf_name = name .. Xtn.pdf
   remove_name(Dir.docfile, pdf_name)
-  return copy_name(pdf_name, dir, Dir.docfile)
+  return copy_file(pdf_name, dir, Dir.docfile)
 end
 
 ---Do nothing function

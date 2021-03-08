@@ -322,14 +322,14 @@ function MT:upload(tag_names)
   response = self:send_request("validate")
 
   if self.override_update_check then
-    if match(response, "non%-existent%spackage") then
+    if response:match("non%-existent%spackage") then
       print("Package not found on CTAN; re-validating as new package:")
       config.update = false
       self:construct_request()
       response = self:send_request("validate")
     end
   end
-  if match(response, "ERROR") then
+  if response:match("ERROR") then
     exit_status = 1
   end
 
@@ -345,7 +345,7 @@ function MT:upload(tag_names)
     upload_to_ctan = _G.ctanupload or "ask"
   end
   if upload_to_ctan ~= nil and upload_to_ctan ~= false and upload_to_ctan ~= true then
-    if match(response, "WARNING") then
+    if response:match("WARNING") then
       print("Warnings from CTAN package validation:" .. response:gsub("%[", "\n["):gsub("%]%]", "]\n]"))
     else
       print("Validation successful." )
@@ -365,11 +365,11 @@ function MT:upload(tag_names)
 --     or echo a cleaned up version
     print('Response from CTAN:')
     print(response)
-    if match(response, "WARNING") or match(response, "ERROR") then
+    if response:match("WARNING") or response:match("ERROR") then
       exit_status = 1
     end
   else
-    if match(response, "WARNING") then
+    if response:match("WARNING") then
       print("Warnings from CTAN package validation:"
         .. response:gsub("%[", "\n["):gsub("%]%]", "]\n]"))
     else

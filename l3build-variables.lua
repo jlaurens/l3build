@@ -103,21 +103,7 @@ local Main_dflt = {
   ctanreadme      = "README.md",
   forcecheckepoch = true,
   epoch           = 1463734800,
-  flattentds      = true,
   tdslocations    = {},
-  [utlib.KEY_did_choose] = function (t, k, result)
-    -- No trailing /
-    -- What about the leading "./"
-    local options = l3build.options
-    if k == "forcecheckepoch" then
-      if options["epoch"] then
-        return true
-      end
-    elseif k == "epoch" then
-      return normalise_epoch(result)
-    end
-    return result
-  end,  
 }
 
 ---This will be called at the beginning of the __index function.
@@ -156,7 +142,20 @@ local function chooser_index(t, k)
 end
 
 Main = chooser(_G, Main_dflt, {
-  index = chooser_index
+  index = chooser_index,
+  did_choose = function (t, k, result)
+    -- No trailing /
+    -- What about the leading "./"
+    local options = l3build.options
+    if k == "forcecheckepoch" then
+      if options["epoch"] then
+        return true
+      end
+    elseif k == "epoch" then
+      return normalise_epoch(result)
+    end
+    return result
+  end,
 })
 
 ---@class Dir_t
@@ -188,20 +187,14 @@ local LOCAL = {}
 local work = "."
 
 ---@type Dir_t
-local default_Dir = setmetatable({
+local default_Dir = {
   work = ".",
--- Directory structure for the build system
--- Use Unix-style path separators
-  [utlib.KEY_did_choose] = function (t, k, result)
-    -- No trailing /
-    -- What about the leading "./"
-    if k.match and k:match("dir$") then
-      return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
-    end
-    return result
-  end
-}, {
-  __index = function (t, k)
+}
+
+---@type Dir_t
+local Dir = chooser(_G, default_Dir, {
+  suffix = "dir",
+  index = function (t, k)
     local result
     if k == "current" then -- deprecate, not equal to the current directory.
       result = work
@@ -246,11 +239,18 @@ local default_Dir = setmetatable({
       result = Main.tdsroot .. (t._standalone and "/" .. Main.bundle .. "/" or "/") .. Main.module
     end
     return result
+  end,
+  -- Directory structure for the build system
+  -- Use Unix-style path separators
+  did_choose = function (t, k, result)
+    -- No trailing /
+    -- What about the leading "./"
+    if k.match and k:match("dir$") then
+      return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
+    end
+    return result
   end
 })
-
----@type Dir_t
-local Dir = chooser(_G, default_Dir, { suffix = "dir" })
 
 Dir.work = work
 
