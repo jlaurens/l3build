@@ -22,22 +22,30 @@ for those people who are interested.
 
 --]]
 
-local select  = select
-local next    = next
-local append  = table.insert
+local append    = table.insert
 
 local stderr  = io.stderr
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
+local chooser       = utlib.chooser
+local readonly      = utlib.readonly
 local sorted_values = utlib.sorted_values
 
----@class l3build_options_t
----@field config    table
+--[=[ Package implementation ]=]
+
+---@class options_flags_t
+---@field debug boolean
+
+---@type options_flags_t
+local flags = {}
+
+---@class options_t
+---@field config    string_list_t
 ---@field date      string
 ---@field debug     boolean
 ---@field dirty     boolean
----@field dry_run   boolean
+---@field dry_run   boolean -- real name "dry-run"
 ---@field email     string
 ---@field engine    table
 ---@field epoch     string
@@ -48,10 +56,11 @@ local sorted_values = utlib.sorted_values
 ---@field halt_on_error boolean -- real name "halt-on-error"
 ---@field help      boolean
 ---@field message   string
----@field names     table
+---@field names     string_list_t
 ---@field quiet     boolean
 ---@field rerun     boolean
 ---@field shuffle   boolean
+---@field target    string
 ---@field texmfhome string
 
 local option_list = {
@@ -165,41 +174,6 @@ local option_list = {
 ---@field load_value    fun(options: table, key: string, value?: string): error_level_t load the given value
 ---@field builtin       boolean whether the option is builtin
 
--- metatable for option_info_t
-local MT = {}
-
----Load the given value in the given table
----Raise an error if no value is required
----@param options table
----@param key     string
----@param value?  string
----@return error_level_t
-function MT:load_value (options, key, value)
-  if self.type == "boolean" then
-    options[self.name] = not key:match("^no-")
-  elseif self.type == "string" then
-    options[self.name] = value
-  elseif self.type == "number" then
-    options[self.name] = tonumber(value)
-  elseif type(self.type) == "function" then
-    return self.type(options, key, value)
-  else -- string sequence
-    local t = options[self.name] or {}
-    options[self.name] = t
-    append(t, value)
-  end
-  return 0
-end
-
-function MT:__index(k)
-  if k == "expect_value" then
-    return self.type ~= "boolean"
-  end
-  if k == "short" then
-    return nil
-  end
-  error("Unknown field name ".. k)
-end
 ---@type table<string, option_info_t>
 local by_key = {}
 ---@type table<string, option_info_t>
@@ -235,6 +209,46 @@ local function get_all_info(hidden)
   end)
 end
 
+---Load the given value in the given table
+---Raise an error if no value is required
+---@param options table
+---@param key     string
+---@param value?  string
+---@return error_level_t
+local function load_value(self, options, key, value)
+  if self.type == "boolean" then
+    options[self.name] = not key:match("^no-")
+  elseif self.type == "string" then
+    options[self.name] = value
+  elseif self.type == "number" then
+    options[self.name] = tonumber(value)
+  elseif type(self.type) == "function" then
+    return self.type(options, key, value)
+  else -- string sequence
+    local t = options[self.name] or {}
+    options[self.name] = t
+    append(t, value)
+  end
+  return 0
+end
+
+local chooser_index = function (t, k)
+  if k == "expect_value" then
+    if flags.debug then
+      print("DEBUG options parse expect_value:", t.type)
+    end
+    return t.type ~= "boolean"
+  end
+  if k == "short" then
+    return nil
+  end
+  if k == "load_value" then
+    return load_value
+  end
+  print(debug.traceback())
+  error("Unknown field name ".. k)
+end
+
 ---Register the given option.
 ---If there is a conflict, an error is raised.
 ---@param info    option_info_t
@@ -260,20 +274,19 @@ local function register(info, builtin)
   if name == "target" or name == "names" then
     error("Reserved option name ".. name)
   end
-  info = setmetatable({
+  assert(info.type)
+  info = {
     short = short,
     long = long,
     name = name,
     description = info.description,
     type = info.type,
     builtin = builtin and true or false,
-  }, MT)
-  info = setmetatable({}, {
-    __index = info,
-    __newindex = function (t, k, v)
-      error("Readonly object")
-    end,
+  }
+  info = setmetatable(info, {
+    __index = chooser_index
   })
+  info = readonly(info)
   by_name[name] = true
   by_long[long] = info
   by_key[long]  = info
@@ -289,10 +302,14 @@ end
 
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
----comment
+---When the key is not recognized by the system,
+---`on_unknown` gets a chance to recognize it.
+---When this function returns `nil` it means no recognition.
+---When it returns 0, all is ok otherwise an error occurred.
 ---@param arg table
+---@param on_unknown fun(key: string): boolean true when catched, false otherwise
 ---@return table
-local function parse(arg)
+local function parse(arg, on_unknown)
   local result = {
     target = "help",
   }
@@ -323,32 +340,42 @@ local function parse(arg)
     if not arg_i then
       break
     end
+    if flags.debug then
+      print("DEBUG options parse:", arg_i)
+    end
+    if arg_i == "-" or arg_i == "--" then
+      i = i + 1
+      break
+    end
     -- Terminate search for options
-    local long, k, v = arg_i:match("^(%-)%-([^=]*)=?(.*)")
+    local k, v = arg_i:match("^%-%-([^=]*)=?(.*)")
     if not k then
       -- this is not a long argument
       k, v = arg_i:match("^%-(.)=?(.*)")
       if not k then
-        -- this is not short argument either
+        -- this is not short argument either,
         -- forthcoming arguments are names
-        if arg_i == "-" then
-          i = i + 1
-        end
         break
       end
-    elseif arg_i == "--" then
-      -- forthcoming arguments are names too
-      i = i + 1
-      break
+      if flags.debug then
+        print("DEBUG options parse: short")
+      end
+    else
+      if flags.debug then
+        print("DEBUG options parse: long")
+      end
     end
     ---@type option_info_t
     local info = get_info_by_key(k)
     if not info then
-      -- Private special debugging options "--debug-<key>"
-      local key = arg_i:match("^%-%-debug%-(%w[%w%d_-]*)")
-      if key then
-        require("l3build").debug[key:gsub("-", "_")] = true
-        goto top
+      if on_unknown then
+        local catched = on_unknown(k)
+        if catched then
+          if flags.debug then
+            print("DEBUG options parse: catched unknown")
+          end
+          goto top
+        end
       end
       stderr:write("Unknown option " .. arg_i .."\n")
       return { target = "help" }
@@ -361,19 +388,21 @@ local function parse(arg)
           error("Missing option value for ".. arg_i);
         end
       end
-      info.load_value(result, k, v)
+      info:load_value(result, k, v)
     elseif #v > 1 then
       error("Unexpected option value in ".. arg_i .."/".. v);
+    else
+      info:load_value(result, k, v)
     end
   end
-  local names = { table.unpack(arg, i) }
-  if next(names) then
-   result["names"] = names
+  if i <= #arg then
+   result["names"] = { table.unpack(arg, i) }
   end
   return result
 end
 
 ---@class l3b_options_t
+---@field ut_flags_t        options_flags_t
 ---@field get_all_info      fun(hidden:  boolean): fun(): option_info_t|nil
 ---@field get_info_by_key   fun(key:  string): option_info_t
 ---@field get_info_by_name  fun(name: string): option_info_t
@@ -381,6 +410,7 @@ end
 ---@field parse fun(arg: table<integer, string>): table<string, boolean|string|number|string_list_t>
 
 return {
+  flags             = flags,
   get_all_info      = get_all_info,
   get_info_by_key   = get_info_by_key,
   get_info_by_name  = get_info_by_name,

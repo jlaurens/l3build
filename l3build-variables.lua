@@ -112,7 +112,7 @@ local Main_dflt = {
 ---@param t table
 ---@param k any
 ---@return any
-local function chooser_index(t, k)
+local function Main_compute(t, k, v_dflt)
   if k == "_standalone" then
     return not _G.bundle or _G.bundle == ""
   elseif k == "_at_bundle_top" then
@@ -148,8 +148,8 @@ local function chooser_index(t, k)
 end
 
 Main = chooser(_G, Main_dflt, {
-  index = chooser_index,
-  did_choose = function (t, k, result)
+  compute = Main_compute,
+  complete = function (t, k, result)
     local options = l3build.options
     if k == "forcecheckepoch" then
       if options["epoch"] then
@@ -198,7 +198,7 @@ local default_Dir = {
 ---@type Dir_t
 local Dir = chooser(_G, default_Dir, {
   suffix = "dir",
-  index = function (t, k)
+  compute = function (t --[[: Dir_t]], k, v_dflt)
     local result
     if k == "current" then -- deprecate, not equal to the current directory.
       result = work
@@ -233,20 +233,24 @@ local Dir = chooser(_G, default_Dir, {
     elseif k == "result" then
       result = t.build .. "/result"
     elseif k == "test" then
-      result = t.build .. "/test"
+      result = t.build .. t._config .."/test"
+    elseif k == "_config" then
+      result = "" -- for example "-config-plain"
     elseif k == "typeset" then
       result = t.build .. "/doc"
     elseif k == "unpack" then
       result = t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
     elseif k == "tds_module" then
-      result = Main.tdsroot .. (t._standalone and "/" .. Main.bundle .. "/" or "/") .. Main.module
+      result = Main.tdsroot
+      .. (Main._standalone and "/" .. Main.bundle .. "/" or "/")
+      .. Main.module
     end
     return result
   end,
   -- Directory structure for the build system
   -- Use Unix-style path separators
-  did_choose = function (t, k, result)
+  complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k.match and k:match("dir$") then
@@ -321,7 +325,7 @@ local Files_dflt  = {
   unpacksupp    = {},
 }
 
-local function Files_index(t, k)
+local function Files_compute(t, k, v_dflt)
   local tt = {}
   if k == "_all_typeset" then
     for glob in entries(t.typeset) do
@@ -342,7 +346,7 @@ end
 ---@type Files_t
 local Files = chooser(_G, Files_dflt, {
   suffix = "files",
-  index = Files_index,
+  compute = Files_compute,
 })
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting

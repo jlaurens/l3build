@@ -117,7 +117,7 @@ local Vars = chooser(_G, {
   forcedocepoch       = false,
   ps2pdfopt           = "",
 }, {
-  did_choose = function (t, k, result)
+  complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k == "forcedocepoch" then
@@ -259,10 +259,10 @@ end
 -- Only fo known keys
 ---@type Ngn_t
 local Ngn = chooser(_G, MT, {
-  index = function (t, k, v_G)
+  fallback = function (t, k, v_dflt, v_G)
     if k == "tex" then --- tex is already a table in texlua.
       if type(v_G) == "table" then
-        return MT[k]
+        return v_dflt
       end
     end
   end
@@ -385,8 +385,8 @@ local function doc(files)
   for typeset_globs in items(Files.typesetdemo, Files.typeset) do
     for glob in entries(typeset_globs) do
       for dir_path in items(Dir.typeset, Dir.unpack) do
-        for p_wrk in values(tree(dir_path, glob)) do
-          local src_dir, src_name = dir_base(p_wrk)
+        for p in tree(dir_path, glob) do
+          local src_dir, src_name = dir_base(p.wrk)
           local name = job_name(src_name)
           if not done[name] then
             local should_typeset = true

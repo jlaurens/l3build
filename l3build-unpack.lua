@@ -89,9 +89,6 @@ local Vars = chooser(_G, Vars_dft)
 function Vars_dft.bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
   sources = sources or { Files.source }
-  if l3build.options.debug then
-    print("DEBUG bundleunpack")
-  end
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
   if error_level ~=0 then
@@ -101,25 +98,25 @@ function Vars_dft.bundleunpack(source_dirs, sources)
   if error_level ~=0 then
     return error_level
   end
-  for i in entries(source_dirs) do
-    for j in entries(sources) do
-      for k in entries(j) do
-        error_level = copy_tree(k, i, Dir.unpack)
+  for src_dir in entries(source_dirs) do
+    for globs in entries(sources) do
+      for glob in entries(globs) do
+        error_level = copy_tree(glob, src_dir, Dir.unpack)
         if error_level ~=0 then
           return error_level
         end
       end
     end
   end
-  for i in entries(Files.unpacksupp) do
-    error_level = copy_tree(i, Dir.support, Dir[l3b_vars.LOCAL])
+  for glob in entries(Files.unpacksupp) do
+    error_level = copy_tree(glob, Dir.support, Dir[l3b_vars.LOCAL])
     if error_level ~=0 then
       return error_level
     end
   end
-  for i in entries(Files.unpack) do
-    for j in keys(tree(Dir.unpack, i)) do
-      local dir_path, base_name = dir_base(j)
+  for glob in entries(Files.unpack) do
+    for p in tree(Dir.unpack, glob) do
+      local dir_path, base_name = dir_base(p.src)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
       local cmd = cmd_concat(
         "cd " .. Dir.unpack .. "/" .. dir_path,

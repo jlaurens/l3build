@@ -63,7 +63,7 @@ local Files     = l3b_vars.Files
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
 
--- module implementation
+--[=[ Package implementation ]=]
 
 ---@class l3b_tagging_vars_t
 ---@field tag_hook    fun(tag_name: string, tag_date: string): error_level_t
@@ -115,7 +115,8 @@ local function tag(tag_names)
   local error_level = 0
   for dir in unique_items(Dir.work, Dir.sourcefile, Dir.docfile) do
     for glob in entries(Files.tag) do
-      for file in values(tree(dir, glob)) do
+      for p in tree(dir, glob) do
+        local file = p.wrk
         error_level = update_file_tag(file, tag_name, tag_date)
         if error_level ~= 0 then
           return error_level

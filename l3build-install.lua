@@ -97,11 +97,8 @@ local typeset_list
 local Vars = chooser(_G, {
   flattentds    = true
 }, {
-  index = function (t, k, v_G)
+  compute = function (t, k, v_dflt)
     if k == "flattenscript" then
-      if v_G ~= nil then
-        return v_G  -- a boolean
-      end
       return t.flattentds -- by defaut flattentds and flattenscript are synonyms
     elseif k == "typeset_list" then
       assert(typeset_list, "Documentation is not installed")
@@ -125,15 +122,16 @@ local function uninstall()
   -- Any script man files need special handling
   local man_files = {}
   for glob in entries(Files.scriptman) do
-    for file in keys(tree(Dir.docfile, glob)) do
+    for p in tree(Dir.docfile, glob) do
+      local p_src = p.src
       -- Man files should have a single-digit extension: the type
-      local man = "man" .. file:match(".$")
+      local man = "man" .. p_src:match(".$")
       local install_dir = Vars.texmf_home .. "/doc/man/"  .. man
-      if file_exists(install_dir .. "/" .. file) then
+      if file_exists(install_dir .. "/" .. p_src) then
         if dry_run then
-          append(man_files, man .. "/" .. base_name(file))
+          append(man_files, man .. "/" .. base_name(p_src))
         else
-          error_level = error_level + remove_tree(install_dir, file)
+          error_level = error_level + remove_tree(install_dir, p_src)
         end
       end
     end
@@ -225,8 +223,9 @@ local function install_files(root_install_dir, full, dry_run)
     -- each candidate is a table
     for glob_list in entries(file_globs) do
       for glob in entries(glob_list) do
-        for file in keys(tree(src_dir, glob)) do
-          local dir, name = dir_base(file)
+        for p in tree(src_dir, glob) do
+          local p_src = p.src
+          local dir, name = dir_base(p_src)
           local src_path_end = "/"
           local source_dir = src_dir
           if dir ~= "." then
@@ -301,17 +300,17 @@ local function install_files(root_install_dir, full, dry_run)
     local exclude_list = {}
     for glob_table in entries(excludes) do
       for glob in entries(glob_table) do
-        for file in keys(tree(dir, glob)) do
-          exclude_list[file] = true
+        for p in tree(dir, glob) do
+          exclude_list[p.src] = true
         end
       end
     end
     ---@type string_list_t
     local result = {}
     for glob in entries(includes) do
-      for file in keys(tree(dir, glob)) do
-        if not exclude_list[file] then
-          append(result, file)
+      for p in tree(dir, glob) do
+        if not exclude_list[p.src] then
+          append(result, p.src)
         end
       end
     end
@@ -395,16 +394,17 @@ local function install_files(root_install_dir, full, dry_run)
 
     -- Any script man files need special handling
     for glob in entries(Files.scriptman) do -- shallow glob
-      for name in keys(tree(Dir.docfile, glob)) do
-        local man = "man" .. name:match(".$")
+      for p in tree(Dir.docfile, glob) do
+        local p_src = p.src
+        local man = "man" .. p_src:match(".$")
         if dry_run then
-          print("- doc/man/" .. man .. "/" .. base_name(name))
+          print("- doc/man/" .. man .. "/" .. base_name(p_src))
         else
           -- Man files should have a single-digit tail: the type
           local install_dir = root_install_dir .. "/doc/man/"  .. man
           error_level = error_level
             + make_directory(install_dir)
-            + copy_file(name, Dir.docfile, install_dir)
+            + copy_file(p_src, Dir.docfile, install_dir)
         end
       end
     end

@@ -93,14 +93,15 @@ local Vars = chooser(_G, {
 local function copy_ctan()
   local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
   make_directory(ctanpkg_dir)
-  local function copyfiles(files, source)
+  local function copy_files(files, source)
     if source == Dir.work or Vars.flatten then
-      for filetype in entries(files) do
-        copy_tree(filetype, source, ctanpkg_dir)
+      for file_type in entries(files) do
+        copy_tree(file_type, source, ctanpkg_dir)
       end
     else
-      for filetype in entries(files) do
-        for file in values(tree(source, filetype)) do
+      for file_type in entries(files) do
+        for p in tree(source, file_type) do
+          local file = p.wrk
           local path = dir_name(file)
           local ctantarget = ctanpkg_dir .. "/" .. path
           make_directory(ctantarget)
@@ -113,9 +114,9 @@ local function copy_ctan()
     Files.bib, Files.demo, Files.doc,
     Files.scriptman, Files._all_pdf, l3b_inst_vars.typeset_list
   ) do
-    copyfiles(tab, Dir.docfile)
+    copy_files(tab, Dir.docfile)
   end
-  copyfiles(Files.source, Dir.sourcefile)
+  copy_files(Files.source, Dir.sourcefile)
   for file in entries(Files.text) do
     copy_tree(file, Dir.textfile, ctanpkg_dir)
   end
@@ -170,10 +171,10 @@ local function ctan()
       return error_level
     end
   end
-  for i in entries(Files.text) do
-    for j in items(Dir.unpack, Dir.textfile) do
-      copy_tree(i, j, Dir.ctan .. "/"     .. Main.ctanpkg)
-      copy_tree(i, j, Dir.tds  .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
+  for glob in entries(Files.text) do
+    for src_dir in items(Dir.unpack, Dir.textfile) do
+      copy_tree(glob, src_dir, Dir.ctan .. "/"     .. Main.ctanpkg)
+      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
     end
   end
   -- Rename README if necessary
@@ -196,22 +197,24 @@ local function ctan()
     local bin_files = to_quoted_string(Files.binary)
     local exclude = to_quoted_string(Files.exclude)
     -- First, zip up all of the text files
-    run(
-      dir,
-      Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " ."
+    local cmd = Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " ."
       .. (
         (bin_files or exclude)
         and (" -x " .. bin_files .. " " .. exclude)
         or ""
       )
-    )
+    if options.debug.run then
+      print("DEBUG run: ".. cmd)
+    end
+    run(dir, cmd)
     -- Then add the binary ones
-    run(
-      dir,
-      Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
+    local cmd = Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
       .. " -i " .. bin_files
       .. (exclude and (" -x " .. exclude) or "")
-    )
+    if options.debug.run then
+      print("DEBUG run: ".. cmd)
+    end
+    run(dir, cmd)
   end
   dirzip(Dir.tds, Main.ctanpkg .. ".tds")
   if Vars.packtdszip then

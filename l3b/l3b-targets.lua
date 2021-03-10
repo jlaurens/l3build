@@ -25,10 +25,10 @@ for those people who are interested.
 -- code dependencies:
 
 local tostring  = tostring
-local exit      = os.exit
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
+local readonly      = utlib.readonly
 local items         = utlib.items
 local sorted_values = utlib.sorted_values
 
@@ -46,27 +46,45 @@ For a module, the action is always determined
 by the `run` field of the target info.
 When at the top of a bundle, the action is determined by
 1) the `bundle_run` field if any,
-2) if `is_bundle_aware` is true, the `bundle_foo` target is triggered
+2) if `has_bundle_variant` is true, the `bundle_foo` target is triggered
 for all the modules.
 3) the required `run` field when all else failed
-`is_bundle_aware` is ignored when `bundle_run` is defined.
+`has_bundle_variant` is ignored when `bundle_run` is defined.
 Due to code separation, the `run` is not always provided.
 
 --]=]
 
----@alias target_run_f fun(names: string_list_t): error_level_t
----@alias target_preflight_f fun(names: string_list_t): error_level_t
+---@alias alt_run_f           fun(options: options_t): error_level_t|nil
+---@alias target_preflight_f  fun(options: options_t): error_level_t
+---@alias target_run_f        fun(names: string_list_t): error_level_t
 
 ---@class target_info_t
 ---@field name          string name
 ---@field alias         string alias, to support old naming
 ---@field description   string description
----@field preflight     target_preflight_f|nil function to run preflight code
+---@field package       string controller package name
+---@field will_run      target_preflight_f|nil function to run preflight code
+---@field configure_run target_preflight_f|nil function to run preflight code
 ---@field run           target_run_f function to run the target, possible computed attributed
+---@field alt_run       alt_run_f|nil function to run the target, not config loaded, possible computed attributed
+---@field has_alt_variant boolean When true, "alt_" is prepended to `target`
 ---@field bundle_run    target_run_f|nil function to run the target, used at top level, possible computed attributed
----@field is_bundle_aware boolean When true, "bundle" is prepended to `target`
----@field bundle_target string `name`, prepended with "bundle_" on `is_bundle_aware`
+---@field has_bundle_variant boolean When true, "bundle_" is prepended to `target`
+---@field bundle_target string `name`, prepended with "bundle_" on `has_bundle_variant`
 ---@field builtin       boolean whether the target is builtin
+
+---@class target_register_info_t
+---@field name          string name
+---@field alias         string|nil alias, to support old naming
+---@field description   string|nil description
+---@field package       string|nil controller package name
+---@field will_run      target_preflight_f|nil function run before any other action code
+---@field configure_run target_preflight_f|nil function run before any other action code
+---@field run           target_run_f|string function to run the target, possible computed attributed
+---@field alt_run       target_run_f|string|nil function to run the target, not config loaded, possible computed attributed
+---@field has_alt_variant boolean|nil When true, "alt_" is prepended to `target`
+---@field bundle_run    target_run_f|string|nil function to run the target, used at top level, possible computed attributed
+---@field has_bundle_variant boolean|nil When true, "bundle_" is prepended to `target`
 
 ---@type table<string, target_info_t>
 local DB = {}
@@ -90,7 +108,7 @@ local function get_info(name)
 end
 
 ---Register the target with the given name and info
----@param info target_info_t
+---@param info target_register_info_t
 ---@param builtin boolean|nil
 local function register(info, builtin)
   if DB[info.name] then
@@ -98,22 +116,48 @@ local function register(info, builtin)
   end
   local result = {}
   for k in items(
+    "has_alt_variant",
+    "has_bundle_variant"
+  ) do
+    result[k] = info[k] ~= nil and true or false
+  end
+  for k in items(
     "name",
     "alias",
+    "description",
     "package",
+    "will_run",
+    "configure",
     "run",
-    "bundle_run",
-    "prepare",
-    "is_bundle_aware",
-    "description"
+    "bundle_run"
   ) do
     result[k] = info[k]
   end
   result.builtin = builtin or false
-  DB[info.name] = setmetatable({}, {
+  DB[info.name] = readonly(setmetatable({}, {
     __index = function (t, k)
       local result_k = result[k]
-      if k == "run" then -- must always return something
+      if k == "will_run" then
+        local package = result.package
+        if type(result_k) == "string" then
+          result_k = require(package)[result_k]
+        elseif result_k == nil then
+          result_k = require(package)["will_".. t.name]
+        end
+        if result_k and type(result_k) ~= "function" then
+          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
+        end
+      elseif k == "configure_run" then
+        local package = result.package
+        if type(result_k) == "string" then
+          result_k = require(package)[result_k]
+        elseif result_k == nil then
+          result_k = require(package)["configure_".. t.name]
+        end
+        if result_k and type(result_k) ~= "function" then
+          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
+        end
+      elseif k == "run" then -- must always return something
         local package = result.package
         if type(result_k) == "string" then
           result_k = require(package)[result_k]
@@ -121,6 +165,16 @@ local function register(info, builtin)
           result_k = require(package)[t.name]
         end
         if type(result_k) ~= "function" then
+          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
+        end
+      elseif k == "alt_run" then
+        local package = t.package
+        if type(result_k) == "string" then
+          result_k = require(package)[result_k]
+        elseif result_k == nil then
+          result_k = require(package)["alt_".. result.name]
+        end
+        if result_k and type(result_k) ~= "function" then
           error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
         end
       elseif k == "bundle_run" then
@@ -132,17 +186,12 @@ local function register(info, builtin)
           error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
         end
       elseif k == "bundle_target" then
-        return t.is_bundle_aware and "bundle_".. t.name or t.name
+        return t.has_bundle_variant and "bundle_".. t.name or t.name
       end
       rawset(t, k, result_k)
       return result_k
     end,
-    __newindex = function (t, k, v)
-      if v ~= nil then
-        error("Target info is readonly: ".. tostring(k) .."=".. tostring(v))
-      end
-    end
-  })
+  }))
   if info.alias then
     DB[info.alias] = DB[info.name] -- latex2e
   end
@@ -169,7 +218,7 @@ local target_list = {
   check = {
     description   = "Run all automated tests",
     package       = "l3build-check",
-    is_bundle_aware  = true,
+    has_bundle_variant  = true,
   },
   clean = {
     description   = "Clean out directory tree",
@@ -200,7 +249,7 @@ local target_list = {
   tag = {
     description = "Updates release tags in files",
     package     = "l3build-tagging",
-    is_bundle_aware  = true,
+    has_bundle_variant  = true,
   },
   uninstall = {
     description   = "Uninstalls files from the local texmf tree",
@@ -209,7 +258,7 @@ local target_list = {
   unpack = {
     description   = "Unpacks the source files into the build tree",
     package       = "l3build-unpack",
-    is_bundle_aware  = true,
+    has_bundle_variant  = true,
   },
   upload = {
     description = "Send archive to CTAN for public release",

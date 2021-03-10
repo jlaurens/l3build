@@ -55,14 +55,15 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@alias flag_table_t table<string, boolean>
 
 ---@class l3build_debug_t
+---@field run     boolean
 ---@field require boolean
----@field call boolean
+---@field call    boolean
 ---@field no_curl_posting boolean
 
 ---@class l3build_data_t
 
 ---@class l3build_t
----@field debug       flag_table_t  the special --debug-foo CLI arguments
+---@field debug       l3build_debug_t the special --debug-foo CLI arguments
 ---@field PACKAGE     string        "l3build", `package.loaded` key
 ---@field NAME        string        "l3build", display name
 ---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
@@ -72,7 +73,7 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field main_dir    string|nil    where the topmost "build.lua" lives, nil means not in_document
 ---@field launch_dir  string        where "l3build.lua" and friends live
 ---@field start_dir   string        the current directory at load time
----@field options     l3build_options_t
+---@field options     options_t
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
 
@@ -82,7 +83,7 @@ local l3build = { -- global data available as package.
   data = {},  -- shared data
 }
 
-print(in_document and "Document mode" or "Package mode")
+print(in_document and "Document mode" or "Bundle mode")
 
 do
   -- the directory containing "l3build.lua" by kpse
@@ -229,6 +230,10 @@ do
   ---@param pkg_name string
   ---@return table|boolean
   function require(pkg_name)
+    if type(pkg_name) ~= "string" then
+      print(debug.traceback())
+      error("Bad package name")
+    end
     local result = package.loaded[pkg_name]
     if result then
       return result -- recursive calls will end here
@@ -273,55 +278,55 @@ do
   end)
 
 end
---[=[ end of booting process ]=]
+--[==[ end of booting process ]==]
 
 -- Terminate here if in document mode
 if in_document then
-  require("l3build-globals")
+  require("l3build-globals") -- certainly too large
   return l3build
 end
 
---[=[DEBUG flags]]
+--[===[DEBUG flags]]
 ---@type oslib_t
 local oslib = require("l3b-oslib")
 oslib.Vars.debug.run = true
---[=[DEBUG flags end]=]
+--[===[DEBUG flags end]===]
 
 ---@type l3b_options_t
 local l3b_options = require("l3b-options")
-l3build.options = l3b_options.parse(arg)
+l3build.options = l3b_options.parse(arg, function (arg_i)
+  -- Private special debugging options "--debug-<key>"
+  local key = arg_i:match("^%-%-debug%-(%w[%w%d_-]*)")
+  if key then
+    l3build.debug[key:gsub("-", "_")] = true
+    return true
+  end
+end)
 local options   = l3build.options
 
-if options.debug then
+local debug = options.debug
+
+if debug then
+  print("DEBUG: ".. arg[0] .." ".. table.concat(arg, " "))
   require("l3b-oslib").Vars.debug.run = true
+  require("l3b-fslib").Vars.debug.copy_core = true
 end
+
+local target = options.target
 
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
 local help      = l3b_help.help
 local version   = l3b_help.version
 
-require("l3build-typesetting")
-
-require("l3build-clean")
-
--- This has to come after stdmain(),
 -- and that has to come after the functions are defined
-if options["target"] == "help" then
+if target == "help" then
   help()
   exit(0)
-elseif options["target"] == "version" then
+elseif target == "version" then
   version()
   exit(0)
 end
-
----@type l3b_main_t
-local l3b_main        = require("l3build-stdmain")
-local multi_check     = l3b_main.multi_check
-local prepare_config  = l3b_main.prepare_config
-
--- Allow main function to be disabled 'higher up'
-_G.main = _G.main or l3b_main.main
 
 require("l3build-globals")
 
@@ -331,26 +336,82 @@ if is_main then
   dofile(work_dir .. "build.lua")
 end
 
----@type l3b_check_t
-local l3b_check   = require("l3build-check")
-local sanitize_engines = l3b_check.sanitize_engines
-
--- Sanity check
-sanitize_engines()
-
---
--- Deal with multiple configs for tests
---
-
-multi_check()   -- check with many configs, may exit here
-
-prepare_config()
-
 ---@type utlib_t
 local utlib = require("l3b-utillib")
 
+---@type l3b_vars_t
+local l3b_vars  = require("l3build-variables")
+---@type Main_t
+local Main      = l3b_vars.Main
+
+---@type l3b_targets_t
+local l3b_targets_t   = require("l3b-targets")
+local get_target_info = l3b_targets_t.get_info
+
+---@type l3b_aux_t
+local l3b_aux             = require("l3build-aux")
+local call                = l3b_aux.call
+
+-- Deal with unknown targets up-front
+local info = get_target_info(target)
+if not info then
+  error("Unknown target name: ".. target)
+end
+local error_level = 0
+if info.will_run then
+  if debug then
+    print("DEBUG: will_run ".. target)
+  end
+  error_level = info.will_run(options)
+  if error_level ~= 0 then
+    exit(error_level)
+  end
+end
+if info.alt_run then
+  if debug then
+    print("DEBUG: alt_run ".. target)
+  end
+  error_level = info.alt_run(options)
+  if error_level ~= nil then
+    exit(error_level)
+  end
+end
+if info.configure_run then
+  if debug then
+    print("DEBUG: configure_run ".. target)
+  end
+  error_level = info.configure_run(options)
+  if error_level ~= 0 then
+    exit(error_level)
+  end
+end
 -- From now on, we can cache results in choosers
 utlib.flags.cache_chosen = true
-
--- Call the main function
-_G.main(options["target"], options["names"])
+local names = options.names
+if _G.main then
+  if debug then
+    print("DEBUG: global main ".. target)
+  end
+  exit(_G.main(target, names, options))
+end
+if Main._at_bundle_top then
+  if info.bundle_run then
+    if debug then
+      print("DEBUG: bundle_run ".. target)
+    end
+    error_level = info.bundle_run(names)
+  else
+    -- Detect all of the modules
+    if debug then
+      print("DEBUG: modules run ".. target)
+    end
+    local modules = Main.modules
+    error_level = call(modules, info.bundle_target)
+  end
+else
+  if debug then
+    print("DEBUG: run ".. target)
+  end
+  error_level = info.run(names)
+end
+exit(error_level)

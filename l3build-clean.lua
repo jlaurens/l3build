@@ -49,6 +49,11 @@ local Files     = l3b_vars.Files
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
 
+---@type l3b_check_t
+local l3b_check         = require("l3build-check")
+---@type l3b_check_vars_t
+local l3b_check_vars_t  = l3b_check.Vars
+
 -- Remove all generated files
 local function clean()
   -- To make sure that Dir.distrib never contains any stray subdirs,
@@ -69,17 +74,17 @@ local function clean()
   local clean_list = {}
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
     for glob in entries(Files.clean) do
-      for file in keys(tree(dir, glob)) do
-        clean_list[file] = true
+      for p in tree(dir, glob) do
+        clean_list[p.src] = true
       end
     end
     for glob in entries(Files.source) do
-      for file in keys(tree(dir, glob)) do
-        clean_list[file] = nil
+      for p in tree(dir, glob) do
+        clean_list[p.src] = nil
       end
     end
-    for file in keys(clean_list) do
-      error_level = remove_tree(dir, file)
+    for p_src in keys(clean_list) do
+      error_level = remove_tree(dir, p_src)
       if error_level ~= 0 then
         return error_level
       end

@@ -24,15 +24,12 @@ for those people who are interested.
 
 -- Local access to functions
 
+local print           = print
 local not_empty       = next
-
 local open            = io.open
-
 local rnd             = math.random
-
 local status          = require("status")
 local luatex_version  = status.luatex_version
-
 local len             = string.len
 local char            = string.char
 local str_format      = string.format
@@ -52,6 +49,7 @@ local remove          = os.remove
 
 ---@type utlib_t
 local utlib           = require("l3b-utillib")
+local deep_copy       = utlib.deep_copy
 local chooser         = utlib.chooser
 local entries         = utlib.entries
 local first_of        = utlib.first_of
@@ -89,6 +87,10 @@ local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3build_t
 local l3build = require("l3build")
+
+---@type l3b_aux_t
+local l3b_aux   = require("l3build-aux")
+local call      = l3b_aux.call
 
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
@@ -135,7 +137,6 @@ local dvi2pdf        = l3b_tpst.dvi2pdf
 ---@field specialformats table  Non-standard engine/format combinations
 ---@field test_types    test_types_t  Custom test variants
 ---@field test_order    string_list_t Which kinds of tests to evaluate
---
 -- Configs for testing
 ---@field checkconfigs  table   Configurations to use for tests
 ---@field includetests  string_list_t Test names to include when checking
@@ -153,7 +154,18 @@ local dflt = {} -- define below
 
 ---@type l3b_check_vars_t
 local Vars = chooser(_G, dflt, {
-  did_choose = function (t, k, result)
+  compute = function (t, k, dflt_k)
+    if k == "unique_config" then
+      local configs = t.checkconfigs
+      if #configs == 1 then
+        local result = configs[1]
+        if result ~= "build" then
+          return result
+        end
+      end
+    end
+  end,
+  complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k == "checkconfigs" then
@@ -224,7 +236,7 @@ end
 local function rewrite(path_in, path_out, translator, ...)
   local content = read_content(path_in, true)
   if not content then
-    --[=[ DEBUG CODE TO BE REMOVED ]=]
+    --[===[ DEBUG CODE TO BE REMOVED ]===]
     local file_path = path_in
     local is_binary = true
     if file_path then
@@ -237,7 +249,7 @@ local function rewrite(path_in, path_out, translator, ...)
           or  content)
       end
     end
-    --[=[ END OF DEBUG CODE ]=]
+    --[===[ END OF DEBUG CODE ]===]
     error("No content available at ".. path_in)
   end
   content = gsub(content .. "\n", "\r\n", "\n")
@@ -1325,9 +1337,64 @@ local function save(names)
   return 0
 end
 
+---Check at the top level
+---@param names string_list_t
+---@return error_level_t
+local function bundle_check(names)
+  if names and #names > 0 then
+    print("Bundle checks should not list test names")
+    help()
+    exit(1)
+  end
+  return check(names)
+end
+
+---Special check.
+---Shortcut when many configurations are given.
+---@param options options_t
+---@return error_level_t
+local function alt_check(options)
+  local check_configs = Vars.checkconfigs
+  if #check_configs > 1 then
+    local error_level = 0
+    local opts = deep_copy(options)
+    ---@type string_list_t
+    local failed_configs = {}
+    -- utlib.Vars.debug.chooser = true
+    local halt_on_error = options["halt-on-error"]
+    for config in entries(check_configs) do
+      opts.config = { config }
+      error_level = call({ "." }, "check", opts)
+      if error_level ~= 0 then
+        if halt_on_error then
+          return error_level
+        else
+          append(failed_configs, config)
+        end
+      end
+    end
+    if not_empty(failed_configs) then
+      for config in entries(failed_configs) do
+        print("Failed tests for configuration " .. config .. ":")
+        print("\n  Check failed with difference files")
+        local test_dir = Dir.test
+        if config ~= "build" then
+          test_dir = test_dir .. "-" .. config
+        end
+        for name in all_names(test_dir, "*" .. _G.os_diffext) do
+          print("  - " .. test_dir .. "/" .. name)
+        end
+        print("")
+      end
+      return 1
+    end
+    -- Avoid running the 'main' set of tests twice
+    return 0
+  end
+end
+
 -- Sanity check
-local function sanitize_engines()
-  local options = l3build.options
+local function sanitize_engines(options)
   if options["engine"] and not options["force"] then
     -- Make a lookup table
     local t = {}
@@ -1348,30 +1415,80 @@ local function sanitize_engines()
   end
 end
 
-
----Check at the top level
----@param names string_list_t
+---Run before the save operation
+---@param options options_t
 ---@return error_level_t
-local function bundle_check(names)
-  if names and #names > 0 then
-    print("Bundle checks should not list test names")
-    help()
-    exit(1)
-  end
-  return check(names)
+local function will_save(options)
+  sanitize_engines(options)
+  return 0
 end
+
+---Run before the check operation
+---@param options options_t
+---@return error_level_t
+local function will_check(options)
+  sanitize_engines(options)
+  return 0
+end
+
+---Load the config file, when unique and not "build".
+---@return error_level_t
+local function load_unique_config(options)
+  local configs = Vars.checkconfigs
+  if #configs ~= 1 then
+    return 0
+  end
+  local config_1 = configs[1]
+  if config_1 == "build" then
+    return 0
+  end
+  local config_path = l3build.work_dir
+    .. config_1:gsub( ".lua$", "") .. ".lua"
+  if file_exists(config_path) then
+    dofile(config_path)
+    Dir._config = "-".. config_1
+    if options.debug then
+      print("DEBUG config: ", config_1)
+    end
+  else
+    print("Error: Missing configuration " .. config_path)
+    return 1
+  end
+  return 0
+end
+
+---Run before the save operation
+---@param options options_t
+---@return error_level_t
+local function configure_save(options)
+  return load_unique_config(options)
+end
+
+---Run before the check operation
+---@param options options_t
+---@return error_level_t
+local function configure_check(options)
+  return load_unique_config(options)
+end
+
 
 ---@class l3b_check_t
 ---@field Vars              l3b_check_vars_t
----@field check             fun(names: string_list_t): integer
----@field bundle_check      fun(names: string_list_t): integer
----@field save              fun(names: string_list_t): integer
----@field sanitize_engines  fun()
+---@field configure_check   fun(options: options_t): error_level_t
+---@field check             fun(names: string_list_t): error_level_t
+---@field alt_check         fun(options: options_t): error_level_t
+---@field bundle_check      fun(names: string_list_t): error_level_t
+---@field configure_save    fun(options: options_t): error_level_t
+---@field save              fun(names: string_list_t): error_level_t
 
 return {
   Vars              = Vars,
+  will_check        = will_check,
+  configure_check   = configure_check,
   check             = check,
+  alt_check         = alt_check,
   bundle_check      = bundle_check,
+  will_save         = will_save,
+  configure_save    = configure_save,
   save              = save,
-  sanitize_engines  = sanitize_engines,
 }

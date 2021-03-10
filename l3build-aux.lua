@@ -24,7 +24,7 @@ for those people who are interested.
 
 -- local safety guards and shortcuts
 
-local pairs   = pairs
+local dofile  = dofile
 local print   = print
 local concat  = table.concat
 
@@ -32,6 +32,8 @@ local concat  = table.concat
 local utlib             = require("l3b-utillib")
 local entries           = utlib.entries
 local to_quoted_string  = utlib.to_quoted_string
+
+local pairs   = pairs -- cache after `l3b-utillib` is loaded.
 
 ---@type wklib_t
 local wklib     = require("l3b-walklib")
@@ -45,10 +47,15 @@ local run         = oslib.run
 ---@type fslib_t
 local fslib         = require("l3b-fslib")
 local absolute_path = fslib.absolute_path
-
+local file_exists   = fslib.file_exists
 
 ---@type l3build_t
 local l3build = require("l3build")
+
+---@type l3b_vars_t
+local l3b_vars  = require("l3build-variables")
+---@type Dir_t
+local Dir       = l3b_vars.Dir
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -87,7 +94,7 @@ end
 ---then executes texlua with proper arguments.
 ---@param modules string_list_t List of modules.
 ---@param target  string
----@param opts    table|nil
+---@param opts    options_t|nil
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public
@@ -142,7 +149,7 @@ end
 
 ---Unpack the given dependencies.
 ---A dependency is the path of a directory relative to the main one.
----@param deps table regular array of dependencies.
+---@param deps table regular array of dependencies. See `Deps`fields.
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see stdmain, check, unpack, typesetting
 ---@usage Private?

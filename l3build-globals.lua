@@ -155,7 +155,7 @@ export_symbols(Main, "",
   "exclmodules"
 )
 
---[=[ ]=]
+--[==[ Shape of the bundle folder ]==]
 local Dir = l3b_vars.Dir
 export_symbols(Dir, "dir",
   "main",

@@ -22,8 +22,6 @@ for those people who are interested.
 
 --]]
 
-local pairs       = pairs
-
 local execute     = os.execute
 local remove      = os.remove
 local os_type     = os["type"]
@@ -43,6 +41,8 @@ local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
 local first_of    = utlib.first_of
+
+local pairs       = pairs -- Cache only after "l3b-utillib" is loaded
 
 ---@type wklib_t
 local wklib           = require("l3b-walklib")
@@ -120,7 +120,7 @@ end
 ---@return boolean
 local function directory_exists(path)
   return attributes(path, "mode") == "directory"
---[=[ Original implementation
+--[===[ Original implementation
   local errorlevel
   if os_type == "windows" then
     errorlevel =
@@ -132,7 +132,7 @@ local function directory_exists(path)
     return false
   end
   return true
---]=]
+--]===]
 end
 
 ---Whether there is a file at the given path
@@ -140,7 +140,7 @@ end
 ---@return boolean
 local function file_exists(path)
   return attributes(path, "mode") == "file"
---[=[ Original implementation
+--[===[ Original implementation
   local f = open(file, "r")
   if f ~= nil then
     f:close()
@@ -148,7 +148,7 @@ local function file_exists(path)
   else
     return false -- also file exits and is not readable
   end
---]=]
+--]===]
 end
 
 ---Look for files, directory by directory, and return the first existing
@@ -211,18 +211,22 @@ local function set_tree_excluder(f)
   tree_excluder = f
 end
 
+---@class tree_entry_t
+---@field src string path relative to the source directory
+---@field wrk string path counterpart relative to the current working directory
+
 ---Does what filelist does, but can also glob subdirectories.
 ---In the returned table, the keys are paths relative to the given source path,
 ---the values are their counterparts relative to the current working directory.
 ---@param dir_path string
 ---@param glob string
----@return table<string, string>
+---@return fun(): tree_entry_t|nil
 local function tree(dir_path, glob)
   if Vars.debug.tree then
     print("DEBUG tree", dir_path, glob)
   end
   local function cropdots(path)
-    return first_of(gsub(path:gsub( "^%./", ""), "/%./", "/"))
+    return first_of(path:gsub( "^%./", ""):gsub("/%./", "/"))
   end
   dir_path = cropdots(dir_path)
   glob = cropdots(glob)
@@ -232,38 +236,43 @@ local function tree(dir_path, glob)
   local function is_dir(file)
     return attributes(file, "mode") == "directory"
   end
-  local result = { ["."] = dir_path }
+  ---@type table<integer, tree_entry_t>
+  local result = { {
+    src = ".",
+    wrk = dir_path,
+  } }
   for glob_part, sep in glob:gmatch("([^/]+)(/?)/*") do
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
-    ---@param p_src string path relative to `src_path`
-    ---@param p_wrk string path counterpart relative to the current working directory
+    ---@param p tree_entry_t path counterpart relative to the current working directory
     ---@param table table
-    local function fill(p_src, p_wrk, table)
+    local function fill(p, table)
       if Vars.debug.tree then
-        print("DEBUG tree fill", p_src, p_wrk)
+        print("DEBUG tree fill", p.src, p.wrk)
       end
-      for file in all_names(p_wrk, glob_part) do
+      for file in all_names(p.wrk, glob_part) do
         if Vars.debug.tree then
           print("DEBUG tree fill all_names", file)
         end
         if file ~= "." and file ~= ".." then
-          local p_wrk_file = p_wrk .. "/" .. file
-          if not tree_excluder(p_wrk_file) then
-            local p_src_file = p_src .. "/" .. file
-            if accept(p_wrk_file) then
+          local pp = {
+            src = p.src .. "/" .. file,
+            wrk = p.wrk .. "/" .. file,
+          }
+          if not tree_excluder(pp.wrk) then
+            if accept(pp.wrk) then
               if Vars.debug.tree then
-                print("DEBUG tree fill ACCEPTED", p_src_file, p_wrk_file)
+                print("DEBUG tree fill ACCEPTED", pp.src, pp.wrk)
               end
-              table[p_src_file] = p_wrk_file
+              append(table, pp)
             else
               if Vars.debug.tree then
-                print("DEBUG tree fill REFUSED", p_src_file, p_wrk_file)
+                print("DEBUG tree fill REFUSED", pp.src, pp.wrk)
               end
             end
           else
             if Vars.debug.tree then
-              print("DEBUG tree fill EXCLUDED", p_wrk_file)
+              print("DEBUG tree fill EXCLUDED", pp.src, pp.wrk)
             end
           end
         end
@@ -271,23 +280,24 @@ local function tree(dir_path, glob)
     end
     local new_result = {}
     if glob_part == "**" then
-      repeat
-        local p_src, p_wrk = next(result)
-        if not p_src then
+      local i = 1
+      repeat -- forever
+        local p = result[i]
+        i = i + 1
+        if not p then
           break
         end
-        result[p_src] = nil
-        new_result[p_src] = p_wrk
-        fill(p_src, p_wrk, result)
+        append(new_result, p)
+        fill(p, result)
       until false
     else
-      for p_src, p_wrk in pairs(result) do
-        fill(p_src, p_wrk, new_result)
+      for p in entries(result) do
+        fill(p, new_result)
       end
     end
     result = new_result
   end
-  return result
+  return entries(result)
 end
 
 ---Rename. Whether paths are properly escaped is another story...
@@ -308,39 +318,36 @@ local function rename(dir_path, source, dest)
   end
 end
 
+---Private function.
+---@param dest string
+---@param p_src any
+---@param p_wrk string
+---@return integer
 local function copy_core(dest, p_src, p_wrk)
-  if Vars.debug.copy_core then
-    print("copy_core", dest, p_src, p_wrk)
-  end
-  local error_level
   -- p_src was a path relative to `source` whereas
   -- p_wrk was the counterpart relative to the current working directory
   local dir, base = dir_base(p_src)
   dest = dest ..'/'.. dir
   p_src = base
   make_directory(dest)
+  local cmd
   if os_type == "windows" then
     if attributes(p_wrk, "mode") == "directory" then
-      error_level = execute(
-        'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
+      cmd = 'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
             .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
-      )
     else
-      error_level = execute(
-        'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
+      cmd = 'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
             .. unix_to_win(dest .. '/') .. '" > nul'
-      )
     end
   else
-    if Vars.debug.copy_core then
-      print("make_directory '" .. dest .. "/'", directory_exists(dest))
-      print("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
-    end
-    error_level = execute("cp -RLf '" .. p_wrk .. "' '" .. dest .. "'")
+    cmd = "cp -RLf '" .. p_wrk .. "' '" .. dest .. "'"
   end
-  return error_level
+  if Vars.debug.copy_core then
+    --print("make_directory '" .. dest .. "/'", directory_exists(dest))
+    print("DEBUG: " .. cmd)
+  end
+return execute(cmd) and 0 or 1
 end
-
 
 ---@class copy_name_kv -- copy_file key/value arguments
 ---@field name    string
@@ -368,9 +375,9 @@ end
 ---@return integer
 local function copy_tree(glob, source, dest)
   local error_level
-  for p_src, p_wrk in pairs(tree(source, glob)) do
-    error_level = copy_core(dest, p_src, p_wrk)
-    if error_level ~=0 then
+  for p in tree(source, glob) do
+    error_level = copy_core(dest, p.src, p.wrk)
+    if error_level ~= 0 then
       return error_level
     end
   end
@@ -393,8 +400,8 @@ end
 ---@param glob string
 ---@return error_level_t
 local function remove_tree(source, glob)
-  for i in keys(tree(source, glob)) do
-    remove_name(source, i)
+  for entry in tree(source, glob) do
+    remove_name(source, entry.src)
   end
   -- os.remove doesn't give a sensible errorlevel
   return 0

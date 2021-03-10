@@ -26,12 +26,73 @@ for those people who are interested.
 ---@alias string_list_t table<integer, string>
 -- local safety guards and shortcuts
 
+local rawget  = rawget
+local assert  = assert
+-- local pairs   = pairs do not cache because it will be overriden
 local next    = next
-local concat  = table.concat
 local open    = io.open
 local os_type = os["type"]
 local sort    = table.sort
 local append  = table.insert
+local concat  = table.concat
+
+local lua = require("lua") -- texlua special
+
+--[=[ Package implementation ]=]
+
+--[==[ Readonly business
+A readonly table is not immutable because we can always use `rawset`.
+The purpose is to prevent spurious higher changes like `foo.bar = baz`.
+With a level of indirections, we loose the `pairs` benefit.
+If Lua 5.4 there is a `__pair` message but in 5.3,
+we override the pairs function. This is why this code chunck must
+reside at the start of this package.
+]==]
+
+local KEY_READONLY_ORIGINAL = {} -- unique key to point to the orginal table
+
+---Return a readony proxy to the given table.
+---@param t     table
+---@param quiet boolean
+---@return table
+local function readonly(t, quiet)
+  assert(type(t) == "table")
+  if rawget(t, KEY_READONLY_ORIGINAL) then
+    return t
+  end
+  return setmetatable({
+    [KEY_READONLY_ORIGINAL] = t,
+  }, {
+    __index = function (tt, k)
+      local original = rawget(tt, KEY_READONLY_ORIGINAL)
+      return original[k]
+    end,
+    __newindex = quiet and nil or function (tt, k, v)
+      error("Readonly table ".. tostring(k) .."=".. tostring(v))
+    end,
+    __pairs = function (tt) -- lua 5.4
+      local original = rawget(tt, KEY_READONLY_ORIGINAL)
+      return pairs(original)
+    end
+  })
+end
+
+---True iff `t` is the result of a previous `readonly` call.
+---The argument must be indexable.
+---@param t any
+---@return boolean
+local function is_readonly(t)
+  return rawget(t, KEY_READONLY_ORIGINAL) ~= nil
+end
+
+if lua.version and lua.version:match("5.3") then
+  local pairs_old = pairs
+  _G.pairs = function (t)
+    local original = rawget(t, KEY_READONLY_ORIGINAL)
+    return pairs_old(original ~= nil and original or t)
+  end
+end
+--[==[ End of the readonly business ]==]
 
 ---@class utlib_vars_t
 ---@field debug flag_table_t
@@ -54,7 +115,7 @@ local function to_quoted_string(table, separator)
   end
   return concat(t, separator or " ")
 end
---[=[ Original implementation
+--[===[ Original implementation
 local function tab_to_str(table)
   local string = ""
   for i in entries(table) do
@@ -62,11 +123,13 @@ local function tab_to_str(table)
   end
   return string
 end
-]=]
+]===]
 
----Iterator for the entries of a sequencial table
+---Iterator for the indices of a sequencial table.
+---Purely syntactic sugar for people preferring `for in` loops.
 ---@param table table
 ---@return fun()
+---@usage `for i in indices(t) do ... end` instead of `for i = 1, #t do ... end`
 local function indices(table)
   local i = 0
   return function ()
@@ -89,6 +152,7 @@ end
 ---Iterator for the items given in arguments
 ---@vararg any
 ---@return fun()
+---@usage `for item in items(a, b, c) do ... end`
 local function items(...)
   return entries({ ... })
 end
@@ -101,17 +165,16 @@ local function unique_entries(table)
   local i = 0
   local already = {}
   return function ()
-    while true do
+    repeat -- forever
       i = i + 1
       local result = table[i]
-      if not result then -- end of iteration
+      if result == nil then -- end of iteration
         return result
-      end
-      if not already[result] then
+      elseif not already[result] then
         already[result] = true
         return result
       end
-    end
+    until false
   end
 end
 
@@ -151,7 +214,7 @@ local function sorted_values(table, exclude)
     repeat
       i = i + 1
       local k = kk[i]
-      if not k then
+      if k == nil then
         return
       end
       local value = table[k]
@@ -260,6 +323,9 @@ local function deep_copy(original)
   return f(original)
 end
 
+
+--[==[ Chooser business ]==]
+
 ---@class ut_flags_t
 ---@field cache_chosen boolean
 
@@ -267,18 +333,22 @@ end
 local flags = {}
 
 ---@alias chooser_t table
----@alias chooser_did_choose_f  fun(t: table, k: any, result: any): any
----@alias chooser_index_f       fun(t: table, k: any, v_G: any): any
+---@alias chooser_compute_f   fun(t: table, k: any, v_dflt: any): any
+---@alias chooser_fallback_f  fun(t: table, k: any, v_dflt: any, v_G: any): any
+---@alias chooser_complete_f  fun(t: table, k: any, result: any): any
 
 ---@class chooser_kv_t
----@field prefix  string|nil -- prepend this prefix to the key for G, not for dflt
----@field suffix  string|nil -- append this prefix to the key for G, not for dflt
----@field index   chooser_index_f
----@field did_choose chooser_did_choose_f
+---@field prefix    string|nil prepend this prefix to the key for G, not for dflt
+---@field suffix    string|nil append this prefix to the key for G, not for dflt
+---@field compute   chooser_compute_f
+---@field fallback  chooser_fallback_f if the global value is not acceptable, this is a possible fallback.
+---@field complete  chooser_complete_f
 
 --[=[
-The purpose of the next chooser function is to allow the customization of a tree from the global domain.
-A tree starts at some variable. If the variable is a table with no metatable,
+The purpose of the next chooser function is to allow
+the customization of a tree from the global domain.
+A tree starts at some variable.
+If the variable is a table with no metatable,
 this is a node, otherwise it is a leaf. This applies recursively to the fields.
 Then for
 ```
@@ -295,18 +365,18 @@ local c = chooser(G, dflt)
 - chooser(G.foo.bar, dflt.foo.bar) otherwise
 
 Things get a bit more complicated by computed properties.
-Given a key k, we have 3 candidates
+Help is provided by `kv` fields `compute` and `fallback`.
+Given a key k, we have 4 candidates
 1) the default one dflt_k
-2) the global one G_k
-3) comp_k computed from the other 2.
+2) comp_k computed from dflt_k with some `compute` field
+3) the global one G_k
 If we have neither dflt_k nor comp_k, the key k is unknown.
-comp_k is chosen if any,
-then G_k is chosen if it is compatible with dflt_k
-then dflt_k is chosen.
+The latter takes precedence over the former.
+If G_k s incompatible with dflt_k and comp_k,
+then the `fallback` field is asked for an alernate value.
 --]=]
 
 ---See above
----There must be only one default set of values per user.
 ---@param G     table
 ---@param dflt  table
 ---@param kv    chooser_kv_t
@@ -318,10 +388,35 @@ do
   -- shared indexer
   local chooser_MT = {
     __index = function (t --[[:table]], k --[[:any]])
-      local dflt = t[KEY_dflt]
+      local dflt = rawget(t, KEY_dflt)
       ---@type chooser_kv_t
-      local kv = t[KEY_kv]
+      local kv = rawget(t, KEY_kv)
       local dflt_k = dflt[k]  -- default candidate
+      local function postflight(result)
+        ---@type chooser_complete_f
+        local complete = kv and kv.complete
+        if complete then
+          result = complete(t, k, result)
+        end
+        -- cache the result if any such that next time, __index is not called
+        if flags.cache_chosen and result ~= nil then
+          rawset(t, k, result)
+        end
+        return result
+      end
+      ---@type chooser_compute_f
+      local compute = kv.compute
+      if compute then
+        local comp_k = compute(t, k, dflt_k) -- a computed property is available
+        if comp_k ~= nil then
+          dflt_k = comp_k
+        end
+      end
+      if dflt_k == nil then   -- unknown key, neither default nor computed
+        return                -- stop here
+      end
+      local result
+      local G = rawget(t, KEY_G)
       local kk = k
       if type(k) == "string" then
         if Vars.debug.chooser then
@@ -332,45 +427,26 @@ do
           if kv.suffix then kk = k .. kv.suffix end
         end
       end
-      local G = t[KEY_G]
       local G_kk = G[kk]                -- global candidate
-      local function postflight(result)
-        ---@type chooser_did_choose_f
-        local did_choose = kv and kv.did_choose
-        if did_choose then
-          result = did_choose(t, k, result)
-        end
-        -- cache the result if any such that next time, __index is not called
-        if flags.cache_chosen and result ~= nil then
-          rawset(t, k, result)
-        end
-        return result
-      end
-      if kv then
-        ---@type chooser_index_f
-        local index = kv.index
-        if index then
-          local comp_k = index(t, k, G_kk) -- a computed property is available
-          if comp_k ~= nil then
-            return postflight(comp_k)
-          end
-        end
-      end
-      if dflt_k == nil then   -- unknown key, neither default nor computed
-        return                -- stop here
-      end
-      local result
       if G_kk == nil then
         result = dflt_k   -- choose the default candidate
       else
         local type_dflt_k = type(dflt_k)
         local type_G_kk   = type(G_kk)
         if type_G_kk ~= type_dflt_k then   -- wrong type, global candidate is not acceptable
+          ---@type chooser_fallback_f
+          local fallback = kv.fallback
+          if fallback then -- the index function take precedence
+            result = fallback(t, k, dflt_k, G_kk)
+            if result ~= nil then
+              return postflight(result)
+            end
+          end
           error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
         end
         if type_dflt_k == "table" then
           if #dflt_k > 0 then
-            result = G_kk -- accept sequences
+            result = G_kk -- accept sequences as is
           elseif not next(dflt_k) then
             result = G_kk -- accept void tables
           else
@@ -419,8 +495,10 @@ end
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
 ---@field write_content     fun(file_pat: string, content: string): error_level_t
----@field deep_copy         fun(original: any): any
 ---@field flags             ut_flags_t
+---@field readonly          fun(t: table, quiet: boolean): table
+---@field is_readonly       fun(t: table): boolean
+---@field deep_copy         fun(original: any): any
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
 
 return {
@@ -439,8 +517,10 @@ return {
   trim              = trim,
   extend_with       = extend_with,
   read_content      = read_content,
+  flags             = flags,
+  readonly          = readonly,
+  is_readonly       = is_readonly,
   write_content     = write_content,
   deep_copy         = deep_copy,
-  flags             = flags,
   chooser           = chooser,
 }

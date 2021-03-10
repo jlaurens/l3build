@@ -22,14 +22,6 @@ for those people who are interested.
 
 --]]
 
---[=[ Usage:
----@type oslib_t
-local oslib       = require("l3b-oslib")
-local cmd_concat  = oslib.cmd_concat
-local run         = oslib.run
-local quoted_path = oslib.quoted_path
---]=]
-
 local execute          = os.execute
 local getenv           = os.getenv
 local os_type          = os["type"]
