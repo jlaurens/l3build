@@ -44,20 +44,20 @@ _G.options = l3build.options
 
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
+local utlib = require("l3b-utillib")
 local items = utlib.items
 
 ---@type wklib_t
-local wklib = require("l3b.walklib")
+local wklib = require("l3b-walklib")
 
 ---@type oslib_t
-local oslib = require("l3b.oslib")
+local oslib = require("l3b-oslib")
 
 ---@type gblib_t
-local gblib = require("l3b.globlib")
+local gblib = require("l3b-globlib")
 
 ---@type fslib_t
-local fslib = require("l3b.fslib")
+local fslib = require("l3b-fslib")
 
 _G.abspath        = fslib.absolute_path
 _G.dirname        = wklib.dir_name
@@ -101,19 +101,19 @@ end
 
 
 ---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
+local l3b_aux = require("l3build-aux")
 
 _G.call = l3b_aux.call
 
 ---@type l3b_inst_t
-local l3b_inst = require("l3b.install")
+local l3b_inst = require("l3build-install")
 
 _G.install_files = l3b_inst.install_files
 
 -- typesetting functions
 
 ---@type l3b_tpst_t
-local l3b_tpst = require("l3b.typesetting")
+local l3b_tpst = require("l3build-typesetting")
 
 _G.biber      = l3b_tpst.biber
 _G.bibtex     = l3b_tpst.bibtex
@@ -139,7 +139,7 @@ local function export_symbols(from, suffix, ...)
 end
 
 ---@type l3b_vars_t
-local l3b_vars = require("l3b.variables")
+local l3b_vars = require("l3build-variables")
 
 if type(_G.module) == "function" then
   _G.module = nil
@@ -212,7 +212,7 @@ export_symbols(Files, "files",
 )
 
 ---@type l3b_check_t
-local l3b_check = require("l3b.check")
+local l3b_check = require("l3build-check")
 ---@type l3b_check_vars_t
 local l3b_check_vars = l3b_check.Vars
 export_symbols(l3b_check_vars, "",
@@ -266,7 +266,7 @@ export_symbols(l3b_check_vars, "",
 )
 
 ---@type l3b_tpst_t
-local l3b_tpst = require("l3b.typesetting")
+local l3b_tpst = require("l3build-typesetting")
 ---@type l3b_tpst_vars_t
 local l3b_tpst_vars = l3b_tpst.Vars
 export_symbols(l3b_tpst_vars, "",
@@ -274,7 +274,7 @@ export_symbols(l3b_tpst_vars, "",
 )
 
 ---@type l3b_unpk_t
-local l3b_unpk = require("l3b.unpack")
+local l3b_unpk = require("l3build-unpack")
 ---@type l3b_unpk_vars_t
 local l3b_unpk_vars = l3b_unpk.Vars
 export_symbols(l3b_unpk_vars, "",
@@ -304,7 +304,7 @@ export_symbols(Main, "",
 )
 
 ---@type l3b_ctan_t
-local l3b_ctan = require("l3b.ctan")
+local l3b_ctan = require("l3build-ctan")
 ---@type l3b_ctan_vars_t
 local l3b_ctan_vars = l3b_ctan.Vars
 export_symbols(l3b_ctan_vars, "",
@@ -340,7 +340,7 @@ export_symbols(l3b_check_vars, "",
 )
 
 ---@type l3b_mfst_t
-local l3b_mfst = require("l3b.manifest")
+local l3b_mfst = require("l3build-manifest")
 ---@type l3b_mfst_vars_t
 local l3b_mfst_vars = l3b_mfst.Vars
 
@@ -353,7 +353,7 @@ export_symbols(Main, "",
 )
 
 ---@type l3b_upld_t
-local l3b_upld = require("l3b.upload")
+local l3b_upld = require("l3build-upload")
 ---@type l3b_upld_vars_t
 local l3b_upld_vars = l3b_upld.Vars
 

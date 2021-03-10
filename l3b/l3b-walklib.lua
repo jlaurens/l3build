@@ -24,7 +24,7 @@ for those people who are interested.
 
 --[=[ Usage:
 ---@type wklib_t
-local wklib     = require("l3b.walklib")
+local wklib     = require("l3b-walklib")
 local dir_base  = wklib.dir_base
 local base_name = wklib.base_name
 local dir_name  = wklib.dir_name
@@ -34,7 +34,7 @@ local job_name  = wklib.job_name
 local match       = string.match
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local first_of    = utlib.first_of
 local second_of   = utlib.second_of
 local extend_with = utlib.extend_with

@@ -23,13 +23,13 @@ for those people who are interested.
 --]]
 
 ---@type utlib_t
-local utlib         = require("l3b.utillib")
+local utlib         = require("l3b-utillib")
 local entries       = utlib.entries
 local keys          = utlib.keys
 local unique_items  = utlib.unique_items
 
 ---@type fslib_t
-local fslib                 = require("l3b.fslib")
+local fslib                 = require("l3b-fslib")
 local make_directory        = fslib.make_directory
 local tree                  = fslib.tree
 local remove_tree           = fslib.remove_tree
@@ -37,7 +37,7 @@ local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Dir_t
@@ -46,7 +46,7 @@ local Dir       = l3b_vars.Dir
 local Files     = l3b_vars.Files
 
 ---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
+local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
 
 -- Remove all generated files

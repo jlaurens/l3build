@@ -24,25 +24,26 @@ for those people who are interested.
 
 -- local safety guards and shortcuts
 
-local pairs = pairs
-local print = print
+local pairs   = pairs
+local print   = print
+local concat  = table.concat
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
-local entries     = utlib.entries
-local extend_with = utlib.extend_with
+local utlib             = require("l3b-utillib")
+local entries           = utlib.entries
+local to_quoted_string  = utlib.to_quoted_string
 
 ---@type wklib_t
-local wklib     = require("l3b.walklib")
+local wklib     = require("l3b-walklib")
 local dir_base  = wklib.dir_base
 
 ---@type oslib_t
-local oslib       = require("l3b.oslib")
+local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
 
 ---@type fslib_t
-local fslib         = require("l3b.fslib")
+local fslib         = require("l3b-fslib")
 local absolute_path = fslib.absolute_path
 
 
@@ -82,10 +83,11 @@ end
 
 -- Performs the task named target given modules in a bundle.
 ---A module is the path of a directory relative to the main one.
----Uses `run` to launch a command.
+---Uses `run` to launch a command: change to the module directory,
+---then executes texlua with proper arguments.
 ---@param modules string_list_t List of modules.
 ---@param target  string
----@param opts    table
+---@param opts    table|nil
 ---@return number 0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public
@@ -94,7 +96,7 @@ local function call(modules, target, opts)
   opts = opts or l3build.options
   local cli_opts = ""
   for k, v in pairs(opts) do
-    if k ~= "names" and k ~= "target" then -- Special cases, TODO enhance the design to remove the need for this comment
+    if k ~= "names" and k ~= "target" then -- historical limitation
       local type_v = type(v)
       local no = ""
       local value = ""
@@ -107,21 +109,20 @@ local function call(modules, target, opts)
       elseif type_v == "string" then
         value = "=" .. v
       elseif type_v == "table" then
-        value = "=" .. table.concat(v, ",")
+        value = "=" .. concat(v, ",")
       end
       cli_opts = cli_opts .." --".. no .. k .. value
     end
   end
   if opts.names then
-    for name in entries(opts.names) do
-      cli_opts = cli_opts .. " " .. name
-    end
+    cli_opts = cli_opts .." ".. to_quoted_string(opts.names)
   end
   local script_name = get_script_name()
   for module in entries(modules) do
     local text
-    if module == "." and opts["config"] and #opts["config"]>0 then
-      text = " with configuration " .. opts["config"][1]
+    local opts_config = opts["config"]
+    if module == "." and opts_config and #opts_config>0 then
+      text = " with configuration " .. opts_config[1]
     else
       text = " for module " .. module
     end

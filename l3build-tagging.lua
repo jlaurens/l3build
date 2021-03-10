@@ -22,28 +22,25 @@ for those people who are interested.
 
 --]]
 
-local open    = io.open
 local os_date = os.date
-local match   = string.match
-local gsub    = string.gsub
+local exit    = os.exit
 
 ---@type utlib_t
-local utlib         = require("l3b.utillib")
+local utlib         = require("l3b-utillib")
 local chooser       = utlib.chooser
 local entries       = utlib.entries
 local values        = utlib.keys
 local unique_items  = utlib.unique_items
-local first_of      = utlib.first_of
 local read_content  = utlib.read_content
 local write_content = utlib.write_content
 
 ---@type wklib_t
-local wklib       = require("l3b.walklib")
+local wklib       = require("l3b-walklib")
 local dir_name    = wklib.dir_name
 local base_name   = wklib.base_name
 
 ---@type fslib_t
-local fslib       = require("l3b.fslib")
+local fslib       = require("l3b-fslib")
 local rename      = fslib.rename
 local remove_tree = fslib.remove_tree
 local tree        = fslib.tree
@@ -52,13 +49,21 @@ local tree        = fslib.tree
 local l3build = require("l3build")
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
+---@type Main_t
+local Main      = l3b_vars.Main
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
 ---@type Files_t
 local Files     = l3b_vars.Files
+
+---@type l3b_aux_t
+local l3b_aux = require("l3build-aux")
+local call    = l3b_aux.call
+
+-- module implementation
 
 ---@class l3b_tagging_vars_t
 ---@field tag_hook    fun(tag_name: string, tag_date: string): error_level_t
@@ -97,9 +102,13 @@ local function update_file_tag(file_path, tag_name, tag_date)
 end
 
 ---Target tag
----@param tag_names? string_list_t
+---@param tag_names string_list_t|nil
 ---@return error_level_t
 local function tag(tag_names)
+  if tag_names and #tag_names > 1 then
+    print("No more that one tag name")
+    exit(1)
+  end
   local options = l3build.options
   local tag_date = options["date"] or os_date("%Y-%m-%d")
   local tag_name = tag_names and tag_names[1]
@@ -117,9 +126,24 @@ local function tag(tag_names)
   return Vars.tag_hook(tag_name, tag_date)
 end
 
+---Target tag
+---@param tag_names string_list_t|nil, singleton list
+---@return error_level_t
+local function bundle_tag(tag_names)
+  local modules = Main.modules
+  local error_level = call(modules, "tag")
+  -- Deal with any files in the bundle dir itself
+  if error_level == 0 then
+    error_level = tag(tag_names)
+  end
+  return error_level
+end
+
 ---@class l3b_tagging_t
----@field tag fun(tag_names: string_list_t): integer
+---@field tag         fun(tag_names: string_list_t): error_level_t
+---@field bundle_tag  fun(tag_names: string_list_t): error_level_t
 
 return {
-  tag = tag,
+  tag         = tag,
+  bundle_tag  = bundle_tag,
 }

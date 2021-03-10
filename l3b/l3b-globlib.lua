@@ -23,7 +23,7 @@ for those people who are interested.
 --]]
 
 --[=[ Usage:
-local gblib           = require("l3b.globlib")
+local gblib           = require("l3b-globlib")
 local glob_to_pattern = gblib.glob_to_pattern
 --]=]
 
@@ -33,7 +33,7 @@ local match            = string.match
 local sub              = string.sub
 
 ---@type utlib_t
-local utlib        = require("l3b.utillib")
+local utlib        = require("l3b-utillib")
 local extend_with = utlib.extend_with
 
 -- Convert a file glob into a pattern for use by e.g. string.gub

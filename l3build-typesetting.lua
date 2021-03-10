@@ -35,7 +35,7 @@ local match     = string.match
 local os_type = os["type"]
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
@@ -44,17 +44,17 @@ local first_of    = utlib.first_of
 local extend_with = utlib.extend_with
 
 ---@type wklib_t
-local wklib             = require("l3b.walklib")
+local wklib             = require("l3b-walklib")
 local job_name          = wklib.job_name
 local dir_base          = wklib.dir_base
 
 ---@type oslib_t
-local oslib             = require("l3b.oslib")
+local oslib             = require("l3b-oslib")
 local cmd_concat        = oslib.cmd_concat
 local run               = oslib.run
 
 ---@type fslib_t
-local fslib             = require("l3b.fslib")
+local fslib             = require("l3b-fslib")
 local directory_exists  = fslib.directory_exists
 local absolute_path     = fslib.absolute_path
 local file_exists       = fslib.file_exists
@@ -68,7 +68,7 @@ local tree              = fslib.tree
 local l3build = require("l3build")
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Xtn_t
@@ -85,12 +85,12 @@ local Files     = l3b_vars.Files
 local Deps      = l3b_vars.Deps
 
 --@type l3b_aux_t
-local l3b_aux       = require("l3b.aux")
+local l3b_aux       = require("l3build-aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
 local deps_install  = l3b_aux.deps_install
 
 --@type l3b_unpk_t
-local l3b_unpk  = require("l3b.unpack")
+local l3b_unpk  = require("l3build-unpack")
 local unpack      = l3b_unpk.unpack
 
 ---@class l3b_tpst_vars_t
@@ -259,9 +259,9 @@ end
 -- Only fo known keys
 ---@type Ngn_t
 local Ngn = chooser(_G, MT, {
-  index = function (t, k)
+  index = function (t, k, v_G)
     if k == "tex" then --- tex is already a table in texlua.
-      if type(_G[k]) == "table" then
+      if type(v_G) == "table" then
         return MT[k]
       end
     end

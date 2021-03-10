@@ -26,19 +26,20 @@ local append  = table.insert
 local os_time = os["time"]
 
 ---@type utlib_t
-local utlib     = require("l3b.utillib")
+local utlib     = require("l3b-utillib")
 local chooser   = utlib.chooser
 local entries   = utlib.entries
 local first_of  = utlib.first_of
 
 ---@type oslib_t
-local oslib       = require("l3b.oslib")
+local oslib       = require("l3b-oslib")
 local quoted_path = oslib.quoted_path
 
 ---@type fslib_t
-local fslib             = require("l3b.fslib")
+local fslib             = require("l3b-fslib")
 local set_tree_excluder = fslib.set_tree_excluder
 local directory_exists  = fslib.directory_exists
+local file_exists       = fslib.file_exists
 local all_names         = fslib.all_names
 
 ---@type l3build_t
@@ -91,6 +92,7 @@ end
 ---@field epoch         integer Epoch (Unix date) to set for test runs
 ---@field tdslocations  string_list_t For non-standard file installations
 ---@field _standalone   boolean True means the module is also the bundle
+---@field _at_bundle_top    boolean True means we are at the top of the bundle
 
 ---@type Main_t
 local Main
@@ -113,6 +115,8 @@ local Main_dflt = {
 local function chooser_index(t, k)
   if k == "_standalone" then
     return not _G.bundle or _G.bundle == ""
+  elseif k == "_at_bundle_top" then
+    return t.module == ""
   elseif k == "bundle" then
     return t._standalone and t.module or _G.bundle
   elseif k == "ctanpkg" then
@@ -123,10 +127,12 @@ local function chooser_index(t, k)
     return t.ctanpkg .. "-ctan"
   elseif k == "modules" then -- dynamically create the module list
     local result = {}
-    local exclmodules = t.exclmodules or {}
-    for entry in all_names(require("l3b.variables").Dir.work) do -- Dir is not yet defined
-      if directory_exists(entry) and not exclmodules[entry] then
-        append(result, entry)
+    local excl_modules = t.exclmodules or {}
+    for entry in all_names(require("l3build-variables").Dir.work) do -- Dir is not yet defined
+      if directory_exists(entry) and not excl_modules[entry] then
+        if file_exists(entry .."/build.lua") then
+          append(result, entry)
+        end
       end
     end
     return result
@@ -134,7 +140,7 @@ local function chooser_index(t, k)
   local options = l3build.options
   if k == "forcecheckepoch" then
     if options["epoch"] then
-      return true -- overwrite any global setting
+      return true
     end
   elseif k == "epoch" then
     return options["epoch"] or _G["epoch"]
@@ -144,12 +150,10 @@ end
 Main = chooser(_G, Main_dflt, {
   index = chooser_index,
   did_choose = function (t, k, result)
-    -- No trailing /
-    -- What about the leading "./"
     local options = l3build.options
     if k == "forcecheckepoch" then
       if options["epoch"] then
-        return true
+        return true -- overwrite any global setting
       end
     elseif k == "epoch" then
       return normalise_epoch(result)

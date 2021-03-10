@@ -22,165 +22,46 @@ for those people who are interested.
 
 --]]
 
-local gsub        = string.gsub
+-- code dependencies
 
 local exit        = os.exit
 local append      = table.insert
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 local deep_copy   = utlib.deep_copy
 
 ---@type fslib_t
-local fslib         = require("l3b.fslib")
+local fslib         = require("l3b-fslib")
 local all_names     = fslib.all_names
 local file_exists   = fslib.file_exists
 
 ---@type l3build_t
 local l3build = require("l3build")
 
+---@type l3b_targets_t
+local l3b_targets_t   = require("l3b-targets")
+local get_target_info = l3b_targets_t.get_info
+
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
----@type Deps_t
-local Deps      = l3b_vars.Deps
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
 
 ---@type l3b_aux_t
-local l3b_aux       = require("l3b.aux")
-local call          = l3b_aux.call
-local deps_install  = l3b_aux.deps_install
+local l3b_aux   = require("l3build-aux")
+local call      = l3b_aux.call
 
 ---@type l3b_check_t
-local l3b_check       = require("l3b.check")
+local l3b_check       = require("l3build-check")
 local l3b_check_vars  = l3b_check.Vars
-local check           = l3b_check.check
-local save            = l3b_check.save
 
-local help          = require("l3b.help").help
-local l3b_ctan      = require("l3b.ctan")
-local ctan          = l3b_ctan.ctan
-local bundlectan    = l3b_ctan.bundlectan
-local l3b_unpk      = require("l3b.unpack")
-local unpack        = l3b_unpk.unpack
-local bundleunpack  = l3b_unpk.Vars.bundleunpack
-local l3b_clean     = require("l3b.clean")
-local clean         = l3b_clean.clean
-local bundleclean   = l3b_clean.bundleclean
-local doc           = require("l3b.typesetting").doc
-local l3b_inst      = require("l3b.install")
-local install       = l3b_inst.install
-local uninstall     = l3b_inst.uninstall
-local manifest      = require("l3b.manifest").manifest
-local tag           = require("l3b.tagging").manifest
-local upload        = require("l3b.upload").upload
+local help  = require("l3build-help").help
 
-local target_list =
-  {
-    -- Some hidden targets
-    bundlecheck =
-      {
-        func = check,
-        pre  = function(names)
-            if names then
-              print("Bundle checks should not list test names")
-              help()
-              exit(1)
-            end
-            return 0
-          end
-      },
-    bundlectan =
-      {
-        func = bundlectan
-      },
-    bundleunpack =
-      {
-        func = bundleunpack,
-        pre  = function()
-          return deps_install(Deps.unpack)
-        end
-      },
-    -- Public targets
-    check =
-      {
-        bundle_target = true,
-        desc = "Run all automated tests",
-        func = check,
-      },
-    clean =
-      {
-        bundle_func = bundleclean,
-        desc = "Clean out directory tree",
-        func = clean
-      },
-    ctan =
-      {
-        bundle_func = ctan,
-        desc = "Create CTAN-ready archive",
-        func = ctan
-      },
-    doc =
-      {
-        desc = "Typesets all documentation files",
-        func = doc
-      },
-    install =
-      {
-        desc = "Installs files into the local texmf tree",
-        func = install
-      },
-    manifest =
-      {
-        desc = "Creates a manifest file",
-        func = manifest
-      },
-    save =
-      {
-        desc = "Saves test validation log",
-        func = save
-      },
-    tag =
-      {
-        bundle_func = function(names)
-            local modules = Main.modules
-            local error_level = call(modules, "tag")
-            -- Deal with any files in the bundle dir itself
-            if error_level == 0 then
-              error_level = tag(names)
-            end
-            return error_level
-          end,
-        desc = "Updates release tags in files",
-        func = tag,
-        pre  = function(names)
-           if names and #names > 1 then
-             print("Too many tags specified; exactly one required")
-             exit(1)
-           end
-           return 0
-         end
-      },
-    uninstall =
-      {
-        desc = "Uninstalls files from the local texmf tree",
-        func = uninstall
-      },
-    unpack =
-      {
-        bundle_target = true,
-        desc = "Unpacks the source files into the build tree",
-        func = unpack
-      },
-    upload =
-      {
-        desc = "Send archive to CTAN for public release",
-        func = upload
-      },
-  }
+-- module implementation
 
 --
 -- The overall main function
@@ -191,31 +72,28 @@ local target_list =
 ---@param names?  string_list_t
 local function main(target, names)
   -- Deal with unknown targets up-front
-  if not target_list[target] then
+  local info = get_target_info(target)
+  if not info then
     help()
     exit(1)
   end
   local error_level = 0
-  if Main.module == "" then
-    local modules = Main.modules
-    if target_list[target].bundle_func then
-      error_level = target_list[target].bundle_func(names)
+  if Main._at_bundle_top then
+    if info.bundle_run then
+      error_level = info.bundle_run(names)
     else
       -- Detect all of the modules
-      if target_list[target].bundle_target then
-        target = "bundle" .. target
-      end
-      error_level = call(modules, target)
+      local modules = Main.modules
+      error_level = call(modules, info.bundle_target)
     end
   else
-    local info = target_list[target]
-    if info.pre then
-     error_level = info.pre(names)
-     if error_level ~= 0 then
-       exit(1)
-     end
+    if info.preflight then
+      error_level = info.preflight(names)
+      if error_level ~= 0 then
+        exit(1)
+      end
     end
-    error_level = info.func(names)
+    error_level = info.run(names)
   end
   -- All done, finish up
   if error_level ~= 0 then
@@ -297,7 +175,6 @@ end
 
 return {
   main              = main,
-  target_list       = target_list,
   multi_check       = multi_check,
   prepare_config    = prepare_config,
 }

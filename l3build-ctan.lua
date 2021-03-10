@@ -28,7 +28,7 @@ local lower = string.lower
 local match = string.match
 
 ---@type utlib_t
-local utlib    = require("l3b.utillib")
+local utlib    = require("l3b-utillib")
 local chooser = utlib.chooser
 local entries = utlib.entries
 local items   = utlib.items
@@ -36,15 +36,15 @@ local values  = utlib.values
 local to_quoted_string = utlib.to_quoted_string
 
 ---@type wklib_t
-local wklib    = require("l3b.walklib")
+local wklib    = require("l3b-walklib")
 local dir_name = wklib.dir_name
 
 ---@type oslib_t
-local oslib = require("l3b.oslib")
+local oslib = require("l3b-oslib")
 local run   = oslib.run
 
 ---@type fslib_t
-local fslib           = require("l3b.fslib")
+local fslib           = require("l3b-fslib")
 local make_directory  = fslib.make_directory
 local file_exists     = fslib.file_exists
 local tree            = fslib.tree
@@ -57,7 +57,7 @@ local remove_directory  = fslib.remove_directory
 local l3build = require("l3build")
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Dir_t
@@ -70,11 +70,11 @@ local Exe       = l3b_vars.Exe
 local Opts      = l3b_vars.Opts
 
 ---@type l3b_aux_t
-local l3b_aux = require("l3b.aux")
+local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
 
 ---@type l3b_inst_t
-local l3b_inst = require("l3b.install")
+local l3b_inst = require("l3build-install")
 local install_files = l3b_inst.install_files
 ---@type l3b_inst_vars_t
 local l3b_inst_vars = l3b_inst.Vars
@@ -121,7 +121,7 @@ local function copy_ctan()
   end
 end
 
----comment
+---One of the bundle private targets
 ---@return error_level_t
 local function bundle_ctan()
   local error_level = install_files(Dir.tds, true)
@@ -143,7 +143,7 @@ local function ctan()
   if standalone then
     error_level = call({ "." }, "check")
   else
-    error_level = call(Main.modules, "bundlecheck")
+    error_level = call(Main.modules, "bundle_check")
   end
   if error_level ~= 0 then
     print("\n====================")
@@ -162,7 +162,7 @@ local function ctan()
     end
     copy_ctan()
   else
-    error_level = call(Main.modules, "bundlectan")
+    error_level = call(Main.modules, "bundle_ctan")
     if error_level ~= 0 then
       print("\n====================")
       print("Typesetting failed, zip stage skipped!")
@@ -172,8 +172,8 @@ local function ctan()
   end
   for i in entries(Files.text) do
     for j in items(Dir.unpack, Dir.textfile) do
-      copy_tree(i, j, Dir.ctan .. "/" .. Main.ctanpkg)
-      copy_tree(i, j, Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
+      copy_tree(i, j, Dir.ctan .. "/"     .. Main.ctanpkg)
+      copy_tree(i, j, Dir.tds  .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
     end
   end
   -- Rename README if necessary

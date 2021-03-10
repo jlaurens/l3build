@@ -38,7 +38,7 @@ local match   = string.match
 local str_rep = string.rep
 
 ---@type utlib_t
-local utlib         = require("l3b.utillib")
+local utlib         = require("l3b-utillib")
 local chooser       = utlib.chooser
 local entries       = utlib.entries
 local trim_space    = utlib.trim
@@ -52,7 +52,7 @@ local l3build = require("l3build")
 local debug   = l3build.debug
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Exe_t

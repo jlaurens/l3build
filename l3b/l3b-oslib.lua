@@ -24,7 +24,7 @@ for those people who are interested.
 
 --[=[ Usage:
 ---@type oslib_t
-local oslib       = require("l3b.oslib")
+local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
 local quoted_path = oslib.quoted_path
@@ -45,7 +45,7 @@ local append          = table.insert
 local concat          = table.concat
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local items       = utlib.items
 local first_of    = utlib.first_of
 

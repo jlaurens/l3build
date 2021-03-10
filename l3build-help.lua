@@ -28,7 +28,7 @@ local rep    = string.rep
 local sort   = table.sort
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
 local extend_with = utlib.extend_with
@@ -43,22 +43,6 @@ local function version()
 end
 
 local function help()
-  local function setup_list(list)
-    local longest = 0
-    for k in keys(list) do
-      if #k > longest then
-        longest = #k
-      end
-    end
-    -- Sort the options
-    local t = {}
-    for k in keys(list) do
-      append(t, k)
-    end
-    sort(t)
-    return longest,t
-  end
-
   local scriptname = "l3build"
   if not (arg[0]:match("l3build%.lua$") or match(arg[0],"l3build$")) then
     scriptname = arg[0]
@@ -66,26 +50,32 @@ local function help()
   print("usage: " .. scriptname .. " <target> [<options>] [<names>]")
   print("")
   print("Valid targets are:")
-  local longest, t = setup_list(_G.target_list)
-  for k in entries(t) do
-    local target = _G.target_list[k]
-    local filler = rep(" ", longest - k:len() + 1)
-    if target["desc"] then
-      print("   " .. k .. filler .. target["desc"])
+  local width = 0
+  local get_all_info = require("l3b-targets").get_all_info
+  for info in get_all_info() do
+    if #info.name > width then
+      width = #info.name
     end
+  end
+  for info in get_all_info() do
+    local filler = rep(" ", width - #info.name + 1)
+    print("   " .. info.name .. filler .. info.description)
   end
   print("")
   print("Valid options are:")
-  longest, t = setup_list(_G.option_list)
-  for k in entries(t) do
-    local opt = _G.option_list[k]
-    local filler = rep(" ", longest - k:len() + 1)
-    if opt["desc"] then
-      if opt["short"] then
-        print("   --" .. k .. "|-" .. opt["short"] .. filler .. opt["desc"])
-      else
-        print("   --" .. k .. "   " .. filler .. opt["desc"])
-      end
+  width = 0
+  get_all_info = require("l3b-options").get_all_info
+  for info in get_all_info() do
+    if #info.long > width then
+      width = #info.long
+    end
+  end
+  for info in get_all_info() do
+    local filler = rep(" ", width - #info.long + 1)
+    if info.short then
+      print("   --" .. info.long .. "|-" .. info.short .. filler .. info.description)
+    else
+      print("   --" .. info.long .. "   " .. filler .. info.description)
     end
   end
   print("")

@@ -36,7 +36,6 @@ local luatex_version  = status.luatex_version
 local len             = string.len
 local char            = string.char
 local str_format      = string.format
-local gmatch          = string.gmatch
 local gsub            = string.gsub
 local match           = string.match
 
@@ -52,7 +51,7 @@ local execute         = os.execute
 local remove          = os.remove
 
 ---@type utlib_t
-local utlib           = require("l3b.utillib")
+local utlib           = require("l3b-utillib")
 local chooser         = utlib.chooser
 local entries         = utlib.entries
 local first_of        = utlib.first_of
@@ -61,20 +60,20 @@ local read_content    = utlib.read_content
 local write_content   = utlib.write_content
 
 ---@type gblib_t
-local gblib           = require("l3b.globlib")
+local gblib           = require("l3b-globlib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type wklib_t
-local wklib     = require("l3b.walklib")
+local wklib     = require("l3b-walklib")
 local job_name  = wklib.job_name
 
 ---@type oslib_t
-local oslib       = require("l3b.oslib")
+local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
 
 ---@type fslib_t
-local fslib       = require("l3b.fslib")
+local fslib       = require("l3b-fslib")
 local all_names   = fslib.all_names
 local copy_file   = fslib.copy_file
 local copy_tree   = fslib.copy_tree
@@ -91,8 +90,12 @@ local make_clean_directory  = fslib.make_clean_directory
 ---@type l3build_t
 local l3build = require("l3build")
 
+---@type l3b_help_t
+local l3b_help  = require("l3build-help")
+local help      = l3b_help.help
+
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Xtn_t
@@ -107,16 +110,16 @@ local Deps      = l3b_vars.Deps
 local Opts      = l3b_vars.Opts
 
 ---@type l3b_aux_t
-local l3b_aux       = require("l3b.aux")
+local l3b_aux       = require("l3build-aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
 local deps_install  = l3b_aux.deps_install
 
 ---@type l3b_unpk_t
-local l3b_unpk    = require("l3b.unpack")
+local l3b_unpk    = require("l3build-unpack")
 local bundleunpack  = l3b_unpk.Vars.bundleunpack
 
 ---@type l3b_tpst_t
-local l3b_tpst = require("l3b.typesetting")
+local l3b_tpst = require("l3build-typesetting")
 local dvi2pdf        = l3b_tpst.dvi2pdf
 
 -- Variables
@@ -1345,15 +1348,30 @@ local function sanitize_engines()
   end
 end
 
+
+---Check at the top level
+---@param names string_list_t
+---@return error_level_t
+local function bundle_check(names)
+  if names and #names > 0 then
+    print("Bundle checks should not list test names")
+    help()
+    exit(1)
+  end
+  return check(names)
+end
+
 ---@class l3b_check_t
 ---@field Vars              l3b_check_vars_t
 ---@field check             fun(names: string_list_t): integer
+---@field bundle_check      fun(names: string_list_t): integer
 ---@field save              fun(names: string_list_t): integer
 ---@field sanitize_engines  fun()
 
 return {
   Vars              = Vars,
   check             = check,
+  bundle_check      = bundle_check,
   save              = save,
   sanitize_engines  = sanitize_engines,
 }

@@ -33,7 +33,6 @@ release_date = "2020-06-04"
 
 local assert    = assert
 local ipairs    = ipairs
-local match     = string.match
 local gmatch    = string.gmatch
 local print     = print
 local exit      = os.exit
@@ -46,7 +45,9 @@ kpse.set_program_name("kpsewhich")
 
 assert(not _G.l3build, "No self call")
 
-local in_document -- Whether in a tex document or in a package folder
+-- Whether in a tex document or in a package folder:
+local in_document = require("status").cs_count > 0 -- tex.print ~= nil is undocumented
+
 local is_main     -- Whether the script is called first
 local work_dir    -- the directory containing the closest "build.lua" and friends
 local main_dir    -- the directory containing the topmost "build.lua" and friends
@@ -75,12 +76,13 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
 
-
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)
   flags = {}, -- various shared flags
   data = {},  -- shared data
 }
+
+print(in_document and "Document mode" or "Package mode")
 
 do
   -- the directory containing "l3build.lua" by kpse
@@ -88,22 +90,18 @@ do
 
   -- Setup dirs where require will look for modules.
 
-  local launch_dir -- the directory containing "l3build.lua"
-
   -- File operations are aided by the LuaFileSystem module
   local lfs = require("lfs")
 
   local start_dir = lfs.currentdir() .. "/" -- this is the current dir at launch time
 
-  ---Extract dir and base from path
-  ---@param path string
-  ---@return string dir includes a trailing '/', defaults to "./"
-  ---@return string base
-  local function to_dir_base(path)
-    local dir, base = path:match("(.*/)(.*)")
-    if not dir then dir, base = "./", path end
-    return dir, base
+  -- is_main: whether required by someone else, or not
+  local cmd_path = arg[0]
+  local cmd_dir, cmd_base = cmd_path:match("(.*/)(.*)")
+  if not cmd_dir then
+    cmd_dir, cmd_base = "./", cmd_path
   end
+  is_main = cmd_base == "l3build" or cmd_base == "l3build.lua"
 
   ---Central function to allow launching l3build from a subdirectory
   ---of a local repository.
@@ -129,13 +127,10 @@ do
     end
   end
 
-  local cmd_path = arg[0]
-  local cmd_dir, cmd_base = to_dir_base(cmd_path)
-
-  is_main = cmd_base == "l3build" or cmd_base == "l3build.lua"
-  assert(is_main == not not (arg[0]:match("l3build$") or arg[0]:match("l3build%.lua$")))
-  -- launch_dir:
-  if cmd_base == "l3build.lua" then -- `texlua foo/bar/l3build.lua ...`
+  local launch_dir -- the directory containing "l3build.lua"
+  if in_document then -- `luatex foo/bar.tex`
+    launch_dir = kpse_dir
+  elseif cmd_base == "l3build.lua" then -- `texlua foo/bar/l3build.lua ...`
     launch_dir = cmd_dir
   elseif cmd_base == "l3build" then
     launch_dir = kpse_dir
@@ -145,11 +140,11 @@ do
 
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
-  local function on_debug(f) end
+  local function on_debug(f) end -- do nothing by default
 
   for _, o in ipairs(arg) do
     if o:match("^%-%-debug") then
-      function on_debug(f)
+      function on_debug(f) -- calls f
         f()
       end
       break
@@ -157,7 +152,9 @@ do
   end
 
   -- work_dir:
-  if cmd_base == "build.lua" then
+  if in_document then
+    work_dir = nil
+  elseif cmd_base == "build.lua" then
     work_dir = cmd_dir
   else
     work_dir = container(cmd_dir, "build.lua") or container(start_dir, "build.lua")
@@ -180,9 +177,7 @@ do
       end)
     end
   end
-  if work_dir then
-    print("Package mode")
-    in_document = false
+  if work_dir then -- package mode
     main_dir = work_dir
     repeat
       local top = container(main_dir .."../", "build.lua")
@@ -190,12 +185,9 @@ do
         main_dir = top
       end
     until not top
-  else
-    print("Document mode")
-    in_document = true
   end
 
-  ---Register the given pakage.
+  ---Register the given pakage in `package.loaded`.
   ---Lua's require function return either true or a table.
   ---Here we always return a table.
   ---@param pkg       table|boolean
@@ -232,7 +224,7 @@ do
   end
   
   ---Overwrites global `require`.
-  ---When `pkg_name` is "l3b.<name>",
+  ---When `pkg_name` is "l3build-<name>",
   ---looks for "<l3b_dir>l3build-<name>.lua".
   ---@param pkg_name string
   ---@return table|boolean
@@ -244,15 +236,23 @@ do
     if debug_require then
       print("DEBUG Info: package required ".. pkg_name)
     end
-    local name = pkg_name:match("^l3b%.(.*)")
+    local name = pkg_name:match("^l3b%-.*")
     if name then
       package.loaded[pkg_name] = true
-      local path = launch_dir .. "l3build-"..name
+      local path = launch_dir .."l3b/".. name
       result = require_orig(path) -- error here if no such module exists
       result = register(result, pkg_name, name, path .. ".lua")
     else
+      name = pkg_name:match("^l3build%-.*")
       -- forthcoming management here
-      result = require_orig(pkg_name)
+      if name then
+        package.loaded[pkg_name] = true
+        local path = launch_dir .. name
+        result = require_orig(path) -- error here if no such module exists
+        result = register(result, pkg_name, name, path .. ".lua")
+      else
+        result = require_orig(pkg_name)
+      end
     end
     if debug_require then
       print("DEBUG Info: package loaded ".. pkg_name, result.PATH)
@@ -277,35 +277,33 @@ end
 
 -- Terminate here if in document mode
 if in_document then
-  require("l3b.globals")
+  require("l3build-globals")
   return l3build
 end
 
 --[=[DEBUG flags]]
 ---@type oslib_t
-local oslib = require("l3b.oslib")
+local oslib = require("l3b-oslib")
 oslib.Vars.debug.run = true
 --[=[DEBUG flags end]=]
 
----@type l3b_arguments_t
-local arguments = require("l3b.arguments")
-l3build.options = arguments.parse(arg)
+---@type l3b_options_t
+local l3b_options = require("l3b-options")
+l3build.options = l3b_options.parse(arg)
 local options   = l3build.options
 
 if options.debug then
-  if options["debug"] then
-    require("l3b.oslib").Vars.debug.run = true
-  end
+  require("l3b-oslib").Vars.debug.run = true
 end
 
 ---@type l3b_help_t
-local l3b_help  = require("l3b.help")
+local l3b_help  = require("l3build-help")
 local help      = l3b_help.help
 local version   = l3b_help.version
 
-require("l3b.typesetting")
+require("l3build-typesetting")
 
-require("l3b.clean")
+require("l3build-clean")
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -318,15 +316,14 @@ elseif options["target"] == "version" then
 end
 
 ---@type l3b_main_t
-local l3b_main        = require("l3b.stdmain")
+local l3b_main        = require("l3build-stdmain")
 local multi_check     = l3b_main.multi_check
 local prepare_config  = l3b_main.prepare_config
 
 -- Allow main function to be disabled 'higher up'
 _G.main = _G.main or l3b_main.main
 
-require("l3b.globals")
-require("l3blib.options")
+require("l3build-globals")
 
 -- Load configuration file if running as a script
 if is_main then
@@ -334,62 +331,8 @@ if is_main then
   dofile(work_dir .. "build.lua")
 end
 
---[=[ CUT FROM HERE ]=]
--- Custom bundleunpack which does not search the localdir
--- That is needed as texsys.cfg is unpacked in an odd way and
--- without this will otherwise not be available
-if _G.bundleunpack ~= nil then
-  print("DEBUG: locally defined _G.bundleunpack")
-  function _G.bundleunpack ()
-    print("!!!! DEBUG bundleunpack not is main")
-    print("_G.maindir", _G.maindir, require("l3b.variables").Dir.main)
-    print("_G.localdir", _G.localdir)
-    print("_G.unpackdir", _G.unpackdir)
-    local errorlevel = _G.mkdir(_G.localdir)
-    if errorlevel ~=0 then
-      return errorlevel
-    end
-    errorlevel = _G.cleandir(_G.unpackdir)
-    if errorlevel ~=0 then
-      return errorlevel
-    end
-    for _,i in ipairs (_G.sourcefiles) do
-      errorlevel = cp (i, ".", _G.unpackdir)
-      if errorlevel ~=0 then
-        return errorlevel
-      end
-    end
-    for _,i in ipairs (_G.unpacksuppfiles) do
-      errorlevel = cp (i, _G.supportdir, _G.localdir)
-      if errorlevel ~=0 then
-        return errorlevel
-      end
-    end
-    for _,i in ipairs (_G.unpackfiles) do
-      for _,j in ipairs (_G.filelist (_G.unpackdir, i)) do
-        local cmd = os_setenv .. " TEXINPUTS=" .. _G.unpackdir .. os_concat ..
-        _G.unpackexe .. " " .. _G.unpackopts .. " -output-directory=" .. _G.unpackdir
-          .. " " .. _G.unpackdir .. "/" .. j
-        local success = io.popen (
-            -- Notice that os.execute is used from 'here' as this ensures that
-            -- localdir points to the correct place: running 'inside'
-            -- unpackdir would avoid the need for setting -output-directory
-            -- but at the cost of needing to correct the relative position
-            -- of localdir w.r.t. unpackdir
-            cmd ,"w"
-          ):write(string.rep("y\n", 300)):close()
-        if not success then
-          return 1
-        end
-      end
-    end
-    return 0
-  end
-end
---[=[ CUT TO HERE ]=]
-
 ---@type l3b_check_t
-local l3b_check   = require("l3b.check")
+local l3b_check   = require("l3build-check")
 local sanitize_engines = l3b_check.sanitize_engines
 
 -- Sanity check
@@ -404,7 +347,7 @@ multi_check()   -- check with many configs, may exit here
 prepare_config()
 
 ---@type utlib_t
-local utlib = require("l3b.utillib")
+local utlib = require("l3b-utillib")
 
 -- From now on, we can cache results in choosers
 utlib.flags.cache_chosen = true

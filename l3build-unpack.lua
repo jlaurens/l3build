@@ -25,25 +25,25 @@ for those people who are interested.
 local popen = io.popen
 
 ---@type l3b_aux_t
-local l3b_aux       = require("l3b.aux")
+local l3b_aux       = require("l3build-aux")
 local deps_install  = l3b_aux.deps_install
 
 ---@type utlib_t
-local utlib   = require("l3b.utillib")
+local utlib   = require("l3b-utillib")
 local chooser = utlib.chooser
 local entries = utlib.entries
 local keys    = utlib.keys
 
 ---@type wklib_t
-local wklib             = require("l3b.walklib")
+local wklib             = require("l3b-walklib")
 local dir_base          = wklib.dir_base
 
 ---@type oslib_t
-local oslib             = require("l3b.oslib")
+local oslib             = require("l3b-oslib")
 local cmd_concat        = oslib.cmd_concat
 
 ---@type fslib_t
-local fslib                 = require("l3b.fslib")
+local fslib                 = require("l3b-fslib")
 local copy_tree             = fslib.copy_tree
 local make_directory        = fslib.make_directory
 local make_clean_directory  = fslib.make_clean_directory
@@ -54,7 +54,7 @@ local absolute_path         = fslib.absolute_path
 local l3build = require("l3build")
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Dir_t
 local Dir       = l3b_vars.Dir
 ---@type Files_t
@@ -83,10 +83,12 @@ local Vars = chooser(_G, Vars_dft)
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
----@param source_dirs string_list_t
----@param sources     string_list_t
+---@param source_dirs string_list_t|nil defaults to the source directory
+---@param sources     string_list_t|nil defaults to the source files glob
 ---@return error_level_t
 function Vars_dft.bundleunpack(source_dirs, sources)
+  source_dirs = source_dirs or { Dir.sourcefile }
+  sources = sources or { Files.source }
   if l3build.options.debug then
     print("DEBUG bundleunpack")
   end
@@ -99,22 +101,10 @@ function Vars_dft.bundleunpack(source_dirs, sources)
   if error_level ~=0 then
     return error_level
   end
-  for i in entries(source_dirs or { Dir.sourcefile }) do
-    for j in entries(sources or { Files.source }) do
+  for i in entries(source_dirs) do
+    for j in entries(sources) do
       for k in entries(j) do
-        if l3build.options.debug then
-          print("glob i, k", k, i)
-        end
-        if k:match("l3blib") then
-          fslib.Vars.debug.tree = true
-          fslib.Vars.debug.copy_core = true
-        end
         error_level = copy_tree(k, i, Dir.unpack)
-        if k:match("l3blib") then
-          fslib.Vars.debug.tree = false
-          fslib.Vars.debug.copy_core = false
-          print("DEBUG")
-        end
         if error_level ~=0 then
           return error_level
         end
@@ -176,11 +166,25 @@ local function unpack(sources, source_dirs)
   return 0
 end
 
+---Wraps the Vars.bundleunpack. Naming may change.
+---@param source_dirs string_list_t|nil defaults to the source directory
+---@param sources     string_list_t|nil defaults to the source files glob
+---@return error_level_t
+local function bundle_unpack(source_dirs, sources)
+  local error_level = deps_install(Deps.unpack)
+  if error_level ~= 0 then
+    return error_level
+  end
+  return Vars.bundleunpack(source_dirs, sources)
+end
+
 ---@class l3b_unpk_t
 ---@field Vars          l3b_unpk_vars_t
 ---@field unpack        bundleunpack_f
+---@field bundle_unpack bundleunpack_f
 
 return {
-  Vars              = Vars,
-  unpack            = unpack,
+  Vars          = Vars,
+  unpack        = unpack,
+  bundle_unpack = bundle_unpack,
 }

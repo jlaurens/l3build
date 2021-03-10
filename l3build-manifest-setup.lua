@@ -56,7 +56,7 @@ for those people who are interested.
 local sort = table.sort
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Xtn_t
 local Xtn       = l3b_vars.Xtn
 ---@type Dir_t

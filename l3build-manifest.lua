@@ -34,19 +34,19 @@ for those people who are interested.
 --]]
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
 local keys        = utlib.keys
 
 ---@type fslib_t
-local fslib      = require("l3b.fslib")
+local fslib      = require("l3b-fslib")
 local all_names = fslib.all_names
 local file_list = fslib.file_list
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main  = l3b_vars.Main
 ---@type Dir_t
@@ -55,7 +55,7 @@ local Dir   = l3b_vars.Dir
 local Files = l3b_vars.Files
 
 ---@type l3b_mfst_setup_t
-local stp = require("l3b.manifest-setup")
+local stp = require("l3build-manifest-setup")
 
 local Mnfst = chooser(_G, {
   setup  = stp.setup,

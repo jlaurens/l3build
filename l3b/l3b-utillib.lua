@@ -22,19 +22,6 @@ for those people who are interested.
 
 --]]
 
---[=[ Usage
----@type utlib_t
-local utlib = require("l3b.utillib")
-local to_quoted_string = utlib.to_quoted_string
-local indices = utlib.indices
-local entries = utlib.entries
-local items = utlib.items
-local unique_entries = utlib.unique_entries
-local unique_items = utlib.unique_items
-local keys = utlib.keys
-local values = utlib.values
---]=]
-
 -- Aliases
 ---@alias string_list_t table<integer, string>
 -- local safety guards and shortcuts
@@ -43,6 +30,8 @@ local next    = next
 local concat  = table.concat
 local open    = io.open
 local os_type = os["type"]
+local sort    = table.sort
+local append  = table.insert
 
 ---@class utlib_vars_t
 ---@field debug flag_table_t
@@ -143,6 +132,33 @@ local function values(table)
   return function ()
     k, v = next(table, k)
     return v
+  end
+end
+
+---Iterates over the values of the table
+---Values are sorted according to the keys
+---Values are filtered.
+---@param table table
+---@param exclude fun(value: any): boolean
+---@return fun()
+local function sorted_values(table, exclude)
+  local i, kk = 0, {}
+  for k in keys(table) do
+    append(kk, k)
+  end
+  sort(kk)
+  return function ()
+    repeat
+      i = i + 1
+      local k = kk[i]
+      if not k then
+        return
+      end
+      local value = table[k]
+      if not exclude or not exclude(value) then
+        return value
+      end
+    until false
   end
 end
 
@@ -251,13 +267,14 @@ end
 local flags = {}
 
 ---@alias chooser_t table
----@alias did_choose_f fun(t: table, k: any, result: any): any
+---@alias chooser_did_choose_f  fun(t: table, k: any, result: any): any
+---@alias chooser_index_f       fun(t: table, k: any, v_G: any): any
 
 ---@class chooser_kv_t
 ---@field prefix  string|nil -- prepend this prefix to the key for G, not for dflt
 ---@field suffix  string|nil -- append this prefix to the key for G, not for dflt
----@field index   fun(t: table, k: any): any
----@field did_choose did_choose_f
+---@field index   chooser_index_f
+---@field did_choose chooser_did_choose_f
 
 --[=[
 The purpose of the next chooser function is to allow the customization of a tree from the global domain.
@@ -276,6 +293,16 @@ local c = chooser(G, dflt)
 - `G.foo.bar` if `dflt.foo.bar` is empty
 - `G.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have the same non nil metatable
 - chooser(G.foo.bar, dflt.foo.bar) otherwise
+
+Things get a bit more complicated by computed properties.
+Given a key k, we have 3 candidates
+1) the default one dflt_k
+2) the global one G_k
+3) comp_k computed from the other 2.
+If we have neither dflt_k nor comp_k, the key k is unknown.
+comp_k is chosen if any,
+then G_k is chosen if it is compatible with dflt_k
+then dflt_k is chosen.
 --]=]
 
 ---See above
@@ -294,33 +321,7 @@ do
       local dflt = t[KEY_dflt]
       ---@type chooser_kv_t
       local kv = t[KEY_kv]
-      local result
-      local function before_return ()
-        -- post treatment
-        ---@type did_choose_f
-        local did_choose = kv and kv.did_choose
-        if did_choose then
-          result = did_choose(t, k, result) -- result *is* used
-        end
-        -- cache the result if any such that next time, __index is not called
-        if flags.cache_chosen and result ~= nil then
-          t[k] = result
-        end
-        return result
-      end
-      if kv then
-        local index = kv.index
-        if index then
-          result = index(t, k)
-          if result ~= nil then
-            return before_return()
-          end
-        end
-      end
       local dflt_k = dflt[k]  -- default candidate
-      if dflt_k == nil then   -- unknown key, stop here
-        return
-      end
       local kk = k
       if type(k) == "string" then
         if Vars.debug.chooser then
@@ -333,8 +334,34 @@ do
       end
       local G = t[KEY_G]
       local G_kk = G[kk]                -- global candidate
+      local function postflight(result)
+        ---@type chooser_did_choose_f
+        local did_choose = kv and kv.did_choose
+        if did_choose then
+          result = did_choose(t, k, result)
+        end
+        -- cache the result if any such that next time, __index is not called
+        if flags.cache_chosen and result ~= nil then
+          rawset(t, k, result)
+        end
+        return result
+      end
+      if kv then
+        ---@type chooser_index_f
+        local index = kv.index
+        if index then
+          local comp_k = index(t, k, G_kk) -- a computed property is available
+          if comp_k ~= nil then
+            return postflight(comp_k)
+          end
+        end
+      end
+      if dflt_k == nil then   -- unknown key, neither default nor computed
+        return                -- stop here
+      end
+      local result
       if G_kk == nil then
-        result = dflt_k                 -- choose the default candidate
+        result = dflt_k   -- choose the default candidate
       else
         local type_dflt_k = type(dflt_k)
         local type_G_kk   = type(G_kk)
@@ -343,29 +370,29 @@ do
         end
         if type_dflt_k == "table" then
           if #dflt_k > 0 then
-            result = G_kk
+            result = G_kk -- accept sequences
           elseif not next(dflt_k) then
-            result = G_kk
+            result = G_kk -- accept void tables
           else
             local MT = getmetatable(dflt_k)
             if MT then
               if MT ~= getmetatable(G_kk) then
                 error("Incompatible objects with different metatables")
               end
-              result = G_kk
+              result = G_kk -- accept tables with the same metatable. Unused yet.
             else
-              result = chooser(G_kk, dflt_k)
+              result = chooser(G_kk, dflt_k) -- return a proxy
             end
           end
         else
-          result = G_kk
+          result = G_kk -- accept candidate when not a table
         end
       end
-      return before_return()
+      return postflight(result)
     end
   }
   chooser = function (G, dflt, kv)
-    assert(G and dflt) -- unless stack overflow
+    assert(G and dflt) -- avoid a stack overflow
     local result = setmetatable({
       [KEY_G]     = G,
       [KEY_dflt]  = dflt,
@@ -385,6 +412,7 @@ end
 ---@field unique_items      fun(...): fun(): integer
 ---@field keys              fun(table: table): fun(): any
 ---@field values            fun(table: table): fun(): any
+---@field sorted_values     fun(table: table, exclude: fun(value: any): boolean): fun(): any
 ---@field first_of          fun(...): any
 ---@field second_of         fun(...): any
 ---@field trim              fun(in: string): string
@@ -405,6 +433,7 @@ return {
   unique_items      = unique_items,
   keys              = keys,
   values            = values,
+  sorted_values     = sorted_values,
   first_of          = first_of,
   second_of         = second_of,
   trim              = trim,

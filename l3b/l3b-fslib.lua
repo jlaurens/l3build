@@ -39,21 +39,21 @@ local chdir       = lfs.chdir
 local lfs_dir     = lfs.dir
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 local keys        = utlib.keys
 local first_of    = utlib.first_of
 
 ---@type wklib_t
-local wklib           = require("l3b.walklib")
+local wklib           = require("l3b-walklib")
 local dir_base        = wklib.dir_base
 
 ---@type gblib_t
-local gblib           = require("l3b.globlib")
+local gblib           = require("l3b-globlib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type oslib_t
-local oslib       = require("l3b.oslib")
+local oslib       = require("l3b-oslib")
 local quoted_path = oslib.quoted_path
 
 ---@class fslib_vars_t
@@ -271,7 +271,7 @@ local function tree(dir_path, glob)
     end
     local new_result = {}
     if glob_part == "**" then
-      while true do
+      repeat
         local p_src, p_wrk = next(result)
         if not p_src then
           break
@@ -279,7 +279,7 @@ local function tree(dir_path, glob)
         result[p_src] = nil
         new_result[p_src] = p_wrk
         fill(p_src, p_wrk, result)
-      end
+      until false
     else
       for p_src, p_wrk in pairs(result) do
         fill(p_src, p_wrk, new_result)

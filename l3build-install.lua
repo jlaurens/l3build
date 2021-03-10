@@ -36,23 +36,23 @@ local match = string.match
 local append = table.insert
 
 ---@type utlib_t
-local utlib       = require("l3b.utillib")
+local utlib       = require("l3b-utillib")
 local chooser     = utlib.chooser
 local entries     = utlib.entries
 local keys        = utlib.keys
 
 ---@type gblib_t
-local gblib           = require("l3b.globlib")
+local gblib           = require("l3b-globlib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type wklib_t
-local wklib           = require("l3b.walklib")
+local wklib           = require("l3b-walklib")
 local dir_base        = wklib.dir_base
 local base_name       = wklib.base_name
 local dir_name        = wklib.dir_name
 
 ---@type fslib_t
-local fslib                 = require("l3b.fslib")
+local fslib                 = require("l3b-fslib")
 local file_list             = fslib.file_list
 local directory_exists      = fslib.directory_exists
 local remove_directory      = fslib.remove_directory
@@ -68,7 +68,7 @@ local rename                = fslib.rename
 local l3build = require("l3build")
 
 ---@type l3b_vars_t
-local l3b_vars  = require("l3b.variables")
+local l3b_vars  = require("l3build-variables")
 ---@type Main_t
 local Main      = l3b_vars.Main
 ---@type Dir_t
@@ -77,11 +77,11 @@ local Dir       = l3b_vars.Dir
 local Files     = l3b_vars.Files
 
 ---@type l3b_unpk_t
-local l3b_unpk  = require("l3b.unpack")
+local l3b_unpk  = require("l3build-unpack")
 local unpack    = l3b_unpk.unpack
 
 ---@type l3b_tpst_t
-local l3b_tpst  = require("l3b.typesetting")
+local l3b_tpst  = require("l3build-typesetting")
 local doc       = l3b_tpst.doc
 
 ---@class l3b_inst_vars_t
@@ -97,8 +97,11 @@ local typeset_list
 local Vars = chooser(_G, {
   flattentds    = true
 }, {
-  index = function (t, k)
+  index = function (t, k, v_G)
     if k == "flattenscript" then
+      if v_G ~= nil then
+        return v_G  -- a boolean
+      end
       return t.flattentds -- by defaut flattentds and flattenscript are synonyms
     elseif k == "typeset_list" then
       assert(typeset_list, "Documentation is not installed")
@@ -196,46 +199,7 @@ local function install_files(root_install_dir, full, dry_run)
     return error_level
   end
 
-  -- Creates a 'controlled' list of files
-  local function create_file_list(dir, includes, excludes)
-    dir = dir or Dir.work
-    ---@type flag_table_t
-    local exclude_list = {}
-    for glob_table in entries(excludes) do
-      for glob in entries(glob_table) do
-        for file in keys(tree(dir, glob)) do
-          exclude_list[file] = true
-        end
-      end
-    end
-    ---@type string_list_t
-    local result = {}
-    for glob in entries(includes) do
-      for file in keys(tree(dir, glob)) do
-        if not exclude_list[file] then
-          append(result, file)
-        end
-      end
-    end
-    return result
-  end
-
-  if full then
-    error_level = doc()
-    if error_level ~= 0 then
-      return error_level
-    end
-
-    -- Set up lists: global as they are also needed to do CTAN releases
-    typeset_list = create_file_list(Dir.docfile, Files.typeset, { Files.source })
-    local source_list = create_file_list(Dir.sourcefile, Files.source,
-      { Files.bst, Files.install, Files.makeindex, Files.script })
-
-    if dry_run then
-      print("\nFor installation inside " .. root_install_dir .. ":")
-    end
-
-  -- Needed so paths are only cleaned out once
+    -- Needed so paths are only cleaned out once
   ---@type flag_table_t
   local already_cleaned = {}
 
@@ -261,14 +225,7 @@ local function install_files(root_install_dir, full, dry_run)
     -- each candidate is a table
     for glob_list in entries(file_globs) do
       for glob in entries(glob_list) do
-        print("feed_to_copy", type, module, glob)
         for file in keys(tree(src_dir, glob)) do
-          if l3build.options.debug then
-            if glob:match("l3blib") then
-              print("DEBUG l3blib")
-            end
-            print("feed_to_copy", type, module, glob, file)
-          end
           local dir, name = dir_base(file)
           local src_path_end = "/"
           local source_dir = src_dir
@@ -277,8 +234,6 @@ local function install_files(root_install_dir, full, dry_run)
             source_dir = src_dir .. dir
             if not flatten then
               src_path_end = dir .. "/"
-            else
-              print("DEBUG FLATTEN TDS")
             end
           end
           local matched = false
@@ -286,13 +241,6 @@ local function install_files(root_install_dir, full, dry_run)
             local l_dir, l_glob = dir_base(location)
             local glob_match = to_glob_match(l_glob)
             if glob_match(name) then
-              if glob:match("l3blib") then
-                print("MATCHED")
-                print(name)
-                print(source_dir)
-                print(root_install_dir .."/".. l_dir)
-                print(root_install_dir .."/".. l_dir .. src_path_end)
-              end
               append(candidates, {
                 name        = name,
                 source      = source_dir,
@@ -346,29 +294,90 @@ local function install_files(root_install_dir, full, dry_run)
     return 0
   end
 
-  error_level =
-    feed_to_copy(
-      Dir.sourcefile,
-      "source",
-      { source_list },
-      Vars.flattentds,
-      Dir.tds_module
-    )
-  + feed_to_copy(
+  -- Creates a 'controlled' list of files
+  local function create_file_list(dir, includes, excludes)
+    dir = dir or Dir.work
+    ---@type flag_table_t
+    local exclude_list = {}
+    for glob_table in entries(excludes) do
+      for glob in entries(glob_table) do
+        for file in keys(tree(dir, glob)) do
+          exclude_list[file] = true
+        end
+      end
+    end
+    ---@type string_list_t
+    local result = {}
+    for glob in entries(includes) do
+      for file in keys(tree(dir, glob)) do
+        if not exclude_list[file] then
+          append(result, file)
+        end
+      end
+    end
+    return result
+  end
+
+  if full then
+    error_level = doc()
+    if error_level ~= 0 then
+      return error_level
+    end
+
+    -- Set up lists: global as they are also needed to do CTAN releases
+    typeset_list = create_file_list(
       Dir.docfile,
-      "doc", {
-        Files.bib,
-        Files.demo,
-        Files.doc,
-        Files._all_pdf, --[[ For the purposes here,
-          any typesetting demo files need to be part
-          of the main typesetting list]] 
-        Files.text,
-        typeset_list
-      },
-      Vars.flattentds,
-      Dir.tds_module
+      Files.typeset,
+      { Files.source }
     )
+    local source_list = create_file_list(
+      Dir.sourcefile,
+      Files.source,
+      {
+        Files.bst,
+        Files.install,
+        Files.makeindex
+      }
+    )
+    local source_list_script = create_file_list(
+      Dir.sourcefile,
+      Files.source,
+      { Files.script }
+    )
+    if dry_run then
+      print("\nFor installation inside " .. root_install_dir .. ":")
+    end
+
+    error_level =
+      feed_to_copy(
+        Dir.sourcefile,
+        "source",
+        { source_list },
+        Vars.flattentds,
+        Dir.tds_module
+      )
+    + feed_to_copy(
+        Dir.sourcefile,
+        "source",
+        { source_list_script },
+        Vars.flattenscript,
+        Dir.tds_module
+      )
+    + feed_to_copy(
+        Dir.docfile,
+        "doc", {
+          Files.bib,
+          Files.demo,
+          Files.doc,
+          Files._all_pdf, --[[ For the purposes here,
+            any typesetting demo files need to be part
+            of the main typesetting list]] 
+          Files.text,
+          typeset_list
+        },
+        Vars.flattentds,
+        Dir.tds_module
+      )
     if error_level ~= 0 then
       return error_level
     end
@@ -393,8 +402,9 @@ local function install_files(root_install_dir, full, dry_run)
         else
           -- Man files should have a single-digit tail: the type
           local install_dir = root_install_dir .. "/doc/man/"  .. man
-          error_level = error_level + make_directory(install_dir)
-                                    + copy_file(name, Dir.docfile, install_dir)
+          error_level = error_level
+            + make_directory(install_dir)
+            + copy_file(name, Dir.docfile, install_dir)
         end
       end
     end
@@ -405,7 +415,6 @@ local function install_files(root_install_dir, full, dry_run)
   if error_level ~= 0 then
     return error_level
   end
-
   error_level =
       feed_to_copy(Dir.unpack, "tex", { install_list }, Vars.flattentds, Dir.tds_module)
     + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst }, Vars.flattentds, Main.module)
