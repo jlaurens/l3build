@@ -120,10 +120,6 @@ local deps_install  = l3b_aux.deps_install
 local l3b_unpk    = require("l3build-unpack")
 local bundleunpack  = l3b_unpk.Vars.bundleunpack
 
----@type l3b_tpst_t
-local l3b_tpst = require("l3build-typesetting")
-local dvi2pdf        = l3b_tpst.dvi2pdf
-
 -- Variables
 
 ---@class test_types_t
@@ -142,12 +138,14 @@ local dvi2pdf        = l3b_tpst.dvi2pdf
 ---@field includetests  string_list_t Test names to include when checking
 ---@field excludetests  string_list_t Test names to exclude when checking
 ---@field recordstatus  boolean Switch to include error level from test runs in \texttt{.tlg} files
+---@field forcecheckepoch boolean Force epoch when running tests
 ---@field asciiengines  string_list_t Engines which should log as pure ASCII
 ---@field checkruns     integer Number of runs to complete for a test before comparing the log
 ---@field checksearch   boolean Switch to search the system \texttt{texmf} for during checking
 ---@field maxprintline  integer Length of line to use in log files
 ---@field runtest_tasks fun(test_name: string, run_number: integer): string
 ---@field checkinit_hook fun(): error_level_t
+---@field ps2pdfopt     string  Options for \texttt{ps2pdf}
 
 ---@type l3b_check_vars_t
 local dflt = {} -- define below
@@ -164,12 +162,18 @@ local Vars = chooser(_G, dflt, {
         end
       end
     end
+    local options = l3build.options
+    if k == "forcecheckepoch" then
+      if options["epoch"] then
+        return true
+      end
+    end
   end,
   complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
+    local options = l3build.options
     if k == "checkconfigs" then
-      local options = l3build.options
       -- When we have specific files to deal with, only use explicit configs
       -- (or just the std one)
       -- TODO: Justify this...
@@ -178,10 +182,32 @@ local Vars = chooser(_G, dflt, {
       else
         return options["config"] or result
       end
+    elseif k == "forcecheckepoch" then
+      if options["epoch"] then
+        return true -- overwrite any global setting
+      end
     end
     return result
   end,
 })
+
+---dvi2pdf, used while checking
+---@param name string
+---@param dir string
+---@param engine string
+---@param hide boolean
+---@return error_level_t
+local function dvi2pdf(name, dir, engine, hide)
+  return run(
+    dir, cmd_concat(
+      set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
+      "dvips " .. name .. Xtn.dvi
+        .. (hide and (" > " .. _G.os_null) or ""),
+      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
+        .. (hide and (" > " .. _G.os_null) or "")
+    ) and 0 or 1
+  )
+end
 
 --
 -- Auxiliary functions which are used by more than one main function
@@ -920,7 +946,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
         _G.os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
         _G.os_setenv .. " TEXMFCNF=." .. _G.os_pathsep,
-        set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
+        set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
         -- Ensure lines are of a known length
         _G.os_setenv .. " max_print_line=" .. Vars.maxprintline,
         binary .. format
@@ -1152,11 +1178,13 @@ extend_with(dflt, {
   checkconfigs  = { "build" },
   checksearch   = true,
   recordstatus  = false,
+  forcecheckepoch = true,
   asciiengines  = { "pdftex" },
   checkruns     = 1,
   maxprintline  = 79,
   checkinit_hook  = checkinit_hook,
   runtest_tasks = runtest_tasks,
+  ps2pdfopt     = "",
 })
 
 dflt.specialformats = {

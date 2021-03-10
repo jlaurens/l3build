@@ -26,8 +26,6 @@ local execute     = os.execute
 local remove      = os.remove
 local os_type     = os["type"]
 
-local gsub        = string.gsub
-
 local append      = table.insert
 
 local lfs         = require("lfs")

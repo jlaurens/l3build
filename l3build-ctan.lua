@@ -203,17 +203,11 @@ local function ctan()
         and (" -x " .. bin_files .. " " .. exclude)
         or ""
       )
-    if options.debug.run then
-      print("DEBUG run: ".. cmd)
-    end
     run(dir, cmd)
     -- Then add the binary ones
-    local cmd = Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
+    cmd = Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
       .. " -i " .. bin_files
       .. (exclude and (" -x " .. exclude) or "")
-    if options.debug.run then
-      print("DEBUG run: ".. cmd)
-    end
     run(dir, cmd)
   end
   dirzip(Dir.tds, Main.ctanpkg .. ".tds")

@@ -85,7 +85,6 @@ end
 ---@field ctanpkg       string Name of the CTAN package matching this module
 ---@field modules       string_list_t The list of all modules in a bundle (when not auto-detecting)
 ---@field exclmodules   string_list_t Directories to be excluded from automatic module detection
----@field forcecheckepoch boolean Force epoch when running tests
 ---@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
 ---@field tdsroot       string
 ---@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
@@ -103,7 +102,6 @@ local Main_dflt = {
   exclmodules     = {},
   tdsroot         = "latex",
   ctanreadme      = "README.md",
-  forcecheckepoch = true,
   epoch           = 1463734800,
   tdslocations    = {},
 }
@@ -138,11 +136,7 @@ local function Main_compute(t, k, v_dflt)
     return result
   end
   local options = l3build.options
-  if k == "forcecheckepoch" then
-    if options["epoch"] then
-      return true
-    end
-  elseif k == "epoch" then
+  if k == "epoch" then
     return options["epoch"] or _G["epoch"]
   end
 end
@@ -150,12 +144,7 @@ end
 Main = chooser(_G, Main_dflt, {
   compute = Main_compute,
   complete = function (t, k, result)
-    local options = l3build.options
-    if k == "forcecheckepoch" then
-      if options["epoch"] then
-        return true -- overwrite any global setting
-      end
-    elseif k == "epoch" then
+    if k == "epoch" then
       return normalise_epoch(result)
     end
     return result

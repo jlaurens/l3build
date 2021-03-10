@@ -288,11 +288,8 @@ export_symbols(l3b_tpst_vars, "",
   "forcedocepoch"
 )
 
-export_symbols(Main, "",
-  "forcecheckepoch"
-)
-
 export_symbols(l3b_check_vars, "",
+"forcecheckepoch"
 "asciiengines",
 "checkruns"
 )

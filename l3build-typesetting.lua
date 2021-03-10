@@ -29,8 +29,6 @@ for those people who are interested.
 local print     = print
 
 local not_empty = next
-local gsub      = string.gsub
-local match     = string.match
 
 local os_type = os["type"]
 
@@ -39,9 +37,7 @@ local utlib       = require("l3b-utillib")
 local chooser     = utlib.chooser
 local entries     = utlib.entries
 local items       = utlib.items
-local values      = utlib.values
 local first_of    = utlib.first_of
-local extend_with = utlib.extend_with
 
 ---@type wklib_t
 local wklib             = require("l3b-walklib")
@@ -101,7 +97,6 @@ local unpack      = l3b_unpk.unpack
 ---@field forcedocepoch string  Force epoch when typesetting
 ---@field typesetcmds   string  Instructions to be passed to \TeX{} when doing typesetting
 ---@field typesetruns   integer Number of cycles of typesetting to carry out
----@field ps2pdfopt     string  Options for \texttt{ps2pdf}
 
 ---@type l3b_tpst_vars_t
 local Vars = chooser(_G, {
@@ -115,7 +110,6 @@ local Vars = chooser(_G, {
   indexstyle          = "gind.ist",
   specialtypesetting  = {},
   forcedocepoch       = false,
-  ps2pdfopt           = "",
 }, {
   complete = function (t, k, result)
     -- No trailing /
@@ -129,24 +123,6 @@ local Vars = chooser(_G, {
     return result
   end,
 })
-
----dvi2pdf, used while checking
----@param name string
----@param dir string
----@param engine string
----@param hide boolean
----@return error_level_t
-local function dvi2pdf(name, dir, engine, hide)
-  return run(
-    dir, cmd_concat(
-      set_epoch_cmd(Main.epoch, Main.forcecheckepoch),
-      "dvips " .. name .. Xtn.dvi
-        .. (hide and (" > " .. _G.os_null) or ""),
-      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
-        .. (hide and (" > " .. _G.os_null) or "")
-    ) and 0 or 1
-  )
-end
 
 -- An auxiliary used to set up the environmental variables
 ---comment

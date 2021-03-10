@@ -62,7 +62,7 @@ local Dir       = l3b_vars.Dir
 --
 
 ---Returns the CLI command to set the epoch
----when forcecheckepoch is true, a void string otherwise.
+---when force is true, a void string otherwise.
 ---Will be run while checking or typesetting
 ---@param epoch string
 ---@param force boolean

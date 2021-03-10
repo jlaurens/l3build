@@ -22,16 +22,12 @@ for those people who are interested.
 
 --]]
 
-local print  = print
+local print     = print
 local not_empty = next
 
 local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
-
-local gsub  = string.gsub
-local lower = string.lower
-local match = string.match
 
 local append = table.insert
 
@@ -229,7 +225,7 @@ local function install_files(root_install_dir, full, dry_run)
           local src_path_end = "/"
           local source_dir = src_dir
           if dir ~= "." then
-            dir = gsub(dir, "^%.", "")
+            dir = dir:gsub("^%.", "")
             source_dir = src_dir .. dir
             if not flatten then
               src_path_end = dir .. "/"
@@ -384,7 +380,7 @@ local function install_files(root_install_dir, full, dry_run)
     -- Rename README if necessary
     if not dry_run then
       local readme = Main.ctanreadme
-      if readme ~= "" and not lower(readme):match("^readme%.%w+") then
+      if readme ~= "" and not readme:lower():match("^readme%.%w+") then
         local install_dir = root_install_dir .. "/doc/" .. Dir.tds_module
         if file_exists(install_dir .. "/" .. readme) then
           rename(install_dir, readme, "README." .. readme:match("%.(%w+)$"))

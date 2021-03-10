@@ -286,7 +286,7 @@ if in_document then
   return l3build
 end
 
---[===[DEBUG flags]]
+--[===[DEBUG flags]===]
 ---@type oslib_t
 local oslib = require("l3b-oslib")
 oslib.Vars.debug.run = true

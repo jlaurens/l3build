@@ -30,9 +30,6 @@ local status          = require("status")
 local luatex_revision = status.luatex_revision
 local luatex_version  = status.luatex_version
 
-local match           = string.match
-local gsub            = string.gsub
-
 local append          = table.insert
 local concat          = table.concat
 
@@ -140,9 +137,9 @@ local function quoted_path(path)
     end
     return path
   else
-    path = gsub(path, "\\ ", "\0")
-    path = gsub(path, " ", "\\ ")
-    return first_of(gsub(path, "\0", "\\ "))
+    return first_of(path:gsub("\\ ", "\0")
+                        :gsub(" ", "\\ ")
+                        :gsub("\0", "\\ "))
   end
 end
 
