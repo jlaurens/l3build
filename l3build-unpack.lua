@@ -79,13 +79,16 @@ local Vars_dft = {
   unpacksearch = true
 }
 ---@type l3b_unpk_vars_t
-local Vars = chooser(_G, Vars_dft)
+local Vars = chooser({
+  global = _G,
+  default = Vars_dft
+})
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
 ---@param source_dirs string_list_t|nil defaults to the source directory
 ---@param sources     string_list_t|nil defaults to the source files glob
----@return error_level_t
+---@return error_level_n
 function Vars_dft.bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
   sources = sources or { Files.source }
@@ -125,7 +128,7 @@ function Vars_dft.bundleunpack(source_dirs, sources)
         _G.os_setenv .. " LUAINPUTS=." .. _G.os_pathsep
           .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
         Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
-          .. (options["quiet"] and (" > " .. _G.os_null) or "")
+          .. (options.quiet and (" > " .. _G.os_null) or "")
       )
       if l3build.options.debug then
         print("DEBUG: ".. cmd)
@@ -140,11 +143,12 @@ function Vars_dft.bundleunpack(source_dirs, sources)
   return 0
 end
 
+---@alias unpack_f fun(sources?: string_list_t, source_dirs?: string_list_t): error_level_n
 ---Unpack the package files using an 'isolated' system: this requires
 ---a copy of the 'basic' DocStrip program, which is used then removed
----@param sources     string_list_t
----@param source_dirs string_list_t
----@return error_level_t
+---@param sources?     string_list_t
+---@param source_dirs? string_list_t
+---@return error_level_n
 local function unpack(sources, source_dirs)
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
@@ -164,24 +168,22 @@ local function unpack(sources, source_dirs)
 end
 
 ---Wraps the Vars.bundleunpack. Naming may change.
----@param source_dirs string_list_t|nil defaults to the source directory
----@param sources     string_list_t|nil defaults to the source files glob
----@return error_level_t
-local function bundle_unpack(source_dirs, sources)
+---@return error_level_n
+local function module_unpack()
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level
   end
-  return Vars.bundleunpack(source_dirs, sources)
+  return Vars.bundleunpack()
 end
 
 ---@class l3b_unpk_t
 ---@field Vars          l3b_unpk_vars_t
----@field unpack        bundleunpack_f
----@field bundle_unpack bundleunpack_f
+---@field unpack        unpack_f
+---@field module_unpack fun(): error_level_n
 
 return {
   Vars          = Vars,
   unpack        = unpack,
-  bundle_unpack = bundle_unpack,
+  module_unpack = module_unpack,
 }

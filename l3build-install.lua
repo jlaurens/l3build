@@ -85,33 +85,41 @@ local doc       = l3b_tpst.doc
 ---@field flattenscript boolean Switch to flatten any script structure when creating a TDS structure
 ---@field texmf_home    string_list_t
 ---@field typeset_list  string_list_t
+---@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
+---@field tdslocations  string_list_t For non-standard file installations
 
 ---@type string_list_t
 local typeset_list
 
 ---@type l3b_inst_vars_t
-local Vars = chooser(_G, {
-  flattentds    = true
-}, {
-  compute = function (t, k, v_dflt)
-    if k == "flattenscript" then
+local Vars = chooser({
+  global = _G,
+  default = {
+    flattentds    = true,
+    ctanreadme    = "README.md",
+    tdslocations    = {},
+  },
+  computed = {
+    flattenscript = function (t, k, v_dflt)
       return t.flattentds -- by defaut flattentds and flattenscript are synonyms
-    elseif k == "typeset_list" then
+    end,
+    typeset_list = function (t, k, v_dflt)
       assert(typeset_list, "Documentation is not installed")
       return typeset_list
-    elseif k == "texmf_home" then
-      local result = l3build.options["texmfhome"]
+    end,
+    texmf_home = function (t, k, v_dflt)
+      local result = l3build.options.texmfhome
       if not result then
         set_program("latex")
         result = var_value("TEXMFHOME")
       end
       return result
-    end
-  end
+    end,
+  },
 })
 
 ---Uninstall
----@return error_level_t
+---@return error_level_n
 local function uninstall()
   local error_level = 0
   local dry_run = l3build.options["dry-run"]
@@ -171,7 +179,7 @@ local function uninstall()
     return error_level
   end
   -- Finally, clean up special locations
-  for location in entries(Main.tdslocations) do
+  for location in entries(Vars.tdslocations) do
     local path = dir_name(location)
     error_level = zap_dir(path)
     if error_level ~= 0 then
@@ -185,7 +193,7 @@ end
 ---@param root_install_dir string
 ---@param full boolean, true means with documentation and man pages
 ---@param dry_run boolean
----@return error_level_t
+---@return error_level_n
 local function install_files(root_install_dir, full, dry_run)
 
   local error_level = unpack()
@@ -232,7 +240,7 @@ local function install_files(root_install_dir, full, dry_run)
             end
           end
           local matched = false
-          for location in entries(Main.tdslocations) do
+          for location in entries(Vars.tdslocations) do
             local l_dir, l_glob = dir_base(location)
             local glob_match = to_glob_match(l_glob)
             if glob_match(name) then
@@ -265,7 +273,7 @@ local function install_files(root_install_dir, full, dry_run)
       end
     end
 
-    local error_level = 0
+    error_level = 0
     -- The target is only created if there are actual files to install
     if not_empty(candidates) then
       if dry_run then
@@ -379,7 +387,7 @@ local function install_files(root_install_dir, full, dry_run)
 
     -- Rename README if necessary
     if not dry_run then
-      local readme = Main.ctanreadme
+      local readme = Vars.ctanreadme
       if readme ~= "" and not readme:lower():match("^readme%.%w+") then
         local install_dir = root_install_dir .. "/doc/" .. Dir.tds_module
         if file_exists(install_dir .. "/" .. readme) then
@@ -435,18 +443,22 @@ end
 
 local function install()
   local options = l3build.options
-  return install_files(Vars.texmf_home, options["full"], options["dry-run"])
+  return install_files(Vars.texmf_home, options.full, options["dry-run"])
 end
 
 ---@class l3b_inst_t
----@field Vars              l3b_inst_vars_t
----@field uninstall         fun(): error_level_t
----@field install_files     fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
----@field install           fun(): error_level_t
+---@field Vars            l3b_inst_vars_t
+---@field install_impl    target_impl_t
+---@field uninstall_impl  target_impl_t
+---@field install_files   fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
 
 return {
-  Vars              = Vars,
-  uninstall         = uninstall,
-  install_files     = install_files,
-  install           = install,
+  Vars            = Vars,
+  install_impl    = {
+    run = install
+  },
+  uninstall_impl  = {
+    run = uninstall
+  },
+  install_files   = install_files,
 }

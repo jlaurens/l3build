@@ -99,29 +99,31 @@ local unpack      = l3b_unpk.unpack
 ---@field typesetruns   integer Number of cycles of typesetting to carry out
 
 ---@type l3b_tpst_vars_t
-local Vars = chooser(_G, {
-  typesetruns         = 3,
-  typesetcmds         = "",
-  -- Enable access to trees outside of the repo
-  -- As these may be set false, a more elaborate test than normal is needed
-  typesetsearch       = true,
-  -- Additional settings to fine-tune typesetting
-  glossarystyle       = "gglo.ist",
-  indexstyle          = "gind.ist",
-  specialtypesetting  = {},
-  forcedocepoch       = false,
-}, {
-  complete = function (t, k, result)
+local Vars = chooser({
+  global = _G,
+  default = {
+    typesetruns         = 3,
+    typesetcmds         = "",
+    -- Enable access to trees outside of the repo
+    -- As these may be set false, a more elaborate test than normal is needed
+    typesetsearch       = true,
+    -- Additional settings to fine-tune typesetting
+    glossarystyle       = "gglo.ist",
+    indexstyle          = "gind.ist",
+    specialtypesetting  = {},
+    forcedocepoch       = false,
+  },
+  completed = {
     -- No trailing /
     -- What about the leading "./"
-    if k == "forcedocepoch" then
+    forcedocepoch = function (t, k, result)
       local options = l3build.options
-      if options["epoch"] then
+      if options.epoch then
         return true
       end
-    end
-    return result
-  end,
+      return result
+    end,
+  },
 })
 
 -- An auxiliary used to set up the environmental variables
@@ -155,13 +157,13 @@ local function runcmd(cmd, dir, vars)
   return run(dir, cmd_concat(set_epoch_cmd(Main.epoch, Vars.forcedocepoch), env, cmd))
 end
 
-local MT = {}
+local Ngn_dflt = {}
 
 ---biber
 ---@param name string
 ---@param dir string
----@return error_level_t
-function MT.biber(name, dir)
+---@return error_level_n
+function Ngn_dflt.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return
       runcmd(Exe.biber .. " " .. Opts.biber .. " " .. name, dir, { "BIBINPUTS" })
@@ -173,8 +175,8 @@ end
 ---comment
 ---@param name string
 ---@param dir? string
----@return error_level_t
-function MT.bibtex(name, dir)
+---@return error_level_n
+function Ngn_dflt.bibtex(name, dir)
   dir = dir or "."
   if file_exists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
@@ -206,8 +208,8 @@ end
 ---@param out_ext string
 ---@param log_ext string
 ---@param style string
----@return error_level_t
-function MT.makeindex(name, dir, in_ext, out_ext, log_ext, style)
+---@return error_level_n
+function Ngn_dflt.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "." -- Why is it optional ?
   if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
@@ -223,33 +225,35 @@ end
 
 -- The engine controller:
 ---@class Ngn_t
----@field tex                 fun(file: string, dir?: string, cmd?: string): error_level_t
----@field typeset             fun(file: string, dir?: string, cmd?: string): error_level_t
----@field typeset_demo_tasks  fun(): error_level_t
----@field doc_init_hook       fun(): error_level_t
----@field bibtex              fun(file: string, dir?: string, cmd?: string): error_level_t
----@field biber               fun(file: string, dir?: string, cmd?: string): error_level_t
----@field makeindex           fun(name: string, dir?: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_t
+---@field tex                 fun(file: string, dir?: string, cmd?: string): error_level_n
+---@field typeset             fun(file: string, dir?: string, cmd?: string): error_level_n
+---@field typeset_demo_tasks  fun(): error_level_n
+---@field docinit_hook        fun(): error_level_n
+---@field bibtex              fun(file: string, dir?: string, cmd?: string): error_level_n
+---@field biber               fun(file: string, dir?: string, cmd?: string): error_level_n
+---@field makeindex           fun(name: string, dir?: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
 
 -- Ngn.foo is _G.foo if it is a function, MF.foo otherwise.
 -- Only fo known keys
 ---@type Ngn_t
-local Ngn = chooser(_G, MT, {
+local Ngn = chooser({
+  global = _G,
+  default = Ngn_dflt,
   fallback = function (t, k, v_dflt, v_G)
     if k == "tex" then --- tex is already a table in texlua.
       if type(v_G) == "table" then
         return v_dflt
       end
     end
-  end
+  end,
 })
 
 ---TeX
 ---@param file string
 ---@param dir? string
 ---@param cmd? string
----@return error_level_t
-function MT.tex(file, dir, cmd)
+---@return error_level_n
+function Ngn_dflt.tex(file, dir, cmd)
   dir = dir or "."
   cmd = cmd or Exe.typeset .." ".. Opts.typeset
   return runcmd(cmd .. " \"" .. Vars.typesetcmds
@@ -261,8 +265,8 @@ end
 ---@param file string
 ---@param dir? string
 ---@param cmd string
----@return error_level_t
-function MT.typeset(file, dir, cmd)
+---@return error_level_n
+function Ngn_dflt.typeset(file, dir, cmd)
   dir = dir or "."
   local error_level = Ngn.tex(file, dir, cmd)
   if error_level ~= 0 then
@@ -285,7 +289,7 @@ end
 ---Local helper
 ---@param file string
 ---@param dir? string
----@return error_level_t
+---@return error_level_n
 local function typesetpdf(file, dir)
   dir = dir or "."
   local name = job_name(file)
@@ -308,19 +312,19 @@ local function typesetpdf(file, dir)
 end
 
 ---Do nothing function
----@return error_level_t
-function MT.typeset_demo_tasks()
+---@return error_level_n
+function Ngn_dflt.typeset_demo_tasks()
   return 0
 end
 
 ---Do nothing function
----@return error_level_t
-function MT.docinit_hook()
+---@return error_level_n
+function Ngn_dflt.docinit_hook()
   return 0
 end
 
 ---comment
----@return error_level_t
+---@return error_level_n
 local function docinit()
   -- Set up
   make_clean_directory(Dir.typeset)
@@ -350,7 +354,7 @@ end
 ---Typeset all required documents
 ---Uses a set of dedicated auxiliaries that need to be available to others
 ---@param files? string_list_t
----@return error_level_t
+---@return error_level_n
 local function doc(files)
   local error_level = docinit()
   if error_level ~= 0 then
@@ -392,23 +396,21 @@ local function doc(files)
   return 0
 end
 
+---@class l3b_tpst_engine_t
+---@field bibtex    fun(name: string, dir: string): error_level_n
+---@field biber     fun(name: string, dir: string): error_level_n
+---@field tex       fun(name: string, dir: string, cmd: string): error_level_n
+---@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
+
 ---@class l3b_tpst_t
 ---@field Vars      l3b_tpst_vars_t
----@field dvi2pdf   fun(name: string, dir: string, engine: string, hide: boolean): integer
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
----@field doc       fun(files: string_list_t): integer
----@field bibtex    fun(name: string, dir: string): integer
----@field biber     fun(name: string, dir: string): integer
----@field tex       fun(name: string, dir: string, cmd: string): integer
----@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): integer
+---@field doc       fun(files?: string_list_t): error_level_n
+---@field engine    l3b_tpst_engine_t
 
 return {
-  Vars              = Vars,
-  dvi2pdf           = dvi2pdf,
-  runcmd            = runcmd,
-  doc               = doc,
-  bibtex            = Ngn.bibtex,
-  biber             = Ngn.biber,
-  tex               = Ngn.tex,
-  makeindex         = Ngn.makeindex,
+  Vars    = Vars,
+  runcmd  = runcmd,
+  doc     = doc,
+  engine  = Ngn,
 }

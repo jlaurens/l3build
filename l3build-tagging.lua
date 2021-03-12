@@ -66,24 +66,27 @@ local call    = l3b_aux.call
 --[=[ Package implementation ]=]
 
 ---@class l3b_tagging_vars_t
----@field tag_hook    fun(tag_name: string, tag_date: string): error_level_t
+---@field tag_hook    fun(tag_name: string, tag_date: string): error_level_n
 ---@field update_tag  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
 
 ---@type l3b_tagging_vars_t
-local Vars = chooser(_G, {
-  tag_hook = function (tag_name, tag_date)
-    return 0
-  end,
-  update_tag = function(file_name, content, tag_name, tag_date)
-    return content
-  end,
+local Vars = chooser({
+  global = _G,
+  default = {
+    tag_hook = function (tag_name, tag_date)
+      return 0
+    end,
+    update_tag = function(file_name, content, tag_name, tag_date)
+      return content
+    end,
+  },
 })
 
 ---Update the tag.
 ---@param file_path string
 ---@param tag_name string
 ---@param tag_date string
----@return error_level_t
+---@return error_level_n
 local function update_file_tag(file_path, tag_name, tag_date)
   local file_name = base_name(file_path)
   print("Tagging  ".. file_name)
@@ -103,14 +106,14 @@ end
 
 ---Target tag
 ---@param tag_names string_list_t|nil
----@return error_level_t
+---@return error_level_n
 local function tag(tag_names)
   if tag_names and #tag_names > 1 then
     print("No more that one tag name")
     exit(1)
   end
   local options = l3build.options
-  local tag_date = options["date"] or os_date("%Y-%m-%d")
+  local tag_date = options.date or os_date("%Y-%m-%d")
   local tag_name = tag_names and tag_names[1]
   local error_level = 0
   for dir in unique_items(Dir.work, Dir.sourcefile, Dir.docfile) do
@@ -129,10 +132,9 @@ end
 
 ---Target tag
 ---@param tag_names string_list_t|nil, singleton list
----@return error_level_t
+---@return error_level_n
 local function bundle_tag(tag_names)
-  local modules = Main.modules
-  local error_level = call(modules, "tag")
+  local error_level = call(Main.modules, "tag")
   -- Deal with any files in the bundle dir itself
   if error_level == 0 then
     error_level = tag(tag_names)
@@ -141,10 +143,11 @@ local function bundle_tag(tag_names)
 end
 
 ---@class l3b_tagging_t
----@field tag         fun(tag_names: string_list_t): error_level_t
----@field bundle_tag  fun(tag_names: string_list_t): error_level_t
+---@field tag_impl target_impl_t
 
 return {
-  tag         = tag,
-  bundle_tag  = bundle_tag,
+  tag_impl = {
+    run = tag,
+    bundle_run = bundle_tag,
+  },
 }

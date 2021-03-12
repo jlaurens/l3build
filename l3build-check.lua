@@ -144,16 +144,18 @@ local bundleunpack  = l3b_unpk.Vars.bundleunpack
 ---@field checksearch   boolean Switch to search the system \texttt{texmf} for during checking
 ---@field maxprintline  integer Length of line to use in log files
 ---@field runtest_tasks fun(test_name: string, run_number: integer): string
----@field checkinit_hook fun(): error_level_t
+---@field checkinit_hook fun(): error_level_n
 ---@field ps2pdfopt     string  Options for \texttt{ps2pdf}
 
 ---@type l3b_check_vars_t
 local dflt = {} -- define below
 
 ---@type l3b_check_vars_t
-local Vars = chooser(_G, dflt, {
-  compute = function (t, k, dflt_k)
-    if k == "unique_config" then
+local Vars = chooser({
+  global = _G,
+  default = dflt,
+  computed = {
+    unique_config = function (t, k, dflt_k)
       local configs = t.checkconfigs
       if #configs == 1 then
         local result = configs[1]
@@ -161,14 +163,14 @@ local Vars = chooser(_G, dflt, {
           return result
         end
       end
-    end
-    local options = l3build.options
-    if k == "forcecheckepoch" then
-      if options["epoch"] then
+    end,
+    forcecheckepoch = function (t, k, dflt_k)
+      local options = l3build.options
+      if options.epoch then
         return true
       end
-    end
-  end,
+    end,
+  },
   complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
@@ -177,13 +179,13 @@ local Vars = chooser(_G, dflt, {
       -- When we have specific files to deal with, only use explicit configs
       -- (or just the std one)
       -- TODO: Justify this...
-      if options["names"] then
-        return options["config"] or { _G.stdconfig }
+      if options.names then
+        return options.config or { _G.stdconfig }
       else
-        return options["config"] or result
+        return options.config or result
       end
     elseif k == "forcecheckepoch" then
-      if options["epoch"] then
+      if options.epoch then
         return true -- overwrite any global setting
       end
     end
@@ -196,7 +198,7 @@ local Vars = chooser(_G, dflt, {
 ---@param dir string
 ---@param engine string
 ---@param hide boolean
----@return error_level_t
+---@return error_level_n
 local function dvi2pdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
@@ -214,7 +216,7 @@ end
 --
 
 ---Default function that can be overwritten
----@return error_level_t
+---@return error_level_n
 local function checkinit_hook()
   return 0
 end
@@ -223,7 +225,7 @@ end
 -- for saving the test files
 local function checkinit()
   local options = l3build.options
-  if not options["dirty"] then
+  if not options.dirty then
     make_clean_directory(Dir.test)
     make_clean_directory(Dir.result)
   end
@@ -765,7 +767,7 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels table<integer, error_level_t>
+---@param err_levels table<integer, error_level_n>
 local function rewrite_log(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_log, engine, err_levels)
 end
@@ -774,7 +776,7 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels table<integer, error_level_t>
+---@param err_levels table<integer, error_level_n>
 local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
@@ -806,7 +808,7 @@ end
 ---@param name string
 ---@param engine string
 ---@param cleanup boolean
----@return error_level_t
+---@return error_level_n
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
   local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. _G.os_diffext
@@ -869,7 +871,7 @@ end
 ---@param ext string
 ---@param test_type table
 ---@param breakout any
----@return error_level_t
+---@return error_level_n
 local function run_test(name, engine, hide, ext, test_type, breakout)
   local lvt_file = name .. (ext or Xtn.lvt)
   copy_tree(lvt_file,
@@ -927,7 +929,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Ensure there is no stray .log file
   remove_name(Dir.test, name .. Xtn.log)
-  ---@type table<integer, error_level_t>
+  ---@type table<integer, error_level_n>
   local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
@@ -1049,7 +1051,7 @@ end
 ---@param hide boolean
 ---@param ext string extension
 ---@param type string test type
----@return error_level_t
+---@return error_level_n
 local function check_and_diff(name, engine, hide, ext, type)
   run_test(name, engine, hide, ext, type, true)
   local error_level = base_compare(type, name, engine)
@@ -1070,7 +1072,7 @@ end
 ---Should create a difference file for each failed test
 ---@param test_name string
 ---@param hide boolean
----@return error_level_t
+---@return error_level_n
 local function run_check(test_name, hide)
   local options = l3build.options
   local file_name, kind = test_exists(test_name)
@@ -1079,8 +1081,8 @@ local function run_check(test_name, hide)
     return 1
   end
   local check_engines = Vars.checkengines
-  if options["engine"] then
-    check_engines = options["engine"]
+  if options.engine then
+    check_engines = options.engine
   end
   -- Used for both .lvt and .pvt tests
   local test_type = Vars.test_types[kind]
@@ -1106,7 +1108,7 @@ end
 ---@param cleanup boolean
 ---@param name string
 ---@param engine string
----@return error_level_t
+---@return error_level_n
 local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   local error_level
   local test_name = name .. "." .. engine
@@ -1215,12 +1217,12 @@ end
 
 ---Check
 ---@param names string_list_t
----@return error_level_t
+---@return error_level_n
 local function check(names)
   local error_level = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     local options = l3build.options
-    if not options["rerun"] then
+    if not options.rerun then
       checkinit()
     end
     local hide = true
@@ -1269,7 +1271,7 @@ local function check(names)
       end
       sort(names)
       -- Deal limiting range of names
-      local firstname = options["first"]
+      local firstname = options.first
       if firstname then
         local allnames = names
         names = {}
@@ -1280,7 +1282,7 @@ local function check(names)
           end
         end
       end
-      local lastname = options["last"]
+      local lastname = options.last
       if lastname then
         local allnames = names
         names = {}
@@ -1292,7 +1294,7 @@ local function check(names)
         end
       end
     end
-    if options["shuffle"] then
+    if options.shuffle then
       -- https://stackoverflow.com/a/32167188
       for i = #names, 2, -1 do
         local j = rnd(1, i)
@@ -1326,7 +1328,7 @@ end
 
 ---Prepare material for a forthcoming check.
 ---@param names string_list_t
----@return error_level_t
+---@return error_level_n
 local function save(names)
   if names == nil then
     print("Arguments are required for the save command")
@@ -1334,7 +1336,7 @@ local function save(names)
   end
   checkinit()
   local options = l3build.options
-  local engines = options["engine"] or { Vars.stdengine }
+  local engines = options.engine or { Vars.stdengine }
   for name in entries(names) do
     local test_filename, kind = test_exists(name)
     if not test_filename then
@@ -1365,23 +1367,23 @@ local function save(names)
   return 0
 end
 
----Check at the top level
+---Check at module level.
 ---@param names string_list_t
----@return error_level_t
-local function bundle_check(names)
+---@return error_level_n
+local function module_check(names)
   if names and #names > 0 then
-    print("Bundle checks should not list test names")
+    print("Module checks should not list test names")
     help()
     exit(1)
   end
   return check(names)
 end
 
----Special check.
 ---Shortcut when many configurations are given.
+---Separate the check action for each configuration.
 ---@param options options_t
----@return error_level_t
-local function alt_check(options)
+---@return error_level_n?
+local function high_check(options)
   local check_configs = Vars.checkconfigs
   if #check_configs > 1 then
     local error_level = 0
@@ -1421,15 +1423,16 @@ local function alt_check(options)
   end
 end
 
--- Sanity check
+---Sanity check
+---@param options options_t
 local function sanitize_engines(options)
-  if options["engine"] and not options["force"] then
+  if options.engine and not options.force then
     -- Make a lookup table
     local t = {}
     for engine in entries(Vars.checkengines) do
       t[engine] = true
     end
-    for opt_engine in entries(options["engine"]) do
+    for opt_engine in entries(options.engine) do
       if not t[opt_engine] then
         print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
@@ -1445,22 +1448,22 @@ end
 
 ---Run before the save operation
 ---@param options options_t
----@return error_level_t
-local function will_save(options)
+---@return error_level_n
+local function prepare_save(options)
   sanitize_engines(options)
   return 0
 end
 
 ---Run before the check operation
 ---@param options options_t
----@return error_level_t
-local function will_check(options)
+---@return error_level_n
+local function prepare_check(options)
   sanitize_engines(options)
   return 0
 end
 
 ---Load the config file, when unique and not "build".
----@return error_level_t
+---@return error_level_n
 local function load_unique_config(options)
   local configs = Vars.checkconfigs
   if #configs ~= 1 then
@@ -1487,36 +1490,38 @@ end
 
 ---Run before the save operation
 ---@param options options_t
----@return error_level_t
+---@return error_level_n
 local function configure_save(options)
   return load_unique_config(options)
 end
 
 ---Run before the check operation
 ---@param options options_t
----@return error_level_t
+---@return error_level_n
 local function configure_check(options)
   return load_unique_config(options)
 end
 
-
 ---@class l3b_check_t
 ---@field Vars              l3b_check_vars_t
----@field configure_check   fun(options: options_t): error_level_t
----@field check             fun(names: string_list_t): error_level_t
----@field alt_check         fun(options: options_t): error_level_t
----@field bundle_check      fun(names: string_list_t): error_level_t
----@field configure_save    fun(options: options_t): error_level_t
----@field save              fun(names: string_list_t): error_level_t
+---@field check_impl        target_impl_t
+---@field module_check_impl target_impl_t
+---@field save_impl         target_impl_t
 
 return {
-  Vars              = Vars,
-  will_check        = will_check,
-  configure_check   = configure_check,
-  check             = check,
-  alt_check         = alt_check,
-  bundle_check      = bundle_check,
-  will_save         = will_save,
-  configure_save    = configure_save,
-  save              = save,
+  Vars        = Vars,
+  check_impl  = {
+    prepare     = prepare_check,
+    high_run    = high_check,
+    configure   = configure_check,
+    run         = check,
+  },
+  module_check_impl = {
+    run = module_check,
+  },
+  save_impl = {
+    prepare   = prepare_save,
+    configure = configure_save,
+    run       = save,
+  },
 }

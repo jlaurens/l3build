@@ -84,9 +84,12 @@ local l3b_inst_vars = l3b_inst.Vars
 ---@field packtdszip boolean Switch to build a TDS-style zip file for CTAN
 
 ---@type l3b_ctan_vars_t
-local Vars = chooser(_G, {
-  flatten = true,
-  packtdszip = false,
+local Vars = chooser({
+  global = _G,
+  default = {
+    flatten = true,
+    packtdszip = false,
+  },
 })
 
 -- Copy files to the main CTAN release directory
@@ -123,8 +126,8 @@ local function copy_ctan()
 end
 
 ---One of the bundle private targets
----@return error_level_t
-local function bundle_ctan()
+---@return error_level_n
+local function module_ctan()
   local error_level = install_files(Dir.tds, true)
   if error_level ~=0 then
     return error_level
@@ -134,17 +137,16 @@ local function bundle_ctan()
 end
 
 ---comment
----@return error_level_t
+---@return error_level_n
 local function ctan()
   -- Always run tests for all engines
-  local options = l3build.options
-  options["engine"] = nil
+  l3build.options.engine = nil
   local error_level
   local standalone = Main._standalone
   if standalone then
     error_level = call({ "." }, "check")
   else
-    error_level = call(Main.modules, "bundle_check")
+    error_level = call(Main.modules, "module_check")
   end
   if error_level ~= 0 then
     print("\n====================")
@@ -163,7 +165,7 @@ local function ctan()
     end
     copy_ctan()
   else
-    error_level = call(Main.modules, "bundle_ctan")
+    error_level = call(Main.modules, "module_ctan")
     if error_level ~= 0 then
       print("\n====================")
       print("Typesetting failed, zip stage skipped!")
@@ -178,7 +180,7 @@ local function ctan()
     end
   end
   -- Rename README if necessary
-  local readme = Main.ctanreadme
+  local readme = Vars.ctanreadme
   if readme ~= "" and not lower(readme):match("^readme%.%w+") then
     local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
@@ -220,12 +222,16 @@ local function ctan()
 end
 
 ---@class l3b_ctan_t
----@field Vars        l3b_ctan_vars_t
----@field ctan        fun(): integer
----@field bundle_ctan fun(): integer
+---@field Vars              l3b_ctan_vars_t
+---@field ctan_impl         target_impl_t
+---@field module_ctan_impl  target_impl_t
 
 return {
   Vars              = Vars,
-  ctan              = ctan,
-  bundle_ctan       = bundle_ctan,
+  ctan_impl         = {
+    run = ctan,
+  },
+  module_ctan_impl  = {
+    run = module_ctan,
+  },
 }

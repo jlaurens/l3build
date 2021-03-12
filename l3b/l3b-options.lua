@@ -28,7 +28,6 @@ local stderr  = io.stderr
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
-local chooser       = utlib.chooser
 local readonly      = utlib.readonly
 local sorted_values = utlib.sorted_values
 
@@ -162,7 +161,7 @@ local option_list = {
     }
   }
 
----@alias option_type_f fun(options: table, key: string, value: string): error_level_t
+---@alias option_type_f fun(options: table, key: string, value: string): error_level_n
 
 ---@class option_info_t
 ---@field description  string  short description
@@ -171,7 +170,7 @@ local option_list = {
 ---@field long  string  long CLI key
 ---@field name  string  name in the options table
 ---@field expect_value  boolean False for boolean type, true for the others.
----@field load_value    fun(options: table, key: string, value?: string): error_level_t load the given value
+---@field load_value    fun(options: table, key: string, value?: string): error_level_n load the given value
 ---@field builtin       boolean whether the option is builtin
 
 ---@type table<string, option_info_t>
@@ -214,7 +213,7 @@ end
 ---@param options table
 ---@param key     string
 ---@param value?  string
----@return error_level_t
+---@return error_level_n
 local function load_value(self, options, key, value)
   if self.type == "boolean" then
     options[self.name] = not key:match("^no-")

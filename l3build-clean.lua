@@ -36,6 +36,9 @@ local remove_tree           = fslib.remove_tree
 local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
+---@type l3build_t
+local l3build  = require("l3build")
+
 ---@type l3b_vars_t
 local l3b_vars  = require("l3build-variables")
 ---@type Main_t
@@ -49,12 +52,8 @@ local Files     = l3b_vars.Files
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
 
----@type l3b_check_t
-local l3b_check         = require("l3build-check")
----@type l3b_check_vars_t
-local l3b_check_vars_t  = l3b_check.Vars
-
--- Remove all generated files
+---Remove all generated files
+---@return error_level_n
 local function clean()
   -- To make sure that Dir.distrib never contains any stray subdirs,
   -- it is entirely removed then recreated rather than simply deleting
@@ -104,10 +103,11 @@ local function bundle_clean()
 end
 
 ---@class l3b_clean_t
----@field clean         fun(): integer
----@field bundle_clean  fun(): integer
+---@field clean_impl  target_impl_t
 
 return {
-  clean             = clean,
-  bundle_clean      = bundle_clean,
+  clean_impl  = {
+    run         = clean,
+    bundle_run  = bundle_clean,
+  }
 }

@@ -115,15 +115,22 @@ with a configuration table `uploadconfig`
 ---@field curl_debug    boolean
 ---@field uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
 
-local Vars = chooser(_G, {
-  curl_debug    = false,
-  uploadconfig  = setmetatable({}, {
-    __index = function (t, k)
-      if k == "pkg" then
-        return Main.ctanpkg
-      end
+local Vars = chooser({
+  global = _G,
+  default = {
+    curl_debug  = false,
+  },
+  computed = {
+    uploadconfig  = function ()
+      return setmetatable({}, {
+        __index = function (t, k)
+          if k == "pkg" then
+            return Main.ctanpkg
+          end
+        end
+      })
     end
-  })
+  },
 })
 
 -- function for interactive multiline fields
@@ -221,7 +228,7 @@ end
 
 ---Prepare the context
 ---@param version string
----@return error_level_t
+---@return error_level_n
 function MT:prepare(version)
 
   -- avoid lower level error from post command if zip file missing
@@ -249,14 +256,14 @@ function MT:prepare(version)
 
   -- Get data from command line if appropriate
   do
-    local message = options["message"]
-        or read_content(options["file"])
+    local message = options.message
+        or read_content(options.file)
         or read_content(config.announcement_file)
     assert(message)
     config.announcement = message
   end
 
-  config.email = options["email"] or config.email
+  config.email = options.email or config.email
 
   config.note = config.note or read_content(config.note_file)
 
@@ -273,14 +280,14 @@ end
 
 ---Append the given text to the current request
 ---@param str string
----@return error_level_t
+---@return error_level_n
 function MT:append_request(str)
   self.request = self.request .. str
 end
 
 ---comment
 ---@param tag_names string_list_t
----@return error_level_t
+---@return error_level_n
 function MT:upload(tag_names)
 
   self:construct_request()
@@ -292,7 +299,7 @@ function MT:upload(tag_names)
 
   self.request = Exe.curl .. " --config " .. curlopt_file
   local options = l3build.options
-  if options["debug"] then
+  if options.debug then
     self.append_request(' https://httpbin.org/post')
     local response = self:send_request("")
     print('\n\nCURL COMMAND:')

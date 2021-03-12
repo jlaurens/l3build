@@ -36,7 +36,12 @@ are `dofile`d such that both inherit all the global variables
 defined here.
 --]=]
 
-local l3build = require("l3build")
+local tostring  = tostring
+local type      = type
+local print     = print
+local write     = io.write
+
+local l3build   = require("l3build")
 
 -- Global variables
 
@@ -44,8 +49,10 @@ _G.options = l3build.options
 
 
 ---@type utlib_t
-local utlib = require("l3b-utillib")
-local items = utlib.items
+local utlib         = require("l3b-utillib")
+local items         = utlib.items
+local keys          = utlib.keys
+local sorted_pairs  = utlib.sorted_pairs
 
 ---@type wklib_t
 local wklib = require("l3b-walklib")
@@ -86,7 +93,7 @@ _G.normalize_path = fslib.to_host
 --components of l3build
 if l3build.in_document then
   for k in items(
-    "call", "install_files", "biber", "makeindex", "tex", "runcmd"
+    "call", "install_files", "bibtex", "biber", "makeindex", "tex", "runcmd"
   ) do
     if not _G[k] then
       -- only provide a global when not available
@@ -98,7 +105,6 @@ if l3build.in_document then
   end
   return
 end
-
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
@@ -114,15 +120,20 @@ _G.install_files = l3b_inst.install_files
 
 ---@type l3b_tpst_t
 local l3b_tpst = require("l3build-typesetting")
+---@type l3b_tpst_engine_t
+local engine = l3b_tpst.engine
 
-_G.biber      = l3b_tpst.biber
-_G.bibtex     = l3b_tpst.bibtex
-_G.makeindex  = l3b_tpst.makeindex
-_G.tex        = l3b_tpst.tex
+_G.biber      = engine.biber
+_G.bibtex     = engine.bibtex
+_G.makeindex  = engine.makeindex
+_G.tex        = engine.tex
 
 _G.runcmd     = l3b_tpst.runcmd
 
 -- Global variables
+
+local exported_count = 0
+local exported = {}
 
 local function export_symbols(from, suffix, ...)
   if not from then
@@ -130,11 +141,14 @@ local function export_symbols(from, suffix, ...)
     error("Missing from")
   end
   for item in items(...) do
-    if from[item] == nil then
+    local from_item = from[item]
+    if from_item == nil then
       print(debug.traceback())
       error("Erroneous item: ".. item)
     end
-    _G[item ..suffix] = from[item]
+    _G[item .. suffix] = from_item
+    exported[item ..suffix] = from_item
+    exported_count = exported_count + 1
   end
 end
 
@@ -168,7 +182,7 @@ export_symbols(Dir, "dir",
   "textfile",
   "build",
   "distrib",
-  --"local",
+  "local",
   "result",
   "test",
   "typeset",
@@ -289,13 +303,19 @@ export_symbols(l3b_tpst_vars, "",
 )
 
 export_symbols(l3b_check_vars, "",
-"forcecheckepoch"
-"asciiengines",
-"checkruns"
+  "forcecheckepoch",
+  "asciiengines",
+  "checkruns"
+)
+
+---@type l3b_inst_vars_t
+local l3b_inst_vars = l3b_inst.Vars
+
+export_symbols(l3b_inst_vars, "",
+"ctanreadme"
 )
 
 export_symbols(Main, "",
-  "ctanreadme",
   "ctanzip",
   "epoch"
 )
@@ -307,9 +327,6 @@ local l3b_ctan_vars = l3b_ctan.Vars
 export_symbols(l3b_ctan_vars, "",
   "flatten"
 )
-
----@type l3b_inst_vars_t
-local l3b_inst_vars = l3b_inst.Vars
 
 export_symbols(l3b_inst_vars, "",
   "flattentds",
@@ -329,6 +346,7 @@ export_symbols(Opts, "opts",
 )
 
 export_symbols(l3b_tpst_vars, "",
+  "typesetruns",
   "typesetcmds"
 )
 
@@ -345,7 +363,7 @@ export_symbols(l3b_mfst_vars, "",
   "manifestfile"
 )
 
-export_symbols(Main, "",
+export_symbols(l3b_inst_vars, "",
   "tdslocations"
 )
 
@@ -371,3 +389,190 @@ export_symbols(Xtn, "ext",
   "pdf",
   "ps"
 )
+
+---Display the list of exported variables
+if l3build.options.debug then
+  local official = {
+"module",
+"bundle",
+"ctanpkg",
+--
+"modules",
+"exclmodules",
+--
+"maindir",
+"docfiledir",
+"sourcefiledir",
+"supportdir",
+"testfiledir",
+"testsuppdir",
+"texmfdir",
+"textfiledir",
+--
+"builddir",
+"distribdir",
+"localdir",
+"resultdir",
+"testdir",
+"typesetdir",
+"unpackdir",
+--
+"ctandir",
+"tdsdir",
+"tdsroot",
+--
+"auxfiles",
+"bibfiles",
+"binaryfiles",
+"bstfiles",
+"checkfiles",
+"checksuppfiles",
+"cleanfiles",
+"demofiles",
+"docfiles",
+"dynamicfiles",
+"excludefiles",
+"installfiles",
+"makeindexfiles",
+"scriptfiles",
+"scriptmanfiles",
+"sourcefiles",
+"tagfiles",
+"textfiles",
+"typesetdemofiles",
+"typesetfiles",
+"typesetsuppfiles",
+"typesetsourcefiles",
+"unpackfiles",
+"unpacksuppfiles",
+--
+"includetests",
+"excludetests",
+--
+"checkdeps",
+"typesetdeps",
+"unpackdeps",
+--
+"checkengines",
+"stdengine",
+"checkformat",
+"specialformats",
+"test_types",
+"test_order",
+--
+"checkconfigs",
+--
+"typesetexe",
+"unpackexe",
+"zipexe",
+"biberexe",
+"bibtexexe",
+"makeindexexe",
+"curlexe",
+--
+"checkopts",
+"typesetopts",
+"unpackopts",
+"zipopts",
+"biberopts",
+"bibtexopts",
+"makeindexopts",
+--
+"checksearch",
+"typesetsearch",
+"unpacksearch",
+--
+"glossarystyle",
+"indexstyle",
+"specialtypesetting",
+--
+"forcecheckepoch",
+"forcedocepoch",
+--
+"asciiengines",
+"checkruns",
+"ctanreadme",
+"ctanzip",
+"epoch",
+"flatten",
+"flattentds",
+"flattenscript",
+"maxprintline",
+"packtdszip",
+"ps2pdfopts",
+"typesetcmds",
+"typesetruns",
+"recordstatus",
+"manifestfile",
+--
+"tdslocations",
+--
+"uploadconfig",
+--"uploadconfig.pkg",
+--
+"bakext",
+"dviext",
+"lvtext",
+"tlgext",
+"tpfext",
+"lveext",
+"logext",
+"pvtext",
+"pdfext",
+"psext",
+  }
+  for entry in utlib.entries(official) do
+    if exported[entry] == nil then
+      print("MISSING GLOBAL: ", entry)
+    end
+  end
+--]==]
+  print(("DEBUG: %d global variables"):format(exported_count))
+  print("{")
+  local i = 0
+  for key, _ in sorted_pairs(exported) do
+    i = i + 1
+    print(("--[[%3d]] %s,"):format(i, key))
+  end
+  print("}")
+  print("DEBUG: Global variables:")
+-- Print anything - including nested tables
+  local function pretty_print(tt, indent, done)
+    done = done or {}
+    indent = indent or 0
+    if type(tt) == "table" then
+      local width = 0
+      for key in keys(tt) do
+        local l = #tostring(key)
+        if l > width then
+          width = l
+        end
+      end
+      for key, value in sorted_pairs(tt) do
+        local filler = (" "):rep(width - #tostring(key))
+        write((" "):rep(indent)) -- indent it
+        if type(value) == "table" and not done[value] then
+          done[value] = true
+          if next(value) then
+            write(('["%s"]%s = {\n'):format(tostring(key), filler))
+            pretty_print(value, indent + width + 7, done)
+            write((" "):rep( indent + width + 5)) -- indent it
+            write("}\n")
+          else
+            write(('["%s"] %s= {}\n'):format(tostring(key), filler))
+          end
+        elseif type(value) == "string" then
+          write(('["%s"] %s= "%s"\n'):format(
+              tostring(key), filler, tostring(value)))
+        else
+          write(('["%s"] %s= %s\n'):format(
+              tostring(key), filler, tostring(value)))
+        end
+      end
+    else
+      io.write(tostring(tt) .. "\n")
+    end
+  end
+  pretty_print(exported)
+  print("")
+end

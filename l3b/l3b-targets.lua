@@ -54,44 +54,33 @@ Due to code separation, the `run` is not always provided.
 
 --]=]
 
----@alias alt_run_f           fun(options: options_t): error_level_t|nil
----@alias target_preflight_f  fun(options: options_t): error_level_t
----@alias target_run_f        fun(names: string_list_t): error_level_t
+-- function signatures
 
----@class target_info_t
----@field name          string name
----@field alias         string alias, to support old naming
----@field description   string description
----@field package       string controller package name
----@field will_run      target_preflight_f|nil function to run preflight code
----@field configure_run target_preflight_f|nil function to run preflight code
----@field run           target_run_f function to run the target, possible computed attributed
----@field alt_run       alt_run_f|nil function to run the target, not config loaded, possible computed attributed
----@field has_alt_variant boolean When true, "alt_" is prepended to `target`
----@field bundle_run    target_run_f|nil function to run the target, used at top level, possible computed attributed
----@field has_bundle_variant boolean When true, "bundle_" is prepended to `target`
----@field bundle_target string `name`, prepended with "bundle_" on `has_bundle_variant`
----@field builtin       boolean whether the target is builtin
+---@alias high_run_f           fun(options: options_t): error_level_n|nil
+---@alias target_preflight_f  fun(options: options_t): error_level_n
+---@alias target_process_f        fun(names: string_list_t): error_level_n
 
----@class target_register_info_t
----@field name          string name
----@field alias         string|nil alias, to support old naming
----@field description   string|nil description
----@field package       string|nil controller package name
----@field will_run      target_preflight_f|nil function run before any other action code
----@field configure_run target_preflight_f|nil function run before any other action code
----@field run           target_run_f|string function to run the target, possible computed attributed
----@field alt_run       target_run_f|string|nil function to run the target, not config loaded, possible computed attributed
----@field has_alt_variant boolean|nil When true, "alt_" is prepended to `target`
----@field bundle_run    target_run_f|string|nil function to run the target, used at top level, possible computed attributed
----@field has_bundle_variant boolean|nil When true, "bundle_" is prepended to `target`
+---@class target_impl_t
+---@field prepare      target_preflight_f|nil function to run preflight code
+---@field configure target_preflight_f|nil function to run preflight code
+---@field run           target_process_f function to run the target, possible computed attributed
+---@field high_run       high_run_f|nil function to run the target, not config loaded, possible computed attributed
+---@field bundle_run    target_process_f|nil function to run the target, used at top level, possible computed attributed
+
+---@class target_info_t -- model for a target
+---@field description string description
+---@field package     string controller package name
+---@field name        string name
+---@field alias       string alias, to support old naming
+---@field builtin     boolean whether the target is builtin
+---@field impl        target_impl_t the target implementation
 
 ---@type table<string, target_info_t>
 local DB = {}
 
 ---Enumerator of all the target infos.
 ---Sorted by name
----@param hidden boolean true to list all hidden targets too.
+---@kvarg hidden boolean true to list all hidden targets too.
 ---@return function
 ---@usage `for info in get_all_info() do ... end`
 local function get_all_info(hidden)
@@ -101,124 +90,55 @@ local function get_all_info(hidden)
 end
 
 ---Return the target info for the given name, if any.
----@param name string
+---@kvarg name string
 ---@return target_info_t|nil
 local function get_info(name)
   return DB[name]
 end
 
 ---Register the target with the given name and info
----@param info target_register_info_t
----@param builtin boolean|nil
-local function register(info, builtin)
+---@kvarg info target_info_t
+---@kvarg builtin boolean|nil
+local function register_info(info, builtin)
   if DB[info.name] then
     error("Target name is already used: ".. info.name)
   end
   local result = {}
   for k in items(
-    "has_alt_variant",
-    "has_bundle_variant"
-  ) do
-    result[k] = info[k] ~= nil and true or false
-  end
-  for k in items(
-    "name",
-    "alias",
     "description",
     "package",
-    "will_run",
-    "configure",
-    "run",
-    "bundle_run"
+    "name",
+    "alias",
+    "impl"
   ) do
     result[k] = info[k]
   end
-  result.builtin = builtin or false
-  DB[info.name] = readonly(setmetatable({}, {
-    __index = function (t, k)
-      local result_k = result[k]
-      if k == "will_run" then
-        local package = result.package
-        if type(result_k) == "string" then
-          result_k = require(package)[result_k]
-        elseif result_k == nil then
-          result_k = require(package)["will_".. t.name]
-        end
-        if result_k and type(result_k) ~= "function" then
-          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
-        end
-      elseif k == "configure_run" then
-        local package = result.package
-        if type(result_k) == "string" then
-          result_k = require(package)[result_k]
-        elseif result_k == nil then
-          result_k = require(package)["configure_".. t.name]
-        end
-        if result_k and type(result_k) ~= "function" then
-          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
-        end
-      elseif k == "run" then -- must always return something
-        local package = result.package
-        if type(result_k) == "string" then
-          result_k = require(package)[result_k]
-        elseif result_k == nil then
-          result_k = require(package)[t.name]
-        end
-        if type(result_k) ~= "function" then
-          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
-        end
-      elseif k == "alt_run" then
-        local package = t.package
-        if type(result_k) == "string" then
-          result_k = require(package)[result_k]
-        elseif result_k == nil then
-          result_k = require(package)["alt_".. result.name]
-        end
-        if result_k and type(result_k) ~= "function" then
-          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
-        end
-      elseif k == "bundle_run" then
-        local package = t.package
-        if type(result_k) == "string" then
-          result_k = require(package)[result_k]
-        end
-        if result_k and type(result_k) ~= "function" then
-          error("Bad target info field (function or string expected) ".. k .."=".. tostring(result_k))
-        end
-      elseif k == "bundle_target" then
-        return t.has_bundle_variant and "bundle_".. t.name or t.name
-      end
-      rawset(t, k, result_k)
-      return result_k
-    end,
-  }))
+  result.builtin = not not (info.builtin or builtin) -- boolean
+  DB[info.name] = result
   if info.alias then
-    DB[info.alias] = DB[info.name] -- latex2e
+    DB[info.alias] = result -- latex2e
   end
 end
 
 local target_list = {
   -- Some hidden targets
-  bundle_check = {
+  module_check = { -- all modules
     package     = "l3build-check",
-    alias       = "bundlecheck",
   },
-  bundle_ctan = {
+  module_ctan = {
     package     = "l3build-ctan",
     alias       = "bundlectan",
   },
-  bundle_unpack = {
+  module_unpack = {
     package     = "l3build-unpack",
-    alias       = "bundleunpack",
   },
-  bundle_tag = {
+  module_tag = {
     package     = "l3build-tagging",
   },
   -- Public targets (with decription)
   check = {
     description   = "Run all automated tests",
     package       = "l3build-check",
-    has_bundle_variant  = true,
   },
   clean = {
     description   = "Clean out directory tree",
@@ -249,7 +169,6 @@ local target_list = {
   tag = {
     description = "Updates release tags in files",
     package     = "l3build-tagging",
-    has_bundle_variant  = true,
   },
   uninstall = {
     description   = "Uninstalls files from the local texmf tree",
@@ -258,7 +177,6 @@ local target_list = {
   unpack = {
     description   = "Unpacks the source files into the build tree",
     package       = "l3build-unpack",
-    has_bundle_variant  = true,
   },
   upload = {
     description = "Send archive to CTAN for public release",
@@ -269,7 +187,139 @@ local target_list = {
 -- register builtin targets
 for name, info in pairs(target_list) do
   info.name = name
-  register(info, true)
+  register_info(info, true)
+end
+
+---@class target_register_kvarg_t
+---@field description   string|nil description
+---@field name          string name
+---@field prepare       target_preflight_f|nil function run before any other action code
+---@field configure     target_preflight_f|nil function run before any other action code
+---@field run           target_process_f|string function to run the target, possible computed attributed
+---@field high_run      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
+---@field bundle_run    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
+
+---Register the target with the given name and info
+---@kvarg kvarg target_register_kvarg_t
+---@kvarg builtin boolean|nil
+local function register(kvarg, builtin)
+  if DB[kvarg.name] then
+    error("Target name is already used: ".. kvarg.name)
+  end
+  local info = {}
+  for k in items(
+    "description",
+    "name"
+  ) do
+    info[k] = kvarg[k]
+  end
+  local impl = {}
+  for k in items(
+    "prepare",
+    "configure",
+    "high_run",
+    "run",
+    "bundle_run"
+  ) do
+    impl[k] = kvarg[k]
+  end
+  info.impl = impl
+  info.builtin = not not builtin
+  DB[kvarg.name] = info
+end
+
+---@alias target_process_top_callback_f fun(module_target: string): error_level_n call the target against all the modules
+
+---@class target_process_kvarg_t
+---@field preflight     fun(): error_level_n
+---@field at_bundle_top nil|boolean
+---@field top_callback  nil|target_process_top_callback_f
+
+---Raises an error when the target is unknown.
+---Get the implementation table of the target.
+---Run its `prepare`, return on error.
+---Run its `high_run` call if possible, after `preflight`. Return the result when not nil.
+---Run its `configure` if possible, return on error.
+---Run the `preflight`.
+---Return its `main` call if any.
+---If at bundle top:
+---  Return its `bundle_run` call if possible
+---  Return its `caller` call with the proper target name
+---Finally return its `run` call.
+---@param options options_t
+---@param kvarg   target_process_kvarg_t
+---@return error_level_n
+local function process(options, kvarg)
+  local target = options.target
+  local info = get_info(target)
+  if not info then
+    error("Unknown target name: ".. target)
+  end
+  local debug = options.debug
+  local impl = info.impl  -- the implementation knows how to
+  if not impl then
+    local pkg = require(info.package)
+    impl = pkg[target .."_impl"]
+    if not impl then
+      impl = {
+        run = pkg[target]
+      }
+    end
+  end
+  local error_level = 0
+  if impl.prepare then
+    if debug then
+      print("DEBUG: prepare ".. target)
+    end
+    error_level = impl.prepare(options)
+    if error_level ~= 0 then
+      return error_level
+    end
+  end
+  if impl.high_run then -- before configure
+    if debug then
+      print("DEBUG: high_run ".. target)
+    end
+    kvarg.preflight()
+    error_level = impl.high_run(options)
+    if error_level ~= nil then
+      return error_level
+    end
+  end
+  if impl.configure then
+    if debug then
+      print("DEBUG: configure ".. target)
+    end
+    error_level = impl.configure(options)
+    if error_level ~= 0 then
+      return error_level
+    end
+  end
+  -- From now on, we can cache results in choosers
+  kvarg.preflight()
+  --[[utlib.flags.cache_chosen = true
+  require("l3build-globals")]]
+  local names = options.names
+  if kvarg.at_bundle_top then
+    if impl.bundle_run then
+      if debug then
+        print("DEBUG: custom bundle_run ".. target)
+      end
+      return impl.bundle_run(names)
+    end
+    local module_target = "module_".. target
+    module_target = get_info(module_target)
+      and module_target
+      or target
+    if debug then
+      print("DEBUG: module run ".. module_target)
+    end
+    return kvarg.top_callback(module_target)
+  end
+  if debug then
+    print("DEBUG: run ".. target)
+  end
+  return impl.run(names)
 end
 
 ---@class l3b_targets_t
@@ -281,4 +331,5 @@ return {
   get_all_info  = get_all_info,
   get_info      = get_info,
   register      = register,
+  process       = process,
 }

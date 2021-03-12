@@ -57,25 +57,32 @@ local Files = l3b_vars.Files
 ---@type l3b_mfst_setup_t
 local stp = require("l3build-manifest-setup")
 
-local Mnfst = chooser(_G, {
-  setup  = stp.setup,
-  extract_filedesc        = stp.extract_filedesc,
-  write_subheading        = stp.write_heading,
-  sort_within_match       = stp.sort_within_match,
-  sort_within_group       = stp.sort_within_group,
-  write_opening           = stp.write_opening,
-  write_group_heading     = stp.write_heading,
-  write_group_file_descr  = stp.write_group_file_descr,
-  write_group_file        = stp.write_group_file,
-}, { prefix = "manifest_" })
+local Mnfst = chooser({
+  global =_G,
+  default = {
+    setup                   = stp.setup,
+    extract_filedesc        = stp.extract_filedesc,
+    write_subheading        = stp.write_heading,
+    sort_within_match       = stp.sort_within_match,
+    sort_within_group       = stp.sort_within_group,
+    write_opening           = stp.write_opening,
+    write_group_heading     = stp.write_heading,
+    write_group_file_descr  = stp.write_group_file_descr,
+    write_group_file        = stp.write_group_file,
+  },
+  prefix = "manifest_",
+})
 
 ---@class l3b_mfst_vars_t
 ---@field manifestfile string File name to use for the manifest file
 
 ---@type l3b_mfst_vars_t
-local Vars = chooser(_G, {
-  -- Manifest options
-  manifestfile    = "MANIFEST.md",
+local Vars = chooser({
+  global = _G,
+  default = {
+    -- Manifest options
+    manifestfile    = "MANIFEST.md",
+  },
 })
 
 local MT = {}
@@ -297,10 +304,12 @@ local function manifest()
 end
 
 ---@class l3b_mfst_t
----@field Vars      l3b_mfst_vars_t
----@field manifest function
+---@field Vars          l3b_mfst_vars_t
+---@field manifest_impl target_impl_t
 
 return {
-  Vars      = Vars,
-  manifest  = manifest,
+  Vars          = Vars,
+  manifest_impl = {
+    run = manifest
+  },
 }

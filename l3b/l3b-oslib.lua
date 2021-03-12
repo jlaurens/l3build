@@ -146,7 +146,7 @@ end
 ---@class oslib_t
 ---@field Vars        oslib_vars_t
 ---@field cmd_concat  fun(...): string
----@field run         fun(dir: string, cmd: string): boolean|nil, nil|string, nil|integer
+---@field run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
 ---@field quoted_path fun(path: string): string
 
 return {

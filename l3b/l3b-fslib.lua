@@ -356,7 +356,7 @@ end
 ---@param name string|copy_name_kv base name of kv arguments
 ---@param source? string path of the source directory, required when name is not a table
 ---@param dest? string path of the destination directory, required when name is not a table
----@return error_level_t
+---@return error_level_n
 local function copy_file(name, source, dest)
   if type(name) == "table" then
     name, source, dest = name.name, name.source, name.dest
@@ -385,7 +385,7 @@ end
 ---Remove the file or void directory with the given name at the given location.
 ---@param dir_path string
 ---@param name string
----@return error_level_t
+---@return error_level_n
 local function remove_name(dir_path, name)
   remove(dir_path .. "/" .. name)
   -- TODO: Is it an error to remove a file that does not exist?
@@ -396,7 +396,7 @@ end
 ---Empties directories but do not remove them.
 ---@param source string
 ---@param glob string
----@return error_level_t
+---@return error_level_n
 local function remove_tree(source, glob)
   for entry in tree(source, glob) do
     remove_name(source, entry.src)
@@ -407,7 +407,7 @@ end
 
 ---For cleaning out a directory, which also ensures that it exists
 ---@param path string
----@return error_level_t
+---@return error_level_n
 local function make_clean_directory(path)
   local error_level = make_directory(path)
   if error_level ~= 0 then

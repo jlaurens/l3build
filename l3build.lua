@@ -328,7 +328,10 @@ elseif target == "version" then
   exit(0)
 end
 
-require("l3build-globals")
+---@type l3b_vars_t
+local l3b_vars  = require("l3build-variables")
+---@type Main_t
+local Main      = l3b_vars.Main
 
 -- Load configuration file if running as a script
 if is_main then
@@ -339,79 +342,21 @@ end
 ---@type utlib_t
 local utlib = require("l3b-utillib")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
-
 ---@type l3b_targets_t
-local l3b_targets_t   = require("l3b-targets")
-local get_target_info = l3b_targets_t.get_info
+local l3b_targets_t = require("l3b-targets")
+local process       = l3b_targets_t.process
 
 ---@type l3b_aux_t
-local l3b_aux             = require("l3build-aux")
-local call                = l3b_aux.call
+local l3b_aux = require("l3build-aux")
+local call    = l3b_aux.call
 
--- Deal with unknown targets up-front
-local info = get_target_info(target)
-if not info then
-  error("Unknown target name: ".. target)
-end
-local error_level = 0
-if info.will_run then
-  if debug then
-    print("DEBUG: will_run ".. target)
-  end
-  error_level = info.will_run(options)
-  if error_level ~= 0 then
-    exit(error_level)
-  end
-end
-if info.alt_run then
-  if debug then
-    print("DEBUG: alt_run ".. target)
-  end
-  error_level = info.alt_run(options)
-  if error_level ~= nil then
-    exit(error_level)
-  end
-end
-if info.configure_run then
-  if debug then
-    print("DEBUG: configure_run ".. target)
-  end
-  error_level = info.configure_run(options)
-  if error_level ~= 0 then
-    exit(error_level)
-  end
-end
--- From now on, we can cache results in choosers
-utlib.flags.cache_chosen = true
-local names = options.names
-if _G.main then
-  if debug then
-    print("DEBUG: global main ".. target)
-  end
-  exit(_G.main(target, names, options))
-end
-if Main._at_bundle_top then
-  if info.bundle_run then
-    if debug then
-      print("DEBUG: bundle_run ".. target)
-    end
-    error_level = info.bundle_run(names)
-  else
-    -- Detect all of the modules
-    if debug then
-      print("DEBUG: modules run ".. target)
-    end
-    local modules = Main.modules
-    error_level = call(modules, info.bundle_target)
-  end
-else
-  if debug then
-    print("DEBUG: run ".. target)
-  end
-  error_level = info.run(names)
-end
-exit(error_level)
+exit(process(options, {
+  preflight     = function ()
+    utlib.flags.cache_chosen = true
+    require("l3build-globals")
+  end,
+  at_bundle_top = Main._at_bundle_top,
+  top_callback  = function (module_target)
+    return call(Main.modules, module_target)
+  end,
+}))

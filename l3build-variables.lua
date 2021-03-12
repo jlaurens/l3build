@@ -22,6 +22,27 @@ for those people who are interested.
 
 --]]
 
+--[=[
+In former implementation, quite all variables were global.
+This design rendered code maintenance very delicate because:
+- the same name was used for global variables and local ones
+- variable definitions were spread over the code
+- names were difficult to read
+
+How things are organized:
+1) low level packages do not use global variables at all.
+2) High level packages only use proxies to some global variables.
+3) Setting global variables is only made in either `build.lua` or a configuration file.
+
+Global variables are used as static parameters to customize
+the behaviour of `l3build`. It means that both `preflight.lua`,
+`build.lua` and configuration scripts are run in an environment
+where only very few `l3build` global variables are defined.
+When all these configuration scripts are executed,
+a snapshot is taken of all the global variables known to `l3build`.
+Any further change to a global variable will have absolutely no effect.
+
+--]=]
 local append  = table.insert
 local os_time = os["time"]
 
@@ -44,13 +65,6 @@ local all_names         = fslib.all_names
 
 ---@type l3build_t
 local l3build = require("l3build")
-
--- "module" is a deprecated function in Lua 5.2: as we want the name
--- for other purposes, and it should eventually be 'free', simply
--- remove the built-in
-if type("module") ~= "string" then
-  module = nil
-end
 
 ---Convert the given `epoch` to a number.
 ---@param epoch string
@@ -85,11 +99,9 @@ end
 ---@field ctanpkg       string Name of the CTAN package matching this module
 ---@field modules       string_list_t The list of all modules in a bundle (when not auto-detecting)
 ---@field exclmodules   string_list_t Directories to be excluded from automatic module detection
----@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
 ---@field tdsroot       string
 ---@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
 ---@field epoch         integer Epoch (Unix date) to set for test runs
----@field tdslocations  string_list_t For non-standard file installations
 ---@field _standalone   boolean True means the module is also the bundle
 ---@field _at_bundle_top    boolean True means we are at the top of the bundle
 
@@ -101,29 +113,28 @@ local Main_dflt = {
   bundle          = "",
   exclmodules     = {},
   tdsroot         = "latex",
-  ctanreadme      = "README.md",
   epoch           = 1463734800,
-  tdslocations    = {},
 }
 
----This will be called at the beginning of the __index function.
----@param t table
----@param k any
----@return any
-local function Main_compute(t, k, v_dflt)
-  if k == "_standalone" then
+local Main_computed = {
+  _standalone = function (t, k, v_dflt)
     return not _G.bundle or _G.bundle == ""
-  elseif k == "_at_bundle_top" then
+  end,
+  _at_bundle_top = function (t, k, v_dflt)
     return t.module == ""
-  elseif k == "bundle" then
+  end,
+  bundle = function (t, k, v_dflt)
     return t._standalone and t.module or _G.bundle
-  elseif k == "ctanpkg" then
+  end,
+  ctanpkg = function (t, k, v_dflt)
     return  t._standalone
         and t.module
         or  t.bundle .."/".. t.module
-  elseif k == "ctanzip" then
+  end,
+  ctanzip = function (t, k, v_dflt)
     return t.ctanpkg .. "-ctan"
-  elseif k == "modules" then -- dynamically create the module list
+  end,
+  modules = function (t, k, v_dflt) -- dynamically create the module list
     local result = {}
     local excl_modules = t.exclmodules or {}
     for entry in all_names(require("l3build-variables").Dir.work) do -- Dir is not yet defined
@@ -134,15 +145,25 @@ local function Main_compute(t, k, v_dflt)
       end
     end
     return result
+  end,
+  epoch = function (t, k, v_dflt)
+    local options = l3build.options
+    return options.epoch or _G["epoch"]
   end
-  local options = l3build.options
-  if k == "epoch" then
-    return options["epoch"] or _G["epoch"]
-  end
-end
+}
 
-Main = chooser(_G, Main_dflt, {
-  compute = Main_compute,
+Main = chooser({
+  global = _G,
+  default = Main_dflt,
+  computed = Main_computed,
+  fallback = function (t, k, v_dflt, v_G)
+    -- "module" is a deprecated function in Lua 5.2: as we want the name
+    -- for other purposes, and it should eventually be 'free', simply
+    -- remove the built-in
+    if k == "module" then
+      return v_dflt
+    end
+  end,
   complete = function (t, k, result)
     if k == "epoch" then
       return normalise_epoch(result)
@@ -175,7 +196,7 @@ Main = chooser(_G, Main_dflt, {
 --[[
 
 ]]
-local LOCAL = {}
+local LOCAL = "local"
 
 local work = "."
 
@@ -185,58 +206,77 @@ local default_Dir = {
 }
 
 ---@type Dir_t
-local Dir = chooser(_G, default_Dir, {
+local Dir = chooser({
+  global = _G,
+  default =  default_Dir,
   suffix = "dir",
-  compute = function (t --[[: Dir_t]], k, v_dflt)
-    local result
-    if k == "current" then -- deprecate, not equal to the current directory.
-      result = work
-    elseif k == "main" then
-      result = work
-    elseif k == "docfile" then
-      result = work
-    elseif k == "sourcefile" then
-      result = work
-    elseif k == "textfile" then
-      result = work
-    elseif k == "support" then
-      result = t.main .. "/support"
-    elseif k == "testfile" then
-      result = work .. "/testfiles"
-    elseif k == "testsupp" then
-      result = t.testfile .. "/support"
-    elseif k == "texmf" then
-      result = t.main .. "/texmf"
+  computed = {
+    current = function (t, k, v_dflt) -- deprecate, not equal to the current directory.
+      return work
+    end,
+    main = function (t, k, v_dflt)
+      return work
+    end,
+    docfile = function (t, k, v_dflt)
+      return work
+    end,
+    sourcefile = function (t, k, v_dflt)
+      return work
+    end,
+    textfile = function (t, k, v_dflt)
+      return work
+    end,
+    support = function (t, k, v_dflt)
+      return t.main .. "/support"
+    end,
+    testfile = function (t, k, v_dflt)
+      return work .. "/testfiles"
+    end,
+    testsupp = function (t, k, v_dflt)
+      return t.testfile .. "/support"
+    end,
+    texmf = function (t, k, v_dflt)
+      return t.main .. "/texmf"
     -- Structure within a development area
-    elseif k == "build" then
-      result = t.main .. "/build"
-    elseif k == "distrib" then
-      result = t.build .. "/distrib"
+    end,
+    build = function (t, k, v_dflt)
+      return t.main .. "/build"
+    end,
+    distrib = function (t, k, v_dflt)
+      return t.build .. "/distrib"
     -- Substructure for CTAN release material
-    elseif k == "ctan" then
-      result = t.distrib .. "/ctan"
-    elseif k == "tds" then
-      result = t.distrib .. "/tds"
-    elseif k == LOCAL then
-      result = t.build .. "/local"
-    elseif k == "result" then
-      result = t.build .. "/result"
-    elseif k == "test" then
-      result = t.build .. t._config .."/test"
-    elseif k == "_config" then
-      result = "" -- for example "-config-plain"
-    elseif k == "typeset" then
-      result = t.build .. "/doc"
-    elseif k == "unpack" then
-      result = t.build .. "/unpacked"
+    end,
+    ctan = function (t, k, v_dflt)
+      return t.distrib .. "/ctan"
+    end,
+    tds = function (t, k, v_dflt)
+      return t.distrib .. "/tds"
+    end,
+    [LOCAL] = function (t, k, v_dflt)
+      return t.build .. "/local"
+    end,
+    result =  function (t, k, v_dflt)
+      return t.build .. "/result"
+    end,
+    test = function (t, k, v_dflt)
+      return t.build .. t._config .."/test"
+    end,
+    _config = function (t, k, v_dflt)
+      return "" -- for example "-config-plain"
+    end,
+    typeset = function (t, k, v_dflt)
+      return t.build .. "/doc"
+    end,
+    unpack = function (t, k, v_dflt)
+      return t.build .. "/unpacked"
     -- Location for installation on CTAN or in TEXMFHOME
-    elseif k == "tds_module" then
-      result = Main.tdsroot
+    end,
+    tds_module = function (t, k, v_dflt)
+      return Main.tdsroot
       .. (Main._standalone and "/" .. Main.bundle .. "/" or "/")
       .. Main.module
-    end
-    return result
-  end,
+    end,
+  },
   -- Directory structure for the build system
   -- Use Unix-style path separators
   complete = function (t, k, result)
@@ -246,10 +286,10 @@ local Dir = chooser(_G, default_Dir, {
       return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
     end
     return result
-  end
+  end,
 })
 
-Dir.work = work
+-- Dir.work = work TODO: what is this ?
 
 set_tree_excluder(function (path)
   return path == Dir.build
@@ -314,9 +354,9 @@ local Files_dflt  = {
   unpacksupp    = {},
 }
 
-local function Files_compute(t, k, v_dflt)
-  local tt = {}
-  if k == "_all_typeset" then
+local Files_computed = {
+  _all_typeset = function (t, k, v_dflt)
+    local tt = {}
     for glob in entries(t.typeset) do
       append(tt, glob)
     end
@@ -324,18 +364,22 @@ local function Files_compute(t, k, v_dflt)
       append(tt, glob)
     end
     return tt
-  elseif k == "_all_pdf" then
+  end,
+  _all_pdf = function (t, k, v_dflt)
+    local tt = {}
     for glob in entries(t._all_typeset) do
       append(tt, first_of(glob:gsub( "%.%w+$", ".pdf")))
     end
     return tt
-  end
-end
+  end,
+}
 
 ---@type Files_t
-local Files = chooser(_G, Files_dflt, {
+local Files = chooser({
+  global = _G,
+  default = Files_dflt,
   suffix = "files",
-  compute = Files_compute,
+  computed = Files_computed,
 })
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
@@ -346,11 +390,15 @@ local Files = chooser(_G, Files_dflt, {
 ---@field unpack  string_list_t -- List of dependencies for unpacking
 
 ---@type Deps_t
-local Deps = chooser(_G, {
-  check = {},
-  typeset = {},
-  unpack = {},
-}, { suffix = "deps" })
+local Deps = chooser({
+  global = _G,
+  default = {
+    check = {},
+    typeset = {},
+    unpack = {},
+  },
+  suffix = "deps",
+})
 
 -- Executable names plus following options
 
@@ -364,15 +412,19 @@ local Deps = chooser(_G, {
 ---@field curl      string Curl executable for \texttt{upload}
 
 ---@type Exe_t
-local Exe = chooser(_G, {
-  typeset   = "pdflatex",
-  unpack    = "pdftex",
-  zip       = "zip",
-  biber     = "biber",
-  bibtex    = "bibtex8",
-  makeindex = "makeindex",
-  curl      = "curl",
-}, { suffix = "exe" })
+local Exe = chooser({
+  global = _G,
+  default = {
+    typeset   = "pdflatex",
+    unpack    = "pdftex",
+    zip       = "zip",
+    biber     = "biber",
+    bibtex    = "bibtex8",
+    makeindex = "makeindex",
+    curl      = "curl",
+  },
+  suffix = "exe",
+})
 
 ---@class Opts_t
 ---@field check     string Options passed to engine when running checks
@@ -385,16 +437,20 @@ local Exe = chooser(_G, {
 ---@field ps2pdf    string ps2pdf options
 
 ---@type Opts_t
-local Opts  = chooser(_G, {
-  check     = "-interaction=nonstopmode",
-  typeset   = "-interaction=nonstopmode",
-  unpack    = "",
-  zip       = "-v -r -X",
-  biber     = "",
-  bibtex    = "-W",
-  makeindex = "",
-  ps2pdf    = "",
-}, { suffix = "opts" })
+local Opts  = chooser({
+  global = _G,
+  default = {
+    check     = "-interaction=nonstopmode",
+    typeset   = "-interaction=nonstopmode",
+    unpack    = "",
+    zip       = "-v -r -X",
+    biber     = "",
+    bibtex    = "-W",
+    makeindex = "",
+    ps2pdf    = "",
+  },
+  suffix = "opts",
+})
 
 -- Extensions for various file types: used to abstract out stuff a bit
 
@@ -411,17 +467,20 @@ local Opts  = chooser(_G, {
 ---@field ps  string  Extension of PostScript files
 
 ---@type Xtn_t
-local Xtn = chooser(_G, {
-  bak = ".bak",
-  dvi = ".dvi",
-  lvt = ".lvt",
-  tlg = ".tlg",
-  tpf = ".tpf",
-  lve = ".lve",
-  log = ".log",
-  pvt = ".pvt",
-  pdf = ".pdf",
-  ps  = ".ps" ,
+local Xtn = chooser({
+  global = _G,
+  default = {
+    bak = ".bak",
+    dvi = ".dvi",
+    lvt = ".lvt",
+    tlg = ".tlg",
+    tpf = ".tpf",
+    lve = ".lve",
+    log = ".log",
+    pvt = ".pvt",
+    pdf = ".pdf",
+    ps  = ".ps" ,
+  }
 })
 
 ---@class l3b_vars_t

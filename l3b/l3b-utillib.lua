@@ -102,7 +102,7 @@ local Vars = {
   debug = {}
 }
 
----@alias error_level_t integer
+---@alias error_level_n integer
 
 ---Turn the string list into quoted items separated by a sep
 ---@param table table
@@ -211,7 +211,7 @@ local function sorted_values(table, exclude)
   end
   sort(kk)
   return function ()
-    repeat
+    repeat -- forever
       i = i + 1
       local k = kk[i]
       if k == nil then
@@ -220,6 +220,33 @@ local function sorted_values(table, exclude)
       local value = table[k]
       if not exclude or not exclude(value) then
         return value
+      end
+    until false
+  end
+end
+
+---Iterates over the values of the table
+---Values are sorted according to the keys
+---Values are filtered.
+---@param table table
+---@param exclude fun(value: any): boolean
+---@return fun()
+local function sorted_pairs(table, exclude)
+  local i, kk = 0, {}
+  for k in keys(table) do
+    append(kk, k)
+  end
+  sort(kk)
+  return function ()
+    repeat -- forever
+      i = i + 1
+      local k = kk[i]
+      if k == nil then
+        return
+      end
+      local value = table[k]
+      if not exclude or not exclude(value) then
+        return k, value
       end
     until false
   end
@@ -286,7 +313,7 @@ end
 ---Before write, the content is converted to host line ending.
 ---@param file_path string
 ---@param content string
----@return error_level_t
+---@return error_level_n
 local function write_content(file_path, content)
   if file_path then
     local fh = assert(open(file_path, "w"))
@@ -300,6 +327,16 @@ local function write_content(file_path, content)
     fh:close()
     return error_level
   end
+end
+
+--https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
+---Make a deep copy of the given object
+---@param original any
+---@return any
+local function shallow_copy(original)
+  local res = {}
+  for k, v in next, original do res[k] = v end
+  return setmetatable(res, getmetatable(original))
 end
 
 --https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
@@ -333,14 +370,16 @@ end
 local flags = {}
 
 ---@alias chooser_t table
----@alias chooser_compute_f   fun(t: table, k: any, v_dflt: any): any
+---@alias chooser_computed_f  fun(t: table, k: any, v_dflt: any): any
 ---@alias chooser_fallback_f  fun(t: table, k: any, v_dflt: any, v_G: any): any
 ---@alias chooser_complete_f  fun(t: table, k: any, result: any): any
 
 ---@class chooser_kv_t
+---@field global    table
+---@field default   table
 ---@field prefix    string|nil prepend this prefix to the key for G, not for dflt
 ---@field suffix    string|nil append this prefix to the key for G, not for dflt
----@field compute   chooser_compute_f
+---@field computed  table<string, chooser_computed_f>
 ---@field fallback  chooser_fallback_f if the global value is not acceptable, this is a possible fallback.
 ---@field complete  chooser_complete_f
 
@@ -352,7 +391,7 @@ If the variable is a table with no metatable,
 this is a node, otherwise it is a leaf. This applies recursively to the fields.
 Then for
 ```
-local c = chooser(G, dflt)
+local c = chooser({ global = G, default = dflt })
 ```
 `c.foo.bar` is
 - nil if no `dflt.foo.bar` exists
@@ -362,7 +401,7 @@ local c = chooser(G, dflt)
 - `G.foo.bar` if `dflt.foo.bar` is a non void sequence
 - `G.foo.bar` if `dflt.foo.bar` is empty
 - `G.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have the same non nil metatable
-- chooser(G.foo.bar, dflt.foo.bar) otherwise
+- chooser({ global = G.foo.bar, default = dflt.foo.bar }) otherwise
 
 Things get a bit more complicated by computed properties.
 Help is provided by `kv` fields `compute` and `fallback`.
@@ -377,24 +416,28 @@ then the `fallback` field is asked for an alernate value.
 --]=]
 
 ---See above
----@param G     table
----@param dflt  table
----@param kv    chooser_kv_t
+---@param kv chooser_kv_t
 ---@return chooser_t
 local chooser
 
+---See above
+---@param any any indexable
+---@return boolean
+local is_chooser
+
 do
-  local KEY_G, KEY_dflt, KEY_kv = {}, {}, {} -- unique key
+  local KEY_kv = {} -- unique key
+
   -- shared indexer
   local chooser_MT = {
     __index = function (t --[[:table]], k --[[:any]])
-      local dflt = rawget(t, KEY_dflt)
-      ---@type chooser_kv_t
       local kv = rawget(t, KEY_kv)
+      local dflt = kv.default
+      ---@type chooser_kv_t
       local dflt_k = dflt[k]  -- default candidate
       local function postflight(result)
         ---@type chooser_complete_f
-        local complete = kv and kv.complete
+        local complete = kv.complete
         if complete then
           result = complete(t, k, result)
         end
@@ -404,28 +447,29 @@ do
         end
         return result
       end
-      ---@type chooser_compute_f
-      local compute = kv.compute
-      if compute then
-        local comp_k = compute(t, k, dflt_k) -- a computed property is available
+      ---@type chooser_computed_f
+      local computed = kv.computed
+      if computed then
+        local comp_k = computed[k]
         if comp_k ~= nil then
-          dflt_k = comp_k
+          comp_k = comp_k(t, k, dflt_k) -- a computed property is available
+          if comp_k ~= nil then
+            dflt_k = comp_k
+          end
         end
       end
       if dflt_k == nil then   -- unknown key, neither default nor computed
         return                -- stop here
       end
       local result
-      local G = rawget(t, KEY_G)
+      local G = kv.global
       local kk = k
       if type(k) == "string" then
         if Vars.debug.chooser then
           print("DEBUG chooser", k)
         end
-        if kv then -- modify the global key
-          if kv.prefix then kk = kv.prefix .. k end
-          if kv.suffix then kk = k .. kv.suffix end
-        end
+        if kv.prefix then kk = kv.prefix .. k end
+        if kv.suffix then kk = k .. kv.suffix end
       end
       local G_kk = G[kk]                -- global candidate
       if G_kk == nil then
@@ -448,7 +492,10 @@ do
           if #dflt_k > 0 then
             result = G_kk -- accept sequences as is
           elseif not next(dflt_k) then
-            result = G_kk -- accept void tables
+            result = G_kk -- accept non void tables as is
+          elseif dflt_k[KEY_kv] ~= nil then -- this is a chooser
+            dflt_k[KEY_kv].global = G_kk -- now this chooser has a global
+            return dflt_k
           else
             local MT = getmetatable(dflt_k)
             if MT then
@@ -457,7 +504,10 @@ do
               end
               result = G_kk -- accept tables with the same metatable. Unused yet.
             else
-              result = chooser(G_kk, dflt_k) -- return a proxy
+              result = chooser({ -- return a proxy
+                global = G_kk,
+                default = dflt_k
+              })
             end
           end
         else
@@ -467,12 +517,9 @@ do
       return postflight(result)
     end
   }
-  chooser = function (G, dflt, kv)
-    assert(G and dflt) -- avoid a stack overflow
+  chooser = function (kv)
     local result = setmetatable({
-      [KEY_G]     = G,
-      [KEY_dflt]  = dflt,
-      [KEY_kv]    = kv or {}, -- ~= nil, unless stack overflow
+      [KEY_kv] = shallow_copy(kv)
     }, chooser_MT)
     return result
   end
@@ -489,15 +536,17 @@ end
 ---@field keys              fun(table: table): fun(): any
 ---@field values            fun(table: table): fun(): any
 ---@field sorted_values     fun(table: table, exclude: fun(value: any): boolean): fun(): any
+---@field sorted_pairs      fun(table: table, exclude: fun(value: any): boolean): fun(): any, any
 ---@field first_of          fun(...): any
 ---@field second_of         fun(...): any
 ---@field trim              fun(in: string): string
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
----@field write_content     fun(file_pat: string, content: string): error_level_t
+---@field write_content     fun(file_pat: string, content: string): error_level_n
 ---@field flags             ut_flags_t
 ---@field readonly          fun(t: table, quiet: boolean): table
 ---@field is_readonly       fun(t: table): boolean
+---@field shallow_copy      fun(original: any): any
 ---@field deep_copy         fun(original: any): any
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
 
@@ -512,6 +561,7 @@ return {
   keys              = keys,
   values            = values,
   sorted_values     = sorted_values,
+  sorted_pairs      = sorted_pairs,
   first_of          = first_of,
   second_of         = second_of,
   trim              = trim,
@@ -521,6 +571,7 @@ return {
   readonly          = readonly,
   is_readonly       = is_readonly,
   write_content     = write_content,
+  shallow_copy      = shallow_copy,
   deep_copy         = deep_copy,
   chooser           = chooser,
 }
