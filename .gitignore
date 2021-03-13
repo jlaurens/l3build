@@ -1,4 +1,5 @@
-build/*
+build
+examples/**/build
 
 *.zip
 
@@ -18,3 +19,4 @@ build/*
 *.log
 *.out
 *.toc
+

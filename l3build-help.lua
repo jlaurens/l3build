@@ -22,16 +22,28 @@ for those people who are interested.
 
 --]]
 
+local concat = table.concat
 local append = table.insert
-local match  = string.match
-local rep    = string.rep
-local sort   = table.sort
 
 ---@type utlib_t
-local utlib       = require("l3b-utillib")
-local entries     = utlib.entries
-local keys        = utlib.keys
-local extend_with = utlib.extend_with
+local utlib           = require("l3b-utillib")
+local sorted_entries  = utlib.sorted_entries
+local read_content    = utlib.read_content
+
+---@type fslib_t
+local fslib = require("l3b-fslib")
+local absolute_path = fslib.absolute_path
+
+---@type l3build_t
+local l3build = require("l3build")
+
+---@type l3b_vars_t
+local l3b_vars = require("l3build-variables")
+---@type Main_t
+local Main  = l3b_vars.Main
+---@type Dir_t
+local Dir   = l3b_vars.Dir
+local guess_bundle_module = l3b_vars.guess_bundle_module
 
 local function version()
   print(
@@ -44,7 +56,7 @@ end
 
 local function help()
   local scriptname = "l3build"
-  if not (arg[0]:match("l3build%.lua$") or match(arg[0],"l3build$")) then
+  if not (arg[0]:match("l3build%.lua$") or arg[0]:match("l3build$")) then
     scriptname = arg[0]
   end
   print("usage: " .. scriptname .. " <target> [<options>] [<names>]")
@@ -58,7 +70,7 @@ local function help()
     end
   end
   for info in get_all_info() do
-    local filler = rep(" ", width - #info.name + 1)
+    local filler = (" "):rep(width - #info.name + 1)
     print("   " .. info.name .. filler .. info.description)
   end
   print("")
@@ -71,7 +83,7 @@ local function help()
     end
   end
   for info in get_all_info() do
-    local filler = rep(" ", width - #info.long + 1)
+    local filler = (" "):rep(width - #info.long + 1)
     if info.short then
       print("   --" .. info.long .. "|-" .. info.short .. filler .. info.description)
     else
@@ -79,6 +91,39 @@ local function help()
     end
   end
   print("")
+  local work_dir = l3build.work_dir
+  local main_dir = l3build.main_dir
+  if work_dir then
+    print("Local bundle information:")
+    local bundle, module = guess_bundle_module()
+    if main_dir == work_dir then
+      local modules = Main.modules
+      if #modules > 0 then
+        -- this is a top bundle
+        print("  bundle: ".. bundle or "")
+        print("  path:   ".. absolute_path(Dir.work))
+        local mm = {}
+        for m in sorted_entries(modules) do
+          append(mm, ("%s (./%s)"):format(m:lower(), m))
+        end
+        if #modules > 1 then
+          print("  modules: ".. concat(mm, ", "))
+        else
+          print("  module: ".. mm[1])
+        end
+      else
+        -- this is a standalone module (not in a bundle).
+        print("  module: ".. module or "")
+        print("  path:   ".. absolute_path(Dir.work))
+      end
+    else
+      -- a module inside a bundle
+      print("  bundle: ".. bundle or "")
+      print("  module: ".. module or "")
+      print("  path:   ".. absolute_path(Dir.work))
+    end
+    print("")
+  end
   print("Full manual available via 'texdoc l3build'.")
   print("")
   print("Repository  : https://github.com/latex3/l3build")

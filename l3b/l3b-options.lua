@@ -306,7 +306,7 @@ end
 ---When this function returns `nil` it means no recognition.
 ---When it returns 0, all is ok otherwise an error occurred.
 ---@param arg table
----@param on_unknown fun(key: string): boolean true when catched, false otherwise
+---@param on_unknown fun(key: string): boolean|fun(any: any, options: options_t) true when catched, false otherwise
 ---@return table
 local function parse(arg, on_unknown)
   local result = {
@@ -319,13 +319,13 @@ local function parse(arg, on_unknown)
   if a then
     -- No options are allowed in position 1, so filter those out
     if a == "--version" then
-      result["target"] = "version"
+      result.target = "version"
     elseif not a:match("^%-") then
-      result["target"] = a
+      result.target = a
     end
   end
   -- Stop here if help or version is required
-  if result["target"] == "help" or result["target"] == "version" then
+  if result.target == "help" or result.target == "version" then
     return result
   end
   -- Examine all other arguments
@@ -369,7 +369,23 @@ local function parse(arg, on_unknown)
     if not info then
       if on_unknown then
         local catched = on_unknown(k)
-        if catched then
+        if type(catched) == "function" then
+          -- this is a callback to require an associate value
+          if #v == 0 then
+            i = i + 1
+            v = arg[i]
+            if v == nil then
+              error("Missing option value for ".. arg_i);
+            end
+          end
+          if flags.debug then
+            print("DEBUG options parse: catched unknown with value")
+          end
+          catched(v, result)
+        elseif catched then
+          if #v > 1 then
+            error("Unexpected option value in ".. arg_i .."/".. v);
+          end
           if flags.debug then
             print("DEBUG options parse: catched unknown")
           end
@@ -395,7 +411,7 @@ local function parse(arg, on_unknown)
     end
   end
   if i <= #arg then
-   result["names"] = { table.unpack(arg, i) }
+   result.names = { table.unpack(arg, i) }
   end
   return result
 end

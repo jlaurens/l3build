@@ -24,6 +24,11 @@ for those people who are interested.
 
 --]]
 
+local assert  = assert
+local print   = print
+
+assert(not _G.l3build, "No self call")
+
 print("DEVELOPMENT: REFACTOR BRANCH")
 
 -- Version information
@@ -31,25 +36,37 @@ release_date = "2020-06-04"
 
 -- Local access to functions
 
-local assert    = assert
 local ipairs    = ipairs
 local gmatch    = string.gmatch
-local print     = print
 local exit      = os.exit
-local os_rename = os.rename
+local open      = io.open
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
 
--- # Start of the booting process
+local lfs = require("lfs")
+local currentdir = lfs.currentdir
+local attributes = lfs.attributes
 
-assert(not _G.l3build, "No self call")
+-- # Start of the booting process
 
 -- Whether in a tex document or in a package folder:
 local in_document = require("status").cs_count > 0 -- tex.print ~= nil is undocumented
+---@type string|nil
+local bundle
+---@type string|nil
+local module
+--[=[
+Bundle and modules are directories containing a `build.lua` file.
+A module does not contain any bundle or directory as direct descendant.
+A bundle does not contain other bundles as direct descendants.
+--]=]
 
 local is_main     -- Whether the script is called first
+---@alias dir_path_s string -- path ending with a '/'
+---@type dir_path_s
 local work_dir    -- the directory containing the closest "build.lua" and friends
+---@type dir_path_s
 local main_dir    -- the directory containing the topmost "build.lua" and friends
 
 ---@alias flag_table_t table<string, boolean>
@@ -69,10 +86,12 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
 ---@field is_main     boolean       True means "l3build" is the main controller.
 ---@field in_document boolean       True means no "build.lua"
----@field work_dir    string|nil    where the closest "build.lua" lives, nil means not in_document
----@field main_dir    string|nil    where the topmost "build.lua" lives, nil means not in_document
----@field launch_dir  string        where "l3build.lua" and friends live
----@field start_dir   string        the current directory at load time
+---@field bundle      string        The bundle name guessed from the `build.lua` above.
+---@field module      string        The module name guessed from the work directory.
+---@field work_dir    dir_path_s|nil  where the closest "build.lua" lives, nil means not in_document
+---@field main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
+---@field launch_dir  dir_path_s      where "l3build.lua" and friends live
+---@field start_dir   dir_path_s      the current directory at load time
 ---@field options     options_t
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
@@ -91,10 +110,7 @@ do
 
   -- Setup dirs where require will look for modules.
 
-  -- File operations are aided by the LuaFileSystem module
-  local lfs = require("lfs")
-
-  local start_dir = lfs.currentdir() .. "/" -- this is the current dir at launch time
+  local start_dir = currentdir() .. "/" -- this is the current dir at launch time
 
   -- is_main: whether required by someone else, or not
   local cmd_path = arg[0]
@@ -115,11 +131,11 @@ do
   ---Intermediate directories must exist.
   ---@param dir   string must end with '/'
   ---@param base  string relative file or directory name
-  ---@return string|nil dir ends with '/' when non nil
+  ---@return string? dir ends with '/' when non nil
   local function container(dir, base)
-    for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do -- tricky loop
+    for _ in gmatch(dir .. currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
-      if lfs.attributes(p, "mode") then -- true iff file or dir at the given path
+      if attributes(p, "mode") then -- true iff file or dir at the given path
         return dir
       end
       -- synonym of previous line:
@@ -158,7 +174,7 @@ do
   elseif cmd_base == "build.lua" then
     work_dir = cmd_dir
   else
-    work_dir = container(cmd_dir, "build.lua") or container(start_dir, "build.lua")
+    work_dir = container(start_dir, "build.lua") or container(start_dir, "build.lua")
     if not work_dir then
       on_debug(function ()
         print(arg[0])
@@ -167,10 +183,10 @@ do
         print("  kpse:   ".. kpse_dir)
         print("  launch: ".. launch_dir)
         local dir, base = start_dir, "build.lua"
-        for _ in gmatch(dir .. lfs.currentdir(), "[^/]+") do
+        for _ in gmatch(dir .. currentdir(), "[^/]+") do
           local p = dir .. base
           print(p)
-          if os_rename(p, p) then -- true iff file or dir at the given path
+          if attributes(p, "mode") then -- true iff file or dir at the given path
             return dir
           end
           dir = dir .. "../"
@@ -178,14 +194,11 @@ do
       end)
     end
   end
-  if work_dir then -- package mode
-    main_dir = work_dir
-    repeat
-      local top = container(main_dir .."../", "build.lua")
-      if top then
-        main_dir = top
-      end
-    until not top
+  if work_dir then -- package mode: bundle or module?
+    main_dir = work_dir .."../"
+    if not attributes(main_dir .."build.lua", "mode") then
+      main_dir = work_dir -- answer: module
+    end
   end
 
   ---Register the given pakage in `package.loaded`.
@@ -213,7 +226,7 @@ do
   l3build.main_dir    = main_dir  -- may be nil as well
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
-  
+
   local require_orig = require
 
   local debug_require
@@ -292,8 +305,21 @@ local oslib = require("l3b-oslib")
 oslib.Vars.debug.run = true
 --[===[DEBUG flags end]===]
 
+---@type utlib_t
+local utlib = require("l3b-utillib")
+
+--[=[ Dealing with options ]=]
+
 ---@type l3b_options_t
 local l3b_options = require("l3b-options")
+
+-- This is where custom options can be declared
+local options_cfg = work_dir .. "options.lua"
+if attributes(options_cfg, "mode") then
+  _G.register_option = l3b_options.register
+  dofile(options_cfg)
+end
+
 l3build.options = l3b_options.parse(arg, function (arg_i)
   -- Private special debugging options "--debug-<key>"
   local key = arg_i:match("^%-%-debug%-(%w[%w%d_-]*)")
@@ -302,6 +328,7 @@ l3build.options = l3b_options.parse(arg, function (arg_i)
     return true
   end
 end)
+
 local options   = l3build.options
 
 local debug = options.debug
@@ -338,9 +365,6 @@ if is_main then
   -- Look for some configuration details
   dofile(work_dir .. "build.lua")
 end
-
----@type utlib_t
-local utlib = require("l3b-utillib")
 
 ---@type l3b_targets_t
 local l3b_targets_t = require("l3b-targets")

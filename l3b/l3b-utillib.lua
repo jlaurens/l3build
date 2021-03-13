@@ -26,27 +26,27 @@ for those people who are interested.
 ---@alias string_list_t table<integer, string>
 -- local safety guards and shortcuts
 
+local type    = type
+local print   = print
 local rawget  = rawget
 local assert  = assert
--- local pairs   = pairs do not cache because it will be overriden
+local pairs   = pairs
 local next    = next
 local open    = io.open
 local os_type = os["type"]
-local sort    = table.sort
-local append  = table.insert
-local concat  = table.concat
 
-local lua = require("lua") -- texlua special
+local sort        = table.sort
+local append      = table.insert
+local concat      = table.concat
+local tbl_unpack  = table.unpack
 
 --[=[ Package implementation ]=]
 
 --[==[ Readonly business
 A readonly table is not immutable because we can always use `rawset`.
 The purpose is to prevent spurious higher changes like `foo.bar = baz`.
-With a level of indirections, we loose the `pairs` benefit.
-If Lua 5.4 there is a `__pair` message but in 5.3,
-we override the pairs function. This is why this code chunck must
-reside at the start of this package.
+With a level of indirections, we loose the `pairs` benefit
+unless we define a `__pairs` event handler.
 ]==]
 
 local KEY_READONLY_ORIGINAL = {} -- unique key to point to the orginal table
@@ -70,7 +70,7 @@ local function readonly(t, quiet)
     __newindex = quiet and nil or function (tt, k, v)
       error("Readonly table ".. tostring(k) .."=".. tostring(v))
     end,
-    __pairs = function (tt) -- lua 5.4
+    __pairs = function (tt)
       local original = rawget(tt, KEY_READONLY_ORIGINAL)
       return pairs(original)
     end
@@ -85,13 +85,6 @@ local function is_readonly(t)
   return rawget(t, KEY_READONLY_ORIGINAL) ~= nil
 end
 
-if lua.version and lua.version:match("5.3") then
-  local pairs_old = pairs
-  _G.pairs = function (t)
-    local original = rawget(t, KEY_READONLY_ORIGINAL)
-    return pairs_old(original ~= nil and original or t)
-  end
-end
 --[==[ End of the readonly business ]==]
 
 ---@class utlib_vars_t
@@ -149,14 +142,6 @@ local function entries(table)
   end
 end
 
----Iterator for the items given in arguments
----@vararg any
----@return fun()
----@usage `for item in items(a, b, c) do ... end`
-local function items(...)
-  return entries({ ... })
-end
-
 ---Iterator for the entries of a sequencial table.
 ---Every entry is ignored when already listed.
 ---@param table table
@@ -178,10 +163,34 @@ local function unique_entries(table)
   end
 end
 
+---Iterator for the entries of a sequencial table.
+---Every entry is ignored when already listed.
+---@param table table
+---@return fun()
+local function sorted_entries(table)
+  local sorted = { tbl_unpack(table) }
+  sort(sorted)
+  return entries(sorted)
+end
+
+---Iterator for the items given in arguments
+---@vararg any
+---@return fun()
+---@usage `for item in items(a, b, c) do ... end`
+local function items(...)
+  return entries({ ... })
+end
+
 ---Iterator for the items given in arguments
 ---Every item is ignored when already listed.
 local function unique_items(...)
   return unique_entries({ ... })
+end
+
+---Iterator for the items given in arguments
+---Every item is ignored when already listed.
+local function sorted_items(...)
+  return sorted_entries({ ... })
 end
 
 ---@type fun(table: table): fun(): any
@@ -530,9 +539,11 @@ end
 ---@field to_quoted_string  fun(table: table, separator: string|nil): string
 ---@field indices           fun(table: table): fun(): integer
 ---@field entries           fun(table: table): fun(): any
----@field items             fun(...): fun(): any
 ---@field unique_entries    fun(table: table): fun(): any
+---@field sorted_entries    fun(table: table): fun(): any
+---@field items             fun(...): fun(): any
 ---@field unique_items      fun(...): fun(): integer
+---@field sorted_items      fun(...): fun(): integer
 ---@field keys              fun(table: table): fun(): any
 ---@field values            fun(table: table): fun(): any
 ---@field sorted_values     fun(table: table, exclude: fun(value: any): boolean): fun(): any
@@ -555,9 +566,11 @@ return {
   to_quoted_string  = to_quoted_string,
   indices           = indices,
   entries           = entries,
-  items             = items,
   unique_entries    = unique_entries,
+  sorted_entries    = sorted_entries,
+  items             = items,
   unique_items      = unique_items,
+  sorted_items      = sorted_items,
   keys              = keys,
   values            = values,
   sorted_values     = sorted_values,
