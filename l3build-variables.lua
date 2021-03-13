@@ -47,10 +47,11 @@ local append  = table.insert
 local os_time = os["time"]
 
 ---@type utlib_t
-local utlib     = require("l3b-utillib")
-local chooser   = utlib.chooser
-local entries   = utlib.entries
-local first_of  = utlib.first_of
+local utlib         = require("l3b-utillib")
+local chooser       = utlib.chooser
+local entries       = utlib.entries
+local first_of      = utlib.first_of
+local read_content  = utlib.read_content
 
 ---@type oslib_t
 local oslib       = require("l3b-oslib")
@@ -109,8 +110,8 @@ end
 local Main
 
 local Main_dflt = {
-  module          = "",
-  bundle          = "",
+  module          = l3build.module or "",
+  bundle          = l3build.bundle or "",
   exclmodules     = {},
   tdsroot         = "latex",
   epoch           = 1463734800,
@@ -193,16 +194,19 @@ Main = chooser({
 ---@field ctan        string Directory for organising files for CTAN
 ---@field tds         string Directory for organised files into TDS structure
 ---@field tds_module  string
---[[
 
-]]
 local LOCAL = "local"
 
-local work = "."
+local dot_dir = "."
 
 ---@type Dir_t
 local default_Dir = {
-  work = ".",
+  work        = dot_dir,
+  current     = dot_dir,
+  main        = dot_dir,
+  docfile     = dot_dir,
+  sourcefile  = dot_dir,
+  textfile    = dot_dir,
 }
 
 ---@type Dir_t
@@ -211,26 +215,11 @@ local Dir = chooser({
   default =  default_Dir,
   suffix = "dir",
   computed = {
-    current = function (t, k, v_dflt) -- deprecate, not equal to the current directory.
-      return work
-    end,
-    main = function (t, k, v_dflt)
-      return work
-    end,
-    docfile = function (t, k, v_dflt)
-      return work
-    end,
-    sourcefile = function (t, k, v_dflt)
-      return work
-    end,
-    textfile = function (t, k, v_dflt)
-      return work
-    end,
     support = function (t, k, v_dflt)
       return t.main .. "/support"
     end,
     testfile = function (t, k, v_dflt)
-      return work .. "/testfiles"
+      return dot_dir .. "/testfiles"
     end,
     testsupp = function (t, k, v_dflt)
       return t.testfile .. "/support"
@@ -290,6 +279,52 @@ local Dir = chooser({
 })
 
 -- Dir.work = work TODO: what is this ?
+
+---Poor man bundle/module getter.
+---@return string
+---@return string
+local function guess_bundle_module()
+  local bundle, module
+  local work = l3build.work_dir
+  local main = l3build.main_dir
+  if main == work then
+    local modules = Main.modules
+    if #modules > 0 then
+      -- this is a top bundle
+      bundle = Main.bundle
+      if not bundle or bundle == "" then
+        local s = read_content(work .."build.lua")
+        bundle = s:match("%f[%w]bundle%s*=%s*'([^']+)'")
+              or s:match('%f[%w]bundle%s*=%s*"([^"]+)"')
+              or s:match('%f[%w]bundle%s*=%s*%[%[([^]]+)%]%]')
+              or "Unknown bundle"
+      end
+    else
+      -- this is a standalone module (not in a bundle).
+      module = Main.module
+      if not module or module== "" then
+        local s = read_content(work .."build.lua")
+        module = s:match("%f[%w]module%s*=%s*'([^']+)'")
+              or s:match('%f[%w]module%s*=%s*"([^"]+)"')
+              or s:match('%f[%w]module%s*=%s*%[%[([^]]+)%]%]')
+              or "Unknown module"
+      end
+    end
+  else
+    -- a module inside a bundle
+    if not bundle or bundle == "" then
+      local s = read_content(work .."build.lua")
+      bundle = s:match("%f[%w]bundle%s*=%s*'([^']+)'")
+            or s:match('%f[%w]bundle%s*=%s*"([^"]+)"')
+            or s:match('%f[%w]bundle%s*=%s*%[%[([^]]+)%]%]')
+            or "Unknown bundle"
+    end
+    if not module or module == "" then
+      module = work:match("([^/]+)/$")
+    end
+  end
+  return bundle, module
+end
 
 set_tree_excluder(function (path)
   return path == Dir.build
@@ -393,9 +428,9 @@ local Files = chooser({
 local Deps = chooser({
   global = _G,
   default = {
-    check = {},
+    check   = {},
     typeset = {},
-    unpack = {},
+    unpack  = {},
   },
   suffix = "deps",
 })
@@ -494,12 +529,13 @@ local Xtn = chooser({
 ---@field Xtn   Xtn_t
 
 return {
-  LOCAL     = LOCAL,
-  Main      = Main,
-  Dir       = Dir,
-  Files     = Files,
-  Deps      = Deps,
-  Exe       = Exe,
-  Opts      = Opts,
-  Xtn       = Xtn,
+  LOCAL = LOCAL,
+  Main  = Main,
+  Dir   = Dir,
+  Files = Files,
+  Deps  = Deps,
+  Exe   = Exe,
+  Opts  = Opts,
+  Xtn   = Xtn,
+  guess_bundle_module = guess_bundle_module,
 }

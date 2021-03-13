@@ -28,12 +28,14 @@ for those people who are interested.
 This modules populates the global space with variables.
 They all are described in `l3build.dtx`.
 
+No global variable declaration is expected out of this package,
+the various `build.lua` and configuration scripts.
+
 It is the responsability of `l3build.dtx` contributors to ensure
 that all global variables referenced there are defined in that file.
 
-This file is `dofile`d just before `options.lua` and `build.lua`
-are `dofile`d such that both inherit all the global variables
-defined here.
+This file is `require`d just before performing the actions,
+after the various build and configuration files are executed.
 --]=]
 
 local tostring  = tostring
@@ -51,8 +53,11 @@ _G.options = l3build.options
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
 local items         = utlib.items
+local entries       = utlib.entries
 local keys          = utlib.keys
 local sorted_pairs  = utlib.sorted_pairs
+local entries       = utlib.entries
+local sorted_entries = utlib.sorted_entries
 
 ---@type wklib_t
 local wklib = require("l3b-walklib")
@@ -93,7 +98,7 @@ _G.normalize_path = fslib.to_host
 --components of l3build
 if l3build.in_document then
   for k in items(
-    "call", "install_files", "bibtex", "biber", "makeindex", "tex", "runcmd"
+    "call", "install_files", "typeset", "bibtex", "biber", "makeindex", "tex", "runcmd"
   ) do
     if not _G[k] then
       -- only provide a global when not available
@@ -120,6 +125,44 @@ _G.install_files = l3b_inst.install_files
 
 ---@type l3b_tpst_t
 local l3b_tpst = require("l3build-typesetting")
+_G.runcmd     = l3b_tpst.runcmd
+
+if l3build.options.debug then
+  print("Hooks and functions")
+  local expected = {
+    "typeset", "bibtex", "biber", "makeindex", "tex",
+    "checkinit_hook",
+    "runtest_tasks",
+    "update_tag",
+    "tag_hook",
+    "typeset_demo_tasks",
+    "docinit_hook",
+    "manifest_setup",
+    "manifest_sort_within_match",
+    "manifest_sort_within_group",
+    "manifest_extract_filedesc",
+    "manifest_write_opening",
+    "manifest_write_subheading",
+    "manifest_write_group_heading",
+    "manifest_write_group_file",
+    "manifest_write_group_file_descr",
+  }
+  local width = 0
+  for name in entries(expected) do
+    if #name > width then
+      width = #name
+    end
+  end
+  for name in sorted_entries(expected) do
+    local filler = (" "):rep(width - #name)
+    local is_custom = type(_G[name]) == "function"
+    print("  ".. name .. filler ..": ".. (is_custom and "builtin" or "custom"))
+  end
+end
+--[[
+]]
+-- Global functions
+
 ---@type l3b_tpst_engine_t
 local engine = l3b_tpst.engine
 
@@ -127,8 +170,8 @@ _G.biber      = engine.biber
 _G.bibtex     = engine.bibtex
 _G.makeindex  = engine.makeindex
 _G.tex        = engine.tex
+_G.typeset    = engine.typeset
 
-_G.runcmd     = l3b_tpst.runcmd
 
 -- Global variables
 
