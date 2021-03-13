@@ -180,7 +180,7 @@ local function ctan()
     end
   end
   -- Rename README if necessary
-  local readme = Vars.ctanreadme
+  local readme = l3b_inst_vars.ctanreadme
   if readme ~= "" and not lower(readme):match("^readme%.%w+") then
     local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
