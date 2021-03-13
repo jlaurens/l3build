@@ -100,7 +100,7 @@ local function help()
       local modules = Main.modules
       if #modules > 0 then
         -- this is a top bundle
-        print("  bundle: ".. bundle or "")
+        print("  bundle: ".. (bundle or ""))
         print("  path:   ".. absolute_path(Dir.work))
         local mm = {}
         for m in sorted_entries(modules) do
@@ -113,13 +113,13 @@ local function help()
         end
       else
         -- this is a standalone module (not in a bundle).
-        print("  module: ".. module or "")
+        print("  module: ".. (module or ""))
         print("  path:   ".. absolute_path(Dir.work))
       end
     else
       -- a module inside a bundle
-      print("  bundle: ".. bundle or "")
-      print("  module: ".. module or "")
+      print("  bundle: ".. (bundle or ""))
+      print("  module: ".. (module or ""))
       print("  path:   ".. absolute_path(Dir.work))
     end
     print("")
