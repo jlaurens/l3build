@@ -60,7 +60,7 @@ local Files = l3b_vars.Files
 ---@type l3b_mfst_setup_t
 local stp = require("l3build-manifest-setup")
 
-local Mnfst = chooser({
+local Hook = chooser({
   global = l3build,
   default = {
     setup                   = stp.setup,
@@ -106,7 +106,7 @@ function MT:build_file(entry, this_file)
     end
     if not entry.skipfiledescription then
       local fh = assert(io.open(entry.dir .. "/" .. this_file, "r"))
-      local this_descr = Mnfst.extract_filedesc(fh, this_file)
+      local this_descr = Hook.extract_filedesc(fh, this_file)
       fh:close()
       if this_descr and this_descr ~= "" then
         entry.descr[this_file] = this_descr
@@ -180,11 +180,11 @@ function MT:build_list(entry)
     for glob_list in entries(entry.files) do
       for this_glob in entries(glob_list) do
         local these_files = file_list(entry.dir, this_glob)
-        these_files = Mnfst.sort_within_match(these_files)
+        these_files = Hook.sort_within_match(these_files)
         for this_file in entries(these_files) do
           entry = self:build_file(entry, this_file)
         end
-        entry.files_ordered = Mnfst.sort_within_group(entry.files_ordered)
+        entry.files_ordered = Hook.sort_within_group(entry.files_ordered)
       end
     end
 	end
@@ -195,10 +195,10 @@ end
 ---@param fh table file handle
 ---@param entry table
 function MT:write_group(fh, entry)
-  local writer = Mnfst.write_group_heading
+  local writer = Hook.write_group_heading
   writer(fh, entry.name, entry.description)
   if entry.ND > 0 then
-    writer = Mnfst.write_group_file_descr
+    writer = Hook.write_group_file_descr
     for ii, file in ipairs(entry.files_ordered) do
       local descr = entry.descr[file] or ""
       ---@type manifest_param_t
@@ -233,7 +233,7 @@ function MT:write_group(fh, entry)
       writer(fh, file, descr, param)
     end
   else
-    writer = Mnfst.write_group_file
+    writer = Hook.write_group_file
     for ii, file in ipairs(entry.files_ordered) do
       local param = {
         dir         = entry.dir         ,
@@ -259,8 +259,8 @@ end
 ---@param manifest_entries table
 function MT:write(manifest_entries)
   local fh = assert(io.open(Vars.manifestfile, "w"))
-  Mnfst.write_opening(fh)
-  local wrt_subheading = Mnfst.write_subheading
+  Hook.write_opening(fh)
+  local wrt_subheading = Hook.write_subheading
   for entry in entries(manifest_entries) do
     if entry.subheading then
       wrt_subheading(fh, entry.subheading, entry.description) -- TODO BAD API: remove that fh!
@@ -284,7 +284,7 @@ function MT:manifest()
     end
   end
 
-  local manifest_entries = Mnfst.setup()
+  local manifest_entries = Hook.setup()
 
   for ii in keys(manifest_entries) do
     manifest_entries[ii] = self:build_list(manifest_entries[ii])
@@ -312,6 +312,7 @@ end
 
 return {
   Vars          = Vars,
+  hook          = Hook,
   manifest_impl = {
     run = manifest
   },

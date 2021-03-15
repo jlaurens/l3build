@@ -24,13 +24,14 @@ for those people who are interested.
 
 -- code dependencies:
 
-local tostring  = tostring
+local time      = os.time
+local difftime  = os.difftime
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
-local readonly      = utlib.readonly
 local items         = utlib.items
 local sorted_values = utlib.sorted_values
+local print_diff_time = utlib.print_diff_time
 
 -- Module implementation
 
@@ -180,6 +181,7 @@ end
 ---@param kvarg   target_process_kvarg_t
 ---@return error_level_n
 local function process(options, kvarg)
+  local start = time()
   local target = options.target
   local info = get_info(target)
   if not info then
@@ -213,6 +215,7 @@ local function process(options, kvarg)
     kvarg.preflight()
     error_level = impl.high_run(options)
     if error_level ~= nil then
+      print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
       return error_level
     end
   end
@@ -235,7 +238,9 @@ local function process(options, kvarg)
       if debug then
         print("DEBUG: custom bundle_run ".. target)
       end
-      return impl.bundle_run(names)
+      error_level = impl.bundle_run(names)
+      print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
+      return error_level
     end
     local module_target = "module_".. target
     module_target = get_info(module_target)
@@ -244,7 +249,9 @@ local function process(options, kvarg)
     if debug then
       print("DEBUG: module run ".. module_target)
     end
-    return kvarg.top_callback(module_target)
+    error_level = kvarg.top_callback(module_target)
+    print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
+    return error_level
   end
   if debug then
     print("DEBUG: run ".. target)
@@ -252,7 +259,9 @@ local function process(options, kvarg)
   if not impl.run then
     error("No run action for target ".. target)
   end
-  return impl.run(names)
+  local error_level = impl.run(names)
+  print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
+  return error_level
 end
 
 ---@class l3b_targets_t
@@ -260,6 +269,7 @@ end
 ---@field get_info      fun(key: string): target_info_t
 ---@field register      fun(info: target_info_t, builtin: boolean)
 ---@field register_info fun(info: target_info_t, builtin: boolean)
+---@field process       target_process_f
 
 return {
   get_all_info  = get_all_info,

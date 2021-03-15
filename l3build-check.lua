@@ -39,6 +39,7 @@ local match           = string.match
 local append          = table.insert
 local sort            = table.sort
 local tbl_unpack      = table.unpack
+local concat          = table.concat
 
 local unicode         = require("unicode")
 local utf8_char       = unicode.utf8.char
@@ -51,6 +52,7 @@ local remove          = os.remove
 local utlib           = require("l3b-utillib")
 local deep_copy       = utlib.deep_copy
 local chooser         = utlib.chooser
+local items           = utlib.items
 local entries         = utlib.entries
 local first_of        = utlib.first_of
 local extend_with     = utlib.extend_with
@@ -1216,22 +1218,19 @@ if not string.find(status.banner," 2019") then
 end
 
 ---Check
----@param names string_list_t
+---@param test_names string_list_t
 ---@return error_level_n
-local function check(names)
+local function check(test_names)
   local error_level = 0
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     local options = l3build.options
     if not options.rerun then
       checkinit()
     end
-    local hide = true
-    if names and not_empty(names) then
-      hide = false
-    end
-    names = names or {}
+    local hide = not (test_names and not_empty(test_names))
+    test_names = test_names or {}
     -- No names passed: find all test files
-    if not not_empty(names) then
+    if not not_empty(test_names) then
       for kind in entries(Vars.test_order) do
         local ext = Vars.test_types[kind].test
         ---@type table<integer, glob_match_f>
@@ -1249,7 +1248,7 @@ local function check(names)
               end
             end
             if not is_excluded then
-              append(names, job_name(name))
+              append(test_names, job_name(name))
             end
           end
           for name in all_names(Dir.unpack, glob .. ext) do
@@ -1264,31 +1263,31 @@ local function check(names)
               if file_exists(Dir.testfile .. "/" .. name) then
                 return 1
               end
-              append(names, job_name(name))
+              append(test_names, job_name(name))
             end
           end
         end
       end
-      sort(names)
+      sort(test_names)
       -- Deal limiting range of names
-      local firstname = options.first
-      if firstname then
-        local allnames = names
-        names = {}
-        for i, name in ipairs(allnames) do
-          if name == firstname then
-            names = { tbl_unpack(allnames, i) }
+      local first_name = options.first
+      if first_name then
+        local all_names = test_names
+        test_names = {}
+        for i, name in ipairs(all_names) do
+          if name == first_name then
+            test_names = { tbl_unpack(all_names, i) }
             break
           end
         end
       end
-      local lastname = options.last
-      if lastname then
-        local allnames = names
-        names = {}
-        for i, name in ipairs(allnames) do
-          if name == lastname then
-            names = { tbl_unpack(allnames, 1, i) }
+      local last_name = options.last
+      if last_name then
+        local all_names = test_names
+        test_names = {}
+        for i, name in ipairs(all_names) do
+          if name == last_name then
+            test_names = { tbl_unpack(all_names, 1, i) }
             break
           end
         end
@@ -1296,27 +1295,26 @@ local function check(names)
     end
     if options.shuffle then
       -- https://stackoverflow.com/a/32167188
-      for i = #names, 2, -1 do
+      for i = #test_names, 2, -1 do
         local j = rnd(1, i)
-        names[i], names[j] = names[j], names[i]
+        test_names[i], test_names[j] = test_names[j], test_names[i]
       end
     end
     -- Actually run the tests
     print("Running checks on")
-    for i, name in ipairs(names) do
-      print("  " .. name .. " (" ..  i .. "/" .. #names ..")")
-      local errlevel = run_check(name, hide)
+    for i, name in ipairs(test_names) do
+      print("  " .. name .. " (" ..  i .. "/" .. #test_names ..")")
+      local err_level = run_check(name, hide)
       -- Return value must be 1 not errlevel
-      if errlevel ~= 0 then
+      if err_level ~= 0 then
         if options["halt-on-error"] then
           return 1
         else
           error_level = 1
-          -- visually show that something has failed
           print("          --> failed\n")
         end
       end
-    end
+    end    
     if error_level ~= 0 then
       check_diff()
     else

@@ -101,8 +101,9 @@ local function status_run()
   local work_dir = l3build.work_dir
   local main_dir = l3build.main_dir
   if not work_dir then
-    print("No status inforation available")
+    print("No status information available")
   end
+
   print("Status information:")
   local bundle, module = guess_bundle_module()
   if not l3build.in_document then
@@ -137,6 +138,8 @@ local function status_run()
   end
   print()
   if l3build.options.debug then
+    print("Command: ".. concat(arg, " ", 0))
+    print()
     ---@type l3b_globals_t
     local l3b_globals = require("l3build-globals")
     l3b_globals.print_status()

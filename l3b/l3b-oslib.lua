@@ -30,13 +30,17 @@ local status          = require("status")
 local luatex_revision = status.luatex_revision
 local luatex_version  = status.luatex_version
 
-local append          = table.insert
-local concat          = table.concat
+local append      = table.insert
+local concat      = table.concat
+
+local time        = os.time
+local difftime    = os.difftime
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
 local items       = utlib.items
 local first_of    = utlib.first_of
+local print_diff_time = utlib.print_diff_time
 
 ---@class oslib_vars_t
 ---@field debug flag_table_t
@@ -124,7 +128,11 @@ local function run(dir, cmd)
   if Vars.debug.run then
     print("DEBUG run: ".. cmd)
   end
-  return execute(cmd)
+  local start_time = time()
+  local succ, msg, code = execute(cmd)
+  local diff = difftime(time(), start_time)
+  print_diff_time("Done in: %s", diff)
+  return succ, msg, code
 end
 
 ---Return a quoted version or properly escaped

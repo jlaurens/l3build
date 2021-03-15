@@ -49,11 +49,12 @@ local flags = {}
 ---@field engine    table
 ---@field epoch     string
 ---@field file      string
----@field first     boolean
+---@field first     string
 ---@field force     boolean
 ---@field full      boolean
 ---@field halt_on_error boolean -- real name "halt-on-error"
 ---@field help      boolean
+---@field last      string
 ---@field message   string
 ---@field names     string_list_t
 ---@field quiet     boolean

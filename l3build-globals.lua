@@ -89,7 +89,8 @@ local function unsetup()
   setmetatable(l3build.G, nil)
 end
 ---Load and runs the build script from the work directory
----The difference with dofile is the environment.
+---The difference with dofile is the running environment
+---where all the declared variables are stored.
 ---@param work_dir string
 local function load_build(work_dir)
   setup()
@@ -128,8 +129,12 @@ local function load_configuration(work_dir, config)
   unsetup()
 end
 
-local functions = {
-  "typeset", "bibtex", "biber", "makeindex", "tex",
+local l3b_functions = {
+  "typeset",
+  "bibtex",
+  "biber",
+  "makeindex",
+  "tex",
   "checkinit_hook",
   "runtest_tasks",
   "update_tag",
@@ -198,29 +203,6 @@ local function export_symbols(G, in_document)
     return
   end
 
-
---[===[
-  "typeset", "bibtex", "biber", "makeindex", "tex", --
-  "checkinit_hook",
-  "runtest_tasks",
-  "update_tag",
-  "tag_hook",
-  "typeset_demo_tasks",
-  "docinit_hook",
-  "manifest_setup",
-  "manifest_sort_within_match",
-  "manifest_sort_within_group",
-  "manifest_extract_filedesc",
-  "manifest_write_opening",
-  "manifest_write_subheading",
-  "manifest_write_group_heading",
-  "manifest_write_group_file",
-  "manifest_write_group_file_descr",
-  "call", --
-  "install_files", --
-  "runcmd", --
---]===]
-
   local function export_f(from, ...)
     for item in items(...) do
       local v = from[item]
@@ -266,9 +248,19 @@ local function export_symbols(G, in_document)
     "update_tag"
   )
 
-  local l3b_mnfst_setup = require("l3build-manifest-setup")
-  local setup = l3b_mnfst_setup.setup
+  ---@type l3b_check_t
+  local l3b_check = require("l3build-check")
+  ---@type l3b_check_vars_t
+  local l3b_check_vars = l3b_check.Vars
+  export_f(l3b_check_vars,
+    "checkinit_hook",
+    "runtest_tasks"
+  )
 
+  ---@type l3b_mfst_t
+  local l3b_mfst = require("l3build-manifest")
+  local l3b_mfst_hook = l3b_mfst.hook
+  
   for item in items(
     "manifest_setup",
     "manifest_sort_within_match",
@@ -281,9 +273,15 @@ local function export_symbols(G, in_document)
     "manifest_write_group_file_descr"
   ) do
     local k = item:match("manifest_(.*)")
-    local v = setup[k]
-    assert(v, "Missing value for key ".. item)
+    local v = l3b_mfst_hook[k]
+    assert(v, "Missing manifest hook for key ".. k)
     G[item] = v
+  end
+
+  if l3build.options.debug then
+    for item in entries(l3b_functions) do
+      assert(type(G[item]) == "function", "Missing function ".. item)
+    end
   end
 
   -- Global variables
@@ -376,10 +374,6 @@ local function export_symbols(G, in_document)
     "unpacksupp"
   )
 
-  ---@type l3b_check_t
-  local l3b_check = require("l3build-check")
-  ---@type l3b_check_vars_t
-  local l3b_check_vars = l3b_check.Vars
   export_v(l3b_check_vars, "",
     "includetests",
     "excludetests"
@@ -582,7 +576,6 @@ local function print_status()
   end
   for k, v in pairs(_G) do
     if type(v) == "function" then
-      print("function", k)
       if expected[k] then
         functions[k] = v
       end
@@ -591,7 +584,7 @@ local function print_status()
       variables_n = variables_n + 1
     end
   end
-  os.exit()
+  
   print("Hooks and functions, (*) for custom ones")
   local width = 0
   for name in keys(expected) do
@@ -740,47 +733,48 @@ local function print_status()
       print("MISSING GLOBAL: ", entry)
     end
   end
+  print("")
   print(("Global variables (%d), (*) for custom ones"):format(variables_n))
 -- Print anything - including nested tables
   local function pretty_print(tt, dflt, indent, done)
+    dflt = dflt or {}
     done = done or {}
     indent = indent or 0
     if type(tt) == "table" then
       local w = 0
       local has_custom = false
       for k in keys(tt) do
-        local dflt_k = dflt[k]
-        if dflt_k then
-          local l = #tostring(k)
-          if l > w then
-            w = l
-          end
-          has_custom = has_custom or tt[k] == dflt[k]
+        local l = #tostring(k)
+        if l > w then
+          w = l
         end
+        has_custom = has_custom or tt[k] == dflt[k]
       end
       for k, v in sorted_pairs(tt) do
-        local dflt_k = dflt[k]
-        if dflt_k then
-          local equals = v == dflt[k] and " =     " or " = (*) "
-          local filler = (" "):rep(w - #tostring(k))
-          write((" "):rep(indent)) -- indent it
-          if type(v) == "table" and not done[v] then
-            done[v] = true
-            if next(v) then
-              write(('["%s"]%s%s{\n'):format(tostring(k), filler, equals))
-              pretty_print(v, dflt[k], indent + w + 7, done)
-              write((" "):rep( indent + w + 5)) -- indent it
-              write("}\n")
-            else
-              write(('["%s"]%s = {}\n'):format(tostring(k), filler, equals))
-            end
-          elseif type(v) == "string" then
-            write(('["%s"]%s%s"%s"\n'):format(
-                tostring(k), filler, equals, tostring(v)))
+        local after_equals
+        if has_custom then
+          after_equals = v == dflt[k] and "    " or "(*) "
+        else
+          after_equals = ""
+        end
+        local filler = (" "):rep(w - #tostring(k))
+        write((" "):rep(indent)) -- indent it
+        if type(v) == "table" and not done[v] then
+          done[v] = true
+          if next(v) then
+            write(('["%s"]%s = %s{\n'):format(tostring(k), filler, after_equals))
+            pretty_print(v, dflt[k], indent + w + 7, done)
+            write((" "):rep( indent + w + 5)) -- indent it
+            write("}\n")
           else
-            write(('["%s"]%s%s%s\n'):format(
-                tostring(k), filler, equals, tostring(v)))
+            write(('["%s"]%s = %s{}\n'):format(tostring(k), filler, after_equals))
           end
+        elseif type(v) == "string" then
+          write(('["%s"]%s = %s"%s"\n'):format(
+              tostring(k), filler, after_equals, tostring(v)))
+        else
+          write(('["%s"]%s = %s%s\n'):format(
+              tostring(k), filler, after_equals, tostring(v)))
         end
       end
     else
@@ -788,7 +782,6 @@ local function print_status()
     end
   end
   pretty_print(variables, l3build.default_G)
-
 end
 
 ---@class l3b_globals_t

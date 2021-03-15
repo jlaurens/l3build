@@ -478,6 +478,8 @@ do
       local G_kk = G[kk]                -- global candidate
       if G_kk == nil then
         result = dflt_k   -- choose the default candidate
+      elseif type(k) == "number" then
+        result = G_kk     -- choose the global candidate for number keys
       else
         local type_dflt_k = type(dflt_k)
         local type_G_kk   = type(G_kk)
@@ -498,7 +500,7 @@ do
           elseif not next(dflt_k) then
             result = G_kk -- accept non void tables as is
           elseif dflt_k[KEY_kv] ~= nil then -- this is a chooser
-            dflt_k[KEY_kv].global = G_kk -- now this chooser has a global
+            dflt_k[KEY_kv].global = { G = G_kk } -- now this chooser has a global
             return dflt_k
           else
             local MT = getmetatable(dflt_k)
@@ -529,6 +531,49 @@ do
   end
 end
 
+---Convert a diff time into a display time
+---@param diff number
+---@return string
+local function to_ymd_hms(diff)
+  local diff_date = {}
+  diff_date.sec = diff % 60
+  diff = diff // 60
+  diff_date.min = diff % 60
+  diff = diff // 60
+  diff_date.hour = diff % 24
+  diff = diff // 24
+  diff_date.day = diff % 30
+  diff = diff // 30
+  diff_date.month = diff % 12
+  diff = diff // 12
+  diff_date.year = diff
+  local display_date = {}
+  for item in items("year", "month", "day") do
+    local n = diff_date[item]
+    if n > 0 then
+      append(display_date, ("%d %s"):format(n, item))
+    end
+  end
+  local display_time = {}
+  for item in items("hour", "min", "sec") do
+    local n = diff_date[item]
+    append(display_time, ("%02d"):format(n))
+  end
+  return concat({
+    concat(display_date, ", "),
+    concat(display_time, ':')
+  }, ' ')
+end
+
+---Print the diff time, if any.
+---@param format string
+---@param diff number
+local function print_diff_time(format, diff)
+  if diff > 0 then
+    print(format, to_ymd_hms(diff))
+  end
+end
+
 ---@class utlib_t
 ---@field Vars              utlib_vars_t
 ---@field to_quoted_string  fun(table: table, separator: string|nil): string
@@ -555,6 +600,8 @@ end
 ---@field shallow_copy      fun(original: any): any
 ---@field deep_copy         fun(original: any): any
 ---@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
+---@field to_ymd_hms        fun(diff: integer): string
+---@field print_diff_time   fun(format: string, diff: integer)
 
 return {
   Vars              = Vars,
@@ -582,4 +629,6 @@ return {
   shallow_copy      = shallow_copy,
   deep_copy         = deep_copy,
   chooser           = chooser,
+  to_ymd_hms        = to_ymd_hms,
+  print_diff_time   = print_diff_time,
 }
