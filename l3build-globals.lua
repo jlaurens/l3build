@@ -51,7 +51,6 @@ local items         = utlib.items
 local keys          = utlib.keys
 local sorted_pairs  = utlib.sorted_pairs
 local entries       = utlib.entries
-local sorted_entries = utlib.sorted_entries
 
 ---@type wklib_t
 local wklib   = require("l3b-walklib")
