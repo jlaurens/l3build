@@ -116,7 +116,7 @@ with a configuration table `uploadconfig`
 ---@field uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
 
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     curl_debug  = false,
   },

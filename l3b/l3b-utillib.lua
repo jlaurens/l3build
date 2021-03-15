@@ -429,11 +429,6 @@ then the `fallback` field is asked for an alernate value.
 ---@return chooser_t
 local chooser
 
----See above
----@param any any indexable
----@return boolean
-local is_chooser
-
 do
   local KEY_kv = {} -- unique key
 
@@ -471,7 +466,7 @@ do
         return                -- stop here
       end
       local result
-      local G = kv.global
+      local G = kv.global.G
       local kk = k
       if type(k) == "string" then
         if Vars.debug.chooser then
@@ -514,7 +509,7 @@ do
               result = G_kk -- accept tables with the same metatable. Unused yet.
             else
               result = chooser({ -- return a proxy
-                global = G_kk,
+                global = { G = G_kk },
                 default = dflt_k
               })
             end

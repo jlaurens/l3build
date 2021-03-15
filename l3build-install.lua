@@ -76,9 +76,9 @@ local Files     = l3b_vars.Files
 local l3b_unpk  = require("l3build-unpack")
 local unpack    = l3b_unpk.unpack
 
----@type l3b_tpst_t
-local l3b_tpst  = require("l3build-typesetting")
-local doc       = l3b_tpst.doc
+---@type l3b_doc_t
+local l3b_doc  = require("l3build-doc")
+local doc       = l3b_doc.doc
 
 ---@class l3b_inst_vars_t
 ---@field flattentds    boolean Switch to flatten any source structure when creating a TDS structure
@@ -93,7 +93,7 @@ local typeset_list
 
 ---@type l3b_inst_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     flattentds    = true,
     ctanreadme    = "README.md",

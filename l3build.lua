@@ -39,7 +39,6 @@ release_date = "2020-06-04"
 local ipairs    = ipairs
 local gmatch    = string.gmatch
 local exit      = os.exit
-local open      = io.open
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
@@ -52,10 +51,7 @@ local attributes = lfs.attributes
 
 -- Whether in a tex document or in a package folder:
 local in_document = require("status").cs_count > 0 -- tex.print ~= nil is undocumented
----@type string|nil
-local bundle
----@type string|nil
-local module
+
 --[=[
 Bundle and modules are directories containing a `build.lua` file.
 A module does not contain any bundle or directory as direct descendant.
@@ -95,6 +91,7 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field options     options_t
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
+---@field G           table           Global environment for build
 
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)
@@ -278,26 +275,22 @@ do
     return result
   end
 
-  on_debug(function ()
-    print("l3build: A testing and building system for LaTeX")
-    print("  start:  ".. start_dir)
-    print("  kpse:   ".. kpse_dir)
-    print("  launch: ".. launch_dir)
-    if not in_document then
-      print("  work:   ".. work_dir)
-      print("  main:   ".. main_dir)
-    end
-    print()
-  end)
-
 end
+
 --[==[ end of booting process ]==]
+
+---@type l3b_globals_t
+local l3b_globals = require("l3build-globals")
+local export_symbols = l3b_globals.export_symbols
+local load_build = l3b_globals.load_build
 
 -- Terminate here if in document mode
 if in_document then
-  require("l3build-globals") -- certainly too large
+  export_symbols(_G, in_document)
   return l3build
 end
+
+l3b_globals.setup()
 
 --[===[DEBUG flags]===]
 ---@type oslib_t
@@ -310,17 +303,14 @@ local utlib = require("l3b-utillib")
 
 --[=[ Dealing with options ]=]
 
----@type l3b_options_t
-local l3b_options = require("l3b-options")
+---@type l3b_cli_t
+local l3b_cli = require("l3build-cli")
 
--- This is where custom options can be declared
-local options_cfg = work_dir .. "options.lua"
-if attributes(options_cfg, "mode") then
-  _G.register_option = l3b_options.register
-  dofile(options_cfg)
-end
+l3b_cli.register_options()
+l3b_cli.register_custom_options(work_dir)
+l3b_cli.register_targets()
 
-l3build.options = l3b_options.parse(arg, function (arg_i)
+l3build.options = l3b_cli.parse(arg, function (arg_i)
   -- Private special debugging options "--debug-<key>"
   local key = arg_i:match("^%-%-debug%-(%w[%w%d_-]*)")
   if key then
@@ -333,10 +323,9 @@ local options   = l3build.options
 
 local debug = options.debug
 
-if debug then
-  print("DEBUG: ".. arg[0] .." ".. table.concat(arg, " "))
-  require("l3b-oslib").Vars.debug.run = true
-  require("l3b-fslib").Vars.debug.copy_core = true
+if debug then -- activate the private special debugging options
+  require("l3b-oslib").Vars.debug.run = l3build.debug.run -- options --debug-run
+  require("l3b-fslib").Vars.debug.copy_core = l3build.debug.copy_core-- options --debug-copy-core
 end
 
 local target = options.target
@@ -346,7 +335,6 @@ local l3b_help  = require("l3build-help")
 local help      = l3b_help.help
 local version   = l3b_help.version
 
--- and that has to come after the functions are defined
 if target == "help" then
   help()
   exit(0)
@@ -363,7 +351,7 @@ local Main      = l3b_vars.Main
 -- Load configuration file if running as a script
 if is_main then
   -- Look for some configuration details
-  dofile(work_dir .. "build.lua")
+  load_build(work_dir)
 end
 
 ---@type l3b_targets_t
@@ -377,7 +365,7 @@ local call    = l3b_aux.call
 exit(process(options, {
   preflight     = function ()
     utlib.flags.cache_chosen = true
-    require("l3build-globals")
+    l3b_globals.export_symbols(_G)
   end,
   at_bundle_top = Main._at_bundle_top,
   top_callback  = function (module_target)

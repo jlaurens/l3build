@@ -1,6 +1,6 @@
 --[[
 
-File l3build-typesetting.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-doc.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -89,18 +89,22 @@ local deps_install  = l3b_aux.deps_install
 local l3b_unpk  = require("l3build-unpack")
 local unpack      = l3b_unpk.unpack
 
----@class l3b_tpst_vars_t
+---@class l3b_doc_special_typesetting_t
+---@field func  typeset_f
+---@field cmd   string
+
+---@class l3b_doc_vars_t
 ---@field typesetsearch boolean Switch to search the system \texttt{texmf} for during typesetting
 ---@field glossarystyle string  MakeIndex style file for glossary/changes creation
 ---@field indexstyle    string  MakeIndex style for index creation
----@field specialtypesetting table  Non-standard typesetting combinations
+---@field specialtypesetting table<string, l3b_doc_special_typesetting_t>  Non-standard typesetting combinations
 ---@field forcedocepoch string  Force epoch when typesetting
 ---@field typesetcmds   string  Instructions to be passed to \TeX{} when doing typesetting
 ---@field typesetruns   integer Number of cycles of typesetting to carry out
 
----@type l3b_tpst_vars_t
+---@type l3b_doc_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     typesetruns         = 3,
     typesetcmds         = "",
@@ -149,7 +153,7 @@ local function runcmd(cmd, dir, vars)
     .. dir .. (Vars.typesetsearch and _G.os_pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and envpaths:match(" ") then
-    envpaths = first_of(envpaths:gsub( '"', '')) -- no '"' in windows!!!
+    envpaths = first_of(envpaths:gsub('"', '')) -- no '"' in windows!!!
   end
   for var in entries(vars) do
     env = cmd_concat(env, _G.os_setenv .. " " .. var .. "=" .. envpaths)
@@ -158,6 +162,8 @@ local function runcmd(cmd, dir, vars)
 end
 
 local Ngn_dflt = {}
+
+---@alias biber_f fun(name: string, dir: string): error_level_n
 
 ---biber
 ---@param name string
@@ -172,12 +178,13 @@ function Ngn_dflt.biber(name, dir)
   return 0
 end
 
+---@alias bibtex_f fun(name: string, dir: string): error_level_n
+
 ---comment
 ---@param name string
----@param dir? string
+---@param dir string
 ---@return error_level_n
 function Ngn_dflt.bibtex(name, dir)
-  dir = dir or "."
   if file_exists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
@@ -201,9 +208,11 @@ function Ngn_dflt.bibtex(name, dir)
   return 0
 end
 
+---@alias makeindex_f fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
+
 ---comment
 ---@param name string
----@param dir? string
+---@param dir string
 ---@param in_ext string
 ---@param out_ext string
 ---@param log_ext string
@@ -229,15 +238,15 @@ end
 ---@field typeset             fun(file: string, dir?: string, cmd?: string): error_level_n
 ---@field typeset_demo_tasks  fun(): error_level_n
 ---@field docinit_hook        fun(): error_level_n
----@field bibtex              fun(file: string, dir?: string, cmd?: string): error_level_n
----@field biber               fun(file: string, dir?: string, cmd?: string): error_level_n
----@field makeindex           fun(name: string, dir?: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
+---@field bibtex              bibtex_f
+---@field biber               biber_f
+---@field makeindex           makeindex_f
 
 -- Ngn.foo is _G.foo if it is a function, MF.foo otherwise.
 -- Only fo known keys
 ---@type Ngn_t
 local Ngn = chooser({
-  global = _G,
+  global = l3build,
   default = Ngn_dflt,
   fallback = function (t, k, v_dflt, v_G)
     if k == "tex" then --- tex is already a table in texlua.
@@ -248,26 +257,28 @@ local Ngn = chooser({
   end,
 })
 
+---@alias tex_f fun(file: string, dir: string, cmd: string|nil): error_level_n
+
 ---TeX
 ---@param file string
----@param dir? string
----@param cmd? string
+---@param dir string
+---@param cmd string|nil
 ---@return error_level_n
 function Ngn_dflt.tex(file, dir, cmd)
-  dir = dir or "."
   cmd = cmd or Exe.typeset .." ".. Opts.typeset
   return runcmd(cmd .. " \"" .. Vars.typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
 
----typeset
+---@alias typeset_f fun(file: string, dir: string, cmd: string|nil): error_level_n
+
+---typeset. Default command is the same as for `tex`.
 ---@param file string
----@param dir? string
----@param cmd string
+---@param dir string
+---@param cmd string|nil
 ---@return error_level_n
 function Ngn_dflt.typeset(file, dir, cmd)
-  dir = dir or "."
   local error_level = Ngn.tex(file, dir, cmd)
   if error_level ~= 0 then
     return error_level
@@ -288,15 +299,16 @@ end
 
 ---Local helper
 ---@param file string
----@param dir? string
+---@param dir string
 ---@return error_level_n
 local function typesetpdf(file, dir)
-  dir = dir or "."
   local name = job_name(file)
   print("Typesetting " .. name)
+  ---@type typeset_f
   local func  = Ngn.typeset
+  ---@type string
   local cmd   = Exe.typeset .. " " .. Opts.typeset
-  local special = _G.specialtypesetting and _G.specialtypesetting[file]
+  local special = Vars.specialtypesetting[file]
   if special then
     func = special.func or func
     cmd  = special.cmd  or cmd
@@ -306,9 +318,9 @@ local function typesetpdf(file, dir)
     print(" ! Compilation failed")
     return error_level
   end
-  local pdf_name = name .. Xtn.pdf
-  remove_name(Dir.docfile, pdf_name)
-  return copy_file(pdf_name, dir, Dir.docfile)
+  local name_pdf = name .. Xtn.pdf
+  remove_name(Dir.docfile, name_pdf)
+  return copy_file(name_pdf, dir, Dir.docfile)
 end
 
 ---Do nothing function
@@ -396,17 +408,17 @@ local function doc(files)
   return 0
 end
 
----@class l3b_tpst_engine_t
+---@class l3b_doc_engine_t
 ---@field bibtex    fun(name: string, dir: string): error_level_n
 ---@field biber     fun(name: string, dir: string): error_level_n
 ---@field tex       fun(name: string, dir: string, cmd: string): error_level_n
 ---@field makeindex fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
 
----@class l3b_tpst_t
----@field Vars      l3b_tpst_vars_t
+---@class l3b_doc_t
+---@field Vars      l3b_doc_vars_t
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
 ---@field doc       fun(files?: string_list_t): error_level_n
----@field engine    l3b_tpst_engine_t
+---@field engine    l3b_doc_engine_t
 
 return {
   Vars    = Vars,

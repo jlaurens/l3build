@@ -45,6 +45,9 @@ local fslib      = require("l3b-fslib")
 local all_names = fslib.all_names
 local file_list = fslib.file_list
 
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type l3b_vars_t
 local l3b_vars  = require("l3build-variables")
 ---@type Main_t
@@ -58,7 +61,7 @@ local Files = l3b_vars.Files
 local stp = require("l3build-manifest-setup")
 
 local Mnfst = chooser({
-  global =_G,
+  global = l3build,
   default = {
     setup                   = stp.setup,
     extract_filedesc        = stp.extract_filedesc,
@@ -78,7 +81,7 @@ local Mnfst = chooser({
 
 ---@type l3b_mfst_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     -- Manifest options
     manifestfile    = "MANIFEST.md",

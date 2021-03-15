@@ -1407,27 +1407,25 @@
 % \emph{not} listed in \var{typesetfiles} or \var{typesetdemofiles}.
 %
 % \begin{figure}[!b]
-%   \begin{lstlisting}[frame=single,language={[5.2]Lua},gobble = 6]
+%   \begin{lstlisting}[frame=single,language={[5.3]Lua},gobble = 6]
 %     #!/usr/bin/env texlua
 %
 %     -- Build script with custom PDF route
 %
 %     module = "mymodule"
 %
-%     function typeset(file)
-%       local name = jobname(file)
-%       local errorlevel = tex (file)
-%       if errorlevel == 0 then
-%         -- Return a non-zero errorlevel if anything goes wrong
-%         errorlevel =(
-%           bibtex(name) +
-%           tex(file)    +
-%           bibtex(name) +
-%           tex(file)    +
-%           tex(file)
-%         )
+%     function typeset(file, dir)
+%       local error_level = tex(file, dir)
+%       if error_level == 0 then
+%         local name = jobname(file)
+%         -- Return a non-zero error level if any step goes wrong
+%         error_level = bibtex(name, dir)
+%                     +    tex(file, dir)
+%                     + bibtex(name, dir)
+%                     +    tex(file, dir)
+%                     +    tex(file, dir)
 %       end
-%       return errorlevel
+%       return error_level
 %     end
 %   \end{lstlisting}
 %   \caption{A customised PDF creation script.}
@@ -1884,7 +1882,7 @@
 %
 % \begin{function}{tex()}
 %   \begin{syntax}
-%     |tex(|\meta{file},\meta{dir},\meta{cmd}|)|
+%     |tex(|\meta{file},\meta{dir},\meta{cmd?}|)|
 %   \end{syntax}
 %   Runs \meta{cmd} (by default \luavar{typesetexe} \luavar{typesetopts}) on the
 %   \meta{name} inside the \meta{dir}.

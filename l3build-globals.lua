@@ -38,98 +38,530 @@ This file is `require`d just before performing the actions,
 after the various build and configuration files are executed.
 --]=]
 
-local tostring  = tostring
-local type      = type
-local print     = print
-local write     = io.write
-
-local l3build   = require("l3build")
-
--- Global variables
-
-_G.options = l3build.options
-
+local setmetatable  = setmetatable
+local type          = type
+local tostring      = tostring
+local pairs         = pairs
+local print         = print
+local write         = io.write
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
 local items         = utlib.items
-local entries       = utlib.entries
 local keys          = utlib.keys
 local sorted_pairs  = utlib.sorted_pairs
 local entries       = utlib.entries
 local sorted_entries = utlib.sorted_entries
 
 ---@type wklib_t
-local wklib = require("l3b-walklib")
+local wklib   = require("l3b-walklib")
 
 ---@type oslib_t
-local oslib = require("l3b-oslib")
+local oslib   = require("l3b-oslib")
 
 ---@type gblib_t
-local gblib = require("l3b-globlib")
+local gblib   = require("l3b-globlib")
 
 ---@type fslib_t
-local fslib = require("l3b-fslib")
+local fslib   = require("l3b-fslib")
+local file_exists = fslib.file_exists
 
-_G.abspath        = fslib.absolute_path
-_G.dirname        = wklib.dir_name
-_G.basename       = wklib.base_name
-_G.cleandir       = fslib.make_clean_directory
-_G.cp             = fslib.copy_tree
-_G.direxists      = fslib.directory_exists
-_G.fileexists     = fslib.file_exists
-_G.filelist       = fslib.file_list
-_G.glob_to_pattern = gblib.glob_to_pattern
-_G.to_glob_match  = gblib.to_glob_match
-_G.jobname        = wklib.job_name
-_G.mkdir          = fslib.make_directory
-_G.ren            = fslib.rename
-_G.rm             = fslib.remove_tree
-_G.run            = oslib.run
-_G.splitpath      = wklib.dir_name
-_G.normalize_path = fslib.to_host
+local l3build = require("l3build")
 
--- System dependent strings
---X os_concat
---X os_null
---X os_pathsep
---X os_setenv
-
---components of l3build
-if l3build.in_document then
-  for k in items(
-    "call", "install_files", "typeset", "bibtex", "biber", "makeindex", "tex", "runcmd"
-  ) do
-    if not _G[k] then
-      -- only provide a global when not available
-      -- `tex` is a table defined by luatex
-      _G[k] = function ()
-        error(k .." is not available in document mode.")
-      end
-    end
+---Add an indirection level to _G
+---Usefull to keep track of what is defined globally
+---by `build.lua` and configuration files
+---Must be run before those files are loaded.
+---Does not work if build is already loaded (old latex2e design)
+local function setup()
+  if not l3build.G then
+    l3build.G = setmetatable({}, {
+      __index = _G,
+    })
   end
-  return
+  if not getmetatable(l3build.G) then
+    setmetatable(l3build.G, {
+      __index = _G,
+    })
+  end
 end
 
----@type l3b_aux_t
-local l3b_aux = require("l3build-aux")
+local function unsetup()
+  setmetatable(l3build.G, nil)
+end
+---Load and runs the build script from the work directory
+---The difference with dofile is the environment.
+---@param work_dir string
+local function load_build(work_dir)
+  setup()
+  local f, msg = loadfile(
+    work_dir .. "/build.lua",
+    "t",
+    l3build.G
+  )
+  if not f then
+    error(msg)
+  end
+  f() -- ignore any output
+  unsetup()
+end
 
-_G.call = l3b_aux.call
+---Load the configuration file.
+---The file must exist.
+---@param work_dir string path of the working directory
+---@param config string name of the configuration
+local function load_configuration(work_dir, config)
+  local name = config:match("^config-(.*)") or config
+  name = name:match("(.*)%.lua$") or name
+  setup()
+  local path = ("%s/config-%s.lua"):format(work_dir, name)
+  if not file_exists(path) then
+    path = ("%s/%s.lua"):format(work_dir, name)
+    if not file_exists(path) then
+      error("Unknown config: ".. config)
+    end
+  end
+  local f, msg = loadfile(path, "t", l3build.G)
+  if not f then
+    error(msg)
+  end
+  f() -- ignore any output
+  unsetup()
+end
 
----@type l3b_inst_t
-local l3b_inst = require("l3build-install")
+local functions = {
+  "typeset", "bibtex", "biber", "makeindex", "tex",
+  "checkinit_hook",
+  "runtest_tasks",
+  "update_tag",
+  "tag_hook",
+  "typeset_demo_tasks",
+  "docinit_hook",
+  "manifest_setup",
+  "manifest_sort_within_match",
+  "manifest_sort_within_group",
+  "manifest_extract_filedesc",
+  "manifest_write_opening",
+  "manifest_write_subheading",
+  "manifest_write_group_heading",
+  "manifest_write_group_file",
+  "manifest_write_group_file_descr",
+}
 
-_G.install_files = l3b_inst.install_files
+---Export symbols to an environment
+---@param G           table
+---@param in_document boolean
+---@return table
+local function export_symbols(G, in_document)
+  -- Global variables
+  G.options         = l3build.options
 
--- typesetting functions
+  G.abspath         = fslib.absolute_path
+  G.dirname         = wklib.dir_name
+  G.basename        = wklib.base_name
+  G.cleandir        = fslib.make_clean_directory
+  G.cp              = fslib.copy_tree
+  G.direxists       = fslib.directory_exists
+  G.fileexists      = fslib.file_exists
+  G.filelist        = fslib.file_list
+  G.glob_to_pattern = gblib.glob_to_pattern
+  G.to_glob_match   = gblib.to_glob_match
+  G.jobname         = wklib.job_name
+  G.mkdir           = fslib.make_directory
+  G.ren             = fslib.rename
+  G.rm              = fslib.remove_tree
+  G.run             = oslib.run
+  G.splitpath       = wklib.dir_name
+  G.normalize_path  = fslib.to_host
 
----@type l3b_tpst_t
-local l3b_tpst = require("l3build-typesetting")
-_G.runcmd     = l3b_tpst.runcmd
 
-if l3build.options.debug then
-  print("Hooks and functions")
-  local expected = {
+  -- System dependent strings
+  --X os_concat
+  --X os_null
+  --X os_pathsep
+  --X os_setenv
+
+  --components of l3build
+  if in_document then
+    for k in items(
+      "call", "install_files",
+      "typeset", "bibtex", "biber", "makeindex", "tex",
+      "runcmd"
+    ) do
+      if not type(G[k]) == "function" then
+        -- only provide a global when not available
+        -- `tex` is a table defined by luatex
+        G[k] = function ()
+          error(k .." is not available in document mode.")
+        end
+      end
+    end
+    return
+  end
+
+
+--[===[
+  "typeset", "bibtex", "biber", "makeindex", "tex", --
+  "checkinit_hook",
+  "runtest_tasks",
+  "update_tag",
+  "tag_hook",
+  "typeset_demo_tasks",
+  "docinit_hook",
+  "manifest_setup",
+  "manifest_sort_within_match",
+  "manifest_sort_within_group",
+  "manifest_extract_filedesc",
+  "manifest_write_opening",
+  "manifest_write_subheading",
+  "manifest_write_group_heading",
+  "manifest_write_group_file",
+  "manifest_write_group_file_descr",
+  "call", --
+  "install_files", --
+  "runcmd", --
+--]===]
+
+  local function export_f(from, ...)
+    for item in items(...) do
+      local v = from[item]
+      assert(v, "Missing value for key ".. item)
+      G[item] = v
+    end
+  end
+
+  ---@type l3b_aux_t
+  local l3b_aux = require("l3build-aux")
+  export_f(l3b_aux, "call")
+
+  ---@type l3b_inst_t
+  local l3b_inst = require("l3build-install")
+  export_f(l3b_inst, "install_files")
+
+  -- typesetting functions
+
+  ---@type l3b_doc_t
+  local l3b_doc = require("l3build-doc")
+  export_f(l3b_doc, "runcmd")
+
+  -- Global functions
+
+  ---@type l3b_doc_engine_t
+  local engine = l3b_doc.engine
+  export_f(engine,
+    "typeset",
+    "bibtex",
+    "biber",
+    "makeindex",
+    "tex",
+    "typeset_demo_tasks",
+    "docinit_hook"
+  )
+
+  ---@type l3b_tag_t
+  local l3b_tag = require("l3build-tag")
+  ---@type l3b_tag_vars_t
+  local l3b_tag_vars = l3b_tag.Vars
+  export_f(l3b_tag_vars,
+    "tag_hook",
+    "update_tag"
+  )
+
+  local l3b_mnfst_setup = require("l3build-manifest-setup")
+  local setup = l3b_mnfst_setup.setup
+
+  for item in items(
+    "manifest_setup",
+    "manifest_sort_within_match",
+    "manifest_sort_within_group",
+    "manifest_extract_filedesc",
+    "manifest_write_opening",
+    "manifest_write_subheading",
+    "manifest_write_group_heading",
+    "manifest_write_group_file",
+    "manifest_write_group_file_descr"
+  ) do
+    local k = item:match("manifest_(.*)")
+    local v = setup[k]
+    assert(v, "Missing value for key ".. item)
+    G[item] = v
+  end
+
+  -- Global variables
+
+  local function export_v(from, suffix, ...)
+    if not from then
+      print(debug.traceback())
+      error("Missing from")
+    end
+    for item in items(...) do
+      local from_item = from[item]
+      if from_item == nil then
+        print(debug.traceback())
+        error("Erroneous item: ".. item)
+      end
+      G[item .. suffix] = from_item
+    end
+  end
+
+  ---@type l3b_vars_t
+  local l3b_vars = require("l3build-variables")
+
+  if type(G.module) == "function" then
+    G.module = nil
+  end
+
+  ---@type Main_t
+  local Main = l3b_vars.Main
+  export_v(Main, "",
+    "module",
+    "bundle",
+    "ctanpkg",
+    "modules",
+    "exclmodules"
+  )
+
+  --[==[ Shape of the bundle folder ]==]
+  local Dir = l3b_vars.Dir
+  export_v(Dir, "dir",
+    "main",
+    "docfile",
+    "sourcefile",
+    "support",
+    "testfile",
+    "testsupp",
+    "texmf",
+    "textfile",
+    "build",
+    "distrib",
+    "local",
+    "result",
+    "test",
+    "typeset",
+    "unpack",
+    "ctan",
+    "tds"
+  )
+
+  G.localdir = Dir[l3b_vars.LOCAL]
+
+  export_v(Main, "",
+    "tdsroot"
+  )
+
+  local Files = l3b_vars.Files
+  export_v(Files, "files",
+    "aux",
+    "bib",
+    "binary",
+    "bst",
+    "check",
+    "checksupp",
+    "clean",
+    "demo",
+    "doc",
+    "dynamic",
+    "exclude",
+    "install",
+    "makeindex",
+    "script",
+    "scriptman",
+    "source",
+    "tag",
+    "text",
+    "typesetdemo",
+    "typeset",
+    "typesetsupp",
+    "typesetsource",
+    "unpack",
+    "unpacksupp"
+  )
+
+  ---@type l3b_check_t
+  local l3b_check = require("l3build-check")
+  ---@type l3b_check_vars_t
+  local l3b_check_vars = l3b_check.Vars
+  export_v(l3b_check_vars, "",
+    "includetests",
+    "excludetests"
+  )
+
+  ---@type Deps_t
+  local Deps = l3b_vars.Deps
+  export_v(Deps, "deps",
+    "check",
+    "typeset",
+    "unpack"
+  )
+
+  export_v(l3b_check_vars, "",
+    "checkengines",
+    "stdengine",
+    "checkformat",
+    "specialformats",
+    "test_types",
+    "test_order",
+    "checkconfigs"
+  )
+
+  ---@type Exe_t
+  local Exe = l3b_vars.Exe
+  export_v(Exe, "exe",
+    "typeset",
+    "unpack",
+    "zip",
+    "biber",
+    "bibtex",
+    "makeindex",
+    "curl"
+  )
+
+  local Opts = l3b_vars.Opts
+  export_v(Opts, "opts",
+    "check",
+    "typeset",
+    "unpack",
+    "zip",
+    "biber",
+    "bibtex",
+    "makeindex"
+  )
+
+  export_v(l3b_check_vars, "",
+    "checksearch"
+  )
+
+  ---@type l3b_doc_vars_t
+  local l3b_doc_vars = l3b_doc.Vars
+  export_v(l3b_doc_vars, "",
+    "typesetsearch"
+  )
+
+  ---@type l3b_unpk_t
+  local l3b_unpk = require("l3build-unpack")
+  ---@type l3b_unpk_vars_t
+  local l3b_unpk_vars = l3b_unpk.Vars
+  export_v(l3b_unpk_vars, "",
+    "unpacksearch"
+  )
+
+  export_v(l3b_doc_vars, "",
+    "glossarystyle",
+    "indexstyle",
+    "specialtypesetting",
+    "forcedocepoch"
+  )
+
+  export_v(l3b_check_vars, "",
+    "forcecheckepoch",
+    "asciiengines",
+    "checkruns"
+  )
+
+  ---@type l3b_inst_vars_t
+  local l3b_inst_vars = l3b_inst.Vars
+
+  export_v(l3b_inst_vars, "",
+    "ctanreadme"
+  )
+
+  export_v(Main, "",
+    "ctanzip",
+    "epoch"
+  )
+
+  ---@type l3b_ctan_t
+  local l3b_ctan = require("l3build-ctan")
+  ---@type l3b_ctan_vars_t
+  local l3b_ctan_vars = l3b_ctan.Vars
+  export_v(l3b_ctan_vars, "",
+    "flatten"
+  )
+
+  export_v(l3b_inst_vars, "",
+    "flattentds",
+    "flattenscript"
+  )
+
+  export_v(l3b_check_vars, "",
+    "maxprintline"
+  )
+
+  export_v(l3b_ctan_vars, "",
+    "packtdszip"
+  )
+
+  export_v(Opts, "opts",
+    "ps2pdf"
+  )
+
+  export_v(l3b_doc_vars, "",
+    "typesetruns",
+    "typesetcmds"
+  )
+
+  export_v(l3b_check_vars, "",
+    "recordstatus"
+  )
+
+  ---@type l3b_mfst_t
+  local l3b_mfst = require("l3build-manifest")
+  ---@type l3b_mfst_vars_t
+  local l3b_mfst_vars = l3b_mfst.Vars
+
+  export_v(l3b_mfst_vars, "",
+    "manifestfile"
+  )
+
+  export_v(l3b_inst_vars, "",
+    "tdslocations"
+  )
+
+  ---@type l3b_upld_t
+  local l3b_upld = require("l3build-upload")
+  ---@type l3b_upld_vars_t
+  local l3b_upld_vars = l3b_upld.Vars
+
+  export_v(l3b_upld_vars, "",
+    "uploadconfig"
+  )
+
+  local Xtn = l3b_vars.Xtn
+  export_v(Xtn, "ext",
+    "bak",
+    "dvi",
+    "lvt",
+    "tlg",
+    "tpf",
+    "lve",
+    "log",
+    "pvt",
+    "pdf",
+    "ps"
+  )
+
+  return G
+end
+
+---Prepares the print status command.
+---Records the vanilla global variables and functions
+local function prepare_print_status()
+  local old = l3build.G
+  l3build.G = {}
+  local G = {}
+  export_symbols(G)
+  l3build.default_G = G
+  l3build.G = old
+end
+
+---Print status for global function and hooks,
+---for global variables as well.
+local function print_status()
+  local variables_n = 0
+  local variables = {}
+  local functions = {}
+  local expected = {}
+  for item in items(
     "typeset", "bibtex", "biber", "makeindex", "tex",
     "checkinit_hook",
     "runtest_tasks",
@@ -145,477 +577,234 @@ if l3build.options.debug then
     "manifest_write_subheading",
     "manifest_write_group_heading",
     "manifest_write_group_file",
-    "manifest_write_group_file_descr",
-  }
+    "manifest_write_group_file_descr"
+  ) do
+    expected[item] = true
+  end
+  for k, v in pairs(_G) do
+    if type(v) == "function" then
+      print("function", k)
+      if expected[k] then
+        functions[k] = v
+      end
+    elseif l3build.default_G[k] then
+      variables[k] = v
+      variables_n = variables_n + 1
+    end
+  end
+  os.exit()
+  print("Hooks and functions, (*) for custom ones")
   local width = 0
-  for name in entries(expected) do
+  for name in keys(expected) do
     if #name > width then
       width = #name
     end
   end
-  for name in sorted_entries(expected) do
+  for name in sorted_pairs(expected) do
     local filler = (" "):rep(width - #name)
-    local is_custom = type(_G[name]) == "function"
-    print("  ".. name .. filler ..": ".. (is_custom and "builtin" or "custom"))
+    local is_custom = l3build.default_G[name] ~= functions[name]
+    print("  ".. name .. filler .. (is_custom and " (*)" or ""))
   end
-end
---[[
-]]
--- Global functions
 
----@type l3b_tpst_engine_t
-local engine = l3b_tpst.engine
-
-_G.biber      = engine.biber
-_G.bibtex     = engine.bibtex
-_G.makeindex  = engine.makeindex
-_G.tex        = engine.tex
-_G.typeset    = engine.typeset
-
-
--- Global variables
-
-local exported_count = 0
-local exported = {}
-
-local function export_symbols(from, suffix, ...)
-  if not from then
-    print(debug.traceback())
-    error("Missing from")
-  end
-  for item in items(...) do
-    local from_item = from[item]
-    if from_item == nil then
-      print(debug.traceback())
-      error("Erroneous item: ".. item)
-    end
-    _G[item .. suffix] = from_item
-    exported[item ..suffix] = from_item
-    exported_count = exported_count + 1
-  end
-end
-
----@type l3b_vars_t
-local l3b_vars = require("l3build-variables")
-
-if type(_G.module) == "function" then
-  _G.module = nil
-end
-
----@type Main_t
-local Main = l3b_vars.Main
-export_symbols(Main, "",
-  "module",
-  "bundle",
-  "ctanpkg",
-  "modules",
-  "exclmodules"
-)
-
---[==[ Shape of the bundle folder ]==]
-local Dir = l3b_vars.Dir
-export_symbols(Dir, "dir",
-  "main",
-  "docfile",
-  "sourcefile",
-  "support",
-  "testfile",
-  "testsupp",
-  "texmf",
-  "textfile",
-  "build",
-  "distrib",
-  "local",
-  "result",
-  "test",
-  "typeset",
-  "unpack",
-  "ctan",
-  "tds"
-)
-
-_G.localdir = Dir[l3b_vars.LOCAL]
-
-export_symbols(Main, "",
-"tdsroot"
-)
-
-local Files = l3b_vars.Files
-export_symbols(Files, "files",
-  "aux",
-  "bib",
-  "binary",
-  "bst",
-  "check",
-  "checksupp",
-  "clean",
-  "demo",
-  "doc",
-  "dynamic",
-  "exclude",
-  "install",
-  "makeindex",
-  "script",
-  "scriptman",
-  "source",
-  "tag",
-  "text",
-  "typesetdemo",
-  "typeset",
-  "typesetsupp",
-  "typesetsource",
-  "unpack",
-  "unpacksupp"
-)
-
----@type l3b_check_t
-local l3b_check = require("l3build-check")
----@type l3b_check_vars_t
-local l3b_check_vars = l3b_check.Vars
-export_symbols(l3b_check_vars, "",
-"includetests",
-"excludetests"
-)
-
----@type Deps_t
-local Deps = l3b_vars.Deps
-export_symbols(Deps, "deps",
-"check",
-"typeset",
-"unpack"
-)
-
-export_symbols(l3b_check_vars, "",
-  "checkengines",
-  "stdengine",
-  "checkformat",
-  "specialformats",
-  "test_types",
-  "test_order",
-  "checkconfigs"
-)
-
----@type Exe_t
-local Exe = l3b_vars.Exe
-export_symbols(Exe, "exe",
-  "typeset",
-  "unpack",
-  "zip",
-  "biber",
-  "bibtex",
-  "makeindex",
-  "curl"
-)
-
-local Opts = l3b_vars.Opts
-export_symbols(Opts, "opts",
-  "check",
-  "typeset",
-  "unpack",
-  "zip",
-  "biber",
-  "bibtex",
-  "makeindex"
-)
-
-export_symbols(l3b_check_vars, "",
-  "checksearch"
-)
-
----@type l3b_tpst_t
-local l3b_tpst = require("l3build-typesetting")
----@type l3b_tpst_vars_t
-local l3b_tpst_vars = l3b_tpst.Vars
-export_symbols(l3b_tpst_vars, "",
-  "typesetsearch"
-)
-
----@type l3b_unpk_t
-local l3b_unpk = require("l3build-unpack")
----@type l3b_unpk_vars_t
-local l3b_unpk_vars = l3b_unpk.Vars
-export_symbols(l3b_unpk_vars, "",
-  "unpacksearch"
-)
-
-export_symbols(l3b_tpst_vars, "",
-  "glossarystyle",
-  "indexstyle",
-  "specialtypesetting",
-  "forcedocepoch"
-)
-
-export_symbols(l3b_check_vars, "",
-  "forcecheckepoch",
-  "asciiengines",
-  "checkruns"
-)
-
----@type l3b_inst_vars_t
-local l3b_inst_vars = l3b_inst.Vars
-
-export_symbols(l3b_inst_vars, "",
-"ctanreadme"
-)
-
-export_symbols(Main, "",
-  "ctanzip",
-  "epoch"
-)
-
----@type l3b_ctan_t
-local l3b_ctan = require("l3build-ctan")
----@type l3b_ctan_vars_t
-local l3b_ctan_vars = l3b_ctan.Vars
-export_symbols(l3b_ctan_vars, "",
-  "flatten"
-)
-
-export_symbols(l3b_inst_vars, "",
-  "flattentds",
-  "flattenscript"
-)
-
-export_symbols(l3b_check_vars, "",
-  "maxprintline"
-)
-
-export_symbols(l3b_ctan_vars, "",
-  "packtdszip"
-)
-
-export_symbols(Opts, "opts",
-  "ps2pdf"
-)
-
-export_symbols(l3b_tpst_vars, "",
-  "typesetruns",
-  "typesetcmds"
-)
-
-export_symbols(l3b_check_vars, "",
-  "recordstatus"
-)
-
----@type l3b_mfst_t
-local l3b_mfst = require("l3build-manifest")
----@type l3b_mfst_vars_t
-local l3b_mfst_vars = l3b_mfst.Vars
-
-export_symbols(l3b_mfst_vars, "",
-  "manifestfile"
-)
-
-export_symbols(l3b_inst_vars, "",
-  "tdslocations"
-)
-
----@type l3b_upld_t
-local l3b_upld = require("l3build-upload")
----@type l3b_upld_vars_t
-local l3b_upld_vars = l3b_upld.Vars
-
-export_symbols(l3b_upld_vars, "",
-  "uploadconfig"
-)
-
-local Xtn = l3b_vars.Xtn
-export_symbols(Xtn, "ext",
-  "bak",
-  "dvi",
-  "lvt",
-  "tlg",
-  "tpf",
-  "lve",
-  "log",
-  "pvt",
-  "pdf",
-  "ps"
-)
-
----Display the list of exported variables
-if l3build.options.debug then
+  ---Display the list of exported variables
   local official = {
-"module",
-"bundle",
-"ctanpkg",
---
-"modules",
-"exclmodules",
---
-"maindir",
-"docfiledir",
-"sourcefiledir",
-"supportdir",
-"testfiledir",
-"testsuppdir",
-"texmfdir",
-"textfiledir",
---
-"builddir",
-"distribdir",
-"localdir",
-"resultdir",
-"testdir",
-"typesetdir",
-"unpackdir",
---
-"ctandir",
-"tdsdir",
-"tdsroot",
---
-"auxfiles",
-"bibfiles",
-"binaryfiles",
-"bstfiles",
-"checkfiles",
-"checksuppfiles",
-"cleanfiles",
-"demofiles",
-"docfiles",
-"dynamicfiles",
-"excludefiles",
-"installfiles",
-"makeindexfiles",
-"scriptfiles",
-"scriptmanfiles",
-"sourcefiles",
-"tagfiles",
-"textfiles",
-"typesetdemofiles",
-"typesetfiles",
-"typesetsuppfiles",
-"typesetsourcefiles",
-"unpackfiles",
-"unpacksuppfiles",
---
-"includetests",
-"excludetests",
---
-"checkdeps",
-"typesetdeps",
-"unpackdeps",
---
-"checkengines",
-"stdengine",
-"checkformat",
-"specialformats",
-"test_types",
-"test_order",
---
-"checkconfigs",
---
-"typesetexe",
-"unpackexe",
-"zipexe",
-"biberexe",
-"bibtexexe",
-"makeindexexe",
-"curlexe",
---
-"checkopts",
-"typesetopts",
-"unpackopts",
-"zipopts",
-"biberopts",
-"bibtexopts",
-"makeindexopts",
---
-"checksearch",
-"typesetsearch",
-"unpacksearch",
---
-"glossarystyle",
-"indexstyle",
-"specialtypesetting",
---
-"forcecheckepoch",
-"forcedocepoch",
---
-"asciiengines",
-"checkruns",
-"ctanreadme",
-"ctanzip",
-"epoch",
-"flatten",
-"flattentds",
-"flattenscript",
-"maxprintline",
-"packtdszip",
-"ps2pdfopts",
-"typesetcmds",
-"typesetruns",
-"recordstatus",
-"manifestfile",
---
-"tdslocations",
---
-"uploadconfig",
---"uploadconfig.pkg",
---
-"bakext",
-"dviext",
-"lvtext",
-"tlgext",
-"tpfext",
-"lveext",
-"logext",
-"pvtext",
-"pdfext",
-"psext",
+    "module",
+    "bundle",
+    "ctanpkg",
+    --
+    "modules",
+    "exclmodules",
+    --
+    "maindir",
+    "docfiledir",
+    "sourcefiledir",
+    "supportdir",
+    "testfiledir",
+    "testsuppdir",
+    "texmfdir",
+    "textfiledir",
+    --
+    "builddir",
+    "distribdir",
+    "localdir",
+    "resultdir",
+    "testdir",
+    "typesetdir",
+    "unpackdir",
+    --
+    "ctandir",
+    "tdsdir",
+    "tdsroot",
+    --
+    "auxfiles",
+    "bibfiles",
+    "binaryfiles",
+    "bstfiles",
+    "checkfiles",
+    "checksuppfiles",
+    "cleanfiles",
+    "demofiles",
+    "docfiles",
+    "dynamicfiles",
+    "excludefiles",
+    "installfiles",
+    "makeindexfiles",
+    "scriptfiles",
+    "scriptmanfiles",
+    "sourcefiles",
+    "tagfiles",
+    "textfiles",
+    "typesetdemofiles",
+    "typesetfiles",
+    "typesetsuppfiles",
+    "typesetsourcefiles",
+    "unpackfiles",
+    "unpacksuppfiles",
+    --
+    "includetests",
+    "excludetests",
+    --
+    "checkdeps",
+    "typesetdeps",
+    "unpackdeps",
+    --
+    "checkengines",
+    "stdengine",
+    "checkformat",
+    "specialformats",
+    "test_types",
+    "test_order",
+    --
+    "checkconfigs",
+    --
+    "typesetexe",
+    "unpackexe",
+    "zipexe",
+    "biberexe",
+    "bibtexexe",
+    "makeindexexe",
+    "curlexe",
+    --
+    "checkopts",
+    "typesetopts",
+    "unpackopts",
+    "zipopts",
+    "biberopts",
+    "bibtexopts",
+    "makeindexopts",
+    --
+    "checksearch",
+    "typesetsearch",
+    "unpacksearch",
+    --
+    "glossarystyle",
+    "indexstyle",
+    "specialtypesetting",
+    --
+    "forcecheckepoch",
+    "forcedocepoch",
+    --
+    "asciiengines",
+    "checkruns",
+    "ctanreadme",
+    "ctanzip",
+    "epoch",
+    "flatten",
+    "flattentds",
+    "flattenscript",
+    "maxprintline",
+    "packtdszip",
+    "ps2pdfopts",
+    "typesetcmds",
+    "typesetruns",
+    "recordstatus",
+    "manifestfile",
+    --
+    "tdslocations",
+    --
+    "uploadconfig",
+    --"uploadconfig.pkg",
+    --
+    "bakext",
+    "dviext",
+    "lvtext",
+    "tlgext",
+    "tpfext",
+    "lveext",
+    "logext",
+    "pvtext",
+    "pdfext",
+    "psext",
   }
-  for entry in utlib.entries(official) do
-    if exported[entry] == nil then
+  for entry in entries(official) do
+    if _G[entry] == nil then
       print("MISSING GLOBAL: ", entry)
     end
   end
---]==]
-  print(("DEBUG: %d global variables"):format(exported_count))
-  print("{")
-  local i = 0
-  for key, _ in sorted_pairs(exported) do
-    i = i + 1
-    print(("--[[%3d]] %s,"):format(i, key))
-  end
-  print("}")
-  print("DEBUG: Global variables:")
+  print(("Global variables (%d), (*) for custom ones"):format(variables_n))
 -- Print anything - including nested tables
-  local function pretty_print(tt, indent, done)
+  local function pretty_print(tt, dflt, indent, done)
     done = done or {}
     indent = indent or 0
     if type(tt) == "table" then
-      local width = 0
-      for key in keys(tt) do
-        local l = #tostring(key)
-        if l > width then
-          width = l
+      local w = 0
+      local has_custom = false
+      for k in keys(tt) do
+        local dflt_k = dflt[k]
+        if dflt_k then
+          local l = #tostring(k)
+          if l > w then
+            w = l
+          end
+          has_custom = has_custom or tt[k] == dflt[k]
         end
       end
-      for key, value in sorted_pairs(tt) do
-        local filler = (" "):rep(width - #tostring(key))
-        write((" "):rep(indent)) -- indent it
-        if type(value) == "table" and not done[value] then
-          done[value] = true
-          if next(value) then
-            write(('["%s"]%s = {\n'):format(tostring(key), filler))
-            pretty_print(value, indent + width + 7, done)
-            write((" "):rep( indent + width + 5)) -- indent it
-            write("}\n")
+      for k, v in sorted_pairs(tt) do
+        local dflt_k = dflt[k]
+        if dflt_k then
+          local equals = v == dflt[k] and " =     " or " = (*) "
+          local filler = (" "):rep(w - #tostring(k))
+          write((" "):rep(indent)) -- indent it
+          if type(v) == "table" and not done[v] then
+            done[v] = true
+            if next(v) then
+              write(('["%s"]%s%s{\n'):format(tostring(k), filler, equals))
+              pretty_print(v, dflt[k], indent + w + 7, done)
+              write((" "):rep( indent + w + 5)) -- indent it
+              write("}\n")
+            else
+              write(('["%s"]%s = {}\n'):format(tostring(k), filler, equals))
+            end
+          elseif type(v) == "string" then
+            write(('["%s"]%s%s"%s"\n'):format(
+                tostring(k), filler, equals, tostring(v)))
           else
-            write(('["%s"] %s= {}\n'):format(tostring(key), filler))
+            write(('["%s"]%s%s%s\n'):format(
+                tostring(k), filler, equals, tostring(v)))
           end
-        elseif type(value) == "string" then
-          write(('["%s"] %s= "%s"\n'):format(
-              tostring(key), filler, tostring(value)))
-        else
-          write(('["%s"] %s= %s\n'):format(
-              tostring(key), filler, tostring(value)))
         end
       end
     else
-      io.write(tostring(tt) .. "\n")
+      write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
     end
   end
-  pretty_print(exported)
-  print("")
+  pretty_print(variables, l3build.default_G)
+
 end
+
+---@class l3b_globals_t
+---@field export_symbols        fun(G: table, in_document: boolean): table
+---@field print_status          fun()
+---@field prepare_print_status  fun()
+---@field setup                 fun()
+---@field load_build            fun(work_dir: string)
+---@field load_configuration    fun(work_dir: string)
+
+return {
+  export_symbols        = export_symbols,
+  print_status          = print_status,
+  prepare_print_status  = prepare_print_status,
+  setup                 = setup,
+  load_build            = load_build,
+  load_configuration    = load_configuration,
+}

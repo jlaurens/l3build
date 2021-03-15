@@ -154,7 +154,7 @@ local Main_computed = {
 }
 
 Main = chooser({
-  global = _G,
+  global = l3build,
   default = Main_dflt,
   computed = Main_computed,
   fallback = function (t, k, v_dflt, v_G)
@@ -211,7 +211,7 @@ local default_Dir = {
 
 ---@type Dir_t
 local Dir = chooser({
-  global = _G,
+  global = l3build,
   default =  default_Dir,
   suffix = "dir",
   computed = {
@@ -302,7 +302,7 @@ local function guess_bundle_module()
     else
       -- this is a standalone module (not in a bundle).
       module = Main.module
-      if not module or module== "" then
+      if not module or module == "" then
         local s = read_content(work .."build.lua")
         module = s:match("%f[%w]module%s*=%s*'([^']+)'")
               or s:match('%f[%w]module%s*=%s*"([^"]+)"')
@@ -411,7 +411,7 @@ local Files_computed = {
 
 ---@type Files_t
 local Files = chooser({
-  global = _G,
+  global = l3build,
   default = Files_dflt,
   suffix = "files",
   computed = Files_computed,
@@ -426,7 +426,7 @@ local Files = chooser({
 
 ---@type Deps_t
 local Deps = chooser({
-  global = _G,
+  global = l3build,
   default = {
     check   = {},
     typeset = {},
@@ -448,7 +448,7 @@ local Deps = chooser({
 
 ---@type Exe_t
 local Exe = chooser({
-  global = _G,
+  global = l3build,
   default = {
     typeset   = "pdflatex",
     unpack    = "pdftex",
@@ -473,7 +473,7 @@ local Exe = chooser({
 
 ---@type Opts_t
 local Opts  = chooser({
-  global = _G,
+  global = l3build,
   default = {
     check     = "-interaction=nonstopmode",
     typeset   = "-interaction=nonstopmode",
@@ -503,7 +503,7 @@ local Opts  = chooser({
 
 ---@type Xtn_t
 local Xtn = chooser({
-  global = _G,
+  global = l3build,
   default = {
     bak = ".bak",
     dvi = ".dvi",

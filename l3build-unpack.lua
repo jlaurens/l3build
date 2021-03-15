@@ -80,7 +80,7 @@ local Vars_dft = {
 }
 ---@type l3b_unpk_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = Vars_dft
 })
 
@@ -94,18 +94,18 @@ function Vars_dft.bundleunpack(source_dirs, sources)
   sources = sources or { Files.source }
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_vars.LOCAL])
-  if error_level ~=0 then
+  if error_level ~= 0 then
     return error_level
   end
   error_level = make_clean_directory(Dir.unpack)
-  if error_level ~=0 then
+  if error_level ~= 0 then
     return error_level
   end
   for src_dir in entries(source_dirs) do
     for globs in entries(sources) do
       for glob in entries(globs) do
         error_level = copy_tree(glob, src_dir, Dir.unpack)
-        if error_level ~=0 then
+        if error_level ~= 0 then
           return error_level
         end
       end
@@ -113,7 +113,7 @@ function Vars_dft.bundleunpack(source_dirs, sources)
   end
   for glob in entries(Files.unpacksupp) do
     error_level = copy_tree(glob, Dir.support, Dir[l3b_vars.LOCAL])
-    if error_level ~=0 then
+    if error_level ~= 0 then
       return error_level
     end
   end

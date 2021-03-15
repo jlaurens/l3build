@@ -62,105 +62,6 @@ local flags = {}
 ---@field target    string
 ---@field texmfhome string
 
-local option_list = {
-    config = {
-      description = "Sets the config(s) used for running tests",
-      short = "c",
-      type  = "table"
-    },
-    date = {
-      description = "Sets the date to insert into sources",
-      type  = "string"
-    },
-    debug = {
-      description = "Runs target in debug mode (not supported by all targets)",
-      type = "boolean"
-    },
-    dirty = {
-      description = "Skip cleaning up the test area",
-      type = "boolean"
-    },
-    ["dry-run"] = {
-      description = "Dry run for install",
-      type = "boolean"
-    },
-    email = {
-      description = "Email address of CTAN uploader",
-      type = "string"
-    },
-    engine = {
-      description = "Sets the engine(s) to use for running test",
-      short = "e",
-      type  = "table"
-    },
-    epoch = {
-      description = "Sets the epoch for tests and typesetting",
-      type  = "string"
-    },
-    file = {
-      description = "Take the upload announcement from the given file",
-      short = "F",
-      type  = "string"
-    },
-    first = {
-      description = "Name of first test to run",
-      type  = "string"
-    },
-    force = {
-      description = "Force tests to run if engine is not set up",
-      short = "f",
-      type  = "boolean"
-    },
-    full = {
-      description = "Install all files",
-      type = "boolean"
-    },
-    ["halt-on-error"] = {
-      description = "Stops running tests after the first failure",
-      short = "H",
-      type  = "boolean"
-    },
-    help = {
-      description = "Print this message and exit",
-      short = "h",
-      type  = "boolean"
-    },
-    last = {
-      description = "Name of last test to run",
-      type  = "string"
-    },
-    message = {
-      description = "Text for upload announcement message",
-      short = "m",
-      type  = "string"
-    },
-    quiet = {
-      description = "Suppresses TeX output when unpacking",
-      short = "q",
-      type  = "boolean"
-    },
-    rerun = {
-      description = "Skip setup: simply rerun tests",
-      type  = "boolean"
-    },
-    ["show-log-on-error"] = {
-      description = "If 'halt-on-error' stops, show the full log of the failure",
-      type  = "boolean"
-    },
-    shuffle = {
-      description = "Shuffle order of tests",
-      type  = "boolean"
-    },
-    texmfhome = {
-      description = "Location of user texmf tree",
-      type = "string"
-    },
-    version = {
-      description = "Print version information and exit",
-      type = "boolean"
-    }
-  }
-
 ---@alias option_type_f fun(options: table, key: string, value: string): error_level_n
 
 ---@class option_info_t
@@ -294,11 +195,6 @@ local function register(info, builtin)
   end
 end
 
-for k, v in pairs(option_list) do
-  v.long = k
-  register(v, true)
-end
-
 -- This is done as a function (rather than do ... end) as it allows early
 -- termination (break)
 ---When the key is not recognized by the system,
@@ -416,13 +312,15 @@ local function parse(arg, on_unknown)
   return result
 end
 
+---@alias l3b_options_parse_f fun(arg: table<integer, string>): table<string, any>
+
 ---@class l3b_options_t
 ---@field ut_flags_t        options_flags_t
 ---@field get_all_info      fun(hidden:  boolean): fun(): option_info_t|nil
 ---@field get_info_by_key   fun(key:  string): option_info_t
 ---@field get_info_by_name  fun(name: string): option_info_t
 ---@field register          fun(info: option_info_t, builtin: boolean)
----@field parse fun(arg: table<integer, string>): table<string, boolean|string|number|string_list_t>
+---@field parse             l3b_options_parse_f
 
 return {
   flags             = flags,

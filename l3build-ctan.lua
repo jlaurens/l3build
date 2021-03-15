@@ -85,7 +85,7 @@ local l3b_inst_vars = l3b_inst.Vars
 
 ---@type l3b_ctan_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     flatten = true,
     packtdszip = false,
@@ -129,7 +129,7 @@ end
 ---@return error_level_n
 local function module_ctan()
   local error_level = install_files(Dir.tds, true)
-  if error_level ~=0 then
+  if error_level ~= 0 then
     return error_level
   end
   copy_ctan()
@@ -160,7 +160,7 @@ local function ctan()
   make_directory(Dir.tds)
   if standalone then
     error_level = install_files(Dir.tds, true)
-    if error_level ~=0 then
+    if error_level ~= 0 then
       return error_level
     end
     copy_ctan()

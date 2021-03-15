@@ -28,7 +28,6 @@ local append = table.insert
 ---@type utlib_t
 local utlib           = require("l3b-utillib")
 local sorted_entries  = utlib.sorted_entries
-local read_content    = utlib.read_content
 
 ---@type fslib_t
 local fslib = require("l3b-fslib")
@@ -91,11 +90,22 @@ local function help()
     end
   end
   print("")
+  print("Full manual available via 'texdoc l3build'.")
+  print("")
+  print("Repository  : https://github.com/latex3/l3build")
+  print("Bug tracker : https://github.com/latex3/l3build/issues")
+  print("Copyright (C) 2014-2020 The LaTeX Project")
+end
+
+local function status_run()
   local work_dir = l3build.work_dir
   local main_dir = l3build.main_dir
-  if work_dir then
-    print("Local bundle information:")
-    local bundle, module = guess_bundle_module()
+  if not work_dir then
+    print("No status inforation available")
+  end
+  print("Status information:")
+  local bundle, module = guess_bundle_module()
+  if not l3build.in_document then
     if main_dir == work_dir then
       local modules = Main.modules
       if #modules > 0 then
@@ -122,20 +132,38 @@ local function help()
       print("  module: ".. (module or ""))
       print("  path:   ".. absolute_path(Dir.work))
     end
-    print("")
+    print("  start:  ".. l3build.start_dir)
+    print("  launch: ".. l3build.launch_dir)
   end
-  print("Full manual available via 'texdoc l3build'.")
-  print("")
-  print("Repository  : https://github.com/latex3/l3build")
-  print("Bug tracker : https://github.com/latex3/l3build/issues")
-  print("Copyright (C) 2014-2020 The LaTeX Project")
+  print()
+  if l3build.options.debug then
+    ---@type l3b_globals_t
+    local l3b_globals = require("l3build-globals")
+    l3b_globals.print_status()
+  end
+end
+
+---Prepare data for status command
+---@return error_level_n
+local function status_prepare()
+  if l3build.options.debug then
+    ---@type l3b_globals_t
+    local l3b_globals = require("l3build-globals")
+    l3b_globals.prepare_print_status()
+  end
+  return 0
 end
 
 ---@class l3b_help_t
----@field version fun()
----@field help    fun()
+---@field version     fun()
+---@field help        fun()
+---@field status_impl target_impl_t
 
 return {
-  version = version,
-  help = help,
+  version     = version,
+  help        = help,
+  status_impl = {
+    prepare = status_prepare,
+    run     = status_run,
+  },
 }

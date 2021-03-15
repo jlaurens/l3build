@@ -152,7 +152,7 @@ local dflt = {} -- define below
 
 ---@type l3b_check_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = dflt,
   computed = {
     unique_config = function (t, k, dflt_k)

@@ -61,11 +61,11 @@ Due to code separation, the `run` is not always provided.
 ---@alias target_process_f        fun(names: string_list_t): error_level_n
 
 ---@class target_impl_t
----@field prepare      target_preflight_f|nil function to run preflight code
----@field configure target_preflight_f|nil function to run preflight code
----@field run           target_process_f function to run the target, possible computed attributed
----@field high_run       high_run_f|nil function to run the target, not config loaded, possible computed attributed
----@field bundle_run    target_process_f|nil function to run the target, used at top level, possible computed attributed
+---@field prepare     target_preflight_f|nil function to run preflight code
+---@field configure   target_preflight_f|nil function to run preflight code
+---@field run         target_process_f function to run the target, possible computed attributed
+---@field high_run    high_run_f|nil function to run the target, not config loaded, possible computed attributed
+---@field bundle_run  target_process_f|nil function to run the target, used at top level, possible computed attributed
 
 ---@class target_info_t -- model for a target
 ---@field description string description
@@ -118,76 +118,6 @@ local function register_info(info, builtin)
   if info.alias then
     DB[info.alias] = result -- latex2e
   end
-end
-
-local target_list = {
-  -- Some hidden targets
-  module_check = { -- all modules
-    package     = "l3build-check",
-  },
-  module_ctan = {
-    package     = "l3build-ctan",
-    alias       = "bundlectan",
-  },
-  module_unpack = {
-    package     = "l3build-unpack",
-  },
-  module_tag = {
-    package     = "l3build-tagging",
-  },
-  -- Public targets (with decription)
-  check = {
-    description   = "Run all automated tests",
-    package       = "l3build-check",
-  },
-  clean = {
-    description   = "Clean out directory tree",
-    package       = "l3build-clean",
-    bundle_run    = "bundle_clean",
-  },
-  ctan = {
-    description   = "Create CTAN-ready archive",
-    package       = "l3build-ctan",
-    bundle_run    = "ctan",
-  },
-  doc = {
-    description   = "Typesets all documentation files",
-    package       = "l3build-typesetting",
-  },
-  install = {
-    description   = "Installs files into the local texmf tree",
-    package       = "l3build-install",
-  },
-  manifest = {
-    description   = "Creates a manifest file",
-    package       = "l3build-manifest",
-  },
-  save = {
-    description   = "Saves test validation log",
-    package       = "l3build-check",
-  },
-  tag = {
-    description = "Updates release tags in files",
-    package     = "l3build-tagging",
-  },
-  uninstall = {
-    description   = "Uninstalls files from the local texmf tree",
-    package       = "l3build-install",
-  },
-  unpack = {
-    description   = "Unpacks the source files into the build tree",
-    package       = "l3build-unpack",
-  },
-  upload = {
-    description = "Send archive to CTAN for public release",
-    package     = "l3build-upload",
-  },
-}
-
--- register builtin targets
-for name, info in pairs(target_list) do
-  info.name = name
-  register_info(info, true)
 end
 
 ---@class target_register_kvarg_t
@@ -319,6 +249,9 @@ local function process(options, kvarg)
   if debug then
     print("DEBUG: run ".. target)
   end
+  if not impl.run then
+    error("No run action for target ".. target)
+  end
   return impl.run(names)
 end
 
@@ -326,10 +259,12 @@ end
 ---@field get_all_info  fun(hidden: boolean): fun(): target_info_t|nil
 ---@field get_info      fun(key: string): target_info_t
 ---@field register      fun(info: target_info_t, builtin: boolean)
+---@field register_info fun(info: target_info_t, builtin: boolean)
 
 return {
   get_all_info  = get_all_info,
   get_info      = get_info,
   register      = register,
+  register_info = register_info,
   process       = process,
 }

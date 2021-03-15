@@ -1,6 +1,6 @@
 --[[
 
-File l3build-tagging.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-tag.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -65,13 +65,16 @@ local call    = l3b_aux.call
 
 --[=[ Package implementation ]=]
 
----@class l3b_tagging_vars_t
----@field tag_hook    fun(tag_name: string, tag_date: string): error_level_n
----@field update_tag  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
+---@alias l3b_tag_hook_f    fun(tag_name: string, tag_date: string): error_level_n
+---@alias l3b_update_tag_f  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
 
----@type l3b_tagging_vars_t
+---@class l3b_tag_vars_t
+---@field tag_hook    l3b_tag_hook_f
+---@field update_tag  l3b_update_tag_f
+
+---@type l3b_tag_vars_t
 local Vars = chooser({
-  global = _G,
+  global = l3build,
   default = {
     tag_hook = function (tag_name, tag_date)
       return 0
@@ -142,12 +145,14 @@ local function bundle_tag(tag_names)
   return error_level
 end
 
----@class l3b_tagging_t
----@field tag_impl target_impl_t
+---@class l3b_tag_t
+---@field Vars      l3b_tag_vars_t
+---@field tag_impl  target_impl_t
 
 return {
-  tag_impl = {
-    run = tag,
-    bundle_run = bundle_tag,
+  Vars      = Vars,
+  tag_impl  = {
+    run         = tag,
+    bundle_run  = bundle_tag,
   },
 }
