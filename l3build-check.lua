@@ -71,6 +71,7 @@ local job_name  = wklib.job_name
 local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
+local OS          = oslib.OS
 
 ---@type fslib_t
 local fslib       = require("l3b-fslib")
@@ -206,9 +207,9 @@ local function dvi2pdf(name, dir, engine, hide)
     dir, cmd_concat(
       set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
-        .. (hide and (" > " .. _G.os_null) or ""),
+        .. (hide and (" > " .. OS.null) or ""),
       "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
-        .. (hide and (" > " .. _G.os_null) or "")
+        .. (hide and (" > " .. OS.null) or "")
     ) and 0 or 1
   )
 end
@@ -253,7 +254,7 @@ local function checkinit()
   for i in entries(Files.checksupp) do
     copy_tree(i, Dir.support, Dir.test)
   end
-  execute(_G.os_ascii .. ">" .. Dir.test .. "/ascii.tcx")
+  execute(OS.ascii .. ">" .. Dir.test .. "/ascii.tcx")
   return Vars.checkinit_hook()
 end
 
@@ -813,7 +814,7 @@ end
 ---@return error_level_n
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
-  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. _G.os_diffext
+  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. OS.diffext
   local gen_file  = Dir.test .. "/" .. test_name .. test_type.generated
   local ref_file  = locate({ Dir.test }, {
     test_name .. test_type.reference,
@@ -825,7 +826,7 @@ local function base_compare(test_type, name, engine, cleanup)
   if compare then
     return compare(diff_file, ref_file, gen_file, cleanup, name, engine)
   end
-  local error_level = execute(_G.os_diffexe .. " "
+  local error_level = execute(OS.diffexe .. " "
     .. to_host(ref_file .. " " .. gen_file .. " > " .. diff_file))
   if error_level == 0 or cleanup then
     remove(diff_file)
@@ -846,7 +847,7 @@ end
 
 local function show_failed_diff()
   print("\nCheck failed with difference file")
-  for i in all_names(Dir.test, "*" .. _G.os_diffext) do
+  for i in all_names(Dir.test, "*" .. OS.diffext) do
     print("  - " .. Dir.test .. "/" .. i)
     print("")
     print("-----------------------------------------------------------------------------------")
@@ -935,28 +936,28 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    localtexmf = _G.os_pathsep .. absolute_path(Dir.texmf) .. "//"
+    localtexmf = OS.pathsep .. absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, Vars.checkruns do
     err_levels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
-        _G.os_setenv .. " TEXINPUTS=." .. localtexmf
-          .. (Vars.checksearch and _G.os_pathsep or ""),
-        _G.os_setenv .. " LUAINPUTS=." .. localtexmf
-          .. (Vars.checksearch and _G.os_pathsep or ""),
+        OS.setenv .. " TEXINPUTS=." .. localtexmf
+          .. (Vars.checksearch and OS.pathsep or ""),
+        OS.setenv .. " LUAINPUTS=." .. localtexmf
+          .. (Vars.checksearch and OS.pathsep or ""),
         -- Avoid spurious output from (u)pTeX
-        _G.os_setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
+        OS.setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
-        _G.os_setenv .. " TEXMFCNF=." .. _G.os_pathsep,
+        OS.setenv .. " TEXMFCNF=." .. OS.pathsep,
         set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
         -- Ensure lines are of a known length
-        _G.os_setenv .. " max_print_line=" .. Vars.maxprintline,
+        OS.setenv .. " max_print_line=" .. Vars.maxprintline,
         binary .. format
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
-          .. (hide and (" > " .. _G.os_null) or ""),
+          .. (hide and (" > " .. OS.null) or ""),
         Vars.runtest_tasks(job_name(lvt_file), run_number)
       )
     )
@@ -1129,14 +1130,14 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
     local lua_tlg_file = Dir.test .. "/" .. test_name .. Xtn.tlg
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
-    error_level = execute(_G.os_diffexe .. " "
+    error_level = execute(OS.diffexe .. " "
       .. to_host(lua_tlg_file .. " " .. lua_log_file .. " > " .. diff_file))
     if cleanup then
       remove(lua_log_file)
       remove(lua_tlg_file)
     end
   else
-    error_level = execute(_G.os_diffexe .. " "
+    error_level = execute(OS.diffexe .. " "
       .. to_host(tlg_file .. " " .. log_file .. " > " .. diff_file))
   end
   if error_level == 0 or cleanup then
@@ -1148,7 +1149,7 @@ end
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
   print("\n  Check failed with difference files")
-  for i in all_names(Dir.test, "*" .. _G.os_diffext) do
+  for i in all_names(Dir.test, "*" .. OS.diffext) do
     print("  - " .. Dir.test .. "/" .. i)
   end
   print("")
@@ -1409,7 +1410,7 @@ local function high_check(options)
         if config ~= "build" then
           test_dir = test_dir .. "-" .. config
         end
-        for name in all_names(test_dir, "*" .. _G.os_diffext) do
+        for name in all_names(test_dir, "*" .. OS.diffext) do
           print("  - " .. test_dir .. "/" .. name)
         end
         print("")

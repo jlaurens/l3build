@@ -41,6 +41,7 @@ local dir_base          = wklib.dir_base
 ---@type oslib_t
 local oslib             = require("l3b-oslib")
 local cmd_concat        = oslib.cmd_concat
+local OS                = oslib.OS
 
 ---@type fslib_t
 local fslib                 = require("l3b-fslib")
@@ -123,12 +124,12 @@ function Vars_dft.bundleunpack(source_dirs, sources)
       local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
       local cmd = cmd_concat(
         "cd " .. Dir.unpack .. "/" .. dir_path,
-        _G.os_setenv .. " TEXINPUTS=." .. _G.os_pathsep
-          .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
-        _G.os_setenv .. " LUAINPUTS=." .. _G.os_pathsep
-          .. local_dir .. (Vars.unpacksearch and _G.os_pathsep or ""),
+        OS.setenv .. " TEXINPUTS=." .. OS.pathsep
+          .. local_dir .. (Vars.unpacksearch and OS.pathsep or ""),
+        OS.setenv .. " LUAINPUTS=." .. OS.pathsep
+          .. local_dir .. (Vars.unpacksearch and OS.pathsep or ""),
         Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
-          .. (options.quiet and (" > " .. _G.os_null) or "")
+          .. (options.quiet and (" > " .. OS.null) or "")
       )
       if l3build.options.debug then
         print("DEBUG: ".. cmd)
@@ -180,10 +181,16 @@ end
 ---@class l3b_unpk_t
 ---@field Vars          l3b_unpk_vars_t
 ---@field unpack        unpack_f
----@field module_unpack fun(): error_level_n
+---@field unpack_impl   target_impl_t
+---@field module_unpack_impl target_impl_t
 
 return {
   Vars          = Vars,
   unpack        = unpack,
-  module_unpack = module_unpack,
+  unpack_impl   = {
+    run = unpack,
+  },
+  module_unpack_impl = {
+    run = module_unpack,
+  },
 }

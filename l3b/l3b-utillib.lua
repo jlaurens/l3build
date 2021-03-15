@@ -570,7 +570,7 @@ end
 ---@param diff number
 local function print_diff_time(format, diff)
   if diff > 0 then
-    print(format, to_ymd_hms(diff))
+    print(format:format(to_ymd_hms(diff)))
   end
 end
 

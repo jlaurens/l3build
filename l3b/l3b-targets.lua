@@ -215,7 +215,7 @@ local function process(options, kvarg)
     kvarg.preflight()
     error_level = impl.high_run(options)
     if error_level ~= nil then
-      print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
+      print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
       return error_level
     end
   end
@@ -250,7 +250,7 @@ local function process(options, kvarg)
       print("DEBUG: module run ".. module_target)
     end
     error_level = kvarg.top_callback(module_target)
-    print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
+    print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
     return error_level
   end
   if debug then
@@ -259,8 +259,8 @@ local function process(options, kvarg)
   if not impl.run then
     error("No run action for target ".. target)
   end
-  local error_level = impl.run(names)
-  print(("Done %s in %s"):format(target, to_ymd_hms(difftime(time(), start))))
+  error_level = impl.run(names)
+  print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
   return error_level
 end
 

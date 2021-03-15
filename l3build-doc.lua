@@ -48,6 +48,7 @@ local dir_base          = wklib.dir_base
 local oslib             = require("l3b-oslib")
 local cmd_concat        = oslib.cmd_concat
 local run               = oslib.run
+local OS                = oslib.OS
 
 ---@type fslib_t
 local fslib             = require("l3b-fslib")
@@ -143,20 +144,20 @@ local function runcmd(cmd, dir, vars)
   dir = absolute_path(dir)
   vars = vars or {}
   -- Allow for local texmf files
-  local env = _G.os_setenv .. " TEXMFCNF=." .. _G.os_pathsep
+  local env = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    localtexmf = _G.os_pathsep .. absolute_path(Dir.texmf) .. "//"
+    localtexmf = OS.pathsep .. absolute_path(Dir.texmf) .. "//"
   end
-  local envpaths = "." .. localtexmf .. _G.os_pathsep
-    .. absolute_path(Dir[l3b_vars.LOCAL]) .. _G.os_pathsep
-    .. dir .. (Vars.typesetsearch and _G.os_pathsep or "")
+  local envpaths = "." .. localtexmf .. OS.pathsep
+    .. absolute_path(Dir[l3b_vars.LOCAL]) .. OS.pathsep
+    .. dir .. (Vars.typesetsearch and OS.pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and envpaths:match(" ") then
     envpaths = first_of(envpaths:gsub('"', '')) -- no '"' in windows!!!
   end
   for var in entries(vars) do
-    env = cmd_concat(env, _G.os_setenv .. " " .. var .. "=" .. envpaths)
+    env = cmd_concat(env, OS.setenv .. " " .. var .. "=" .. envpaths)
   end
   return run(dir, cmd_concat(set_epoch_cmd(Main.epoch, Vars.forcedocepoch), env, cmd))
 end
@@ -195,11 +196,11 @@ function Ngn_dflt.bibtex(name, dir)
      grep = "\\\\\\\\"
     end
     if run(dir,
-        _G.os_grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
-          .. _G.os_null
+        OS.grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
+          .. OS.null
       ) + run(dir,
-        _G.os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
-          .. _G.os_null
+        OS.grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
+          .. OS.null
       ) == 0 then
       return runcmd(Exe.bibtex .. " " .. Opts.bibtex .. " " .. name, dir,
         { "BIBINPUTS", "BSTINPUTS" }) and 0 or 1
@@ -417,12 +418,14 @@ end
 ---@class l3b_doc_t
 ---@field Vars      l3b_doc_vars_t
 ---@field runcmd    fun(cmd:  string, dir: string, vars: table): boolean?, exitcode?, integer?
----@field doc       fun(files?: string_list_t): error_level_n
+---@field doc_impl  target_impl_t
 ---@field engine    l3b_doc_engine_t
 
 return {
   Vars    = Vars,
   runcmd  = runcmd,
-  doc     = doc,
+  doc_impl = {
+    run = doc,
+  },
   engine  = Ngn,
 }

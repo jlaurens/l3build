@@ -57,41 +57,61 @@ local Vars = setmetatable({
 -- Support items are defined here for cases where a single string can cover
 -- both Windows and Unix cases: more complex situations are handled inside
 -- the support functions
+
+---@class OS_t
+---@field pathsep string
+---@field concat  string
+---@field null    string
+---@field ascii   string
+---@field cmpexe  string
+---@field cmpext  string
+---@field diffexe string
+---@field diffext string
+---@field grepexe string
+---@field setenv  string
+---@field yes     string
+
+---@type OS_t
+local OS
 if os_type == "windows" then
+  OS = {
+    pathsep = ";",
+    concat  = "&",
+    null    = "nul",
+    ascii   = "@echo.",
+    cmpexe  = getenv("cmpexe") or "fc /b",
+    cmpext  = getenv("cmpext") or ".cmp",
+    diffexe = getenv("diffexe") or "fc /n",
+    diffext = getenv("diffext") or ".fc",
+    grepexe = "findstr /r",
+    setenv  = "set",
+    yes     = "for /l %I in (1,1,300) do @echo y",
+  }
   if tonumber(luatex_version) < 100
   or (tonumber(luatex_version) == 100 and tonumber(luatex_revision) < 4)
   then
-    _G.os_newline = "\r\n"
+    OS.newline = "\r\n"
   else
-    _G.os_newline = "\n"
+    OS.newline = "\n"
   end
-  _G.os_pathsep = ";"
-  _G.os_concat  = "&"
-  _G.os_null    = "nul"
-  _G.os_ascii   = "@echo."
-  _G.os_cmpexe  = getenv("cmpexe") or "fc /b"
-  _G.os_cmpext  = getenv("cmpext") or ".cmp"
-  _G.os_diffexe = getenv("diffexe") or "fc /n"
-  _G.os_diffext = getenv("diffext") or ".fc"
-  _G.os_grepexe = "findstr /r"
-  _G.os_setenv  = "set"
-  _G.os_yes     = "for /l %I in (1,1,300) do @echo y"
 else
-  _G.os_pathsep = ":"
-  _G.os_newline = "\n"
-  _G.os_concat  = ";"
-  _G.os_null    = "/dev/null"
-  _G.os_ascii   = "echo \"\""
-  _G.os_cmpexe  = getenv("cmpexe") or "cmp"
-  _G.os_cmpext  = getenv("cmpext") or ".cmp"
-  _G.os_diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr"
-  _G.os_diffext = getenv("diffext") or ".diff"
-  _G.os_grepexe = "grep"
-  _G.os_setenv  = "export"
-  _G.os_yes     = "printf 'y\\n%.0s' {1..300}"
+  OS = {
+    pathsep = ":",
+    newline = "\n",
+    concat  = ";",
+    null    = "/dev/null",
+    ascii   = "echo \"\"",
+    cmpexe  = getenv("cmpexe") or "cmp",
+    cmpext  = getenv("cmpext") or ".cmp",
+    diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr",
+    diffext = getenv("diffext") or ".diff",
+    grepexe = "grep",
+    setenv  = "export",
+    yes     = "printf 'y\\n%.0s' {1..300}",
+  }
 end
 
----Concat the given string with `_G.os_concat`
+---Concat the given string with `OS.concat`
 ---@vararg string ...
 local function cmd_concat(...)
   local t = {}
@@ -102,7 +122,7 @@ local function cmd_concat(...)
   end
   local result
   local success = pcall (function()
-    result = concat(t, _G.os_concat)
+    result = concat(t, OS.concat)
   end)
   if success then
     return result
@@ -152,6 +172,7 @@ local function quoted_path(path)
 end
 
 ---@class oslib_t
+---@field osdate      OS_t
 ---@field Vars        oslib_vars_t
 ---@field cmd_concat  fun(...): string
 ---@field run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
@@ -159,6 +180,7 @@ end
 
 return {
   Vars        = Vars,
+  OS          = OS,
   cmd_concat  = cmd_concat,
   run         = run,
   quoted_path = quoted_path,

@@ -43,6 +43,7 @@ local dir_base  = wklib.dir_base
 local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
+local OS          = oslib.OS
 
 ---@type fslib_t
 local fslib         = require("l3b-fslib")
@@ -71,9 +72,9 @@ local Dir       = l3b_vars.Dir
 ---@usage private?
 local function set_epoch_cmd(epoch, force)
   return force and cmd_concat(
-    _G.os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
-    _G.os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
-    _G.os_setenv .. " FORCE_SOURCE_DATE=1"
+    OS.setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
+    OS.setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
+    OS.setenv .. " FORCE_SOURCE_DATE=1"
   ) or ""
 end
 

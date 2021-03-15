@@ -36,9 +36,6 @@ local remove_tree           = fslib.remove_tree
 local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
----@type l3build_t
-local l3build  = require("l3build")
-
 ---@type l3b_vars_t
 local l3b_vars  = require("l3build-variables")
 ---@type Main_t

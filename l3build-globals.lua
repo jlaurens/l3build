@@ -52,11 +52,11 @@ local keys          = utlib.keys
 local sorted_pairs  = utlib.sorted_pairs
 local entries       = utlib.entries
 
+---@type oslib_t
+local oslib         = require("l3b-oslib")
+
 ---@type wklib_t
 local wklib   = require("l3b-walklib")
-
----@type oslib_t
-local oslib   = require("l3b-oslib")
 
 ---@type gblib_t
 local gblib   = require("l3b-globlib")
@@ -285,6 +285,30 @@ local function export_symbols(G, in_document)
   end
 
   -- Global variables
+
+  ---@type OS_t
+  local OS = oslib.OS
+
+  for item in items(
+    "pathsep",
+    "concat",
+    "null",
+    "ascii",
+    "cmpexe",
+    "cmpext",
+    "diffexe",
+    "diffext",
+    "grepexe",
+    "setenv",
+    "yes"
+  ) do
+    local from_item = OS[item]
+    if from_item == nil then
+      print(debug.traceback())
+      error("Erroneous item: ".. item)
+    end
+    G["os_".. item] = from_item
+  end
 
   local function export_v(from, suffix, ...)
     if not from then
@@ -727,6 +751,17 @@ local function print_status()
     "pvtext",
     "pdfext",
     "psext",
+    "os_pathsep",
+    "os_concat",
+    "os_null",
+    "os_ascii",
+    "os_cmpexe",
+    "os_cmpext",
+    "os_diffexe",
+    "os_diffext",
+    "os_grepexe",
+    "os_setenv",
+    "os_yes"
   }
   for entry in entries(official) do
     if _G[entry] == nil then
@@ -748,7 +783,7 @@ local function print_status()
         if l > w then
           w = l
         end
-        has_custom = has_custom or tt[k] == dflt[k]
+        has_custom = has_custom or tt[k] ~= dflt[k]
       end
       for k, v in sorted_pairs(tt) do
         local after_equals
