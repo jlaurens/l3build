@@ -51,7 +51,6 @@ local utlib         = require("l3b-utillib")
 local chooser       = utlib.chooser
 local entries       = utlib.entries
 local first_of      = utlib.first_of
-local read_content  = utlib.read_content
 
 ---@type oslib_t
 local oslib       = require("l3b-oslib")
@@ -103,32 +102,36 @@ end
 ---@field tdsroot       string
 ---@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
 ---@field epoch         integer Epoch (Unix date) to set for test runs
----@field _standalone   boolean True means the module is also the bundle
----@field _at_bundle_top    boolean True means we are at the top of the bundle
+-- unexposed computed properties
+---@field is_embedded   boolean True means the module belongs to a bundle
+---@field _at_bundle_top  boolean True means we are at the top of the bundle
 
 ---@type Main_t
 local Main
 
 local Main_dflt = {
-  module          = l3build.module or "",
-  bundle          = l3build.bundle or "",
+  bundle          = "",
+  module          = "",
   exclmodules     = {},
   tdsroot         = "latex",
   epoch           = 1463734800,
 }
 
 local Main_computed = {
-  _standalone = function (t, k, v_dflt)
-    return not _G.bundle or _G.bundle == ""
+  is_embedded = function (t, k, v_dflt)
+    return l3build.main_dir ~= l3build.work_dir
+  end,
+  is_standalone = function (t, k, v_dflt)
+    return l3build.main_dir == l3build.work_dir
   end,
   _at_bundle_top = function (t, k, v_dflt)
     return t.module == ""
   end,
   bundle = function (t, k, v_dflt)
-    return t._standalone and t.module or _G.bundle
+    return t.is_standalone and t.module or _G.bundle
   end,
   ctanpkg = function (t, k, v_dflt)
-    return  t._standalone
+    return  t.is_standalone
         and t.module
         or  t.bundle .."/".. t.module
   end,
@@ -203,7 +206,6 @@ local dot_dir = "."
 local default_Dir = {
   work        = dot_dir,
   current     = dot_dir,
-  main        = dot_dir,
   docfile     = dot_dir,
   sourcefile  = dot_dir,
   textfile    = dot_dir,
@@ -215,6 +217,9 @@ local Dir = chooser({
   default =  default_Dir,
   suffix = "dir",
   computed = {
+    main = function(t, k, v_dflt)
+      return l3build.main_dir:sub(1, -1)
+    end,
     support = function (t, k, v_dflt)
       return t.main .. "/support"
     end,
@@ -262,7 +267,7 @@ local Dir = chooser({
     end,
     tds_module = function (t, k, v_dflt)
       return Main.tdsroot
-      .. (Main._standalone and "/" .. Main.bundle .. "/" or "/")
+      .. (Main.is_standalone and "/" .. Main.bundle .. "/" or "/")
       .. Main.module
     end,
   },
@@ -279,52 +284,6 @@ local Dir = chooser({
 })
 
 -- Dir.work = work TODO: what is this ?
-
----Poor man bundle/module getter.
----@return string
----@return string
-local function guess_bundle_module()
-  local bundle, module
-  local work = l3build.work_dir
-  local main = l3build.main_dir
-  if main == work then
-    local modules = Main.modules
-    if #modules > 0 then
-      -- this is a top bundle
-      bundle = Main.bundle
-      if not bundle or bundle == "" then
-        local s = read_content(work .."build.lua")
-        bundle = s:match("%f[%w]bundle%s*=%s*'([^']+)'")
-              or s:match('%f[%w]bundle%s*=%s*"([^"]+)"')
-              or s:match('%f[%w]bundle%s*=%s*%[%[([^]]+)%]%]')
-              or "Unknown bundle"
-      end
-    else
-      -- this is a standalone module (not in a bundle).
-      module = Main.module
-      if not module or module == "" then
-        local s = read_content(work .."build.lua")
-        module = s:match("%f[%w]module%s*=%s*'([^']+)'")
-              or s:match('%f[%w]module%s*=%s*"([^"]+)"')
-              or s:match('%f[%w]module%s*=%s*%[%[([^]]+)%]%]')
-              or "Unknown module"
-      end
-    end
-  else
-    -- a module inside a bundle
-    if not bundle or bundle == "" then
-      local s = read_content(work .."build.lua")
-      bundle = s:match("%f[%w]bundle%s*=%s*'([^']+)'")
-            or s:match('%f[%w]bundle%s*=%s*"([^"]+)"')
-            or s:match('%f[%w]bundle%s*=%s*%[%[([^]]+)%]%]')
-            or "Unknown bundle"
-    end
-    if not module or module == "" then
-      module = work:match("([^/]+)/$")
-    end
-  end
-  return bundle, module
-end
 
 set_tree_excluder(function (path)
   return path == Dir.build
@@ -537,5 +496,4 @@ return {
   Exe   = Exe,
   Opts  = Opts,
   Xtn   = Xtn,
-  guess_bundle_module = guess_bundle_module,
 }

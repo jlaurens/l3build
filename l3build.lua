@@ -82,8 +82,6 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
 ---@field is_main     boolean       True means "l3build" is the main controller.
 ---@field in_document boolean       True means no "build.lua"
----@field bundle      string        The bundle name guessed from the `build.lua` above.
----@field module      string        The module name guessed from the work directory.
 ---@field work_dir    dir_path_s|nil  where the closest "build.lua" lives, nil means not in_document
 ---@field main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
 ---@field launch_dir  dir_path_s      where "l3build.lua" and friends live
@@ -91,7 +89,7 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field options     options_t
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
----@field G           table           Global environment for build
+---@field G           table           Global environment for build.lua and configs
 
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)
@@ -132,11 +130,9 @@ do
   local function container(dir, base)
     for _ in gmatch(dir .. currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
-      if attributes(p, "mode") then -- true iff file or dir at the given path
+      if attributes(p, "mode") then -- true iff something at the given path
         return dir
       end
-      -- synonym of previous line:
-      -- if package.searchpath("?", p, "", "") then return dir end
       dir = dir .. "../"
     end
   end
@@ -171,7 +167,8 @@ do
   elseif cmd_base == "build.lua" then
     work_dir = cmd_dir
   else
-    work_dir = container(start_dir, "build.lua") or container(start_dir, "build.lua")
+    work_dir = container(start_dir,  "build.lua")
+            or container(launch_dir, "build.lua")
     if not work_dir then
       on_debug(function ()
         print(arg[0])
@@ -252,7 +249,7 @@ do
       print("DEBUG Info: package required ".. pkg_name)
     end
     local name = pkg_name:match("^l3b%-.*")
-    if name then
+    if name then -- an l3b library package
       package.loaded[pkg_name] = true
       local path = launch_dir .."l3b/".. name
       result = require_orig(path) -- error here if no such module exists
@@ -260,12 +257,12 @@ do
     else
       name = pkg_name:match("^l3build%-.*")
       -- forthcoming management here
-      if name then
+      if name then -- an l3build package
         package.loaded[pkg_name] = true
         local path = launch_dir .. name
         result = require_orig(path) -- error here if no such module exists
         result = register(result, pkg_name, name, path .. ".lua")
-      else
+      else -- other packages
         result = require_orig(pkg_name)
       end
     end
@@ -343,16 +340,88 @@ elseif target == "version" then
   exit(0)
 end
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
-
 -- Load configuration file if running as a script
 if is_main then
   -- Look for some configuration details
   load_build(work_dir)
 end
+
+-- bundle and module names recovery
+
+local read_content  = utlib.read_content
+
+---@type l3b_vars_t
+local l3b_vars  = require("l3build-variables")
+---@type Main_t
+local Main      = l3b_vars.Main
+
+-- bundle and module values are very important
+-- because they control the behaviour of actions
+local bundle, module
+if Main.is_embedded then
+  -- a module inside a bundle.
+  -- The bundle name must be provided, but can be a void string
+  -- It is read from the the parent's `build.lua`
+  -- We cannot execute the parent's script because
+  -- this script may perform actions and change files (see latex2e)
+  -- So we parse the content finger crossed.
+  local s = read_content(l3build.main_dir .."build.lua")
+  bundle = s:match("%f[%w]bundle%s*=%s*'([^']*)'")
+        or s:match('%f[%w]bundle%s*=%s*"([^"]*)"')
+        or s:match('%f[%w]bundle%s*=%s*%[%[([^]]*)%]%]')
+  if bundle then -- is it consistent?
+    if _G.bundle and bundle ~= _G.bundle then
+      error(("Bundle names are not consistent: %s and %s")
+            :format(bundle, _G.bundle))
+    end
+    if l3build.G.bundle and bundle ~= l3build.G.bundle then
+      error(("Bundle names are not consistent: %s and %s")
+            :format(bundle, l3build.G.bundle))
+    end
+  else
+    bundle = _G.bundle or l3build.G.bundle
+    if not bundle then
+      error('Missing in top build.lua: bundle = "<bundle name>"')
+    end
+  end
+  module = work_dir:match("([^/]+)/$"):lower()
+  if _G.module and module ~= _G.module then
+    error(("Module names are not consistent: %s and %s")
+          :format(module, _G.module))
+  end
+  if l3build.G.module and module ~= l3build.G.module then
+    error(("Module names are not consistent: %s and %s")
+          :format(module, l3build.G.module))
+  end
+else -- not an embeded module
+  local modules = Main.modules
+  bundle = _G.bundle or l3build.G.bundle
+  if #modules > 0 then
+    -- this is a top bundle,
+    -- the bundle name must be provided
+    -- the module name does not make sense
+    if not bundle or bundle == "" then
+      error('Missing in top build.lua: bundle = "<bundle name>"')
+    end
+    module = nil -- not ""!
+  elseif bundle then
+    -- this is a bundle with no modules,
+    -- like latex2e
+    module = nil
+  else
+    -- this is a standalone module (not in a bundle),
+    -- the module name must be provided append
+    -- the bundle name does not make sense
+    module = _G.module or l3build.G.module
+    if not module or module == "" then
+      error('Missing in top build.lua: module = "<module name>"')
+    end
+    bundle = nil -- not ""!
+  end
+end
+-- MISSING naming constraints
+l3build.bundle = bundle
+l3build.module = module
 
 ---@type l3b_targets_t
 local l3b_targets_t = require("l3b-targets")

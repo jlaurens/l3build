@@ -74,7 +74,7 @@ local Opts      = l3b_vars.Opts
 ---@field bundleunpack bundleunpack_f  bundle unpack overwrite
 
 ---@type l3b_unpk_vars_t
-local Vars_dft = {
+local Vars_dflt = {
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
   unpacksearch = true
@@ -82,7 +82,7 @@ local Vars_dft = {
 ---@type l3b_unpk_vars_t
 local Vars = chooser({
   global = l3build,
-  default = Vars_dft
+  default = Vars_dflt
 })
 
 ---Split off from the main unpack so it can be used on a bundle and not
@@ -90,7 +90,7 @@ local Vars = chooser({
 ---@param source_dirs string_list_t|nil defaults to the source directory
 ---@param sources     string_list_t|nil defaults to the source files glob
 ---@return error_level_n
-function Vars_dft.bundleunpack(source_dirs, sources)
+function Vars_dflt.bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
   sources = sources or { Files.source }
   local options = l3build.options

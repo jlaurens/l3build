@@ -99,13 +99,13 @@ end
 
 local function status_run()
   local work_dir = l3build.work_dir
-  local main_dir = l3build.main_dir
   if not work_dir then
     print("No status information available")
   end
-
   print("Status information:")
-  local bundle, module = guess_bundle_module()
+  local main_dir = l3build.main_dir
+  local bundle = Main.bundle
+  local module = Main.module
   if not l3build.in_document then
     if main_dir == work_dir then
       local modules = Main.modules

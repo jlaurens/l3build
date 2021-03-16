@@ -458,7 +458,7 @@ do
         if comp_k ~= nil then
           comp_k = comp_k(t, k, dflt_k) -- a computed property is available
           if comp_k ~= nil then
-            dflt_k = comp_k
+            dflt_k = comp_k         -- overwrite what comes from default
           end
         end
       end

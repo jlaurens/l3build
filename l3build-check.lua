@@ -39,7 +39,6 @@ local match           = string.match
 local append          = table.insert
 local sort            = table.sort
 local tbl_unpack      = table.unpack
-local concat          = table.concat
 
 local unicode         = require("unicode")
 local utf8_char       = unicode.utf8.char
@@ -52,7 +51,6 @@ local remove          = os.remove
 local utlib           = require("l3b-utillib")
 local deep_copy       = utlib.deep_copy
 local chooser         = utlib.chooser
-local items           = utlib.items
 local entries         = utlib.entries
 local first_of        = utlib.first_of
 local extend_with     = utlib.extend_with
@@ -226,7 +224,7 @@ end
 
 -- Set up the check system files: needed for checking one or more tests and
 -- for saving the test files
-local function checkinit()
+local function check_init()
   local options = l3build.options
   if not options.dirty then
     make_clean_directory(Dir.test)
@@ -1226,7 +1224,7 @@ local function check(test_names)
   if Dir.testfile ~= "" and directory_exists(Dir.testfile) then
     local options = l3build.options
     if not options.rerun then
-      checkinit()
+      check_init()
     end
     local hide = not (test_names and not_empty(test_names))
     test_names = test_names or {}
@@ -1333,7 +1331,7 @@ local function save(names)
     print("Arguments are required for the save command")
     return 1
   end
-  checkinit()
+  check_init()
   local options = l3build.options
   local engines = options.engine or { Vars.stdengine }
   for name in entries(names) do

@@ -142,11 +142,11 @@ local function ctan()
   -- Always run tests for all engines
   l3build.options.engine = nil
   local error_level
-  local standalone = Main._standalone
-  if standalone then
-    error_level = call({ "." }, "check")
-  else
+  local is_embedded = Main.is_embedded
+  if is_embedded then
     error_level = call(Main.modules, "module_check")
+  else
+    error_level = call({ "." }, "check")
   end
   if error_level ~= 0 then
     print("\n====================")
@@ -158,7 +158,7 @@ local function ctan()
   make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
   remove_directory(Dir.tds)
   make_directory(Dir.tds)
-  if standalone then
+  if is_embedded then
     error_level = install_files(Dir.tds, true)
     if error_level ~= 0 then
       return error_level
