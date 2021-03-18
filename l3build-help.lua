@@ -105,12 +105,6 @@ end
 ---Print status for global function and hooks,
 ---for global variables as well.
 local function print_status()
-  print("PRINT", _G.abspath, defaults.abspath)
-  print("PRINT", _G["abspath"], defaults["abspath"])
-  local variables_n = 0
-  local variables = {}
-  local functions = {}
-  local expected = {}
   local l3b_functions = {
     "bundlectan",
     "typeset",
@@ -152,7 +146,6 @@ local function print_status()
     "splitpath",
     "normalize_path",
   }
-
   print("Hooks and functions, (*) for custom ones")
   local width = 0
   for name in entries(l3b_functions) do
@@ -167,7 +160,7 @@ local function print_status()
   end
 
   ---Display the list of exported variables
-  local official = {
+  local l3b_variables = {
     "module",
     "bundle",
     "ctanpkg",
@@ -305,15 +298,17 @@ local function print_status()
     "os_diffext",
     "os_grepexe",
     "os_setenv",
-    "os_yes"
+    "os_yes",
   }
-  for entry in entries(official) do
+  local variables = {}
+  for entry in entries(l3b_variables) do
     if _G[entry] == nil then
       print("MISSING GLOBAL: ", entry)
     end
+    variables[entry] = _G[entry]
   end
   print("")
-  print(("Global variables (%d), (*) for custom ones"):format(variables_n))
+  print(("Global variables (%d), (*) for custom ones"):format(#l3b_variables))
 -- Print anything - including nested tables
   local function pretty_print(tt, dflt, indent, done)
     dflt = dflt or {}

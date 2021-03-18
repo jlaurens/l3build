@@ -796,6 +796,26 @@ local G_computed = function (t, k)
     return t.builddir .. "/unpacked"
   -- Location for installation on CTAN or in TEXMFHOME
   end
+  if k == "uploadconfig" then
+    return setmetatable({}, {
+      __index = function (tt, kk)
+        if kk == "pkg" then
+          return G.ctanpkg
+        end
+      end
+    })
+  end
+  if k == "typeset_list" then
+    error("Documentation is not installed")
+  end
+  if k == "texmf_home" then
+    local result = l3build.options.texmfhome
+    if not result then
+      set_program("latex")
+      result = var_value("TEXMFHOME")
+    end
+    return result
+  end
 end
 
 G = bridge({
@@ -808,26 +828,6 @@ G = bridge({
     end
     if k == "at_bundle_top" then
       return t.module == ""
-    end
-    if k == "uploadconfig" then
-      return setmetatable({}, {
-        __index = function (tt, kk)
-          if kk == "pkg" then
-            return G.ctanpkg
-          end
-        end
-      })
-    end
-    if k == "typeset_list" then
-      error("Documentation is not installed")
-    end
-    if k == "texmf_home" then
-      local result = l3build.options.texmfhome
-      if not result then
-        set_program("latex")
-        result = var_value("TEXMFHOME")
-      end
-      return result
     end
   end,
   complete = function (t, k, result)
@@ -965,7 +965,7 @@ end
 
 return {
   LOCAL           = LOCAL,
-  export  = export,
+  export          = export,
   defaults        = defaults,
   G               = G,
   Dir             = Dir,
