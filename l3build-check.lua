@@ -50,7 +50,6 @@ local remove          = os.remove
 ---@type utlib_t
 local utlib           = require("l3b-utillib")
 local deep_copy       = utlib.deep_copy
-local chooser         = utlib.chooser
 local entries         = utlib.entries
 local first_of        = utlib.first_of
 local extend_with     = utlib.extend_with
@@ -90,109 +89,36 @@ local make_clean_directory  = fslib.make_clean_directory
 local l3build = require("l3build")
 
 ---@type l3b_aux_t
-local l3b_aux   = require("l3build-aux")
-local call      = l3b_aux.call
+local l3b_aux       = require("l3build-aux")
+local call          = l3b_aux.call
+local set_epoch_cmd = l3b_aux.set_epoch_cmd
+local deps_install  = l3b_aux.deps_install
 
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
 local help      = l3b_help.help
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G      = l3b_globals.G
 ---@type Xtn_t
-local Xtn       = l3b_vars.Xtn
+local Xtn       = l3b_globals.Xtn
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir       = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files     = l3b_globals.Files
 ---@type Deps_t
-local Deps      = l3b_vars.Deps
+local Deps      = l3b_globals.Deps
 ---@type Opts_t
-local Opts      = l3b_vars.Opts
-
----@type l3b_aux_t
-local l3b_aux       = require("l3build-aux")
-local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local deps_install  = l3b_aux.deps_install
+local Opts      = l3b_globals.Opts
+local defaults  = l3b_globals.defaults
 
 ---@type l3b_unpk_t
 local l3b_unpk    = require("l3build-unpack")
 local bundleunpack  = l3b_unpk.Vars.bundleunpack
 
 -- Variables
-
----@class test_types_t
----@field log table<string, string|function>
----@field pdf table<string, string|function>
-
----@class l3b_check_vars_t
----@field checkengines  string_list_t Engines to check with \texttt{check} by default
----@field stdengine     string  Engine to generate \texttt{.tlg} file from
----@field checkformat   string  Format to use for tests
----@field specialformats table  Non-standard engine/format combinations
----@field test_types    test_types_t  Custom test variants
----@field test_order    string_list_t Which kinds of tests to evaluate
--- Configs for testing
----@field checkconfigs  table   Configurations to use for tests
----@field includetests  string_list_t Test names to include when checking
----@field excludetests  string_list_t Test names to exclude when checking
----@field recordstatus  boolean Switch to include error level from test runs in \texttt{.tlg} files
----@field forcecheckepoch boolean Force epoch when running tests
----@field asciiengines  string_list_t Engines which should log as pure ASCII
----@field checkruns     integer Number of runs to complete for a test before comparing the log
----@field checksearch   boolean Switch to search the system \texttt{texmf} for during checking
----@field maxprintline  integer Length of line to use in log files
----@field runtest_tasks fun(test_name: string, run_number: integer): string
----@field checkinit_hook fun(): error_level_n
----@field ps2pdfopt     string  Options for \texttt{ps2pdf}
-
----@type l3b_check_vars_t
-local dflt = {} -- define below
-
----@type l3b_check_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = dflt,
-  computed = {
-    unique_config = function (t, k, dflt_k)
-      local configs = t.checkconfigs
-      if #configs == 1 then
-        local result = configs[1]
-        if result ~= "build" then
-          return result
-        end
-      end
-    end,
-    forcecheckepoch = function (t, k, dflt_k)
-      local options = l3build.options
-      if options.epoch then
-        return true
-      end
-    end,
-  },
-  complete = function (t, k, result)
-    -- No trailing /
-    -- What about the leading "./"
-    local options = l3build.options
-    if k == "checkconfigs" then
-      -- When we have specific files to deal with, only use explicit configs
-      -- (or just the std one)
-      -- TODO: Justify this...
-      if options.names then
-        return options.config or { _G.stdconfig }
-      else
-        return options.config or result
-      end
-    elseif k == "forcecheckepoch" then
-      if options.epoch then
-        return true -- overwrite any global setting
-      end
-    end
-    return result
-  end,
-})
 
 ---dvi2pdf, used while checking
 ---@param name string
@@ -203,10 +129,10 @@ local Vars = chooser({
 local function dvi2pdf(name, dir, engine, hide)
   return run(
     dir, cmd_concat(
-      set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
+      set_epoch_cmd(G.epoch, G.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. OS.null) or ""),
-      "ps2pdf " .. Vars.ps2pdfopt .. name .. Xtn.ps
+      "ps2pdf " .. G.ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. OS.null) or "")
     ) and 0 or 1
   )
@@ -215,12 +141,6 @@ end
 --
 -- Auxiliary functions which are used by more than one main function
 --
-
----Default function that can be overwritten
----@return error_level_n
-local function checkinit_hook()
-  return 0
-end
 
 -- Set up the check system files: needed for checking one or more tests and
 -- for saving the test files
@@ -234,8 +154,8 @@ local function check_init()
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for i in all_names(Dir[l3b_vars.LOCAL]) do
-    copy_tree(i, Dir[l3b_vars.LOCAL], Dir.test)
+  for i in all_names(Dir[l3b_globals.LOCAL]) do
+    copy_tree(i, Dir[l3b_globals.LOCAL], Dir.test)
   end
   bundleunpack({ Dir.sourcefile, Dir.testfile })
   for i in entries(Files.install) do
@@ -253,7 +173,7 @@ local function check_init()
     copy_tree(i, Dir.support, Dir.test)
   end
   execute(OS.ascii .. ">" .. Dir.test .. "/ascii.tcx")
-  return Vars.checkinit_hook()
+  return G.checkinit_hook()
 end
 
 ---Apply the `translator` to the content at `path_in`
@@ -293,7 +213,7 @@ end
 ---@param errlevels table
 ---@return string
 local function normalize_log(content, engine, errlevels)
-  local max_print_line = Vars.maxprintline
+  local max_print_line = G.maxprintline
   if match(engine, "^lua") or match(engine, "^harf") then
     max_print_line = max_print_line + 1 -- Deal with an out-by-one error
   end
@@ -409,7 +329,7 @@ local function normalize_log(content, engine, errlevels)
     if match(line, "^> \\box%d+=$") or match(line, "^> \\box%d+=(void)$") then
       line = gsub(line, "%d+=", "...=")
     end
-    if not match(Vars.stdengine, "^e?u?ptex$") then
+    if not match(G.stdengine, "^e?u?ptex$") then
       -- Remove 'normal' direction information on boxes with (u)pTeX
       line = gsub(line, ",? yoko direction,?", "")
       line = gsub(line, ",? yoko%(math%) direction,?", "")
@@ -461,7 +381,7 @@ local function normalize_log(content, engine, errlevels)
                       "<lua data reference ...>")
     -- Unicode engines display chars in the upper half of the 8-bit range:
     -- tidy up to match pdfTeX if an ASCII engine is in use
-    if not_empty(Vars.asciiengines) then
+    if not_empty(G.asciiengines) then
       for i = 128, 255 do
         line = gsub(line, utf8_char(i), "^^" .. str_format("%02x", i))
       end
@@ -491,9 +411,9 @@ local function normalize_log(content, engine, errlevels)
       end
     end
   end
-  if Vars.recordstatus then
+  if G.recordstatus then
     new_content = new_content .. '***************' .. _G.os_newline
-    for i = 1, Vars.checkruns do
+    for i = 1, G.checkruns do
       if errlevels[i] == nil then
         new_content = new_content
           .. 'Compilation ' .. i .. ' of test file skipped ' .. _G.os_newline
@@ -686,7 +606,7 @@ local function normalize_lua_log(content, is_luatex)
     -- Wrap some cases that can be picked out
     -- In some places LuaTeX does use max_print_line, then we
     -- get into issues with different wrapping approaches
-    local max_print_line = Vars.maxprintline
+    local max_print_line = G.maxprintline
     if len(line) == max_print_line then
       return "", last_line .. line
     elseif len(last_line) == max_print_line then
@@ -782,6 +702,9 @@ local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
 
+defaults.test_types.log.rewrite = rewrite_log
+defaults.test_types.pdf.rewrite = rewrite_pdf
+
 -- Look for a test: could be in the Dir.testfile or the Dir.unpack
 ---comment
 ---@param test string
@@ -790,12 +713,12 @@ end
 local function test_exists(test)
   ---@type string_list_t
   local file_names = {}
-  for i, kind in ipairs(Vars.test_order) do
-    file_names[i] = test .. Vars.test_types[kind].test
+  for i, kind in ipairs(G.test_order) do
+    file_names[i] = test .. G.test_types[kind].test
   end
   local found = locate({ Dir.testfile, Dir.unpack }, file_names)
   if found then
-    for i, kind in ipairs(Vars.test_order) do
+    for i, kind in ipairs(G.test_order) do
       local file_name = file_names[i]
       if found:sub(-#file_name) == file_name then
         return found, kind
@@ -854,15 +777,6 @@ local function show_failed_diff()
   end
 end
 
--- A hook to allow additional tasks to run for the tests
----comment
----@param test_name string
----@param run_number integer
----@return string
-local function runtest_tasks(test_name, run_number)
-  return ""
-end
-
 -- Run one of the test files: doesn't check the result so suitable for
 -- both creating and verifying
 ---comment
@@ -881,11 +795,11 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
       or Dir.unpack,
     Dir.test)
   local check_opts = Opts.check
-  engine = engine or Vars.stdengine
+  engine = engine or G.stdengine
   local binary = engine
-  local format = gsub(engine, "tex$", Vars.checkformat)
+  local format = gsub(engine, "tex$", G.checkformat)
   -- Special binary/format combos
-  local special_check = Vars.specialformats[Vars.checkformat]
+  local special_check = G.specialformats[G.checkformat]
   if special_check and not_empty(special_check) then
     local engine_info = special_check[engine]
     if engine_info then
@@ -904,7 +818,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Special casing for ConTeXt
   local setup
-  if match(Vars.checkformat, "^context$") then
+  if match(G.checkformat, "^context$") then
     function setup(file)
       return ' "' .. file .. '" '
     end
@@ -918,7 +832,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local gen_file = base_name .. test_type.generated
   local new_file = base_name .. "." .. engine .. test_type.generated
   local ascii_opt = ""
-  for i in entries(Vars.asciiengines) do
+  for i in entries(G.asciiengines) do
     if binary == i then
       ascii_opt = "-translate-file ./ascii.tcx "
       break
@@ -936,31 +850,31 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
     localtexmf = OS.pathsep .. absolute_path(Dir.texmf) .. "//"
   end
-  for run_number = 1, Vars.checkruns do
+  for run_number = 1, G.checkruns do
     err_levels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
         OS.setenv .. " TEXINPUTS=." .. localtexmf
-          .. (Vars.checksearch and OS.pathsep or ""),
+          .. (G.checksearch and OS.pathsep or ""),
         OS.setenv .. " LUAINPUTS=." .. localtexmf
-          .. (Vars.checksearch and OS.pathsep or ""),
+          .. (G.checksearch and OS.pathsep or ""),
         -- Avoid spurious output from (u)pTeX
         OS.setenv .. " GUESS_INPUT_KANJI_ENCODING=0",
         -- Allow for local texmf files
         OS.setenv .. " TEXMFCNF=." .. OS.pathsep,
-        set_epoch_cmd(Main.epoch, Vars.forcecheckepoch),
+        set_epoch_cmd(G.epoch, G.forcecheckepoch),
         -- Ensure lines are of a known length
-        OS.setenv .. " max_print_line=" .. Vars.maxprintline,
+        OS.setenv .. " max_print_line=" .. G.maxprintline,
         binary .. format
           .. " " .. ascii_opt .. " " .. check_opts
           .. setup(lvt_file)
           .. (hide and (" > " .. OS.null) or ""),
-        Vars.runtest_tasks(job_name(lvt_file), run_number)
+        G.runtest_tasks(job_name(lvt_file), run_number)
       )
     )
     -- Break the loop if the result is stable
-    if breakout and run_number < Vars.checkruns then
+    if breakout and run_number < G.checkruns then
       if test_type.generated == Xtn.pdf then
         if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
           dvi2pdf(name, Dir.test, engine, hide)
@@ -1001,8 +915,8 @@ end
 local function setup_check(name, engine)
   local test_name = name .. "." .. engine
   local found
-  for kind in entries(Vars.test_order) do
-    local reference_ext = Vars.test_types[kind].reference
+  for kind in entries(G.test_order) do
+    local reference_ext = G.test_types[kind].reference
     local reference_file = locate(
       { Dir.testfile, Dir.unpack },
       { test_name .. reference_ext, name .. reference_ext }
@@ -1021,8 +935,8 @@ local function setup_check(name, engine)
      return
   end
   -- Attempt to generate missing reference file from expectation
-  for kind in entries(Vars.test_order) do
-    local test_type = Vars.test_types[kind]
+  for kind in entries(G.test_order) do
+    local test_type = G.test_types[kind]
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
       { Dir.testfile, Dir.unpack },
@@ -1081,12 +995,12 @@ local function run_check(test_name, hide)
     print("Failed to find input for test " .. test_name)
     return 1
   end
-  local check_engines = Vars.checkengines
+  local check_engines = G.checkengines
   if options.engine then
     check_engines = options.engine
   end
   -- Used for both .lvt and .pvt tests
-  local test_type = Vars.test_types[kind]
+  local test_type = G.test_types[kind]
   local error_level = 0
   for engine in entries(check_engines) do
     setup_check(test_name, engine)
@@ -1117,7 +1031,7 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   -- LuaTeX-specific .tlg file and the default engine is not LuaTeX
   if (match(engine, "^lua") or match(engine, "^harf"))
   and not match(tlg_file, "%.luatex" .. "%" .. Xtn.tlg)
-  and not match(Vars.stdengine, "^lua")
+  and not match(G.stdengine, "^lua")
   then
     local lua_log_file
     if cleanup then
@@ -1144,6 +1058,8 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   return error_level
 end
 
+defaults.test_types.log.compare = compare_tlg
+
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
   print("\n  Check failed with difference files")
@@ -1151,69 +1067,6 @@ local function check_diff()
     print("  - " .. Dir.test .. "/" .. i)
   end
   print("")
-end
-
--- define the default once the required object are properly defined
-extend_with(dflt, {
-  includetests  = { "*" },
-  excludetests  = {},
-  checkengines    = { "pdftex", "xetex", "luatex" },
-  stdengine     = "pdftex",
-  checkformat   = "latex",
-  -- specialformats is defined below
-  test_types = {
-    log = {
-      test = Xtn.lvt,
-      generated = Xtn.log,
-      reference = Xtn.tlg,
-      expectation = Xtn.lve,
-      compare = compare_tlg,
-      rewrite = rewrite_log,
-    },
-    pdf = {
-      test = Xtn.pvt,
-      generated = Xtn.pdf,
-      reference = Xtn.tpf,
-      rewrite = rewrite_pdf,
-    },
-  },
-  test_order    = { "log", "pdf" },
-  checkconfigs  = { "build" },
-  checksearch   = true,
-  recordstatus  = false,
-  forcecheckepoch = true,
-  asciiengines  = { "pdftex" },
-  checkruns     = 1,
-  maxprintline  = 79,
-  checkinit_hook  = checkinit_hook,
-  runtest_tasks = runtest_tasks,
-  ps2pdfopt     = "",
-})
-
-dflt.specialformats = {
-  context = {
-    luatex = { binary = "context", format = "" },
-    pdftex = { binary = "texexec", format = "" },
-    xetex  = { binary = "texexec", format = "", options = "--xetex" }
-  },
-  latex = {
-    etex  = { format = "latex" },
-    ptex  = { binary = "eptex" },
-    uptex = { binary = "euptex" }
-  }
-}
-
-if not string.find(status.banner," 2019") then
-  dflt.specialformats.latex.luatex = {
-    binary = "luahbtex",
-    format = "lualatex"
-  }
-  dflt.specialformats["latex-dev"] = {
-    luatex = {
-      binary ="luahbtex",
-      format = "lualatex-dev"
-    }
-  }
 end
 
 ---Check
@@ -1230,14 +1083,14 @@ local function check(test_names)
     test_names = test_names or {}
     -- No names passed: find all test files
     if not not_empty(test_names) then
-      for kind in entries(Vars.test_order) do
-        local ext = Vars.test_types[kind].test
+      for kind in entries(G.test_order) do
+        local ext = G.test_types[kind].test
         ---@type table<integer, glob_match_f>
         local exclude_glob_matches = {}
-        for glob in entries(Vars.excludetests) do
+        for glob in entries(G.excludetests) do
           append(exclude_glob_matches, to_glob_match(glob .. ext))
         end
-        for glob in entries(Vars.includetests) do
+        for glob in entries(G.includetests) do
           for name in all_names(Dir.testfile, glob .. ext) do
             local is_excluded
             for glob_match in entries(exclude_glob_matches) do
@@ -1333,21 +1186,21 @@ local function save(names)
   end
   check_init()
   local options = l3build.options
-  local engines = options.engine or { Vars.stdengine }
+  local engines = options.engine or { G.stdengine }
   for name in entries(names) do
     local test_filename, kind = test_exists(name)
     if not test_filename then
       print('Test "' .. name .. '" not found')
       return 1
     end
-    local test_type = Vars.test_types[kind]
+    local test_type = G.test_types[kind]
     if locate({ Dir.unpack, Dir.testfile }, { name .. test_type.expectation }) then
       print("Saved " .. test_type.test .. " file would override a "
         .. test_type.expectation .. " file of the same name")
       return 1
     end
     for engine in entries(engines) do
-      local test_engine = engine == Vars.stdengine and "" or ("." .. engine)
+      local test_engine = engine == G.stdengine and "" or ("." .. engine)
       local out_file = name .. test_engine .. test_type.reference
       local gen_file = name .. "." .. engine .. test_type.generated
       print("Creating and copying " .. out_file)
@@ -1381,13 +1234,13 @@ end
 ---@param options options_t
 ---@return error_level_n?
 local function high_check(options)
-  local check_configs = Vars.checkconfigs
+  local check_configs = G.checkconfigs
   if #check_configs > 1 then
     local error_level = 0
     local opts = deep_copy(options)
     ---@type string_list_t
     local failed_configs = {}
-    -- utlib.Vars.debug.chooser = true
+    -- utlib.G.debug.chooser = true
     local halt_on_error = options["halt-on-error"]
     for config in entries(check_configs) do
       opts.config = { config }
@@ -1426,14 +1279,14 @@ local function sanitize_engines(options)
   if options.engine and not options.force then
     -- Make a lookup table
     local t = {}
-    for engine in entries(Vars.checkengines) do
+    for engine in entries(G.checkengines) do
       t[engine] = true
     end
     for opt_engine in entries(options.engine) do
       if not t[opt_engine] then
         print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
         print("\n  Valid values are:")
-        for engine in entries(Vars.checkengines) do
+        for engine in entries(G.checkengines) do
           print("  - " .. engine)
         end
         print("")
@@ -1462,7 +1315,7 @@ end
 ---Load the config file, when unique and not "build".
 ---@return error_level_n
 local function load_unique_config(options)
-  local configs = Vars.checkconfigs
+  local configs = G.checkconfigs
   if #configs ~= 1 then
     return 0
   end
@@ -1470,11 +1323,14 @@ local function load_unique_config(options)
   if config_1 == "build" then
     return 0
   end
-  local config_path = l3build.work_dir
-    .. config_1:gsub( ".lua$", "") .. ".lua"
+  config_1 = config_1:gsub( ".lua$", "") .. ".lua"
+  local config_path = l3build.work_dir .. config_1
+  if not file_exists(config_path) then
+    config_path = l3build.work_dir .. "config-".. config_1
+  end
   if file_exists(config_path) then
     dofile(config_path)
-    Dir._config = "-".. config_1
+    Dir.config = "-".. config_1
     if options.debug then
       print("DEBUG config: ", config_1)
     end
@@ -1500,13 +1356,12 @@ local function configure_check(options)
 end
 
 ---@class l3b_check_t
----@field Vars              l3b_check_vars_t
 ---@field check_impl        target_impl_t
 ---@field module_check_impl target_impl_t
 ---@field save_impl         target_impl_t
+---@field load_unique_config  fun(options: options_t): error_level_n
 
 return {
-  Vars        = Vars,
   check_impl  = {
     prepare     = prepare_check,
     high_run    = high_check,
@@ -1521,4 +1376,5 @@ return {
     configure = configure_save,
     run       = save,
   },
+  load_unique_config = load_unique_config,
 }

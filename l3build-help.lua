@@ -24,10 +24,14 @@ for those people who are interested.
 
 local concat = table.concat
 local append = table.insert
+local write  = io.write
 
 ---@type utlib_t
 local utlib           = require("l3b-utillib")
+local entries         = utlib.entries
+local keys            = utlib.keys
 local sorted_entries  = utlib.sorted_entries
+local sorted_pairs    = utlib.sorted_pairs
 
 ---@type fslib_t
 local fslib = require("l3b-fslib")
@@ -36,13 +40,14 @@ local absolute_path = fslib.absolute_path
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars = require("l3build-variables")
----@type Main_t
-local Main  = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals = require("l3build-globals")
+---@type G_t
+local G  = l3b_globals.G
 ---@type Dir_t
-local Dir   = l3b_vars.Dir
-local guess_bundle_module = l3b_vars.guess_bundle_module
+local Dir   = l3b_globals.Dir
+local export  = l3b_globals.export
+local defaults        = l3b_globals.defaults
 
 local function version()
   print(
@@ -97,6 +102,267 @@ local function help()
   print("Copyright (C) 2014-2020 The LaTeX Project")
 end
 
+---Print status for global function and hooks,
+---for global variables as well.
+local function print_status()
+  print("PRINT", _G.abspath, defaults.abspath)
+  print("PRINT", _G["abspath"], defaults["abspath"])
+  local variables_n = 0
+  local variables = {}
+  local functions = {}
+  local expected = {}
+  local l3b_functions = {
+    "bundlectan",
+    "typeset",
+    "bibtex",
+    "biber",
+    "makeindex",
+    "tex",
+    "checkinit_hook",
+    "runtest_tasks",
+    "update_tag",
+    "tag_hook",
+    "typeset_demo_tasks",
+    "docinit_hook",
+    "manifest_setup",
+    "manifest_sort_within_match",
+    "manifest_sort_within_group",
+    "manifest_extract_filedesc",
+    "manifest_write_opening",
+    "manifest_write_subheading",
+    "manifest_write_group_heading",
+    "manifest_write_group_file",
+    "manifest_write_group_file_descr",
+    "call",
+    "runcmd",
+    "abspath",
+    "dirname",
+    "basename",
+    "cleandir",
+    "cp",
+    "direxists",
+    "fileexists",
+    "filelist",
+    "glob_to_pattern",
+    "jobname",
+    "mkdir",
+    "ren",
+    "rm",
+    "run",
+    "splitpath",
+    "normalize_path",
+  }
+
+  print("Hooks and functions, (*) for custom ones")
+  local width = 0
+  for name in entries(l3b_functions) do
+    if #name > width then
+      width = #name
+    end
+  end
+  for name in sorted_entries(l3b_functions) do
+    local filler = (" "):rep(width - #name)
+    local is_custom = defaults[name] ~= _G[name]
+    print("  ".. name .. filler .. (is_custom and " (*)" or ""))
+  end
+
+  ---Display the list of exported variables
+  local official = {
+    "module",
+    "bundle",
+    "ctanpkg",
+    --
+    "modules",
+    "exclmodules",
+    --
+    "maindir",
+    "docfiledir",
+    "sourcefiledir",
+    "supportdir",
+    "testfiledir",
+    "testsuppdir",
+    "texmfdir",
+    "textfiledir",
+    --
+    "builddir",
+    "distribdir",
+    "localdir",
+    "resultdir",
+    "testdir",
+    "typesetdir",
+    "unpackdir",
+    --
+    "ctandir",
+    "tdsdir",
+    "tdsroot",
+    --
+    "auxfiles",
+    "bibfiles",
+    "binaryfiles",
+    "bstfiles",
+    "checkfiles",
+    "checksuppfiles",
+    "cleanfiles",
+    "demofiles",
+    "docfiles",
+    "dynamicfiles",
+    "excludefiles",
+    "installfiles",
+    "makeindexfiles",
+    "scriptfiles",
+    "scriptmanfiles",
+    "sourcefiles",
+    "tagfiles",
+    "textfiles",
+    "typesetdemofiles",
+    "typesetfiles",
+    "typesetsuppfiles",
+    "typesetsourcefiles",
+    "unpackfiles",
+    "unpacksuppfiles",
+    --
+    "includetests",
+    "excludetests",
+    --
+    "checkdeps",
+    "typesetdeps",
+    "unpackdeps",
+    --
+    "checkengines",
+    "stdengine",
+    "checkformat",
+    "specialformats",
+    "test_types",
+    "test_order",
+    --
+    "checkconfigs",
+    --
+    "typesetexe",
+    "unpackexe",
+    "zipexe",
+    "biberexe",
+    "bibtexexe",
+    "makeindexexe",
+    "curlexe",
+    --
+    "checkopts",
+    "typesetopts",
+    "unpackopts",
+    "zipopts",
+    "biberopts",
+    "bibtexopts",
+    "makeindexopts",
+    --
+    "checksearch",
+    "typesetsearch",
+    "unpacksearch",
+    --
+    "glossarystyle",
+    "indexstyle",
+    "specialtypesetting",
+    --
+    "forcecheckepoch",
+    "forcedocepoch",
+    --
+    "asciiengines",
+    "checkruns",
+    "ctanreadme",
+    "ctanzip",
+    "epoch",
+    "flatten",
+    "flattentds",
+    "flattenscript",
+    "maxprintline",
+    "packtdszip",
+    "ps2pdfopts",
+    "typesetcmds",
+    "typesetruns",
+    "recordstatus",
+    "manifestfile",
+    --
+    "tdslocations",
+    --
+    "uploadconfig",
+    --"uploadconfig.pkg",
+    --
+    "bakext",
+    "dviext",
+    "lvtext",
+    "tlgext",
+    "tpfext",
+    "lveext",
+    "logext",
+    "pvtext",
+    "pdfext",
+    "psext",
+    "os_pathsep",
+    "os_concat",
+    "os_null",
+    "os_ascii",
+    "os_cmpexe",
+    "os_cmpext",
+    "os_diffexe",
+    "os_diffext",
+    "os_grepexe",
+    "os_setenv",
+    "os_yes"
+  }
+  for entry in entries(official) do
+    if _G[entry] == nil then
+      print("MISSING GLOBAL: ", entry)
+    end
+  end
+  print("")
+  print(("Global variables (%d), (*) for custom ones"):format(variables_n))
+-- Print anything - including nested tables
+  local function pretty_print(tt, dflt, indent, done)
+    dflt = dflt or {}
+    done = done or {}
+    indent = indent or 0
+    if type(tt) == "table" then
+      local w = 0
+      local has_custom = false
+      for k in keys(tt) do
+        local l = #tostring(k)
+        if l > w then
+          w = l
+        end
+        has_custom = has_custom or tt[k] ~= dflt[k]
+      end
+      for k, v in sorted_pairs(tt) do
+        local after_equals
+        if has_custom then
+          after_equals = v == dflt[k] and "    " or "(*) "
+        else
+          after_equals = ""
+        end
+        local filler = (" "):rep(w - #tostring(k))
+        write((" "):rep(indent)) -- indent it
+        if type(v) == "table" and not done[v] then
+          done[v] = true
+          if next(v) then
+            write(('["%s"]%s = %s{\n'):format(tostring(k), filler, after_equals))
+            pretty_print(v, dflt[k], indent + w + 7, done)
+            write((" "):rep( indent + w + 5)) -- indent it
+            write("}\n")
+          else
+            write(('["%s"]%s = %s{}\n'):format(tostring(k), filler, after_equals))
+          end
+        elseif type(v) == "string" then
+          write(('["%s"]%s = %s"%s"\n'):format(
+              tostring(k), filler, after_equals, tostring(v)))
+        else
+          write(('["%s"]%s = %s%s\n'):format(
+              tostring(k), filler, after_equals, tostring(v)))
+        end
+      end
+    else
+      write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
+    end
+  end
+  pretty_print(variables, defaults)
+end
+
 local function status_run()
   local work_dir = l3build.work_dir
   if not work_dir then
@@ -104,11 +370,11 @@ local function status_run()
   end
   print("Status information:")
   local main_dir = l3build.main_dir
-  local bundle = Main.bundle
-  local module = Main.module
+  local bundle = G.bundle
+  local module = G.module
   if not l3build.in_document then
     if main_dir == work_dir then
-      local modules = Main.modules
+      local modules = G.modules
       if #modules > 0 then
         -- this is a top bundle
         print("  bundle: ".. (bundle or ""))
@@ -140,21 +406,8 @@ local function status_run()
   if l3build.options.debug then
     print("Command: ".. concat(arg, " ", 0))
     print()
-    ---@type l3b_globals_t
-    local l3b_globals = require("l3build-globals")
-    l3b_globals.print_status()
+    print_status()
   end
-end
-
----Prepare data for status command
----@return error_level_n
-local function status_prepare()
-  if l3build.options.debug then
-    ---@type l3b_globals_t
-    local l3b_globals = require("l3build-globals")
-    l3b_globals.prepare_print_status()
-  end
-  return 0
 end
 
 ---@class l3b_help_t
@@ -166,7 +419,6 @@ return {
   version     = version,
   help        = help,
   status_impl = {
-    prepare = status_prepare,
     run     = status_run,
   },
 }

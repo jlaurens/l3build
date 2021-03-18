@@ -51,12 +51,12 @@ local l3build = require("l3build")
 ---@type l3build_debug_t
 local debug   = l3build.debug
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G      = l3b_globals.G
 ---@type Exe_t
-local Exe       = l3b_vars.Exe
+local Exe       = l3b_globals.Exe
 
 --[=[ Package description
 
@@ -87,51 +87,10 @@ with a configuration table `uploadconfig`
 
 --]=]
 
----@class l3b_upld_config_t
----@field announcement  string        Announcement text
----@field author        string        Author name (semicolon-separated for multiple)
----@field ctanPath      string        CTAN path
----@field email         string        Email address of uploader
----@field license       string|string_list_t Package license(s)\footnote{See \url{https://ctan.org/license}}
----@field pkg           string        Name of the CTAN package (defaults to Main.ctanpkg)
----@field summary       string        One-line summary
----@field uploader      string        Name of uploader
----@field version       string        Package version
----@field bugtracker    string|string_list_t URL(s) of bug tracker
----@field description   string        Short description/abstract
----@field development   string|string_list_t URL(s) of development channels
----@field home          string|string_list_t URL(s) of home page
----@field note          string        Internal note to CTAN
----@field repository    string|string_list_t URL(s) of source repositories
----@field support       string|string_list_t URL(s) of support channels
----@field topic         string|string_list_t Topic(s)\footnote{See \url{https://ctan.org/topics/highscore}}
----@field update        string        Boolean \texttt{true} for an update, \texttt{false} for a new package
----@field announcement_file string    Announcement text  file
----@field note_file     string        Note text file
----@field curlopt_file  string        The filename containing the options passed to curl
-
 
 ---@class l3b_upld_vars_t
 ---@field curl_debug    boolean
 ---@field uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
-
-local Vars = chooser({
-  global = l3build,
-  default = {
-    curl_debug  = false,
-  },
-  computed = {
-    uploadconfig  = function ()
-      return setmetatable({}, {
-        __index = function (t, k)
-          if k == "pkg" then
-            return Main.ctanpkg
-          end
-        end
-      })
-    end
-  },
-})
 
 -- function for interactive multiline fields
 local function input_multi_line_field(name)
@@ -232,7 +191,7 @@ end
 function MT:prepare(version)
 
   -- avoid lower level error from post command if zip file missing
-  self.upload_file = Main.ctanzip ..".zip"
+  self.upload_file = G.ctanzip ..".zip"
   local zip = open(trim_space(tostring(self.upload_file)), "r")
   if zip then
     close(zip)
@@ -246,7 +205,7 @@ function MT:prepare(version)
   -- For now, this is undocumented. I think I would prefer to keep it always set to ask for the time being.
   
   -- Keep data local, JL: what does it mean?
-  self.config = deep_copy(Vars.uploadconfig)
+  self.config = deep_copy(G.uploadconfig)
   local config = self.config
 
   local options = l3build.options
@@ -274,7 +233,7 @@ function MT:prepare(version)
     config.update = true
     self.override_update_check = true
   end
-  self.ctanzip = Main.ctanzip
+  self.ctanzip = G.ctanzip
 
 end
 
@@ -316,8 +275,8 @@ function MT:upload(tag_names)
   local response = ""
   -- use popen not execute so get the return body local exit_status = os.execute(self.ctan_post .. "validate")
 
-  if Vars.curl_debug or debug.no_curl_posting then
-    local reason = Vars.curl_debug
+  if G.curl_debug or debug.no_curl_posting then
+    local reason = G.curl_debug
       and "curl_debug==true"
       or  "--debug-no-curl-posting"
     response = "WARNING: ".. reason ..": posting disabled"
@@ -438,10 +397,10 @@ function MT:append_request_field(name, max, desc, mandatory, multi)
 end
 
 ---@class l3b_upld_t
----@field Vars l3b_upld_vars_t
 ---@field upload fun(tag_names: string_list_t): string
 
 return {
-  Vars    = Vars,
-  upload  = upload,
+  upload  = {
+    run = upload,
+  },
 }

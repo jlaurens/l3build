@@ -30,9 +30,7 @@ local deps_install  = l3b_aux.deps_install
 
 ---@type utlib_t
 local utlib   = require("l3b-utillib")
-local chooser = utlib.chooser
 local entries = utlib.entries
-local keys    = utlib.keys
 
 ---@type wklib_t
 local wklib             = require("l3b-walklib")
@@ -54,47 +52,32 @@ local absolute_path         = fslib.absolute_path
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G      = l3b_globals.G
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir       = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files     = l3b_globals.Files
 ---@type Deps_t
-local Deps      = l3b_vars.Deps
+local Deps      = l3b_globals.Deps
 ---@type Exe_t
-local Exe       = l3b_vars.Exe
+local Exe       = l3b_globals.Exe
 ---@type Opts_t
-local Opts      = l3b_vars.Opts
-
----@alias bundleunpack_f fun(source_dirs: string_list_t, sources: string_list_t): integer
-
----@class l3b_unpk_vars_t
----@field unpacksearch boolean  Switch to search the system \texttt{texmf} for during unpacking
----@field bundleunpack bundleunpack_f  bundle unpack overwrite
-
----@type l3b_unpk_vars_t
-local Vars_dflt = {
-  -- Enable access to trees outside of the repo
-  -- As these may be set false, a more elaborate test than normal is needed
-  unpacksearch = true
-}
----@type l3b_unpk_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = Vars_dflt
-})
+local Opts      = l3b_globals.Opts
+local defaults  = l3b_globals.defaults
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
 ---@param source_dirs string_list_t|nil defaults to the source directory
 ---@param sources     string_list_t|nil defaults to the source files glob
 ---@return error_level_n
-function Vars_dflt.bundleunpack(source_dirs, sources)
+function defaults.bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
   sources = sources or { Files.source }
   local options = l3build.options
-  local error_level = make_directory(Dir[l3b_vars.LOCAL])
+  local error_level = make_directory(Dir[l3b_globals.LOCAL])
   if error_level ~= 0 then
     return error_level
   end
@@ -113,7 +96,7 @@ function Vars_dflt.bundleunpack(source_dirs, sources)
     end
   end
   for glob in entries(Files.unpacksupp) do
-    error_level = copy_tree(glob, Dir.support, Dir[l3b_vars.LOCAL])
+    error_level = copy_tree(glob, Dir.support, Dir[l3b_globals.LOCAL])
     if error_level ~= 0 then
       return error_level
     end
@@ -121,13 +104,13 @@ function Vars_dflt.bundleunpack(source_dirs, sources)
   for glob in entries(Files.unpack) do
     for p in tree(Dir.unpack, glob) do
       local dir_path, base_name = dir_base(p.src)
-      local local_dir = absolute_path(Dir[l3b_vars.LOCAL])
+      local local_dir = absolute_path(Dir[l3b_globals.LOCAL])
       local cmd = cmd_concat(
         "cd " .. Dir.unpack .. "/" .. dir_path,
         OS.setenv .. " TEXINPUTS=." .. OS.pathsep
-          .. local_dir .. (Vars.unpacksearch and OS.pathsep or ""),
+          .. local_dir .. (G.unpacksearch and OS.pathsep or ""),
         OS.setenv .. " LUAINPUTS=." .. OS.pathsep
-          .. local_dir .. (Vars.unpacksearch and OS.pathsep or ""),
+          .. local_dir .. (G.unpacksearch and OS.pathsep or ""),
         Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
           .. (options.quiet and (" > " .. OS.null) or "")
       )
@@ -155,12 +138,12 @@ local function unpack(sources, source_dirs)
   if error_level ~= 0 then
     return error_level
   end
-  error_level = Vars.bundleunpack(source_dirs, sources)
+  error_level = G.bundleunpack(source_dirs, sources)
   if error_level ~= 0 then
     return error_level
   end
   for g in entries(Files.install) do
-    error_level = copy_tree(g, Dir.unpack, Dir[l3b_vars.LOCAL])
+    error_level = copy_tree(g, Dir.unpack, Dir[l3b_globals.LOCAL])
     if error_level ~= 0 then
       return error_level
     end
@@ -168,24 +151,22 @@ local function unpack(sources, source_dirs)
   return 0
 end
 
----Wraps the Vars.bundleunpack. Naming may change.
+---Wraps the G.bundleunpack. Naming may change.
 ---@return error_level_n
 local function module_unpack()
   local error_level = deps_install(Deps.unpack)
   if error_level ~= 0 then
     return error_level
   end
-  return Vars.bundleunpack()
+  return G.bundleunpack()
 end
 
 ---@class l3b_unpk_t
----@field Vars          l3b_unpk_vars_t
 ---@field unpack        unpack_f
 ---@field unpack_impl   target_impl_t
 ---@field module_unpack_impl target_impl_t
 
 return {
-  Vars          = Vars,
   unpack        = unpack,
   unpack_impl   = {
     run = unpack,

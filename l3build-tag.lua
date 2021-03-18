@@ -48,16 +48,16 @@ local tree        = fslib.tree
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G      = l3b_globals.G
 ---@type Xtn_t
-local Xtn       = l3b_vars.Xtn
+local Xtn       = l3b_globals.Xtn
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir       = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files     = l3b_globals.Files
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
@@ -137,7 +137,7 @@ end
 ---@param tag_names string_list_t|nil, singleton list
 ---@return error_level_n
 local function bundle_tag(tag_names)
-  local error_level = call(Main.modules, "tag")
+  local error_level = call(G.modules, "tag")
   -- Deal with any files in the bundle dir itself
   if error_level == 0 then
     error_level = tag(tag_names)

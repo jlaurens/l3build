@@ -25,17 +25,11 @@ for those people who are interested.
 local print     = print
 local not_empty = next
 
-local kpse        = require("kpse")
-local set_program = kpse.set_program_name
-local var_value   = kpse.var_value
-
 local append = table.insert
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
-local chooser     = utlib.chooser
 local entries     = utlib.entries
-local keys        = utlib.keys
 
 ---@type gblib_t
 local gblib           = require("l3b-globlib")
@@ -63,14 +57,15 @@ local rename                = fslib.rename
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G         = l3b_globals.G
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir       = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files     = l3b_globals.Files
+local defaults  = l3b_globals.defaults
 
 ---@type l3b_unpk_t
 local l3b_unpk  = require("l3build-unpack")
@@ -79,44 +74,6 @@ local unpack    = l3b_unpk.unpack
 ---@type l3b_doc_t
 local l3b_doc  = require("l3build-doc")
 local doc       = l3b_doc.doc
-
----@class l3b_inst_vars_t
----@field flattentds    boolean Switch to flatten any source structure when creating a TDS structure
----@field flattenscript boolean Switch to flatten any script structure when creating a TDS structure
----@field texmf_home    string_list_t
----@field typeset_list  string_list_t
----@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
----@field tdslocations  string_list_t For non-standard file installations
-
----@type string_list_t
-local typeset_list
-
----@type l3b_inst_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = {
-    flattentds    = true,
-    ctanreadme    = "README.md",
-    tdslocations    = {},
-  },
-  computed = {
-    flattenscript = function (t, k, v_dflt)
-      return t.flattentds -- by defaut flattentds and flattenscript are synonyms
-    end,
-    typeset_list = function (t, k, v_dflt)
-      assert(typeset_list, "Documentation is not installed")
-      return typeset_list
-    end,
-    texmf_home = function (t, k, v_dflt)
-      local result = l3build.options.texmfhome
-      if not result then
-        set_program("latex")
-        result = var_value("TEXMFHOME")
-      end
-      return result
-    end,
-  },
-})
 
 ---Uninstall
 ---@return error_level_n
@@ -130,7 +87,7 @@ local function uninstall()
       local p_src = p.src
       -- Man files should have a single-digit extension: the type
       local man = "man" .. p_src:match(".$")
-      local install_dir = Vars.texmf_home .. "/doc/man/"  .. man
+      local install_dir = G.texmf_home .. "/doc/man/"  .. man
       if file_exists(install_dir .. "/" .. p_src) then
         if dry_run then
           append(man_files, man .. "/" .. base_name(p_src))
@@ -141,14 +98,14 @@ local function uninstall()
     end
   end
   if not_empty(man_files) then
-    print("\n" .. "For removal from " .. Vars.texmf_home .. "/doc/man:")
+    print("\n" .. "For removal from " .. G.texmf_home .. "/doc/man:")
     for v in entries(man_files) do
       print("- " .. v)
     end
   end
   local zap_dir = dry_run
     and function (dir)
-      local install_dir = Vars.texmf_home .. "/" .. dir
+      local install_dir = G.texmf_home .. "/" .. dir
       local files = file_list(install_dir)
       if not_empty(files) then
         print("\n" .. "For removal from " .. install_dir .. ":")
@@ -159,7 +116,7 @@ local function uninstall()
       return 0
     end
     or function (dir)
-      local install_dir = Vars.texmf_home .. "/" .. dir
+      local install_dir = G.texmf_home .. "/" .. dir
       if directory_exists(install_dir) then
         return remove_directory(install_dir)
       end
@@ -171,15 +128,15 @@ local function uninstall()
   error_level = uninstall_files("doc")
               + uninstall_files("source")
               + uninstall_files("tex")
-              + uninstall_files("bibtex/bst", Main.module)
-              + uninstall_files("makeindex", Main.module)
-              + uninstall_files("scripts", Main.module)
+              + uninstall_files("bibtex/bst", G.module)
+              + uninstall_files("makeindex", G.module)
+              + uninstall_files("scripts", G.module)
               + error_level
   if error_level ~= 0 then
     return error_level
   end
   -- Finally, clean up special locations
-  for location in entries(Vars.tdslocations) do
+  for location in entries(G.tdslocations) do
     local path = dir_name(location)
     error_level = zap_dir(path)
     if error_level ~= 0 then
@@ -216,7 +173,7 @@ local function install_files(root_install_dir, full, dry_run)
     -- the structure needed is slightly different from those items going
     -- into the tex/doc/source trees
     if (type == "makeindex" or type:match("^bibtex"))
-      and Main.module == "base" -- "base" is latex2e specific
+      and G.module == "base" -- "base" is latex2e specific
     then
       module = "latex"
     end
@@ -240,7 +197,7 @@ local function install_files(root_install_dir, full, dry_run)
             end
           end
           local matched = false
-          for location in entries(Vars.tdslocations) do
+          for location in entries(G.tdslocations) do
             local l_dir, l_glob = dir_base(location)
             local glob_match = to_glob_match(l_glob)
             if glob_match(name) then
@@ -328,7 +285,7 @@ local function install_files(root_install_dir, full, dry_run)
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typeset_list = create_file_list(
+    G.typeset_list = create_file_list(
       Dir.docfile,
       Files.typeset,
       { Files.source }
@@ -356,14 +313,14 @@ local function install_files(root_install_dir, full, dry_run)
         Dir.sourcefile,
         "source",
         { source_list },
-        Vars.flattentds,
+        G.flattentds,
         Dir.tds_module
       )
     + feed_to_copy(
         Dir.sourcefile,
         "source",
         { source_list_script },
-        Vars.flattenscript,
+        G.flattenscript,
         Dir.tds_module
       )
     + feed_to_copy(
@@ -376,9 +333,9 @@ local function install_files(root_install_dir, full, dry_run)
             any typesetting demo files need to be part
             of the main typesetting list]] 
           Files.text,
-          typeset_list
+          G.typeset_list
         },
-        Vars.flattentds,
+        G.flattentds,
         Dir.tds_module
       )
     if error_level ~= 0 then
@@ -387,7 +344,7 @@ local function install_files(root_install_dir, full, dry_run)
 
     -- Rename README if necessary
     if not dry_run then
-      local readme = Vars.ctanreadme
+      local readme = G.ctanreadme
       if readme ~= "" and not readme:lower():match("^readme%.%w+") then
         local install_dir = root_install_dir .. "/doc/" .. Dir.tds_module
         if file_exists(install_dir .. "/" .. readme) then
@@ -420,10 +377,10 @@ local function install_files(root_install_dir, full, dry_run)
     return error_level
   end
   error_level =
-      feed_to_copy(Dir.unpack, "tex", { install_list }, Vars.flattentds, Dir.tds_module)
-    + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst }, Vars.flattentds, Main.module)
-    + feed_to_copy(Dir.unpack, "makeindex", { Files.makeindex }, Vars.flattentds, Main.module)
-    + feed_to_copy(Dir.unpack, "scripts", { Files.script }, Vars.flattenscript, Main.module)
+      feed_to_copy(Dir.unpack, "tex", { install_list }, G.flattentds, Dir.tds_module)
+    + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst }, G.flattentds, G.module)
+    + feed_to_copy(Dir.unpack, "makeindex", { Files.makeindex }, G.flattentds, G.module)
+    + feed_to_copy(Dir.unpack, "scripts", { Files.script }, G.flattenscript, G.module)
 
   if error_level ~= 0 then
     return error_level
@@ -443,17 +400,17 @@ end
 
 local function install()
   local options = l3build.options
-  return install_files(Vars.texmf_home, options.full, options["dry-run"])
+  return install_files(G.texmf_home, options.full, options["dry-run"])
 end
 
+defaults.install_files = install_files
+
 ---@class l3b_inst_t
----@field Vars            l3b_inst_vars_t
 ---@field install_impl    target_impl_t
 ---@field uninstall_impl  target_impl_t
 ---@field install_files   fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
 
 return {
-  Vars            = Vars,
   install_impl    = {
     run = install
   },

@@ -278,16 +278,14 @@ end
 
 ---@type l3b_globals_t
 local l3b_globals = require("l3build-globals")
-local export_symbols = l3b_globals.export_symbols
-local load_build = l3b_globals.load_build
+
+l3b_globals.export()
 
 -- Terminate here if in document mode
 if in_document then
-  export_symbols(_G, in_document)
   return l3build
 end
 
-l3b_globals.setup()
 
 --[===[DEBUG flags]===]
 ---@type oslib_t
@@ -320,9 +318,13 @@ local options   = l3build.options
 
 local debug = options.debug
 
+---@type fslib_t
+local fslib = require("l3b-fslib")
+local set_tree_excluder = fslib.set_tree_excluder
+
 if debug then -- activate the private special debugging options
   require("l3b-oslib").Vars.debug.run = l3build.debug.run -- options --debug-run
-  require("l3b-fslib").Vars.debug.copy_core = l3build.debug.copy_core-- options --debug-copy-core
+  fslib.Vars.debug.copy_core = l3build.debug.copy_core-- options --debug-copy-core
 end
 
 local target = options.target
@@ -342,23 +344,26 @@ end
 
 -- Load configuration file if running as a script
 if is_main then
-  -- Look for some configuration details
-  load_build(work_dir)
+  local f, msg = loadfile(work_dir .. "/build.lua")
+  if not f then
+    error(msg)
+  end
+  f() -- ignore any output
 end
 
 -- bundle and module names recovery
 
 local read_content  = utlib.read_content
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type G_t
+local G   = l3b_globals.G
+---@type Dir_t
+local Dir = l3b_globals.Dir
 
 -- bundle and module values are very important
 -- because they control the behaviour of actions
 local bundle, module
-if Main.is_embedded then
+if G.is_embedded then
   -- a module inside a bundle.
   -- The bundle name must be provided, but can be a void string
   -- It is read from the the parent's `build.lua`
@@ -394,7 +399,7 @@ if Main.is_embedded then
           :format(module, l3build.G.module))
   end
 else -- not an embeded module
-  local modules = Main.modules
+  local modules = G.modules
   bundle = _G.bundle or l3build.G.bundle
   if #modules > 0 then
     -- this is a top bundle,
@@ -434,10 +439,12 @@ local call    = l3b_aux.call
 exit(process(options, {
   preflight     = function ()
     utlib.flags.cache_chosen = true
-    l3b_globals.export_symbols(_G)
+    set_tree_excluder(function (path)
+      return path == Dir.build
+    end)
   end,
-  at_bundle_top = Main._at_bundle_top,
+  at_bundle_top = G.at_bundle_top,
   top_callback  = function (module_target)
-    return call(Main.modules, module_target)
+    return call(G.modules, module_target)
   end,
 }))

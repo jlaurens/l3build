@@ -24,15 +24,10 @@ for those people who are interested.
 
 local print = print
 
-local lower = string.lower
-local match = string.match
-
 ---@type utlib_t
-local utlib    = require("l3b-utillib")
-local chooser = utlib.chooser
+local utlib   = require("l3b-utillib")
 local entries = utlib.entries
 local items   = utlib.items
-local values  = utlib.values
 local to_quoted_string = utlib.to_quoted_string
 
 ---@type wklib_t
@@ -56,18 +51,18 @@ local remove_directory  = fslib.remove_directory
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals = require("l3build-globals")
+---@type G_t
+local G           = l3b_globals.G
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir         = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files       = l3b_globals.Files
 ---@type Exe_t
-local Exe       = l3b_vars.Exe
+local Exe         = l3b_globals.Exe
 ---@type Opts_t
-local Opts      = l3b_vars.Opts
+local Opts        = l3b_globals.Opts
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
@@ -76,28 +71,13 @@ local call    = l3b_aux.call
 ---@type l3b_inst_t
 local l3b_inst = require("l3build-install")
 local install_files = l3b_inst.install_files
----@type l3b_inst_vars_t
-local l3b_inst_vars = l3b_inst.Vars
-
----@class l3b_ctan_vars_t
----@field flatten boolean Switch to flatten any source structure when sending to CTAN
----@field packtdszip boolean Switch to build a TDS-style zip file for CTAN
-
----@type l3b_ctan_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = {
-    flatten = true,
-    packtdszip = false,
-  },
-})
 
 -- Copy files to the main CTAN release directory
 local function copy_ctan()
-  local ctanpkg_dir = Dir.ctan .. "/" .. Main.ctanpkg
+  local ctanpkg_dir = Dir.ctan .. "/" .. G.ctanpkg
   make_directory(ctanpkg_dir)
   local function copy_files(files, source)
-    if source == Dir.work or Vars.flatten then
+    if source == Dir.work or G.flatten then
       for file_type in entries(files) do
         copy_tree(file_type, source, ctanpkg_dir)
       end
@@ -115,7 +95,7 @@ local function copy_ctan()
   end
   for tab in items(
     Files.bib, Files.demo, Files.doc,
-    Files.scriptman, Files._all_pdf, l3b_inst_vars.typeset_list
+    Files.scriptman, Files._all_pdf, G.typeset_list
   ) do
     copy_files(tab, Dir.docfile)
   end
@@ -142,9 +122,9 @@ local function ctan()
   -- Always run tests for all engines
   l3build.options.engine = nil
   local error_level
-  local is_embedded = Main.is_embedded
+  local is_embedded = G.is_embedded
   if is_embedded then
-    error_level = call(Main.modules, "module_check")
+    error_level = call(G.modules, "module_check")
   else
     error_level = call({ "." }, "check")
   end
@@ -155,7 +135,7 @@ local function ctan()
     return error_level
   end
   remove_directory(Dir.ctan)
-  make_directory(Dir.ctan .. "/" .. Main.ctanpkg)
+  make_directory(Dir.ctan .. "/" .. G.ctanpkg)
   remove_directory(Dir.tds)
   make_directory(Dir.tds)
   if is_embedded then
@@ -165,7 +145,7 @@ local function ctan()
     end
     copy_ctan()
   else
-    error_level = call(Main.modules, "module_ctan")
+    error_level = call(G.modules, "module_ctan")
     if error_level ~= 0 then
       print("\n====================")
       print("Typesetting failed, zip stage skipped!")
@@ -175,17 +155,17 @@ local function ctan()
   end
   for glob in entries(Files.text) do
     for src_dir in items(Dir.unpack, Dir.textfile) do
-      copy_tree(glob, src_dir, Dir.ctan .. "/"     .. Main.ctanpkg)
-      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle)
+      copy_tree(glob, src_dir, Dir.ctan .. "/"     .. G.ctanpkg)
+      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. G.tdsroot .. "/" .. G.bundle)
     end
   end
   -- Rename README if necessary
-  local readme = l3b_inst_vars.ctanreadme
-  if readme ~= "" and not lower(readme):match("^readme%.%w+") then
+  local readme = G.ctanreadme
+  if readme ~= "" and not readme:lower():match("^readme%.%w+") then
     local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
-      Dir.ctan .. "/" .. Main.ctanpkg,
-      Dir.tds .. "/doc/" .. Main.tdsroot .. "/" .. Main.bundle
+      Dir.ctan .. "/" .. G.ctanpkg,
+      Dir.tds .. "/doc/" .. G.tdsroot .. "/" .. G.bundle
     ) do
       if file_exists(dir .. "/" .. readme) then
         remove_tree(dir, newfile)
@@ -212,22 +192,20 @@ local function ctan()
       .. (exclude and (" -x " .. exclude) or "")
     run(dir, cmd)
   end
-  dirzip(Dir.tds, Main.ctanpkg .. ".tds")
-  if Vars.packtdszip then
-    copy_tree(Main.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
+  dirzip(Dir.tds, G.ctanpkg .. ".tds")
+  if G.packtdszip then
+    copy_tree(G.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
   end
-  dirzip(Dir.ctan, Main.ctanzip)
-  copy_tree(Main.ctanzip .. ".zip", Dir.ctan, Dir.work)
+  dirzip(Dir.ctan, G.ctanzip)
+  copy_tree(G.ctanzip .. ".zip", Dir.ctan, Dir.work)
   return error_level
 end
 
 ---@class l3b_ctan_t
----@field Vars              l3b_ctan_vars_t
 ---@field ctan_impl         target_impl_t
 ---@field module_ctan_impl  target_impl_t
 
 return {
-  Vars              = Vars,
   ctan_impl         = {
     run = ctan,
   },

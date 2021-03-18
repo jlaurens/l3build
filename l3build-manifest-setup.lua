@@ -55,14 +55,15 @@ for those people who are interested.
 
 local sort = table.sort
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
+
+---@type l3b_globals_t
+local l3b_globals = require("l3build-globals")
 ---@type Xtn_t
-local Xtn       = l3b_vars.Xtn
+local Xtn      = l3b_globals.Xtn
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir      = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files    = l3b_globals.Files
 
 ---@class manifest_entry_t
 ---@field subheading          string
@@ -84,7 +85,7 @@ local Files     = l3b_vars.Files
 ---@field Nchar_descr         integer
 
 ---comment
----@return table<integer, manifest_entry_t>
+---@return table<integer,manifest_entry_t>
 local function manifest_setup()
   local groups = {
     {

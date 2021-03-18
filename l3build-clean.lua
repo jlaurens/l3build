@@ -36,18 +36,22 @@ local remove_tree           = fslib.remove_tree
 local make_clean_directory  = fslib.make_clean_directory
 local remove_directory      = fslib.remove_directory
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main      = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G      = l3b_globals.G
 ---@type Dir_t
-local Dir       = l3b_vars.Dir
+local Dir       = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_vars.Files
+local Files     = l3b_globals.Files
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
+
+---@type l3b_check_t
+local l3b_check = require("l3build-check")
+local load_unique_config = l3b_check.load_unique_config
 
 ---Remove all generated files
 ---@return error_level_n
@@ -57,7 +61,7 @@ local function clean()
   -- all of the files
   local error_level = remove_directory(Dir.distrib)
                     + make_directory(Dir.distrib)
-                    + make_clean_directory(Dir[l3b_vars.LOCAL])
+                    + make_clean_directory(Dir[l3b_globals.LOCAL])
                     + make_clean_directory(Dir.test)
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
@@ -89,8 +93,16 @@ local function clean()
   return 0
 end
 
+---Run before the clean operation
+---@param options options_t
+---@return error_level_n
+local function configure_clean(options)
+  return load_unique_config(options)
+end
+
+
 local function bundle_clean()
-  local error_level = call(Main.modules, "clean")
+  local error_level = call(G.modules, "clean")
   for g in entries(Files.clean) do
     error_level = error_level + remove_tree(Dir.work, g)
   end
@@ -105,6 +117,7 @@ end
 return {
   clean_impl  = {
     run         = clean,
+    configure   = configure_clean,
     bundle_run  = bundle_clean,
   }
 }

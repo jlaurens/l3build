@@ -369,166 +369,44 @@ local function deep_copy(original)
   return f(original)
 end
 
+--[==[ Bridge business ]==]
 
---[==[ Chooser business ]==]
+---@class bridge_kv_t
+---@field prefix    string
+---@field suffix    string
+---@field index     fun(t: table, k: any): any
+---@field complete  fun(t: table, k: any, result: any): any
+---@field map       table<string,string>
 
----@class ut_flags_t
----@field cache_chosen boolean
-
----@type_t ut_flags_t
-local flags = {}
-
----@alias chooser_t table
----@alias chooser_computed_f  fun(t: table, k: any, v_dflt: any): any
----@alias chooser_fallback_f  fun(t: table, k: any, v_dflt: any, v_G: any): any
----@alias chooser_complete_f  fun(t: table, k: any, result: any): any
-
----@class chooser_kv_t
----@field global    table
----@field default   table
----@field prefix    string|nil prepend this prefix to the key for G, not for dflt
----@field suffix    string|nil append this prefix to the key for G, not for dflt
----@field computed  table<string, chooser_computed_f>
----@field fallback  chooser_fallback_f if the global value is not acceptable, this is a possible fallback.
----@field complete  chooser_complete_f
-
---[=[
-The purpose of the next chooser function is to allow
-the customization of a tree from the global domain.
-A tree starts at some variable.
-If the variable is a table with no metatable,
-this is a node, otherwise it is a leaf. This applies recursively to the fields.
-Then for
-```
-local c = chooser({ global = G, default = dflt })
-```
-`c.foo.bar` is
-- nil if no `dflt.foo.bar` exists
-- `dflt.foo.bar` if no `G.foo.bar` exists
-- `dflt.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have different type
-- `G.foo.bar` if it is not a table
-- `G.foo.bar` if `dflt.foo.bar` is a non void sequence
-- `G.foo.bar` if `dflt.foo.bar` is empty
-- `G.foo.bar` if `dflt.foo.bar` and `G.foo.bar` have the same non nil metatable
-- chooser({ global = G.foo.bar, default = dflt.foo.bar }) otherwise
-
-Things get a bit more complicated by computed properties.
-Help is provided by `kv` fields `compute` and `fallback`.
-Given a key k, we have 4 candidates
-1) the default one dflt_k
-2) comp_k computed from dflt_k with some `compute` field
-3) the global one G_k
-If we have neither dflt_k nor comp_k, the key k is unknown.
-The latter takes precedence over the former.
-If G_k s incompatible with dflt_k and comp_k,
-then the `fallback` field is asked for an alernate value.
---]=]
-
----See above
----@param kv chooser_kv_t
----@return chooser_t
-local chooser
-
-do
-  local KEY_kv = {} -- unique key
-
-  -- shared indexer
-  local chooser_MT = {
-    __index = function (t --[[:table]], k --[[:any]])
-      local kv = rawget(t, KEY_kv)
-      local dflt = kv.default
-      ---@type chooser_kv_t
-      local dflt_k = dflt[k]  -- default candidate
-      local function postflight(result)
-        ---@type chooser_complete_f
-        local complete = kv.complete
-        if complete then
-          result = complete(t, k, result)
-        end
-        -- cache the result if any such that next time, __index is not called
-        if flags.cache_chosen and result ~= nil then
-          rawset(t, k, result)
-        end
-        return result
-      end
-      ---@type chooser_computed_f
-      local computed = kv.computed
-      if computed then
-        local comp_k = computed[k]
-        if comp_k ~= nil then
-          comp_k = comp_k(t, k, dflt_k) -- a computed property is available
-          if comp_k ~= nil then
-            dflt_k = comp_k         -- overwrite what comes from default
-          end
-        end
-      end
-      if dflt_k == nil then   -- unknown key, neither default nor computed
-        return                -- stop here
-      end
-      local result
-      local G = kv.global.G
-      local kk = k
-      if type(k) == "string" then
-        if Vars.debug.chooser then
-          print("DEBUG chooser", k)
-        end
-        if kv.prefix then kk = kv.prefix .. k end
-        if kv.suffix then kk = k .. kv.suffix end
-      end
-      local G_kk = G[kk]                -- global candidate
-      if G_kk == nil then
-        result = dflt_k   -- choose the default candidate
-      elseif type(k) == "number" then
-        result = G_kk     -- choose the global candidate for number keys
-      else
-        local type_dflt_k = type(dflt_k)
-        local type_G_kk   = type(G_kk)
-        if type_G_kk ~= type_dflt_k then   -- wrong type, global candidate is not acceptable
-          ---@type chooser_fallback_f
-          local fallback = kv.fallback
-          if fallback then -- the index function take precedence
-            result = fallback(t, k, dflt_k, G_kk)
-            if result ~= nil then
-              return postflight(result)
+---Return a bridge to global variables
+---@param kv bridge_kv_t
+---@return table
+local function bridge(kv)
+  if kv then
+    kv = shallow_copy(kv)
+    return setmetatable({}, {
+      __index = function (t --[[: table]], k --[[: string]])
+        if type(k) == "string" then
+          if kv.map then
+            k = kv.map[k]
+            if not k then
+              return
             end
           end
-          error("Global ".. k .." must be a ".. type_dflt_k ..", not a ".. type_G_kk)
+          k = (kv.prefix or "") .. k .. (kv.suffix or "")
+          local _G_k = _G[k]
+          return kv.complete
+            and kv.complete(t, k, _G_k)
+            or _G_k
         end
-        if type_dflt_k == "table" then
-          if #dflt_k > 0 then
-            result = G_kk -- accept sequences as is
-          elseif not next(dflt_k) then
-            result = G_kk -- accept non void tables as is
-          elseif dflt_k[KEY_kv] ~= nil then -- this is a chooser
-            dflt_k[KEY_kv].global = { G = G_kk } -- now this chooser has a global
-            return dflt_k
-          else
-            local MT = getmetatable(dflt_k)
-            if MT then
-              if MT ~= getmetatable(G_kk) then
-                error("Incompatible objects with different metatables")
-              end
-              result = G_kk -- accept tables with the same metatable. Unused yet.
-            else
-              result = chooser({ -- return a proxy
-                global = { G = G_kk },
-                default = dflt_k
-              })
-            end
-          end
-        else
-          result = G_kk -- accept candidate when not a table
-        end
-      end
-      return postflight(result)
-    end
-  }
-  chooser = function (kv)
-    local result = setmetatable({
-      [KEY_kv] = shallow_copy(kv)
-    }, chooser_MT)
-    return result
+      end,
+    })
   end
+  return setmetatable({}, {
+    __index = function (t, k)
+      return _G[k]
+    end,
+  })
 end
 
 ---Convert a diff time into a display time
@@ -574,8 +452,14 @@ local function print_diff_time(format, diff)
   end
 end
 
+---@alias utlib_flags_t table<string,boolean>
+
+---@type utlib_flags_t
+local flags = {}
+
 ---@class utlib_t
 ---@field Vars              utlib_vars_t
+---@field flags             utlib_flags_t
 ---@field to_quoted_string  fun(table: table, separator: string|nil): string
 ---@field indices           fun(table: table): fun(): integer
 ---@field entries           fun(table: table): fun(): any
@@ -594,17 +478,17 @@ end
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
 ---@field write_content     fun(file_pat: string, content: string): error_level_n
----@field flags             ut_flags_t
 ---@field readonly          fun(t: table, quiet: boolean): table
 ---@field is_readonly       fun(t: table): boolean
 ---@field shallow_copy      fun(original: any): any
 ---@field deep_copy         fun(original: any): any
----@field chooser           fun(G: table, dflt: table, kv: chooser_kv_t): chooser_t
+---@field bridge            fun(kv: bridge_kv_t): table
 ---@field to_ymd_hms        fun(diff: integer): string
 ---@field print_diff_time   fun(format: string, diff: integer)
 
 return {
   Vars              = Vars,
+  flags             = flags,
   to_quoted_string  = to_quoted_string,
   indices           = indices,
   entries           = entries,
@@ -622,13 +506,12 @@ return {
   trim              = trim,
   extend_with       = extend_with,
   read_content      = read_content,
-  flags             = flags,
   readonly          = readonly,
   is_readonly       = is_readonly,
   write_content     = write_content,
   shallow_copy      = shallow_copy,
   deep_copy         = deep_copy,
-  chooser           = chooser,
+  bridge            = bridge,
   to_ymd_hms        = to_ymd_hms,
   print_diff_time   = print_diff_time,
 }

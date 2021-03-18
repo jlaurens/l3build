@@ -35,7 +35,7 @@ for those people who are interested.
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
-local chooser     = utlib.chooser
+local bridge      = utlib.bridge
 local entries     = utlib.entries
 local items       = utlib.items
 local keys        = utlib.keys
@@ -48,45 +48,50 @@ local file_list = fslib.file_list
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_vars_t
-local l3b_vars  = require("l3build-variables")
----@type Main_t
-local Main  = l3b_vars.Main
+---@type l3b_globals_t
+local l3b_globals  = require("l3build-globals")
+---@type G_t
+local G  = l3b_globals.G
 ---@type Dir_t
-local Dir   = l3b_vars.Dir
+local Dir   = l3b_globals.Dir
 ---@type Files_t
-local Files = l3b_vars.Files
+local Files = l3b_globals.Files
+
+local defaults = l3b_globals.defaults
+
+local Hook = bridge({
+  prefix = "manifest_",
+})
 
 ---@type l3b_mfst_setup_t
 local stp = require("l3build-manifest-setup")
 
-local Hook = chooser({
-  global = l3build,
-  default = {
-    setup                   = stp.setup,
-    extract_filedesc        = stp.extract_filedesc,
-    write_subheading        = stp.write_heading,
-    sort_within_match       = stp.sort_within_match,
-    sort_within_group       = stp.sort_within_group,
-    write_opening           = stp.write_opening,
-    write_group_heading     = stp.write_heading,
-    write_group_file_descr  = stp.write_group_file_descr,
-    write_group_file        = stp.write_group_file,
-  },
-  prefix = "manifest_",
-})
-
----@class l3b_mfst_vars_t
----@field manifestfile string File name to use for the manifest file
-
----@type l3b_mfst_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = {
-    -- Manifest options
-    manifestfile    = "MANIFEST.md",
-  },
-})
+--setup              = manifest_setup,
+--sort_within_match  = sort_within_match,
+--sort_within_group  = sort_within_group,
+--write_opening      = write_opening,
+--write_heading      = write_heading,
+--write_group_file   = write_group_file,
+--write_group_file_descr = write_group_file_descr,
+--extract_filedesc   = extract_filedesc,
+for item in items(
+  "manifest_setup",
+  "manifest_sort_within_match",
+  "manifest_sort_within_group",
+  "manifest_extract_filedesc",
+  "manifest_write_opening",
+  --"manifest_write_subheading",
+  --"manifest_write_group_heading",
+  "manifest_write_group_file",
+  "manifest_write_group_file_descr"
+) do
+  local k = item:match("manifest_(.*)")
+  local v = stp[k]
+  assert(v, "Missing manifest hook for key ".. k)
+  defaults[item] = v
+end
+defaults.manifest_write_subheading    = stp.write_heading
+defaults.manifest_write_group_heading = stp.write_heading
 
 local MT = {}
 ---comment
@@ -258,7 +263,7 @@ end
 ---comment
 ---@param manifest_entries table
 function MT:write(manifest_entries)
-  local fh = assert(io.open(Vars.manifestfile, "w"))
+  local fh = assert(io.open(G.manifestfile, "w"))
   Hook.write_opening(fh)
   local wrt_subheading = Hook.write_subheading
   for entry in entries(manifest_entries) do
@@ -274,7 +279,7 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_names(Dir.ctan .."/".. Main.ctanpkg, "*.*") do
+  for f in all_names(Dir.ctan .."/".. G.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}
@@ -292,7 +297,7 @@ function MT:manifest()
 
   self:write(manifest_entries)
 
-  local footer = "Manifest written to " .. Vars.manifestfile
+  local footer = "Manifest written to " .. G.manifestfile
   local alt_footer = footer:gsub(".", "*")
   print(alt_footer)
   print(footer)
@@ -307,11 +312,9 @@ local function manifest()
 end
 
 ---@class l3b_mfst_t
----@field Vars          l3b_mfst_vars_t
 ---@field manifest_impl target_impl_t
 
 return {
-  Vars          = Vars,
   hook          = Hook,
   manifest_impl = {
     run = manifest

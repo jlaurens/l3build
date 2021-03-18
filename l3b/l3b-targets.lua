@@ -42,7 +42,7 @@ The action is triggered by providing a target name to the CLI.
 What is performed is determined by info tables defined below.
 
 The actions can be different when performed from the top level
-or from an embedded module (see `Main._at_bundle_top`).
+or from an embedded module (see `G.at_bundle_top`).
 For a module, the action is always determined
 by the `run` field of the target info.
 When at the top of a bundle, the action is determined by
