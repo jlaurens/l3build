@@ -32,8 +32,6 @@ local rawget  = rawget
 local assert  = assert
 local pairs   = pairs
 local next    = next
-local open    = io.open
-local os_type = os["type"]
 
 local sort        = table.sort
 local append      = table.insert
@@ -298,46 +296,6 @@ local function extend_with(holder, addendum, can_overwrite)
   return holder
 end
 
----if filename is non nil and file readable return contents otherwise nil.
----The content is converted to unix line ending when not binary.
----@param file_path string
----@param is_binary boolean
----@return string? the content of the file
----@return string? an error message
-local function read_content(file_path, is_binary)
-  if file_path then
-    local fh = open(file_path, is_binary and "rb" or "r")
-    if not fh then
-      return
-    end
-    local content = fh:read("a")
-    fh:close()
-    return not is_binary and os_type == "windows"
-      and content:gsub("\r\n?", "\n")
-      or  content
-  end
-end
-
----if filename is non nil and file readable return contents otherwise nil
----Before write, the content is converted to host line ending.
----@param file_path string
----@param content string
----@return error_level_n
-local function write_content(file_path, content)
-  if file_path then
-    local fh = assert(open(file_path, "w"))
-    if not fh then
-      return 1
-    end
-    if os_type == "windows" then
-      content = content:gsub("\n", _G.os_newline)
-    end
-    local error_level = fh:write(content) and 0 or 1
-    fh:close()
-    return error_level
-  end
-end
-
 --https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
 ---Make a deep copy of the given object
 ---@param original any
@@ -375,38 +333,65 @@ end
 ---@field prefix    string
 ---@field suffix    string
 ---@field index     fun(t: table, k: any): any
+---@field newindex  fun(t: table, k: any, result: any): boolean
 ---@field complete  fun(t: table, k: any, result: any): any
 ---@field map       table<string,string>
+---@field primary   table the main object, defaults to _G
+---@field secondary table the secondary object
 
----Return a bridge to global variables
+---Return a bridge to "global" variables
 ---@param kv bridge_kv_t
 ---@return table
 local function bridge(kv)
+  local MT = {}
   if kv then
     kv = shallow_copy(kv)
-    return setmetatable({}, {
-      __index = function (t --[[: table]], k --[[: string]])
-        if type(k) == "string" then
-          if kv.map then
-            k = kv.map[k]
-            if not k then
-              return
-            end
+    MT.__index = function (t --[[: table]], k --[[: string]])
+      if type(k) == "string" then
+        if kv.map then
+          k = kv.map[k]
+          if not k then
+            return
           end
-          k = (kv.prefix or "") .. k .. (kv.suffix or "")
-          local _G_k = _G[k]
-          return kv.complete
-            and kv.complete(t, k, _G_k)
-            or _G_k
         end
-      end,
-    })
-  end
-  return setmetatable({}, {
-    __index = function (t, k)
+        local k_G = (kv.prefix or "") .. k .. (kv.suffix or "")
+        local primary = kv.primary or _G
+        local result  = primary[k_G]
+        if not result and kv.index then
+          result = kv.index(t, k)
+        end
+        if kv.complete then
+          result = kv.complete(t, k, result)
+        end
+        if kv.secondary then
+          local result_2 = kv.secondary[k_G]
+          if  result ~= result_2
+          and type(result_2) == "table"
+          and type(result)    == "table"
+          then
+            result = bridge({
+              primary   = result,
+              secondary = result_2
+            })
+          end
+        end
+        return result
+      end
+    end
+    if kv.newindex then
+      MT.__newindex = function (t, k, v)
+        assert(kv.newindex(t, k, v), "Readonly bridge ".. tostring(k) .." ".. tostring(v))
+      end
+    end
+  else
+    MT.__index = function (t, k)
       return _G[k]
-    end,
-  })
+    end
+    MT.__newindex = function (t, k, v)
+      error("Readonly bridge".. tostring(k) .." ".. tostring(v))
+    end
+  end
+  return setmetatable({}, MT)
 end
 
 ---Convert a diff time into a display time
@@ -476,8 +461,6 @@ local flags = {}
 ---@field second_of         fun(...): any
 ---@field trim              fun(in: string): string
 ---@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
----@field read_content      fun(file_pat: string, is_binary: boolean): string|nil
----@field write_content     fun(file_pat: string, content: string): error_level_n
 ---@field readonly          fun(t: table, quiet: boolean): table
 ---@field is_readonly       fun(t: table): boolean
 ---@field shallow_copy      fun(original: any): any
@@ -505,10 +488,8 @@ return {
   second_of         = second_of,
   trim              = trim,
   extend_with       = extend_with,
-  read_content      = read_content,
   readonly          = readonly,
   is_readonly       = is_readonly,
-  write_content     = write_content,
   shallow_copy      = shallow_copy,
   deep_copy         = deep_copy,
   bridge            = bridge,

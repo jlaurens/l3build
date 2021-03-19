@@ -27,17 +27,18 @@ local exit    = os.exit
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
-local chooser       = utlib.chooser
 local entries       = utlib.entries
-local values        = utlib.keys
 local unique_items  = utlib.unique_items
-local read_content  = utlib.read_content
-local write_content = utlib.write_content
 
 ---@type wklib_t
 local wklib       = require("l3b-walklib")
 local dir_name    = wklib.dir_name
 local base_name   = wklib.base_name
+
+---@type oslib_t
+local oslib         = require("l3b-oslib")
+local read_content  = oslib.read_content
+local write_content = oslib.write_content
 
 ---@type fslib_t
 local fslib       = require("l3b-fslib")
@@ -49,15 +50,15 @@ local tree        = fslib.tree
 local l3build = require("l3build")
 
 ---@type l3b_globals_t
-local l3b_globals  = require("l3build-globals")
+local l3b_globals = require("l3build-globals")
 ---@type G_t
-local G      = l3b_globals.G
+local G     = l3b_globals.G
 ---@type Xtn_t
-local Xtn       = l3b_globals.Xtn
+local Xtn   = l3b_globals.Xtn
 ---@type Dir_t
-local Dir       = l3b_globals.Dir
+local Dir   = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_globals.Files
+local Files = l3b_globals.Files
 
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
@@ -65,25 +66,18 @@ local call    = l3b_aux.call
 
 --[=[ Package implementation ]=]
 
----@alias l3b_tag_hook_f    fun(tag_name: string, tag_date: string): error_level_n
----@alias l3b_update_tag_f  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
+---@alias tag_hook_f    fun(tag_name: string, tag_date: string): error_level_n
+---@alias update_tag_f  fun(file_name: string, content: string, tag_name: string, tag_date: string): string
 
----@class l3b_tag_vars_t
----@field tag_hook    l3b_tag_hook_f
----@field update_tag  l3b_update_tag_f
+---@type tag_hook_f
+local function tag_hook(tag_name, tag_date)
+  return 0
+end
 
----@type l3b_tag_vars_t
-local Vars = chooser({
-  global = l3build,
-  default = {
-    tag_hook = function (tag_name, tag_date)
-      return 0
-    end,
-    update_tag = function(file_name, content, tag_name, tag_date)
-      return content
-    end,
-  },
-})
+---@type update_tag_f
+local function update_tag(file_name, content, tag_name, tag_date)
+  return content
+end
 
 ---Update the tag.
 ---@param file_path string
@@ -96,7 +90,7 @@ local function update_file_tag(file_path, tag_name, tag_date)
   local content = assert(read_content(file_path, true))
   -- Deal with Unix/Windows line endings
   content = content .. (content:match("\n$") and "" or "\n")
-  local updated_content = Vars.update_tag(file_name, content, tag_name, tag_date)
+  local updated_content = G.update_tag(file_name, content, tag_name, tag_date)
   if content == updated_content then
     return 0
   end
@@ -130,7 +124,7 @@ local function tag(tag_names)
       end
     end
   end
-  return Vars.tag_hook(tag_name, tag_date)
+  return G.tag_hook(tag_name, tag_date)
 end
 
 ---Target tag
@@ -146,12 +140,14 @@ local function bundle_tag(tag_names)
 end
 
 ---@class l3b_tag_t
----@field Vars      l3b_tag_vars_t
----@field tag_impl  target_impl_t
+---@field tag_impl    target_impl_t
+---@field update_tag  update_tag_f
+---@field tag_hook    tag_hook_f
 
 return {
-  Vars      = Vars,
-  tag_impl  = {
+  tag_hook    = tag_hook,
+  update_tag  = update_tag,
+  tag_impl    = {
     run         = tag,
     bundle_run  = bundle_tag,
   },

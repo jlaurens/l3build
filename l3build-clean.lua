@@ -1,3 +1,4 @@
+local l3build = require "l3build"
 --[[
 
 File l3build-clean.lua Copyright (C) 2028-2020 The LaTeX Project
@@ -65,11 +66,17 @@ local function clean()
                     + make_clean_directory(Dir.test)
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
-
   if error_level ~= 0 then
     return error_level
   end
-
+  if l3build.options.debug then
+    print("DEBUG clean:")
+    print("- remove and make directory at ".. Dir.distrib)
+    print("- make clean directory at ".. Dir[l3b_globals.LOCAL])
+    print("- make clean directory at ".. Dir.test)
+    print("- make clean directory at ".. Dir.typeset)
+    print("- make clean directory at ".. Dir.unpack)
+  end
   ---@type flag_table_t
   local clean_list = {}
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do

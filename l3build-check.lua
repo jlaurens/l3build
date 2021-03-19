@@ -52,9 +52,6 @@ local utlib           = require("l3b-utillib")
 local deep_copy       = utlib.deep_copy
 local entries         = utlib.entries
 local first_of        = utlib.first_of
-local extend_with     = utlib.extend_with
-local read_content    = utlib.read_content
-local write_content   = utlib.write_content
 
 ---@type gblib_t
 local gblib           = require("l3b-globlib")
@@ -69,6 +66,8 @@ local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
 local OS          = oslib.OS
+local read_content  = oslib.read_content
+local write_content = oslib.write_content
 
 ---@type fslib_t
 local fslib       = require("l3b-fslib")
@@ -82,7 +81,7 @@ local to_host     = fslib.to_host
 local remove_tree = fslib.remove_tree
 local remove_name = fslib.remove_name
 local directory_exists      = fslib.directory_exists
-local absolute_path         = fslib.absolute_path
+local quoted_absolute_path  = fslib.quoted_absolute_path
 local make_clean_directory  = fslib.make_clean_directory
 
 ---@type l3build_t
@@ -101,7 +100,7 @@ local help      = l3b_help.help
 ---@type l3b_globals_t
 local l3b_globals  = require("l3build-globals")
 ---@type G_t
-local G      = l3b_globals.G
+local G         = l3b_globals.G
 ---@type Xtn_t
 local Xtn       = l3b_globals.Xtn
 ---@type Dir_t
@@ -112,11 +111,6 @@ local Files     = l3b_globals.Files
 local Deps      = l3b_globals.Deps
 ---@type Opts_t
 local Opts      = l3b_globals.Opts
-local defaults  = l3b_globals.defaults
-
----@type l3b_unpk_t
-local l3b_unpk    = require("l3build-unpack")
-local bundleunpack  = l3b_unpk.Vars.bundleunpack
 
 -- Variables
 
@@ -134,7 +128,7 @@ local function dvi2pdf(name, dir, engine, hide)
         .. (hide and (" > " .. OS.null) or ""),
       "ps2pdf " .. G.ps2pdfopt .. name .. Xtn.ps
         .. (hide and (" > " .. OS.null) or "")
-    ) and 0 or 1
+    )
   )
 end
 
@@ -157,7 +151,7 @@ local function check_init()
   for i in all_names(Dir[l3b_globals.LOCAL]) do
     copy_tree(i, Dir[l3b_globals.LOCAL], Dir.test)
   end
-  bundleunpack({ Dir.sourcefile, Dir.testfile })
+  G.bundleunpack({ Dir.sourcefile, Dir.testfile })
   for i in entries(Files.install) do
     copy_tree(i, Dir.unpack, Dir.test)
   end
@@ -407,20 +401,20 @@ local function normalize_log(content, engine, errlevels)
     elseif not prestart and not skipping then
       line, lastline, drop_fd = normalize(line, lastline, drop_fd)
       if not match(line, "^ *$") and not killcheck(line) then
-        new_content = new_content .. line .. _G.os_newline
+        new_content = new_content .. line .. OS.newline
       end
     end
   end
   if G.recordstatus then
-    new_content = new_content .. '***************' .. _G.os_newline
+    new_content = new_content .. '***************' .. OS.newline
     for i = 1, G.checkruns do
       if errlevels[i] == nil then
         new_content = new_content
-          .. 'Compilation ' .. i .. ' of test file skipped ' .. _G.os_newline
+          .. 'Compilation ' .. i .. ' of test file skipped ' .. OS.newline
       else
         new_content = new_content ..
           'Compilation ' .. i .. ' of test file completed with exit status ' ..
-          errlevels[i] .. _G.os_newline
+          errlevels[i] .. OS.newline
       end
     end
   end
@@ -557,7 +551,7 @@ local function normalize_lua_log(content, is_luatex)
         last_line = gsub(last_line, " %(penalty 50%)$", "")
         -- A normal (TeX90) discretionary:
         -- add with the line break reintroduced
-        return last_line .. _G.os_newline .. line, ""
+        return last_line .. OS.newline .. line, ""
       end
     end
     -- Look for another form of \discretionary, replacing a "-"
@@ -571,7 +565,7 @@ local function normalize_lua_log(content, is_luatex)
       elseif dropping then
         return "", ""
       else
-        return last_line .. _G.os_newline .. line, ""
+        return last_line .. OS.newline .. line, ""
       end
     end
     -- For \mathon, if the current line is an empty \hbox then
@@ -618,7 +612,7 @@ local function normalize_lua_log(content, is_luatex)
       elseif match(line, "^%}%}%}$") then
         return last_line .. line, ""
       else
-        return last_line .. _G.os_newline .. line, ""
+        return last_line .. OS.newline .. line, ""
       end
     -- Return all of the text for a wrapped (multi)line
     elseif len(last_line) > max_print_line then
@@ -634,7 +628,7 @@ local function normalize_lua_log(content, is_luatex)
   for line in content:gmatch("([^\n]*)\n") do
     line, lastline, dropping = normalize(line, lastline, dropping)
     if not match(line, "^ *$") then
-      new_content = new_content .. line .. _G.os_newline
+      new_content = new_content .. line .. OS.newline
     end
   end
   return new_content
@@ -653,9 +647,9 @@ local function normalize_pdf(content)
       if match(line, "endstream") then
         is_stream = false
         if is_binary then
-          new_content = new_content .. "[BINARY STREAM]" .. _G.os_newline
+          new_content = new_content .. "[BINARY STREAM]" .. OS.newline
         else
-          new_content = new_content .. stream_content .. line .. _G.os_newline
+          new_content = new_content .. stream_content .. line .. OS.newline
         end
         is_binary = false
       else
@@ -666,19 +660,19 @@ local function normalize_pdf(content)
           end
         end
         if not is_binary and not match(line, "^ *$") then
-          stream_content = stream_content .. line .. _G.os_newline
+          stream_content = stream_content .. line .. OS.newline
         end
       end
     elseif match(line, "^stream$") then
       is_binary = false
       is_stream = true
-      stream_content = "stream" .. _G.os_newline
+      stream_content = "stream" .. OS.newline
     elseif  not match(line, "^ *$")
         and not match(line, "^%%%%Invocation")
         and not match(line, "^%%%%%+")
     then
       line = gsub(line, "%/ID( ?)%[<[^>]+><[^>]+>]", "/ID%1[<ID-STRING><ID-STRING>]")
-      new_content = new_content .. line .. _G.os_newline
+      new_content = new_content .. line .. OS.newline
     end
   end
   return new_content
@@ -701,9 +695,6 @@ end
 local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
-
-defaults.test_types.log.rewrite = rewrite_log
-defaults.test_types.pdf.rewrite = rewrite_pdf
 
 -- Look for a test: could be in the Dir.testfile or the Dir.unpack
 ---comment
@@ -748,7 +739,8 @@ local function base_compare(test_type, name, engine, cleanup)
     return compare(diff_file, ref_file, gen_file, cleanup, name, engine)
   end
   local error_level = execute(OS.diffexe .. " "
-    .. to_host(ref_file .. " " .. gen_file .. " > " .. diff_file))
+    .. to_host(ref_file .. " " .. gen_file .. " > " .. diff_file)
+  ) and 0 or 1
   if error_level == 0 or cleanup then
     remove(diff_file)
   end
@@ -848,7 +840,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    localtexmf = OS.pathsep .. absolute_path(Dir.texmf) .. "//"
+    localtexmf = OS.pathsep .. quoted_absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, G.checkruns do
     err_levels[run_number] = run(
@@ -1043,7 +1035,8 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
     error_level = execute(OS.diffexe .. " "
-      .. to_host(lua_tlg_file .. " " .. lua_log_file .. " > " .. diff_file))
+      .. to_host(lua_tlg_file .. " " .. lua_log_file .. " > " .. diff_file)
+    ) and 0 or 1
     if cleanup then
       remove(lua_log_file)
       remove(lua_tlg_file)
@@ -1057,8 +1050,6 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   end
   return error_level
 end
-
-defaults.test_types.log.compare = compare_tlg
 
 -- A short auxiliary to print the list of differences for check
 local function check_diff()
@@ -1084,6 +1075,10 @@ local function check(test_names)
     -- No names passed: find all test files
     if not not_empty(test_names) then
       for kind in entries(G.test_order) do
+        local test_info = G.test_types[kind]
+        if not test_info then
+          error('Missing in test_types: '.. kind)
+        end
         local ext = G.test_types[kind].test
         ---@type table<integer, glob_match_f>
         local exclude_glob_matches = {}
@@ -1233,14 +1228,13 @@ end
 ---Separate the check action for each configuration.
 ---@param options options_t
 ---@return error_level_n?
-local function high_check(options)
+local function check_high(options)
   local check_configs = G.checkconfigs
   if #check_configs > 1 then
     local error_level = 0
     local opts = deep_copy(options)
     ---@type string_list_t
     local failed_configs = {}
-    -- utlib.G.debug.chooser = true
     local halt_on_error = options["halt-on-error"]
     for config in entries(check_configs) do
       opts.config = { config }
@@ -1362,9 +1356,12 @@ end
 ---@field load_unique_config  fun(options: options_t): error_level_n
 
 return {
+  rewrite_pdf = rewrite_pdf,
+  rewrite_log = rewrite_log,
+  compare_tlg = compare_tlg,
   check_impl  = {
     prepare     = prepare_check,
-    high_run    = high_check,
+    run_high    = check_high,
     configure   = configure_check,
     run         = check,
   },

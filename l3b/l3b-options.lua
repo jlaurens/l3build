@@ -39,29 +39,7 @@ local sorted_values = utlib.sorted_values
 ---@type options_flags_t
 local flags = {}
 
----@class options_t
----@field config    string_list_t
----@field date      string
----@field debug     boolean
----@field dirty     boolean
----@field dry_run   boolean -- real name "dry-run"
----@field email     string
----@field engine    table
----@field epoch     string
----@field file      string
----@field first     string
----@field force     boolean
----@field full      boolean
----@field halt_on_error boolean -- real name "halt-on-error"
----@field help      boolean
----@field last      string
----@field message   string
----@field names     string_list_t
----@field quiet     boolean
----@field rerun     boolean
----@field shuffle   boolean
----@field target    string
----@field texmfhome string
+---@class options_base_t
 
 ---@alias option_type_f fun(options: table, key: string, value: string): error_level_n
 
@@ -203,7 +181,7 @@ end
 ---When this function returns `nil` it means no recognition.
 ---When it returns 0, all is ok otherwise an error occurred.
 ---@param arg table
----@param on_unknown fun(key: string): boolean|fun(any: any, options: options_t) true when catched, false otherwise
+---@param on_unknown fun(key: string): boolean|fun(any: any, options: options_base_t) true when catched, false otherwise
 ---@return table
 local function parse(arg, on_unknown)
   local result = {

@@ -43,11 +43,11 @@ local l3build = require("l3build")
 ---@type l3b_globals_t
 local l3b_globals = require("l3build-globals")
 ---@type G_t
-local G  = l3b_globals.G
+local G     = l3b_globals.G
 ---@type Dir_t
 local Dir   = l3b_globals.Dir
-local export  = l3b_globals.export
-local defaults        = l3b_globals.defaults
+
+local G_defaults  = l3b_globals.defaults
 
 local function version()
   print(
@@ -155,7 +155,7 @@ local function print_status()
   end
   for name in sorted_entries(l3b_functions) do
     local filler = (" "):rep(width - #name)
-    local is_custom = defaults[name] ~= _G[name]
+    local is_custom = G_defaults[name] ~= G[name]
     print("  ".. name .. filler .. (is_custom and " (*)" or ""))
   end
 
@@ -299,13 +299,16 @@ local function print_status()
     "os_grepexe",
     "os_setenv",
     "os_yes",
+    -- private
+    --"texmf_home", can be nil
+    --"typeset_list", can be nil
   }
   local variables = {}
   for entry in entries(l3b_variables) do
-    if _G[entry] == nil then
+    if G[entry] == nil then
       print("MISSING GLOBAL: ", entry)
     end
-    variables[entry] = _G[entry]
+    variables[entry] = G[entry]
   end
   print("")
   print(("Global variables (%d), (*) for custom ones"):format(#l3b_variables))
@@ -355,24 +358,34 @@ local function print_status()
       write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
     end
   end
-  pretty_print(variables, defaults)
+  pretty_print(variables, G_defaults)
 end
 
+---High level status runner
+---@return error_level_n?
+local function status_high()
+  local options = l3build.options
+  local name = options.get_main_variable
+  if name then
+    return l3b_globals.handle_get_main_variable(name, options.config)
+  end
+  print("NOT A RUN HIGH")
+end
+
+---Display status information.
 local function status_run()
   local work_dir = l3build.work_dir
   if not work_dir then
     print("No status information available")
   end
   print("Status information:")
-  local main_dir = l3build.main_dir
-  local bundle = G.bundle
-  local module = G.module
+  local bundle, module = G.bundle, G.module
   if not l3build.in_document then
-    if main_dir == work_dir then
+    if G.at_bundle_top then
       local modules = G.modules
       if #modules > 0 then
         -- this is a top bundle
-        print("  bundle: ".. (bundle or ""))
+        print("  bundle: ".. bundle)
         print("  path:   ".. absolute_path(Dir.work))
         local mm = {}
         for m in sorted_entries(modules) do
@@ -385,13 +398,13 @@ local function status_run()
         end
       else
         -- this is a standalone module (not in a bundle).
-        print("  module: ".. (module or ""))
+        print("  module: ".. module)
         print("  path:   ".. absolute_path(Dir.work))
       end
     else
       -- a module inside a bundle
-      print("  bundle: ".. (bundle or ""))
-      print("  module: ".. (module or ""))
+      print("  bundle: ".. bundle)
+      print("  module: ".. module)
       print("  path:   ".. absolute_path(Dir.work))
     end
     print("  start:  ".. l3build.start_dir)
@@ -414,6 +427,7 @@ return {
   version     = version,
   help        = help,
   status_impl = {
-    run     = status_run,
+    run_high  = status_high,
+    run       = status_run,
   },
 }

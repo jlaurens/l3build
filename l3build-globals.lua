@@ -41,22 +41,27 @@ For that, a metatable is added to `_G`.
 
 --]=]
 
-if type(module) == "function" then
+if type(_G.module) == "function" then
   module = nil
 end
+if type(_G.tex) == "table" then
+  _G.tex = nil
+end
 
-local append  = table.insert
-local os_time = os["time"]
-local os_type = os["type"]
+local tostring  = tostring
+local print     = print
+local append    = table.insert
+local os_time   = os.time
+local os_type   = os["type"]
 
-local status          = require("status")
+local status  = require("status")
 
 local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
 ---@type wklib_t
-local wklib         = require("l3b-walklib")
+local wklib     = require("l3b-walklib")
 local job_name  = wklib.job_name
 
 ---@type gblib_t
@@ -68,23 +73,31 @@ local items         = utlib.items
 local bridge        = utlib.bridge
 local entries       = utlib.entries
 local first_of      = utlib.first_of
+local to_quoted_string = utlib.to_quoted_string
 
 ---@type oslib_t
-local oslib       = require("l3b-oslib")
-local quoted_path = oslib.quoted_path
-local OS          = oslib.OS
-local cmd_concat  = oslib.cmd_concat
-local run         = oslib.run
+local oslib         = require("l3b-oslib")
+local quoted_path   = oslib.quoted_path
+local OS            = oslib.OS
+local cmd_concat    = oslib.cmd_concat
+local run           = oslib.run
+local read_content  = oslib.read_content
+local read_command  = oslib.read_command
 
 ---@type fslib_t
-local fslib             = require("l3b-fslib")
-local directory_exists  = fslib.directory_exists
-local file_exists       = fslib.file_exists
-local all_names         = fslib.all_names
-local absolute_path     = fslib.absolute_path
+local fslib                 = require("l3b-fslib")
+local directory_exists      = fslib.directory_exists
+local file_exists           = fslib.file_exists
+local all_names             = fslib.all_names
+local quoted_absolute_path  = fslib.quoted_absolute_path
+local get_current_directory = fslib.get_current_directory
+local change_current_directory = fslib.change_current_directory
 
 ---@type l3build_t
 local l3build = require("l3build")
+
+---@type l3b_cli_t
+local l3b_cli = require("l3build-cli")
 
 ---@type l3b_aux_t
 local l3b_aux       = require("l3build-aux")
@@ -168,13 +181,16 @@ end
 ---@field flattentds    boolean Switch to flatten any source structure when creating a TDS structure
 ---@field flattenscript boolean Switch to flatten any script structure when creating a TDS structure
 ---@field ctanreadme    string  Name of the file to send to CTAN as \texttt{README.\meta{ext}}s
+---@field ctanupload    boolean Undocumented
 ---@field tdslocations  string_list_t For non-standard file installations
 -- unexposed computed properties
 ---@field is_embedded   boolean True means the module belongs to a bundle
 ---@field is_standalone boolean False means the module belongs to a bundle
+---@field at_top        boolean True means there is no bundle above
 ---@field at_bundle_top boolean True means we are at the top of the bundle
 ---@field config        string
----@field unique_config string|nil
+---@field tds_module    string
+---@field tds_main      string  G.tdsroot .."/".. G.bundle or G.module
 -- doc related
 ---@field typesetsearch boolean Switch to search the system \texttt{texmf} for during typesetting
 ---@field glossarystyle string  MakeIndex style file for glossary/changes creation
@@ -219,8 +235,11 @@ end
 ---@field manifestfile    string File name to use for the manifest file
 ---@field curl_debug      boolean
 ---@field uploadconfig    l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
----@field texmf_home    string_list_t
----@field typeset_list  string_list_t
+---@field texmf_home      string
+---@field typeset_list    string_list_t
+-- tag
+---@field tag_hook        tag_hook_f
+---@field update_tag      update_tag_f
 
 ---@type G_t
 local G
@@ -245,7 +264,6 @@ local G
 ---@field unpack      string Directory for unpacking sources
 ---@field ctan        string Directory for organising files for CTAN
 ---@field tds         string Directory for organised files into TDS structure
----@field tds_module  string
 
 ---@type Dir_t
 local Dir
@@ -378,7 +396,7 @@ local function NYI()
   error("Missing implementation")
 end
 
-local defaults = {
+local G_defaults = {
   bundle          = "",
   module          = "",
   exclmodules     = {},
@@ -386,6 +404,7 @@ local defaults = {
   epoch           = 1463734800,
   flattentds      = true,
   ctanreadme      = "README.md",
+  ctanupload      = false, -- Only validation is attempted
   tdslocations    = {},
   -- dir suffix
   workdir       = dot_dir,
@@ -493,46 +512,28 @@ local defaults = {
   checksearch   = true,
   recordstatus  = false,
   forcecheckepoch = true,
-  asciiengines  = { "pdftex" },
-  checkruns     = 1,
-  maxprintline  = 79,
-  ps2pdfopt     = "",
-  test_types = {
-    log = {
-      test        = Xtn.lvt,
-      generated   = Xtn.log,
-      reference   = Xtn.tlg,
-      expectation = Xtn.lve,
-      -- compare     = compare_tlg,
-      -- rewrite     = rewrite_log,
-    },
-    pdf = {
-      test      = Xtn.pvt,
-      generated = Xtn.pdf,
-      reference = Xtn.tpf,
-      -- rewrite   = rewrite_pdf,
-    },
-  },
+  asciiengines    = { "pdftex" },
+  checkruns       = 1,
+  maxprintline    = 79,
+  ps2pdfopt       = "",
   test_order      = { "log", "pdf" },
   specialformats  = specialformats,
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
   unpacksearch    = true,
-  bundleunpack    = function () error("MISSING IMPLEMENTATION") end,
   flatten         = true, -- Is it used?
   packtdszip      = false,
   manifestfile    = "MANIFEST.md",
-  manifest_setup                   = NYI,
-  manifest_extract_filedesc        = NYI,
-  manifest_write_subheading        = NYI,
-  manifest_sort_within_match       = NYI,
-  manifest_sort_within_group       = NYI,
-  manifest_write_opening           = NYI,
-  manifest_write_group_heading     = NYI,
-  manifest_write_group_file_descr  = NYI,
-  manifest_write_group_file        = NYI,
+  manifest_setup                  = NYI,
+  manifest_extract_filedesc       = NYI,
+  manifest_write_subheading       = NYI,
+  manifest_sort_within_match      = NYI,
+  manifest_sort_within_group      = NYI,
+  manifest_write_opening          = NYI,
+  manifest_write_group_heading    = NYI,
+  manifest_write_group_file_descr = NYI,
+  manifest_write_group_file       = NYI,
   curl_debug  = false,
-  
 }
 
 for item in items(
@@ -553,7 +554,7 @@ for item in items(
     print(debug.traceback())
     error("Erroneous item: ".. item)
   end
-  defaults["os_".. item] = from_item
+  G_defaults["os_".. item] = from_item
 end
 
 local LOCAL = "local"
@@ -566,18 +567,17 @@ local LOCAL = "local"
 ---@return boolean?  suc
 ---@return exitcode? exitcode
 ---@return integer?  code
-function defaults.runcmd(cmd, dir, vars)
-  dir = dir or "."
-  dir = absolute_path(dir)
+function G_defaults.runcmd(cmd, dir, vars)
+  dir = quoted_absolute_path(dir or ".")
   vars = vars or {}
   -- Allow for local texmf files
   local env = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
   local local_texmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    local_texmf = OS.pathsep .. absolute_path(Dir.texmf) .. "//"
+    local_texmf = OS.pathsep .. quoted_absolute_path(Dir.texmf) .. "//"
   end
   local env_paths = "." .. local_texmf .. OS.pathsep
-    .. absolute_path(Dir[LOCAL]) .. OS.pathsep
+    .. quoted_absolute_path(Dir[LOCAL]) .. OS.pathsep
     .. dir .. (G.typesetsearch and OS.pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and env_paths:match(" ") then
@@ -593,7 +593,7 @@ end
 ---@param name string
 ---@param dir string
 ---@return error_level_n
-function defaults.biber(name, dir)
+function G_defaults.biber(name, dir)
   if file_exists(dir .. "/" .. name .. ".bcf") then
     return G.runcmd(
       Exe.biber .. " " .. Opts.biber .. " " .. name,
@@ -608,7 +608,7 @@ end
 ---@param name string
 ---@param dir string
 ---@return error_level_n
-function defaults.bibtex(name, dir)
+function G_defaults.bibtex(name, dir)
   if file_exists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
@@ -643,7 +643,7 @@ end
 ---@param log_ext string
 ---@param style string
 ---@return error_level_n
-function defaults.makeindex(name, dir, in_ext, out_ext, log_ext, style)
+function G_defaults.makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "." -- Why is it optional ?
   if file_exists(dir .. "/" .. name .. in_ext) then
     if style == "" then style = nil end
@@ -664,7 +664,7 @@ end
 ---@param dir string
 ---@param cmd string|nil
 ---@return error_level_n
-function defaults.tex(file, dir, cmd)
+function G_defaults.tex(file, dir, cmd)
   cmd = cmd or Exe.typeset .." ".. Opts.typeset
   return G.runcmd(cmd .. " \"" .. G.typesetcmds
     .. "\\input " .. file .. "\"",
@@ -676,7 +676,7 @@ end
 ---@param dir string
 ---@param cmd string|nil
 ---@return error_level_n
-function defaults.typeset(file, dir, cmd)
+function G_defaults.typeset(file, dir, cmd)
   local error_level = G.tex(file, dir, cmd)
   if error_level ~= 0 then
     return error_level
@@ -697,19 +697,19 @@ end
 
 ---Do nothing function
 ---@return error_level_n
-function defaults.typeset_demo_tasks()
+function G_defaults.typeset_demo_tasks()
   return 0
 end
 
 ---Do nothing function
 ---@return error_level_n
-function defaults.docinit_hook()
+function G_defaults.docinit_hook()
   return 0
 end
 
 ---Default function that can be overwritten
 ---@return error_level_n
-function defaults.checkinit_hook()
+function G_defaults.checkinit_hook()
   return 0
 end
 
@@ -718,16 +718,23 @@ end
 ---@param test_name string
 ---@param run_number integer
 ---@return string
-function defaults.runtest_tasks(test_name, run_number)
+function G_defaults.runtest_tasks(test_name, run_number)
   return ""
 end
 
--- computed global variables
+---Computed global variables
+---Used only when the eponym global variable is not set.
+---@param t table
+---@param k string
+---@return any
 local G_computed = function (t, k)
-  if k == "ctanpkg" then
+  if k == "options" then -- we have _G.ctanpkg == nil
+    return l3build.options
+  end
+  if k == "ctanpkg" then -- we have _G.ctanpkg == nil
     return  G.is_standalone
         and G.module
-        or  G.bundle .."/".. G.module
+        or (G.bundle .."/".. G.module)
   end
   if k == "ctanzip" then
     return t.ctanpkg .. "-ctan"
@@ -752,7 +759,17 @@ local G_computed = function (t, k)
     return G.flattentds -- by defaut flattentds and flattenscript are synonyms
   end
   if k == "maindir" then
-    return l3build.main_dir:sub(1, -1)
+    if t.is_embedded then
+      -- retrieve the maindir from the main build.lua
+      local s = read_content(l3build.main_dir .."build.lua")
+      s = s:match("%f[%w]maindir%s*=%s*'([^']*)'")
+      or  s:match('%f[%w]maindir%s*=%s*"([^"]*)"')
+      or  s:match('%f[%w]maindir%s*=%s*%[%[([^]]*)%]%]')
+      if s then
+        return s
+      end
+    end
+    return l3build.main_dir:sub(1, -2)
   end
   if k == "supportdir" then
     return t.maindir .. "/support"
@@ -805,6 +822,26 @@ local G_computed = function (t, k)
       end
     })
   end
+  if k == "test_types" then -- Xtn will be known at run time
+    ---@type l3b_check_t
+    local l3b_check = require("l3build-check")
+    return {
+      log = {
+        test        = Xtn.lvt,
+        generated   = Xtn.log,
+        reference   = Xtn.tlg,
+        expectation = Xtn.lve,
+        compare     = l3b_check.compare_tlg,
+        rewrite     = l3b_check.rewrite_log,
+      },
+      pdf = {
+        test      = Xtn.pvt,
+        generated = Xtn.pdf,
+        reference = Xtn.tpf,
+        rewrite   = l3b_check.rewrite_pdf,
+      }
+    }
+  end
   if k == "typeset_list" then
     error("Documentation is not installed")
   end
@@ -818,16 +855,124 @@ local G_computed = function (t, k)
   end
 end
 
+---Bundle and module names can sometimes be guessed.
+---Bundles and modules are directories containing a
+---`build.lua` at the top.
+---In general a bundle contains modules at its top level
+---whereas modules do not.
+---The standard bundle organization is illustrated
+---by the examples.
+---The bundle and module variables are not really meant
+---to change during execution once they are initialized
+---but this is not a requirement.
+---One shot function.
+---@usage after the `build.lua` has been executed.
+local function guess_bundle_module()
+  -- bundle and module values are very important
+  -- because they control the behaviour of somme actions
+  -- they also control where things are stored.
+  -- Find bundle and module names defined by the client
+  local bundle = rawget(_G, "bundle") -- do not fall back
+  local module = rawget(_G, "module") -- to the metatable
+  -- We act as if bundle and module were not already provided.
+  -- This allows to make tests and eventually inform the user
+  -- of a non standard shape, in case she has made a mistake.
+  if G.is_embedded then
+    -- A module inside a bundle: the current directory is
+    -- .../<bundle>/<module>/...
+    -- The bundle name must be provided, but can be a void string
+    -- When missing, it is read from the the parent's `build.lua`
+    -- We cannot execute the parent's script because
+    -- this script may perform actions and change files (see latex2e)
+    -- So we parse the content finger crossed.
+    local s = read_content(l3build.main_dir .."build.lua")
+    s = s:match("%f[%w]bundle%s*=%s*'([^']*)'")
+          or s:match('%f[%w]bundle%s*=%s*"([^"]*)"')
+          or s:match('%f[%w]bundle%s*=%s*%[%[([^]]*)%]%]')
+    if not s then -- bundle name is required in bundle/module shape
+      error('Missing in top `build.lua`: bundle = "<bundle name>"')
+    end
+    -- is it consistent?
+    if not bundle then
+      bundle = s
+    elseif bundle ~= s then
+      print(("Warning, bundle names are not consistent: %s and %s")
+            :format(bundle, s))
+    end
+    -- embedded module names are the base name
+    s = Dir.work:match("([^/]+)/$"):lower()
+    if not module then
+      module = s
+    elseif module ~= s then
+      print(("Warning, module names are not consistent: %s and %s")
+            :format(module, s))
+    end
+  else -- not an embeded module
+    local modules = G.modules
+    if #modules > 0 then
+      -- this is a top bundle,
+      -- the bundle name must be provided
+      -- the module name does not make sense
+      if not bundle or bundle == "" then
+        error('Missing in top build.lua: bundle = "<bundle name>"')
+      end
+      if module and module ~= "" then
+        print("Warning, module name ignored: ".. module)
+      end
+      module = "" -- not nil!
+    elseif bundle then
+      -- this is a bundle with no modules,
+      -- like latex2e
+      if module and module ~= "" then
+        print("Warning, module name ignored: ".. module)
+      end
+      module = "" -- not nil!
+    elseif not module or module == "" then
+      -- this is a standalone module (not in a bundle),
+      -- the module name must be provided append
+      -- the bundle name does not make sense
+      error('Missing in top build.lua: module = "<module name>"')
+    end
+  end
+  -- MISSING naming constraints
+  rawset(_G, "bundle", bundle)
+  rawset(_G, "module", module)
+  -- One shot function: next call is a do nothing action.
+  guess_bundle_module = function () end
+end
+
 G = bridge({
-  index = function (t, k)
+  secondary = G_defaults,
+  index     = function (t, k)
+    if k == "bundle" then
+      guess_bundle_module()
+      return rawget(t, k)
+    end
+    if k == "module" then
+      guess_bundle_module()
+      return rawget(t, k)
+    end
     if k == "is_embedded" then
       return l3build.main_dir ~= l3build.work_dir
     end
     if k == "is_standalone" then
+      return t.bundle == ""
+    end
+    if k == "at_top" then
       return l3build.main_dir == l3build.work_dir
     end
     if k == "at_bundle_top" then
-      return t.module == ""
+      return t.at_top and not t.is_standalone
+    end
+    if k == "bundleunpack" then
+      return require("l3build-unpack").bundleunpack
+    end
+  -- tag
+    if k == "tag_hook" then
+      return require("l3build-tag").tag_hook
+    end
+    if k == "update_tag" then
+      return require("l3build-tag").update_tag
     end
   end,
   complete = function (t, k, result)
@@ -844,15 +989,6 @@ G = bridge({
         return true
       end
     end
-    if k == "unique_config" then
-      local configs = t.checkconfigs
-      if #configs == 1 then
-        local cfg = configs[1]
-        if cfg ~= "build" then
-          return cfg
-        end
-      end
-    end
     -- No trailing /
     -- What about the leading "./"
     local options = l3build.options
@@ -866,23 +1002,36 @@ G = bridge({
         return options.config or result
       end
     end
+    -- next ignores `result`: no influence of _G
+    if k == "tds_main" then
+      return t.is_standalone
+        and t.tdsroot .."/".. t.module
+        or  t.tdsroot .."/".. t.bundle
+    end
+    if k == "tds_module" then
+      return t.is_standalone
+        and t.module
+        or  t.bundle .."/".. t.module
+    end
     return result
+  end,
+  newindex = function (t, k, v)
+    if k == "typeset_list" then
+      rawset(t, k, v)
+      return true
+    end
   end,
 })
 
 Dir = bridge({
   suffix = "dir",
-  index = function (t, k)
-    if k == "tds_module" then
-      return G.tdsroot
-      .. (G.is_standalone and "/" .. G.bundle .. "/" or "/")
-      .. G.module
-    end
-  end,
   complete = function (t, k, result)
     -- No trailing /
     -- What about the leading "./"
     if k.match and k:match("dir$") then
+      if not result then
+        error("No result for key ".. k)
+      end
       return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
     end
     return result
@@ -915,17 +1064,17 @@ Files = bridge({
 })
 
 ---Export globals in the metatable of the given table.
----@param G? table
-local function export(G)
-  G = G or _G
-  local MT = getmetatable(G) or {}
+---@param env? table
+local function export(env)
+  env = env or _G
+  local MT = getmetatable(env) or {}
   local __index = MT.__index
   local f_index = type(__index) == "function" and __index
   local t_index = type(__index) == "table"    and __index
   function MT.__index(t, k)
     local result
     if type(k) == "string" then
-      result = defaults[k]
+      result = G_defaults[k]
       if result ~= nil then
         return result
       end
@@ -947,31 +1096,87 @@ local function export(G)
       end
     end
   end
-  setmetatable(G, MT)
+  return setmetatable(env, MT)
+end
+
+--[==[ Main variable query business
+Allows a module to get the value of a global variable
+of its owning main bundle. Can catch values defined in `build.lua`
+but not in configuration files.
+Used for "l3build --get-global-variable bundle"
+and      "l3build --get-global-variable maindir"
+]==]
+
+---Get the variable with the given name,
+---@param name string
+---@return string|nil
+local function get_main_variable(name)
+  local cwd = get_current_directory()
+  change_current_directory(l3build.main_dir)
+  local cmd = to_quoted_string({
+    "texlua",
+    quoted_path(l3build.script_path),
+    "status",
+    "--".. l3b_cli.GET_MAIN_VARIABLE,
+    name,
+  })
+  local t
+  local ok, msg = pcall(function ()
+    t = read_command(cmd)
+  end)
+  change_current_directory(cwd)
+  if ok then
+    local k, v = t:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
+    return name == k and v or nil
+  else
+    error(msg)
+  end
+end
+
+---Print the correct message such that one can parse it
+---and retrieve the value. Os agnostic method.
+---@param name    string
+---@param config  string_list_t
+---@return error_level_n
+local function handle_get_main_variable(name, config)
+  name = name or "MISSING VARIABLE NAME"
+  local f, msg = loadfile(l3build.work_dir .. "/build.lua")
+  if not f then
+    error(msg)
+  end
+  f() -- ignore any output
+  print(("GLOBAL VARIABLE: name = %s, value = %s")
+    :format(name, tostring(G[name])))
+  return 0
 end
 
 -- Roots which should be unpacked to support unpacking/testing/typesetting
 
 ---@class l3b_globals_t
 ---@field LOCAL     any
+---@field export    function
+---@field get_main_variable        fun(name: string, dir: string): string
+---@field handle_get_main_variable fun(name: string): error_level_n
 ---@field G         G_t
+---@field defaults  G_t
 ---@field Dir       Dir_t
 ---@field Files     Files_t
 ---@field Deps      Deps_t
 ---@field Exe       Exe_t
 ---@field Opts      Opts_t
 ---@field Xtn       Xtn_t
----@field defaults  table
 
 return {
-  LOCAL           = LOCAL,
-  export          = export,
-  defaults        = defaults,
-  G               = G,
-  Dir             = Dir,
-  Files           = Files,
-  Deps            = Deps,
-  Exe             = Exe,
-  Opts            = Opts,
-  Xtn             = Xtn,
+  LOCAL                 = LOCAL,
+  export                = export,
+  get_main_variable     = get_main_variable,
+  handle_get_main_variable = handle_get_main_variable,
+  defaults              = G_defaults, -- TODO: this is implementation details, exposed a function instead
+  G                     = G,
+  Dir                   = Dir,
+  Files                 = Files,
+  Deps                  = Deps,
+  Exe                   = Exe,
+  Opts                  = Opts,
+  Xtn                   = Xtn,
 }

@@ -45,9 +45,6 @@ local fslib      = require("l3b-fslib")
 local all_names = fslib.all_names
 local file_list = fslib.file_list
 
----@type l3build_t
-local l3build = require("l3build")
-
 ---@type l3b_globals_t
 local l3b_globals  = require("l3build-globals")
 ---@type G_t
@@ -57,7 +54,7 @@ local Dir   = l3b_globals.Dir
 ---@type Files_t
 local Files = l3b_globals.Files
 
-local defaults = l3b_globals.defaults
+local G_defaults = l3b_globals.defaults
 
 local Hook = bridge({
   prefix = "manifest_",
@@ -88,10 +85,10 @@ for item in items(
   local k = item:match("manifest_(.*)")
   local v = stp[k]
   assert(v, "Missing manifest hook for key ".. k)
-  defaults[item] = v
+  G_defaults[item] = v
 end
-defaults.manifest_write_subheading    = stp.write_heading
-defaults.manifest_write_group_heading = stp.write_heading
+G_defaults.manifest_write_subheading    = stp.write_heading
+G_defaults.manifest_write_group_heading = stp.write_heading
 
 local MT = {}
 ---comment
@@ -240,6 +237,7 @@ function MT:write_group(fh, entry)
   else
     writer = Hook.write_group_file
     for ii, file in ipairs(entry.files_ordered) do
+      ---@type manifest_param_t
       local param = {
         dir         = entry.dir         ,
       	count       = ii                ,
@@ -284,7 +282,7 @@ function MT:manifest()
   end
   self.tds_files = {}
   for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_names(Dir.tds .. subdir .. Dir.tds_module, "*.*") do
+    for f in all_names(Dir.tds .. subdir .. G.tds_module, "*.*") do
       self.tds_files[f] = true
     end
   end
@@ -307,7 +305,9 @@ end
 
 local function manifest()
   ---Create a wrapper to shared data
-  local helper = setmetatable({}, MT)
+  local helper = setmetatable({}, {
+    __index = MT
+  })
   helper:manifest()
 end
 

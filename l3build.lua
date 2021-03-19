@@ -27,7 +27,7 @@ for those people who are interested.
 local assert  = assert
 local print   = print
 
-assert(not _G.l3build, "No self call")
+assert(not _G.options, "No self call")
 
 print("DEVELOPMENT: REFACTOR BRANCH")
 
@@ -68,10 +68,11 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@alias flag_table_t table<string, boolean>
 
 ---@class l3build_debug_t
----@field run     boolean
----@field require boolean
----@field call    boolean
+---@field run       boolean
+---@field require   boolean
+---@field call      boolean
 ---@field no_curl_posting boolean
+---@field copy_core boolean
 
 ---@class l3build_data_t
 
@@ -86,6 +87,7 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
 ---@field launch_dir  dir_path_s      where "l3build.lua" and friends live
 ---@field start_dir   dir_path_s      the current directory at load time
+---@field script_path string        the path of the `l3build.lua` in action.
 ---@field options     options_t
 ---@field flags       flag_table_t
 ---@field data        l3build_data_t
@@ -100,12 +102,12 @@ local l3build = { -- global data available as package.
 print(in_document and "Document mode" or "Bundle mode")
 
 do
-  -- the directory containing "l3build.lua" by kpse
+  -- the directory containing "l3build.lua" by kpse, absolute
   local kpse_dir = kpse.lookup("l3build.lua"):match(".*/")
 
   -- Setup dirs where require will look for modules.
 
-  local start_dir = currentdir() .. "/" -- this is the current dir at launch time
+  local start_dir = currentdir() .. "/" -- this is the current dir at launch time, absolute
 
   -- is_main: whether required by someone else, or not
   local cmd_path = arg[0]
@@ -113,6 +115,11 @@ do
   if not cmd_dir then
     cmd_dir, cmd_base = "./", cmd_path
   end
+  -- TODO: what about the windows stuff?
+  if not cmd_dir:match("^%/") and not cmd_dir:match("^%w:") then
+    cmd_dir = start_dir .. cmd_dir
+  end
+  -- start_dir and cmd_dir are absolute
   is_main = cmd_base == "l3build" or cmd_base == "l3build.lua"
 
   ---Central function to allow launching l3build from a subdirectory
@@ -145,8 +152,9 @@ do
   elseif cmd_base == "l3build" then
     launch_dir = kpse_dir
   else
-    launch_dir = container('./', "l3build.lua") or kpse_dir
+    launch_dir = container(currentdir(), "l3build.lua") or kpse_dir
   end
+  -- launch_dir is absolute as well
 
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
@@ -194,7 +202,8 @@ do
       main_dir = work_dir -- answer: module
     end
   end
-
+  -- work_dir and main_dir are absolute as well, if any
+  
   ---Register the given pakage in `package.loaded`.
   ---Lua's require function return either true or a table.
   ---Here we always return a table.
@@ -216,6 +225,7 @@ do
   l3build.in_document = in_document
   l3build.start_dir   = start_dir -- all these are expected to end with a "/"
   l3build.launch_dir  = launch_dir
+  l3build.script_path = launch_dir .."l3build.lua"
   l3build.work_dir    = work_dir  -- may be nil
   l3build.main_dir    = main_dir  -- may be nil as well
 
@@ -252,7 +262,10 @@ do
     if name then -- an l3b library package
       package.loaded[pkg_name] = true
       local path = launch_dir .."l3b/".. name
-      result = require_orig(path) -- error here if no such module exists
+      if debug_require then
+        print("path ".. path)
+      end
+        result = require_orig(path) -- error here if no such module exists
       result = register(result, pkg_name, name, path .. ".lua")
     else
       name = pkg_name:match("^l3build%-.*")
@@ -276,6 +289,20 @@ end
 
 --[==[ end of booting process ]==]
 
+---@type utlib_t
+-- local utlib = require("l3b-utillib")
+
+--[===[ DEBUG flags ]===]
+---@type oslib_t
+local oslib = require("l3b-oslib")
+oslib.Vars.debug.run = true
+--[===[ DEBUG flags end ]===]
+
+---@type fslib_t
+local fslib = require("l3b-fslib")
+local set_tree_excluder = fslib.set_tree_excluder
+fslib.set_working_directory(l3build.work_dir)
+
 ---@type l3b_globals_t
 local l3b_globals = require("l3build-globals")
 
@@ -286,22 +313,12 @@ if in_document then
   return l3build
 end
 
-
---[===[DEBUG flags]===]
----@type oslib_t
-local oslib = require("l3b-oslib")
-oslib.Vars.debug.run = true
---[===[DEBUG flags end]===]
-
----@type utlib_t
-local utlib = require("l3b-utillib")
-
 --[=[ Dealing with options ]=]
 
 ---@type l3b_cli_t
 local l3b_cli = require("l3build-cli")
 
-l3b_cli.register_options()
+l3b_cli.register_builtin_options()
 l3b_cli.register_custom_options(work_dir)
 l3b_cli.register_targets()
 
@@ -318,17 +335,18 @@ local options   = l3build.options
 
 local debug = options.debug
 
----@type fslib_t
-local fslib = require("l3b-fslib")
-local set_tree_excluder = fslib.set_tree_excluder
-
 if debug then -- activate the private special debugging options
   require("l3b-oslib").Vars.debug.run = l3build.debug.run -- options --debug-run
   fslib.Vars.debug.copy_core = l3build.debug.copy_core-- options --debug-copy-core
+  fslib.Vars.debug.all  = true
 end
 
 local target = options.target
 
+if target ~= "status" then
+  print(l3b_globals.get_main_variable("bundle"))
+  os.exit(421)
+end
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
 local help      = l3b_help.help
@@ -353,80 +371,10 @@ end
 
 -- bundle and module names recovery
 
-local read_content  = utlib.read_content
-
 ---@type G_t
 local G   = l3b_globals.G
 ---@type Dir_t
 local Dir = l3b_globals.Dir
-
--- bundle and module values are very important
--- because they control the behaviour of actions
-local bundle, module
-if G.is_embedded then
-  -- a module inside a bundle.
-  -- The bundle name must be provided, but can be a void string
-  -- It is read from the the parent's `build.lua`
-  -- We cannot execute the parent's script because
-  -- this script may perform actions and change files (see latex2e)
-  -- So we parse the content finger crossed.
-  local s = read_content(l3build.main_dir .."build.lua")
-  bundle = s:match("%f[%w]bundle%s*=%s*'([^']*)'")
-        or s:match('%f[%w]bundle%s*=%s*"([^"]*)"')
-        or s:match('%f[%w]bundle%s*=%s*%[%[([^]]*)%]%]')
-  if bundle then -- is it consistent?
-    if _G.bundle and bundle ~= _G.bundle then
-      error(("Bundle names are not consistent: %s and %s")
-            :format(bundle, _G.bundle))
-    end
-    if l3build.G.bundle and bundle ~= l3build.G.bundle then
-      error(("Bundle names are not consistent: %s and %s")
-            :format(bundle, l3build.G.bundle))
-    end
-  else
-    bundle = _G.bundle or l3build.G.bundle
-    if not bundle then
-      error('Missing in top build.lua: bundle = "<bundle name>"')
-    end
-  end
-  module = work_dir:match("([^/]+)/$"):lower()
-  if _G.module and module ~= _G.module then
-    error(("Module names are not consistent: %s and %s")
-          :format(module, _G.module))
-  end
-  if l3build.G.module and module ~= l3build.G.module then
-    error(("Module names are not consistent: %s and %s")
-          :format(module, l3build.G.module))
-  end
-else -- not an embeded module
-  local modules = G.modules
-  bundle = _G.bundle or l3build.G.bundle
-  if #modules > 0 then
-    -- this is a top bundle,
-    -- the bundle name must be provided
-    -- the module name does not make sense
-    if not bundle or bundle == "" then
-      error('Missing in top build.lua: bundle = "<bundle name>"')
-    end
-    module = nil -- not ""!
-  elseif bundle then
-    -- this is a bundle with no modules,
-    -- like latex2e
-    module = nil
-  else
-    -- this is a standalone module (not in a bundle),
-    -- the module name must be provided append
-    -- the bundle name does not make sense
-    module = _G.module or l3build.G.module
-    if not module or module == "" then
-      error('Missing in top build.lua: module = "<module name>"')
-    end
-    bundle = nil -- not ""!
-  end
-end
--- MISSING naming constraints
-l3build.bundle = bundle
-l3build.module = module
 
 ---@type l3b_targets_t
 local l3b_targets_t = require("l3b-targets")
@@ -438,9 +386,9 @@ local call    = l3b_aux.call
 
 exit(process(options, {
   preflight     = function ()
-    utlib.flags.cache_chosen = true
+    -- utlib.flags.cache_bridge = true not yet implemented
     set_tree_excluder(function (path)
-      return path == Dir.build
+      return path == Dir.build -- problem with path comparison
     end)
   end,
   at_bundle_top = G.at_bundle_top,

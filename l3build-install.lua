@@ -122,15 +122,12 @@ local function uninstall()
       end
       return 0
     end
-  local function uninstall_files(dir, subdir)
-    return zap_dir(dir .. "/" .. (subdir or Dir.tds_module))
-  end
-  error_level = uninstall_files("doc")
-              + uninstall_files("source")
-              + uninstall_files("tex")
-              + uninstall_files("bibtex/bst", G.module)
-              + uninstall_files("makeindex", G.module)
-              + uninstall_files("scripts", G.module)
+  error_level = zap_dir("doc/"        .. G.tds_module)
+              + zap_dir("source/"     .. G.tds_module)
+              + zap_dir("tex/"        .. G.tds_module)
+              + zap_dir("bibtex/bst/" .. G.module)
+              + zap_dir("makeindex/"  .. G.module)
+              + zap_dir("scripts/"    .. G.module)
               + error_level
   if error_level ~= 0 then
     return error_level
@@ -168,7 +165,6 @@ local function install_files(root_install_dir, full, dry_run)
   local to_copy = {}
 
   local function feed_to_copy(src_dir, type, file_globs, flatten, module)
-    module = module or Dir.tds_module
     -- For material associated with secondary tools (BibTeX, MakeIndex)
     -- the structure needed is slightly different from those items going
     -- into the tex/doc/source trees
@@ -314,14 +310,14 @@ local function install_files(root_install_dir, full, dry_run)
         "source",
         { source_list },
         G.flattentds,
-        Dir.tds_module
+        G.tds_module
       )
     + feed_to_copy(
         Dir.sourcefile,
         "source",
         { source_list_script },
         G.flattenscript,
-        Dir.tds_module
+        G.tds_module
       )
     + feed_to_copy(
         Dir.docfile,
@@ -336,7 +332,7 @@ local function install_files(root_install_dir, full, dry_run)
           G.typeset_list
         },
         G.flattentds,
-        Dir.tds_module
+        G.tds_module
       )
     if error_level ~= 0 then
       return error_level
@@ -346,7 +342,7 @@ local function install_files(root_install_dir, full, dry_run)
     if not dry_run then
       local readme = G.ctanreadme
       if readme ~= "" and not readme:lower():match("^readme%.%w+") then
-        local install_dir = root_install_dir .. "/doc/" .. Dir.tds_module
+        local install_dir = root_install_dir .. "/doc/" .. G.tds_module
         if file_exists(install_dir .. "/" .. readme) then
           rename(install_dir, readme, "README." .. readme:match("%.(%w+)$"))
         end
@@ -377,10 +373,10 @@ local function install_files(root_install_dir, full, dry_run)
     return error_level
   end
   error_level =
-      feed_to_copy(Dir.unpack, "tex", { install_list }, G.flattentds, Dir.tds_module)
-    + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst }, G.flattentds, G.module)
-    + feed_to_copy(Dir.unpack, "makeindex", { Files.makeindex }, G.flattentds, G.module)
-    + feed_to_copy(Dir.unpack, "scripts", { Files.script }, G.flattenscript, G.module)
+      feed_to_copy(Dir.unpack, "tex",        { install_list },    G.flattentds,    G.tds_module)
+    + feed_to_copy(Dir.unpack, "bibtex/bst", { Files.bst },       G.flattentds,    G.module)
+    + feed_to_copy(Dir.unpack, "makeindex",  { Files.makeindex }, G.flattentds,    G.module)
+    + feed_to_copy(Dir.unpack, "scripts",    { Files.script },    G.flattenscript, G.module)
 
   if error_level ~= 0 then
     return error_level

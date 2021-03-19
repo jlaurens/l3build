@@ -27,20 +27,18 @@ local remove      = os.remove
 local os_type     = os["type"]
 
 local append      = table.insert
+local unappend    = table.remove
 
 local lfs         = require("lfs")
 local attributes  = lfs.attributes
-local current_dir = lfs.currentdir
-local chdir       = lfs.chdir
-local lfs_dir     = lfs.dir
+local get_current_directory     = lfs.currentdir
+local change_current_directory  = lfs.chdir
+local get_directory_content     = lfs.dir
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
-local keys        = utlib.keys
 local first_of    = utlib.first_of
-
-local pairs       = pairs -- Cache only after "l3b-utillib" is loaded
 
 ---@type wklib_t
 local wklib           = require("l3b-walklib")
@@ -54,13 +52,22 @@ local to_glob_match = gblib.to_glob_match
 local oslib       = require("l3b-oslib")
 local quoted_path = oslib.quoted_path
 
+-- implementation
+
 ---@class fslib_vars_t
----@field debug flag_table_t
+---@field debug     flag_table_t
 
 ---@type fslib_vars_t
-local Vars = {
+local Vars = setmetatable({
   debug = {}
-}
+}, {
+  __index = function (t, k)
+    if k == "working_directory" then
+      print(debug.traceback())
+      error("Missing set_working_directory.", 2)
+    end
+  end
+})
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
   return first_of(cmd:gsub( "/", "\\"))
@@ -96,21 +103,6 @@ local function make_directory(path)
   else
     return execute("mkdir -p " .. path)
   end
-end
-
----Return a quoted absolute path from a relative one
----Due to chdir, path must exist and be accessible.
----@param path string
----@return string
-local function absolute_path(path)
-  local oldpwd = current_dir()
-  local ok, msg = chdir(path)
-  if ok then
-    local result = current_dir()
-    chdir(oldpwd)
-    return quoted_path(result:gsub( "\\", "/"))
-  end
-  error(msg)
 end
 
 ---Whether there is a directory at the given path
@@ -149,6 +141,97 @@ local function file_exists(path)
 --]===]
 end
 
+--[==[ Current directory business ]==]
+
+---@type string_list_t
+local cwd_list = {}
+
+---Save the current directory to the top of the
+---current directory stack then change the
+---current directory to the given one.
+---@param dir string path of the directory to switch to
+---@return boolean ok true means success
+---@return string msg error message
+local function push_current_directory(dir)
+  if not directory_exists(dir) then
+    print(debug.traceback())
+  end
+  assert(directory_exists(dir), "No directory at ".. tostring(dir))
+  append(cwd_list, get_current_directory())
+  return change_current_directory(dir)
+end
+
+---Remove the top entry from the directory stack,
+---then change back current directory to this removed value and return it.
+---@return string|nil dir the new current directory on success, nil on error
+---@return nil|string msg nil on success, error message on error
+local function pop_current_directory()
+  local dir = unappend(cwd_list)
+  if not dir then
+    print(debug.traceback())
+  end
+  assert(dir)
+  local ok, msg = change_current_directory(dir)
+  return ok and dir or nil, msg
+end
+
+---Set the working directory. As soon as possible
+---@param dir string
+local function set_working_directory(dir)
+  assert(not dir:match("^%."),
+    "Absolute path required in set_working_directory, got "
+    .. tostring(dir)
+  )
+  Vars.working_directory = dir
+end
+
+---Return an absolute path from a relative one.
+---Due to chdir, path must exist and be accessible.
+---If `is_current` is true, the given path is relative
+---to the current directory when not absolute.
+---If `is_current` is false, the given path is relative
+---to the working directory when not absolute.
+---@see `set_working_directory`.
+---@param path string
+---@param is_current boolean whether `path` is relative to the current directory
+---@return string
+local function absolute_path(path, is_current)
+  local dir, base = dir_base(path)
+  if not is_current then
+    push_current_directory(Vars.working_directory)
+  end
+  local result
+  local ok, msg = push_current_directory(dir)
+  if ok then
+    result = get_current_directory()
+    pop_current_directory()
+  end
+  if not is_current then
+    pop_current_directory()
+  end
+  if ok then
+    result = result:gsub("\\", "/")
+    local candidate = result .."/".. base
+    if attributes(candidate, "mode") then
+      return candidate
+    end
+    return path
+  end
+  error(msg)
+end
+
+---Return a quoted absolute path from a relative one
+---Due to chdir, path must exist and be accessible.
+---@param path string
+---@return string
+local function quoted_absolute_path(path)
+  local result, msg = absolute_path(path)
+  if result then
+    return quoted_path(result)
+  end
+  return result, msg
+end
+
 ---Look for files, directory by directory, and return the first existing
 ---@param dirs  string_list_t
 ---@param names string_list_t
@@ -176,13 +259,13 @@ local function file_list(dir_path, glob)
   if directory_exists(dir_path) then
     local glob_match = to_glob_match(glob)
     if glob_match then
-      for entry in lfs_dir(dir_path) do
+      for entry in get_directory_content(dir_path) do
         if glob_match(entry) then
           append(files, entry)
         end
       end
     else
-      for entry in lfs_dir(dir_path) do
+      for entry in get_directory_content(dir_path) do
         if entry ~= "." and entry ~= ".." then
           append(files, entry)
         end
@@ -353,13 +436,15 @@ end
 ---@field dest    string
 
 ---Copy files 'quietly'.
----@param name string|copy_name_kv base name of kv arguments
+---@param name copy_name_kv|string base name of kv arguments
 ---@param source? string path of the source directory, required when name is not a table
 ---@param dest? string path of the destination directory, required when name is not a table
 ---@return error_level_n
 local function copy_file(name, source, dest)
   if type(name) == "table" then
-    name, source, dest = name.name, name.source, name.dest
+    ---@type copy_name_kv
+    local kv = name
+    name, source, dest = kv.name, kv.source, kv.dest
   end
   local p_src = name
   local p_wrk = source .."/".. name
@@ -435,6 +520,7 @@ end
 ---@field Vars              fslib_vars_t
 ---@field to_host           fun(cmd: string):   string
 ---@field absolute_path     fun(path: string):  string
+---@field quoted_absolute_path fun(path: string):  string
 ---@field make_directory    fun(path: string):  boolean, exitcode, integer
 ---@field directory_exists  fun(path: string): boolean
 ---@field file_exists       fun(path: string): boolean
@@ -446,28 +532,39 @@ end
 ---@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
 ---@field copy_file   fun(file: string, source: string, dest: string): integer
 ---@field copy_tree   fun(glob: string, source: string, dest: string): integer
----@field make_clean_directory fun(path: string): integer
+---@field make_clean_directory      fun(path: string): integer
 ---@field remove_name fun(dir_path: string, name: string): integer
 ---@field remove_tree fun(source: string, glob: string): integer
----@field remove_directory fun(path: string): boolean?, exitcode?, integer?
+---@field remove_directory          fun(path: string): boolean?, exitcode?, integer?
+---@field set_working_directory     fun(path: string)
+---@field get_current_directory     fun(): string
+---@field change_current_directory  fun(dir: string) raises if dir does not exist
+---@field push_current_directory    fun(dir: string): string
+---@field pop_current_directory     fun(): string
 
 return {
-  Vars = Vars,
-  to_host = to_host,
-  absolute_path = absolute_path,
-  make_directory = make_directory,
-  directory_exists = directory_exists,
-  file_exists = file_exists,
-  locate = locate,
-  file_list = file_list,
-  all_names = all_names,
-  set_tree_excluder = set_tree_excluder,
-  tree = tree,
-  rename = rename,
-  copy_file = copy_file,
-  copy_tree = copy_tree,
-  make_clean_directory = make_clean_directory,
-  remove_name = remove_name,
-  remove_tree = remove_tree,
-  remove_directory = remove_directory,
+  Vars                  = Vars,
+  to_host               = to_host,
+  absolute_path         = absolute_path,
+  quoted_absolute_path  = quoted_absolute_path,
+  make_directory        = make_directory,
+  directory_exists      = directory_exists,
+  file_exists           = file_exists,
+  locate                = locate,
+  file_list             = file_list,
+  all_names             = all_names,
+  set_tree_excluder     = set_tree_excluder,
+  tree                  = tree,
+  rename                = rename,
+  copy_file             = copy_file,
+  copy_tree             = copy_tree,
+  make_clean_directory  = make_clean_directory,
+  remove_name           = remove_name,
+  remove_tree           = remove_tree,
+  remove_directory      = remove_directory,
+  set_working_directory     = set_working_directory,
+  get_current_directory     = get_current_directory,
+  change_current_directory  = change_current_directory,
+  push_current_directory    = push_current_directory,
+  pop_current_directory     = pop_current_directory,
 }

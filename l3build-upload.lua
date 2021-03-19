@@ -28,23 +28,20 @@ local tostring = tostring
 local close = io.close
 local flush = io.flush
 local open  = io.open
-local popen = io.popen
 local read  = io.read
 local write = io.write
 
-local len     = string.len
-local lower   = string.lower
-local match   = string.match
-local str_rep = string.rep
-
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
-local chooser       = utlib.chooser
 local entries       = utlib.entries
 local trim_space    = utlib.trim
-local read_content  = utlib.read_content
-local write_content = utlib.write_content
 local deep_copy     = utlib.deep_copy
+
+---@type oslib_t
+local oslib         = require("l3b-oslib")
+local read_content  = oslib.read_content
+local write_content = oslib.write_content
+local read_command  = oslib.read_command
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -54,9 +51,9 @@ local debug   = l3build.debug
 ---@type l3b_globals_t
 local l3b_globals  = require("l3build-globals")
 ---@type G_t
-local G      = l3b_globals.G
+local G   = l3b_globals.G
 ---@type Exe_t
-local Exe       = l3b_globals.Exe
+local Exe = l3b_globals.Exe
 
 --[=[ Package description
 
@@ -105,7 +102,7 @@ local function input_multi_line_field(name)
     if answer_line == "" then
       return_count = return_count + 1
     else
-      field = field + str_rep("\n", return_count)
+      field = field + ("\n"):rep(return_count)
       return_count = 0
       if answer_line then
         field = field .. "\n" .. answer_line
@@ -148,8 +145,8 @@ local function single_field(name, value, max, desc, mandatory)
         error("The field " .. name .. " must contain " .. desc)
       end
     end
-    if value and len(vs) > 0 then
-      if max > 0 and len(vs) > max then
+    if value and vs:len() > 0 then
+      if max > 0 and vs:len() > max then
         error("The field " .. name .. " is longer than " .. max)
       end
       vs =  vs:gsub('"', '"')
@@ -179,10 +176,7 @@ end
 ---@param command string
 ---@return string
 function MT:send_request(command)
-  local fh = assert(popen(self.request .. command, "r"))
-  local t  = assert(fh:read("a"))
-  fh:close()
-  return t
+  return read_command(self.request .. command)
 end
 
 ---Prepare the context
@@ -211,7 +205,7 @@ function MT:prepare(version)
   local options = l3build.options
 
   -- try a sensible default for the package name:
-  config.pkg = config.pkg or _G.ctanpkg or nil
+  config.pkg = config.pkg or G.ctanpkg or nil
 
   -- Get data from command line if appropriate
   do
@@ -308,7 +302,7 @@ function MT:upload(tag_names)
   if options["dry-run"] then
     upload_to_ctan = false
   else
-    upload_to_ctan = _G.ctanupload or "ask"
+    upload_to_ctan = G.ctanupload or "ask"
   end
   if upload_to_ctan ~= nil and upload_to_ctan ~= false and upload_to_ctan ~= true then
     if response:match("WARNING") then
@@ -321,7 +315,7 @@ function MT:upload(tag_names)
     io.stdout:write("> ")
     io.stdout:flush()
     answer = read()
-    if lower(answer, 1, 1) == "y" then
+    if answer:lower(1, 1) == "y" then
       upload_to_ctan = true
     end
   end

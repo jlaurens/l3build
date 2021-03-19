@@ -47,33 +47,34 @@ local copy_tree             = fslib.copy_tree
 local make_directory        = fslib.make_directory
 local make_clean_directory  = fslib.make_clean_directory
 local tree                  = fslib.tree
-local absolute_path         = fslib.absolute_path
+local quoted_absolute_path  = fslib.quoted_absolute_path
 
 ---@type l3build_t
 local l3build = require("l3build")
 
 ---@type l3b_globals_t
-local l3b_globals  = require("l3build-globals")
+local l3b_globals = require("l3build-globals")
 ---@type G_t
-local G      = l3b_globals.G
+local G           = l3b_globals.G
 ---@type Dir_t
-local Dir       = l3b_globals.Dir
+local Dir         = l3b_globals.Dir
 ---@type Files_t
-local Files     = l3b_globals.Files
+local Files       = l3b_globals.Files
 ---@type Deps_t
-local Deps      = l3b_globals.Deps
+local Deps        = l3b_globals.Deps
 ---@type Exe_t
-local Exe       = l3b_globals.Exe
+local Exe         = l3b_globals.Exe
 ---@type Opts_t
-local Opts      = l3b_globals.Opts
-local defaults  = l3b_globals.defaults
+local Opts        = l3b_globals.Opts
+
+local G_defaults  = l3b_globals.defaults
 
 ---Split off from the main unpack so it can be used on a bundle and not
 ---leave only one modules files
 ---@param source_dirs string_list_t|nil defaults to the source directory
 ---@param sources     string_list_t|nil defaults to the source files glob
 ---@return error_level_n
-function defaults.bundleunpack(source_dirs, sources)
+local function bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
   sources = sources or { Files.source }
   local options = l3build.options
@@ -104,7 +105,7 @@ function defaults.bundleunpack(source_dirs, sources)
   for glob in entries(Files.unpack) do
     for p in tree(Dir.unpack, glob) do
       local dir_path, base_name = dir_base(p.src)
-      local local_dir = absolute_path(Dir[l3b_globals.LOCAL])
+      local local_dir = quoted_absolute_path(Dir[l3b_globals.LOCAL])
       local cmd = cmd_concat(
         "cd " .. Dir.unpack .. "/" .. dir_path,
         OS.setenv .. " TEXINPUTS=." .. OS.pathsep
@@ -168,6 +169,7 @@ end
 
 return {
   unpack        = unpack,
+  bundleunpack  = bundleunpack,
   unpack_impl   = {
     run = unpack,
   },

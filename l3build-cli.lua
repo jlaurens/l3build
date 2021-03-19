@@ -43,6 +43,35 @@ local register_option = l3b_options.register
 local l3b_targets     = require("l3b-targets")
 local register_target = l3b_targets.register_info
 
+-- Implementation
+
+local GET_MAIN_VARIABLE = "get_main_variable"
+
+---@class options_t: options_base_t
+---@field config    string_list_t
+---@field date      string
+---@field debug     boolean
+---@field dirty     boolean
+---@field dry_run   boolean -- real name "dry-run"
+---@field email     string
+---@field engine    table
+---@field epoch     string
+---@field file      string
+---@field first     string
+---@field force     boolean
+---@field full      boolean
+---@field halt_on_error boolean -- real name "halt-on-error"
+---@field help      boolean
+---@field last      string
+---@field message   string
+---@field names     string_list_t
+---@field quiet     boolean
+---@field rerun     boolean
+---@field shuffle   boolean
+---@field target    string
+---@field texmfhome string
+---@field get_main_variable string
+
 local option_list = {
   config = {
     description = "Sets the config(s) used for running tests",
@@ -139,16 +168,24 @@ local option_list = {
   version = {
     description = "Print version information and exit",
     type = "boolean"
+  },
+  [GET_MAIN_VARIABLE] = {
+    description = "Status returns the value of the main variable given its name",
+    type = "string"
   }
 }
 
-local function register_options()
+---Register the builtin options
+local function register_builtin_options()
   for k, v in pairs(option_list) do
     v.long = k
     register_option(v, true)
   end
 end
 
+---Register the custom options by loading and executing
+---the `options.lua` located at `work_dir`.
+---@param work_dir string
 local function register_custom_options(work_dir)
   local options_cfg = work_dir .. "options.lua"
   if file_exists(options_cfg) then
@@ -234,14 +271,16 @@ local function register_targets()
 end
 
 ---@class l3b_cli_t
----@field register_options        fun()
----@field register_custom_options fun()
----@field register_targets        fun()
----@field parse                   l3b_options_parse_f
+---@field GET_MAIN_VARIABLE         string
+---@field register_builtin_options  fun()
+---@field register_custom_options   fun()
+---@field register_targets          fun()
+---@field parse                     l3b_options_parse_f
 
 return {
-  register_options        = register_options,
-  register_custom_options = register_custom_options,
-  register_targets        = register_targets,
-  parse                   = l3b_options.parse
+  GET_MAIN_VARIABLE         = GET_MAIN_VARIABLE,
+  register_builtin_options  = register_builtin_options,
+  register_custom_options   = register_custom_options,
+  register_targets          = register_targets,
+  parse                     = l3b_options.parse
 }

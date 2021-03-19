@@ -57,7 +57,7 @@ Due to code separation, the `run` is not always provided.
 
 -- function signatures
 
----@alias high_run_f           fun(options: options_t): error_level_n|nil
+---@alias run_high_f           fun(options: options_t): error_level_n|nil
 ---@alias target_preflight_f  fun(options: options_t): error_level_n
 ---@alias target_process_f        fun(names: string_list_t): error_level_n
 
@@ -65,7 +65,7 @@ Due to code separation, the `run` is not always provided.
 ---@field prepare     target_preflight_f|nil function to run preflight code
 ---@field configure   target_preflight_f|nil function to run preflight code
 ---@field run         target_process_f function to run the target, possible computed attributed
----@field high_run    high_run_f|nil function to run the target, not config loaded, possible computed attributed
+---@field run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
 ---@field bundle_run  target_process_f|nil function to run the target, used at top level, possible computed attributed
 
 ---@class target_info_t -- model for a target
@@ -127,7 +127,7 @@ end
 ---@field prepare       target_preflight_f|nil function run before any other action code
 ---@field configure     target_preflight_f|nil function run before any other action code
 ---@field run           target_process_f|string function to run the target, possible computed attributed
----@field high_run      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
+---@field run_high      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
 ---@field bundle_run    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
 
 ---Register the target with the given name and info
@@ -148,7 +148,7 @@ local function register(kvarg, builtin)
   for k in items(
     "prepare",
     "configure",
-    "high_run",
+    "run_high",
     "run",
     "bundle_run"
   ) do
@@ -169,7 +169,7 @@ end
 ---Raises an error when the target is unknown.
 ---Get the implementation table of the target.
 ---Run its `prepare`, return on error.
----Run its `high_run` call if possible, after `preflight`. Return the result when not nil.
+---Run its `run_high` call if possible, after `preflight`. Return the result when not nil.
 ---Run its `configure` if possible, return on error.
 ---Run the `preflight`.
 ---Return its `main` call if any.
@@ -208,12 +208,12 @@ local function process(options, kvarg)
       return error_level
     end
   end
-  if impl.high_run then -- before configure
+  if impl.run_high then -- before configure
     if debug then
-      print("DEBUG: high_run ".. target)
+      print("DEBUG: run_high ".. target)
     end
     kvarg.preflight()
-    error_level = impl.high_run(options)
+    error_level = impl.run_high(options)
     if error_level ~= nil then
       print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
       return error_level
@@ -230,7 +230,7 @@ local function process(options, kvarg)
   end
   -- From now on, we can cache results in choosers
   kvarg.preflight()
-  --[[utlib.flags.cache_chosen = true
+  --[[utlib.flags.cache_bridge = true
   require("l3build-globals")]]
   local names = options.names
   if kvarg.at_bundle_top then

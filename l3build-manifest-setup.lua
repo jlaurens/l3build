@@ -53,17 +53,21 @@ for those people who are interested.
       the ‘Repository manifest’ subheading below.
 --]]
 
+-- TODO: remove this counter productive file handle
+
 local sort = table.sort
 
 
 ---@type l3b_globals_t
 local l3b_globals = require("l3build-globals")
+---@type G_t
+local G           = l3b_globals.G
 ---@type Xtn_t
-local Xtn      = l3b_globals.Xtn
+local Xtn         = l3b_globals.Xtn
 ---@type Dir_t
-local Dir      = l3b_globals.Dir
+local Dir         = l3b_globals.Dir
 ---@type Files_t
-local Files    = l3b_globals.Files
+local Files       = l3b_globals.Files
 
 ---@class manifest_entry_t
 ---@field subheading          string
@@ -205,7 +209,7 @@ the package into a TeX distribution.
     {
        name    = "Source files (TDS)",
        description = "All files included in the `"..module.."/source` directory.\n",
-       dir     = Dir.tds.."/source/"..Dir.tds_module,
+       dir     = Dir.tds.."/source/"..G.tds_module,
        files   = { "*.*" },
        exclude = { ".", ".." },
        flag    = false,
@@ -214,16 +218,16 @@ the package into a TeX distribution.
     {
        name    = "TeX files (TDS)",
        description = "All files included in the `"..module.."/tex` directory.\n",
-       dir     = Dir.tds.."/tex/"..Dir.tds_module,
+       dir     = Dir.tds.."/tex/"..G.tds_module,
        files   = { "*.*" },
-       exclude = { ".",".." },
+       exclude = { ".", ".." },
        flag    = false,
        skipfiledescription = true,
     },
     {
        name    = "Doc files (TDS)",
        description = "All files included in the `"..module.."/doc` directory.\n",
-       dir     = Dir.tds.."/doc/"..Dir.tds_module,
+       dir     = Dir.tds.."/doc/"..G.tds_module,
        files   = { "*.*" },
        exclude = { ".",".." },
        flag    = false,

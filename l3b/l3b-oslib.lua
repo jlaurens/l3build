@@ -22,24 +22,26 @@ for those people who are interested.
 
 --]]
 
-local execute          = os.execute
-local getenv           = os.getenv
-local os_type          = os["type"]
+local execute = os.execute
+local getenv  = os.getenv
+local exit    = os.exit
+local os_type = os["type"]
+local open    = io.open
+local popen   = io.popen
 
 local status          = require("status")
 local luatex_revision = status.luatex_revision
 local luatex_version  = status.luatex_version
 
-local append      = table.insert
-local concat      = table.concat
+local concat    = table.concat
 
-local time        = os.time
-local difftime    = os.difftime
+local time      = os.time
+local difftime  = os.difftime
 
 ---@type utlib_t
-local utlib       = require("l3b-utillib")
-local items       = utlib.items
-local first_of    = utlib.first_of
+local utlib     = require("l3b-utillib")
+local items     = utlib.items
+local first_of  = utlib.first_of
 local print_diff_time = utlib.print_diff_time
 
 ---@class oslib_vars_t
@@ -111,24 +113,16 @@ else
   }
 end
 
----Concat the given string with `OS.concat`
+---Concat the given strings with `OS.concat`
 ---@vararg string ...
 local function cmd_concat(...)
-  local t = {}
-  for item in items( ... ) do
-    if #item > 0 then
-      append(t, item)
-    end
-  end
+  local t = { ... }
   local result
-  local success = pcall (function()
+  local success = pcall(function()
     result = concat(t, OS.concat)
   end)
   if success then
     return result
-  end
-  for i, v in ipairs({ ... }) do
-    print("i, ...", i, v)
   end
   for i, v in ipairs(t) do
     print("i, v  ", i, v)
@@ -140,19 +134,27 @@ end
 ---Run a command in a given directory
 ---@param dir string
 ---@param cmd string
----@return boolean?  suc
----@return exitcode? exitcode
----@return integer?  code
+---@return error_level_n
 local function run(dir, cmd)
   cmd = cmd_concat("cd " .. dir, cmd)
+  local start_time
   if Vars.debug.run then
     print("DEBUG run: ".. cmd)
+    start_time = time()
   end
-  local start_time = time()
   local succ, msg, code = execute(cmd)
-  local diff = difftime(time(), start_time)
-  print_diff_time("Done in: %s", diff)
-  return succ, msg, code
+  if Vars.debug.run then
+    local diff = difftime(time(), start_time)
+    print_diff_time("Done run in: %s", diff)
+  end
+  if succ then
+    return 0
+  end
+  if msg == "signal" then
+    print("\nSignal sent ".. tostring(code))
+    exit(code)
+  end
+  return code > 0 and code or 1
 end
 
 ---Return a quoted version or properly escaped
@@ -171,12 +173,66 @@ local function quoted_path(path)
   end
 end
 
+
+---if filename is non nil and file readable return contents otherwise nil.
+---The content is converted to unix line ending when not binary.
+---@param file_path string
+---@param is_binary boolean
+---@return string? content the content of the file
+local function read_content(file_path, is_binary)
+  if file_path then
+    local fh = open(file_path, is_binary and "rb" or "r")
+    if not fh then
+      return
+    end
+    local content = fh:read("a")
+    fh:close()
+    return not is_binary and os_type == "windows"
+      and content:gsub("\r\n?", "\n")
+      or  content
+  end
+end
+
+---if filename is non nil and file readable return contents otherwise nil
+---Before write, the content is converted to host line ending.
+---@param file_path string
+---@param content string
+---@return error_level_n
+local function write_content(file_path, content)
+  if file_path then
+    local fh = assert(open(file_path, "w"))
+    if not fh then
+      return 1
+    end
+    if os_type == "windows" then
+      content = content:gsub("\n", OS.newline)
+    end
+    local error_level = fh:write(content) and 0 or 1
+    fh:close()
+    return error_level
+  end
+end
+
+---Execute the given command and returns the output
+---@param command string
+---@return string
+local function read_command(command)
+---Return the result.
+  local fh = assert(popen(command, "r"))
+  local t  = assert(fh:read("a"))
+  fh:close()
+  return t
+end
+
 ---@class oslib_t
 ---@field osdate      OS_t
 ---@field Vars        oslib_vars_t
 ---@field cmd_concat  fun(...): string
 ---@field run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
 ---@field quoted_path fun(path: string): string
+---@field read_content  fun(file_path: string, is_binary: boolean): string|nil
+---@field write_content fun(file_path: string, content: string): error_level_n
+---@field read_command  fun(command: string): string
 
 return {
   Vars        = Vars,
@@ -184,4 +240,7 @@ return {
   cmd_concat  = cmd_concat,
   run         = run,
   quoted_path = quoted_path,
+  read_content  = read_content,
+  write_content = write_content,
+  read_command  = read_command,
 }

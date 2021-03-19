@@ -24,7 +24,6 @@ for those people who are interested.
 
 -- local safety guards and shortcuts
 
-local dofile  = dofile
 local print   = print
 local concat  = table.concat
 
@@ -35,19 +34,12 @@ local to_quoted_string  = utlib.to_quoted_string
 
 local pairs   = pairs -- cache after `l3b-utillib` is loaded.
 
----@type wklib_t
-local wklib     = require("l3b-walklib")
-local dir_base  = wklib.dir_base
-
 ---@type oslib_t
 local oslib       = require("l3b-oslib")
 local cmd_concat  = oslib.cmd_concat
 local run         = oslib.run
 local OS          = oslib.OS
-
----@type fslib_t
-local fslib         = require("l3b-fslib")
-local absolute_path = fslib.absolute_path
+local quoted_path = oslib.quoted_path
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -72,17 +64,6 @@ local function set_epoch_cmd(epoch, force)
   ) or ""
 end
 
----Returns the script name depending on the calling sequence.
----`l3build ...` -> full path of `l3build.lua` in the TDS
----When called via `texlua l3build.lua ...`, `l3build.lua` is resolved to either
----`./l3build.lua` or the full path of `l3build.lua` in the TDS.
----`texlua l3build.lua` -> `/Library/TeX/texbin/l3build.lua` or `./l3build.lua`
----@return string
-local function get_script_name()
-  local dir, base = dir_base(l3build.PATH)
-  return absolute_path(dir) .. '/' .. base
-end
-
 -- Performs the task named target given modules in a bundle.
 ---A module is the path of a directory relative to the main one.
 ---Uses `run` to launch a command: change to the module directory,
@@ -90,7 +71,7 @@ end
 ---@param modules string_list_t List of modules.
 ---@param target  string
 ---@param opts    options_t|nil
----@return number 0 on proper termination, a non 0 error code otherwise.
+---@return error_level_n 0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public
 local function call(modules, target, opts)
@@ -119,7 +100,7 @@ local function call(modules, target, opts)
   if opts.names then
     cli_opts = cli_opts .." ".. to_quoted_string(opts.names)
   end
-  local script_name = get_script_name()
+  local script_path = quoted_path(l3build.script_path)
   for module in entries(modules) do
     local text
     local opts_config = opts["config"]
@@ -129,7 +110,7 @@ local function call(modules, target, opts)
       text = " for module " .. module
     end
     print("Running l3build with target \"" .. target .. "\"" .. text )
-    local cmd = "texlua " .. script_name .. " " .. target .. cli_opts
+    local cmd = "texlua " .. script_path .. " " .. target .. cli_opts
     if l3build.debug.call then
       print("DEBUG Info: module  ".. module)
       print("DEBUG Info: execute ".. cmd)
@@ -152,7 +133,7 @@ local function deps_install(deps)
   local error_level
   for dep in entries(deps) do
     print("Installing dependency: " .. dep)
-    error_level = run(dep, "texlua " .. get_script_name() .. " unpack -q")
+    error_level = run(dep, "texlua " .. quoted_path(l3build.script_path) .. " unpack -q")
     if error_level ~= 0 then
       return error_level
     end

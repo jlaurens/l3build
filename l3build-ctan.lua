@@ -156,7 +156,7 @@ local function ctan()
   for glob in entries(Files.text) do
     for src_dir in items(Dir.unpack, Dir.textfile) do
       copy_tree(glob, src_dir, Dir.ctan .. "/"     .. G.ctanpkg)
-      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. G.tdsroot .. "/" .. G.bundle)
+      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. G.tds_main)
     end
   end
   -- Rename README if necessary
@@ -165,7 +165,7 @@ local function ctan()
     local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
       Dir.ctan .. "/" .. G.ctanpkg,
-      Dir.tds .. "/doc/" .. G.tdsroot .. "/" .. G.bundle
+      Dir.tds .. "/doc/" .. G.tds_main
     ) do
       if file_exists(dir .. "/" .. readme) then
         remove_tree(dir, newfile)
@@ -173,13 +173,14 @@ local function ctan()
       end
     end
   end
-  local function dirzip(dir, name)
-    local zipname = name .. ".zip"
+  local function zip_directory(dir, name)
+    os.execute("ls -al \"".. dir .. "\"")
+    local zip_name = name .. ".zip"
     -- Convert the tables of files to quoted strings
     local bin_files = to_quoted_string(Files.binary)
     local exclude = to_quoted_string(Files.exclude)
     -- First, zip up all of the text files
-    local cmd = Exe.zip .. " " .. Opts.zip .. " -ll ".. zipname .. " ."
+    local cmd = Exe.zip .. " " .. Opts.zip .. " -ll ".. zip_name .. " ."
       .. (
         (bin_files or exclude)
         and (" -x " .. bin_files .. " " .. exclude)
@@ -187,18 +188,17 @@ local function ctan()
       )
     run(dir, cmd)
     -- Then add the binary ones
-    cmd = Exe.zip .. " " .. Opts.zip .. " -g ".. zipname .. " ."
+    cmd = Exe.zip .. " " .. Opts.zip .. " -g ".. zip_name .. " ."
       .. " -i " .. bin_files
       .. (exclude and (" -x " .. exclude) or "")
     run(dir, cmd)
   end
-  dirzip(Dir.tds, G.ctanpkg .. ".tds")
+  zip_directory(Dir.tds, G.ctanpkg .. ".tds")
   if G.packtdszip then
     copy_tree(G.ctanpkg .. ".tds.zip", Dir.tds, Dir.ctan)
   end
-  dirzip(Dir.ctan, G.ctanzip)
+  zip_directory(Dir.ctan, G.ctanzip)
   copy_tree(G.ctanzip .. ".zip", Dir.ctan, Dir.work)
-  return error_level
 end
 
 ---@class l3b_ctan_t
