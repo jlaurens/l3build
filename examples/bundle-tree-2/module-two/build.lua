@@ -6,5 +6,7 @@ typesetfiles  = { "*.dtx", "*.tex" }
 packtdszip    = true -- recommended for "tree" layouts
 
 if options.debug then
-  print("build.lua module-two")
+  print("DEBUG: module-two build.lua executed")
+  print("- bundle: ".. bundle)
+  print("- module: ".. module)
 end

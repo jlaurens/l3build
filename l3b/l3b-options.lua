@@ -27,9 +27,10 @@ local append    = table.insert
 local stderr  = io.stderr
 
 ---@type utlib_t
-local utlib         = require("l3b-utillib")
-local readonly      = utlib.readonly
-local sorted_values = utlib.sorted_values
+local utlib             = require("l3b-utillib")
+local readonly          = utlib.readonly
+local values            = utlib.values
+local compare_ascending = utlib.compare_ascending
 
 --[=[ Package implementation ]=]
 
@@ -83,9 +84,12 @@ end
 ---@param hidden boolean true to list all hidden targets too.
 ---@return function
 local function get_all_info(hidden)
-  return sorted_values(by_long, function (info)
-    return not info.description
-  end)
+  return values(by_long, {
+    compare = compare_ascending,
+    exclude = function (info)
+      return not info.description
+    end,
+  })
 end
 
 ---Load the given value in the given table
@@ -291,7 +295,7 @@ local function parse(arg, on_unknown)
   return result
 end
 
----@alias l3b_options_parse_f fun(arg: table<integer, string>): table<string, any>
+---@alias l3b_options_parse_f fun(arg: string[]): table<string, any>
 
 ---@class l3b_options_t
 ---@field ut_flags_t        options_flags_t

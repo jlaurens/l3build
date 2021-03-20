@@ -102,7 +102,7 @@ local function update_file_tag(file_path, tag_name, tag_date)
 end
 
 ---Target tag
----@param tag_names string_list_t|nil
+---@param tag_names string[]|nil
 ---@return error_level_n
 local function tag(tag_names)
   if tag_names and #tag_names > 1 then
@@ -128,7 +128,7 @@ local function tag(tag_names)
 end
 
 ---Target tag
----@param tag_names string_list_t|nil, singleton list
+---@param tag_names string[]|nil, singleton list
 ---@return error_level_n
 local function bundle_tag(tag_names)
   local error_level = call(G.modules, "tag")
@@ -149,6 +149,6 @@ return {
   update_tag  = update_tag,
   tag_impl    = {
     run         = tag,
-    bundle_run  = bundle_tag,
+    run_bundle  = bundle_tag,
   },
 }

@@ -22,8 +22,6 @@ for those people who are interested.
 
 --]]
 
--- Aliases
----@alias string_list_t table<integer, string>
 -- local safety guards and shortcuts
 
 local type    = type
@@ -119,38 +117,83 @@ end
 ---Iterator for the indices of a sequencial table.
 ---Purely syntactic sugar for people preferring `for in` loops.
 ---@param table table
----@return fun()
+---@param reverse boolean true for reverse ordering
+---@return fun(): integer|nil
 ---@usage `for i in indices(t) do ... end` instead of `for i = 1, #t do ... end`
-local function indices(table)
-  local i = 0
-  return function ()
-    i = i + 1
-    return i <= #table and i or nil
+local function indices(table, reverse)
+  if reverse then
+    local i = #table + 1
+    return function ()
+      i = i - 1
+      return i > 0 and i or nil
+    end
+  else
+    local i = 0
+    return function ()
+      i = i + 1
+      return i <= #table and i or nil
+    end
   end
 end
+
+---@alias compare_f  fun(a: any, b: any): boolean
+---Compare function to sort in reverse order
+---@param a any comparable with <
+---@param b any comparable with <
+---@return boolean
+local function compare_descending(a, b)
+  return a > b
+end
+
+-- Ascending counterpart. Implemented for balancing reasons
+-- despite it is the default behavior in `table.sort`.
+---Compare function to sort in default order.
+---@param a any comparable with <
+---@param b any comparable with <
+---@return boolean
+local function compare_ascending(a, b)
+  return a < b
+end
+
+
+---@alias exclude_f  fun(value: any): boolean
+
+---@class iterator_kv_t
+---@field unique boolean
+---@field compare compare_f
+---@field exclude exclude_f
+
+---@alias iterator_f fun(): any
 
 ---Iterator for the entries of a sequencial table
----@param table table
----@return fun()
-local function entries(table)
-  local i = 0
-  return function ()
-    i = i + 1
-    return table[i]
+---No ordering when compare is not provided.
+---@generic T
+---@param table T[]
+---@param kv    iterator_kv_t
+---@return fun(): T|nil
+local function entries(table, kv)
+  local function raw_iterator(t)
+    local i = 0
+    return function ()
+      i = i + 1
+      return t[i]
+    end
   end
-end
-
----Iterator for the entries of a sequencial table.
----Every entry is ignored when already listed.
----@param table table
----@return fun()
-local function unique_entries(table)
-  local i = 0
+  if not kv then
+    return raw_iterator(table)
+  end
+  if kv.compare then
+    table = { tbl_unpack(table) }
+    sort(table, kv.compare)
+  end
+  local iterator = raw_iterator(table)
+  if not kv.exclude then
+    return iterator
+  end
   local already = {}
   return function ()
     repeat -- forever
-      i = i + 1
-      local result = table[i]
+      local result = iterator()
       if result == nil then -- end of iteration
         return result
       elseif not already[result] then
@@ -161,19 +204,9 @@ local function unique_entries(table)
   end
 end
 
----Iterator for the entries of a sequencial table.
----Every entry is ignored when already listed.
----@param table table
----@return fun()
-local function sorted_entries(table)
-  local sorted = { tbl_unpack(table) }
-  sort(sorted)
-  return entries(sorted)
-end
-
 ---Iterator for the items given in arguments
 ---@vararg any
----@return fun()
+---@return iterator_f
 ---@usage `for item in items(a, b, c) do ... end`
 local function items(...)
   return entries({ ... })
@@ -181,102 +214,92 @@ end
 
 ---Iterator for the items given in arguments
 ---Every item is ignored when already listed.
+---@vararg any
+---@return iterator_f
+---@usage `for item in unique_items(a, b, c) do ... end`
 local function unique_items(...)
-  return unique_entries({ ... })
+  return entries({ ... }, { unique = true })
 end
 
----Iterator for the items given in arguments
----Every item is ignored when already listed.
-local function sorted_items(...)
-  return sorted_entries({ ... })
-end
-
----@type fun(table: table): fun(): any
-local keys = pairs
-
----Iterates over the values of the table
----@param table table
----@return fun()
-local function values(table)
-  local k, v
-  return function ()
-    k, v = next(table, k)
-    return v
-  end
-end
-
----Iterates over the values of the table
----Values are sorted according to the keys
----Values are filtered.
----@param table table
----@param exclude fun(value: any): boolean
----@return fun()
-local function sorted_values(table, exclude)
-  local i, kk = 0, {}
-  for k in keys(table) do
+---Keys iterator, poosibly sorted.
+---No ordering when no comparator is given.
+---@generic K, V
+---@param table     table<K,V>
+---@param compare?  fun(l: K, r: K): boolean
+---@return fun(): K|nil
+local function keys(table, compare)
+  local kk = {}
+  for k in pairs(table) do
     append(kk, k)
   end
-  sort(kk)
+  return items(kk, { compare = compare })
+end
+
+---@class sorted_kv_t
+---@field compare compare_f
+---@field exclude exclude_f
+
+---Iterates over the values of the table.
+---Values are sorted according to the keys ordering.
+---Values are filtered out by the excluder.
+---@generic K, V
+---@param table table<K,V>
+---@param kv? sorted_kv_t
+---@return fun(): K|nil, V|nil
+local function sorted_pairs(table, kv)
+  kv = kv or {}
+  local iterator = keys(table, kv.compare)
   return function ()
     repeat -- forever
-      i = i + 1
-      local k = kk[i]
+      local k = iterator()
       if k == nil then
         return
       end
       local value = table[k]
-      if not exclude or not exclude(value) then
-        return value
-      end
-    until false
-  end
-end
-
----Iterates over the values of the table
----Values are sorted according to the keys
----Values are filtered.
----@param table table
----@param exclude fun(value: any): boolean
----@return fun()
-local function sorted_pairs(table, exclude)
-  local i, kk = 0, {}
-  for k in keys(table) do
-    append(kk, k)
-  end
-  sort(kk)
-  return function ()
-    repeat -- forever
-      i = i + 1
-      local k = kk[i]
-      if k == nil then
-        return
-      end
-      local value = table[k]
-      if not exclude or not exclude(value) then
+      if not kv.exclude or not kv.exclude(value) then
         return k, value
       end
     until false
   end
 end
 
+---Iterates over the values of the table
+---Values are sorted according to the keys ordering.
+---Values are filtered.
+---@generic K, V
+---@param table table<K,V>
+---@param kv? sorted_kv_t
+---@return fun(): V|nil
+local function values(table, kv)
+  local iterator = sorted_pairs(table, kv)
+  return function ()
+    repeat -- forever
+      local _, v = iterator()
+      return v
+    until false
+  end
+end
+
 ---Return the first argument
----@param first any
----@return any
----@usage first_of(gsub(...))
+---@generic T
+---@param first T
+---@return T
+---@usage `first_of(gsub(...))`
 local function first_of(first)
   return first
 end
 
 ---Return the second argument
+---@generic T
 ---@param _ any
----@param second any
----@return any
----@usage seconf_of(...)
+---@param second T
+---@return T
+---@usage `second_of(...)`
 local function second_of(_, second)
   return second
 end
 
----Return a copy of s witthout heading nor trailing spaces.
+---Return a copy of s without heading nor trailing spaces.
 ---@param s string
 ---@return string
 local function trim(s)
@@ -284,10 +307,11 @@ local function trim(s)
 end
 
 ---Merge in place `holder` with `addendum`.
----@param holder table The receiver
----@param addendum table What is merged into the receiver
----@param can_overwrite boolean|nil if falsy overwriting is an error
----@return table holder
+---@generic K, V
+---@param holder table<K,V> The receiver
+---@param addendum table<K,V> What is merged into the receiver
+---@param can_overwrite? boolean if falsy overwriting is an error
+---@return table<K,V> holder
 local function extend_with(holder, addendum, can_overwrite)
   for key, value in pairs(addendum) do
     assert(can_overwrite or not holder[key], "Conflicting symbol ".. tostring(key))
@@ -296,10 +320,11 @@ local function extend_with(holder, addendum, can_overwrite)
   return holder
 end
 
---https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
----Make a deep copy of the given object
----@param original any
----@return any
+---Make a shallow copy of the given object,
+---taking the metatable into account.
+---@generic T
+---@param original T
+---@return T
 local function shallow_copy(original)
   local res = {}
   for k, v in next, original do res[k] = v end
@@ -308,8 +333,9 @@ end
 
 --https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
 ---Make a deep copy of the given object
----@param original any
----@return any
+---@generic T
+---@param original T
+---@return T
 local function deep_copy(original)
   local seen = {}
   local function f(obj)
@@ -327,7 +353,10 @@ local function deep_copy(original)
   return f(original)
 end
 
---[==[ Bridge business ]==]
+--[==[ Bridge business
+Some proxy of both primary and secondary tables,
+with supplemental computed properties given by index.
+--]==]
 
 ---@class bridge_kv_t
 ---@field prefix    string
@@ -357,7 +386,7 @@ local function bridge(kv)
         local k_G = (kv.prefix or "") .. k .. (kv.suffix or "")
         local primary = kv.primary or _G
         local result  = primary[k_G]
-        if not result and kv.index then
+        if result == nil and kv.index then
           result = kv.index(t, k)
         end
         if kv.complete then
@@ -437,62 +466,58 @@ local function print_diff_time(format, diff)
   end
 end
 
----@alias utlib_flags_t table<string,boolean>
+---@alias flags_t table<string,boolean>
 
----@type utlib_flags_t
+---@type flags_t
 local flags = {}
 
 ---@class utlib_t
----@field Vars              utlib_vars_t
----@field flags             utlib_flags_t
----@field to_quoted_string  fun(table: table, separator: string|nil): string
----@field indices           fun(table: table): fun(): integer
----@field entries           fun(table: table): fun(): any
----@field unique_entries    fun(table: table): fun(): any
----@field sorted_entries    fun(table: table): fun(): any
----@field items             fun(...): fun(): any
----@field unique_items      fun(...): fun(): integer
----@field sorted_items      fun(...): fun(): integer
----@field keys              fun(table: table): fun(): any
----@field values            fun(table: table): fun(): any
----@field sorted_values     fun(table: table, exclude: fun(value: any): boolean): fun(): any
----@field sorted_pairs      fun(table: table, exclude: fun(value: any): boolean): fun(): any, any
----@field first_of          fun(...): any
----@field second_of         fun(...): any
----@field trim              fun(in: string): string
----@field extend_with       fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
----@field readonly          fun(t: table, quiet: boolean): table
----@field is_readonly       fun(t: table): boolean
----@field shallow_copy      fun(original: any): any
----@field deep_copy         fun(original: any): any
----@field bridge            fun(kv: bridge_kv_t): table
----@field to_ymd_hms        fun(diff: integer): string
----@field print_diff_time   fun(format: string, diff: integer)
+---@field Vars                utlib_vars_t
+---@field flags               flags_t
+---@field to_quoted_string    fun(table: table, separator: string|nil): string
+---@field indices             fun(table: table, reverse: boolean): fun(): integer
+---@field compare_ascending   compare_f
+---@field compare_descending  compare_f
+---@field entries             fun(table: table, kv: sorted_kv_t): iterator_f
+---@field items               fun(...): iterator_f
+---@field unique_items        fun(...): iterator_f
+---@field keys                fun(table: table, compare: compare_f): iterator_f
+---@field sorted_pairs        fun(table: table, kv: sorted_kv_t): fun(): any, any
+---@field values              fun(table: table, kv: sorted_kv_t): iterator_f
+---@field first_of            fun(...): any
+---@field second_of           fun(...): any
+---@field trim                fun(in: string): string
+---@field extend_with         fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
+---@field readonly            fun(t: table, quiet: boolean): table
+---@field is_readonly         fun(t: table): boolean
+---@field shallow_copy        fun(original: any): any
+---@field deep_copy           fun(original: any): any
+---@field bridge              fun(kv: bridge_kv_t): table
+---@field to_ymd_hms          fun(diff: integer): string
+---@field print_diff_time     fun(format: string, diff: integer)
 
 return {
-  Vars              = Vars,
-  flags             = flags,
-  to_quoted_string  = to_quoted_string,
-  indices           = indices,
-  entries           = entries,
-  unique_entries    = unique_entries,
-  sorted_entries    = sorted_entries,
-  items             = items,
-  unique_items      = unique_items,
-  sorted_items      = sorted_items,
-  keys              = keys,
-  values            = values,
-  sorted_values     = sorted_values,
-  sorted_pairs      = sorted_pairs,
-  first_of          = first_of,
-  second_of         = second_of,
-  trim              = trim,
-  extend_with       = extend_with,
-  readonly          = readonly,
-  is_readonly       = is_readonly,
-  shallow_copy      = shallow_copy,
-  deep_copy         = deep_copy,
-  bridge            = bridge,
-  to_ymd_hms        = to_ymd_hms,
-  print_diff_time   = print_diff_time,
+  Vars                = Vars,
+  flags               = flags,
+  to_quoted_string    = to_quoted_string,
+  indices             = indices,
+  entries             = entries,
+  items               = items,
+  unique_items        = unique_items,
+  compare_ascending   = compare_ascending,
+  compare_descending  = compare_descending,
+  keys                = keys,
+  sorted_pairs        = sorted_pairs,
+  values              = values,
+  first_of            = first_of,
+  second_of           = second_of,
+  trim                = trim,
+  extend_with         = extend_with,
+  readonly            = readonly,
+  is_readonly         = is_readonly,
+  shallow_copy        = shallow_copy,
+  deep_copy           = deep_copy,
+  bridge              = bridge,
+  to_ymd_hms          = to_ymd_hms,
+  print_diff_time     = print_diff_time,
 }

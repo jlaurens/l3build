@@ -28,10 +28,11 @@ local time      = os.time
 local difftime  = os.difftime
 
 ---@type utlib_t
-local utlib         = require("l3b-utillib")
-local items         = utlib.items
-local sorted_values = utlib.sorted_values
-local print_diff_time = utlib.print_diff_time
+local utlib             = require("l3b-utillib")
+local items             = utlib.items
+local values            = utlib.values
+local compare_ascending = utlib.compare_ascending
+local print_diff_time   = utlib.print_diff_time
 
 -- Module implementation
 
@@ -46,11 +47,11 @@ or from an embedded module (see `G.at_bundle_top`).
 For a module, the action is always determined
 by the `run` field of the target info.
 When at the top of a bundle, the action is determined by
-1) the `bundle_run` field if any,
+1) the `run_bundle` field if any,
 2) if `has_bundle_variant` is true, the `bundle_foo` target is triggered
 for all the modules.
 3) the required `run` field when all else failed
-`has_bundle_variant` is ignored when `bundle_run` is defined.
+`has_bundle_variant` is ignored when `run_bundle` is defined.
 Due to code separation, the `run` is not always provided.
 
 --]=]
@@ -59,14 +60,14 @@ Due to code separation, the `run` is not always provided.
 
 ---@alias run_high_f           fun(options: options_t): error_level_n|nil
 ---@alias target_preflight_f  fun(options: options_t): error_level_n
----@alias target_process_f        fun(names: string_list_t): error_level_n
+---@alias target_process_f        fun(names: string[]): error_level_n
 
 ---@class target_impl_t
 ---@field prepare     target_preflight_f|nil function to run preflight code
 ---@field configure   target_preflight_f|nil function to run preflight code
 ---@field run         target_process_f function to run the target, possible computed attributed
 ---@field run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
----@field bundle_run  target_process_f|nil function to run the target, used at top level, possible computed attributed
+---@field run_bundle  target_process_f|nil function to run the target, used at top level, possible computed attributed
 
 ---@class target_info_t -- model for a target
 ---@field description string description
@@ -85,9 +86,12 @@ local DB = {}
 ---@return function
 ---@usage `for info in get_all_info() do ... end`
 local function get_all_info(hidden)
-  return sorted_values(DB, function (info)
-    return not info.description
-  end)
+  return values(DB, {
+    compare = compare_ascending,
+    exclude = function (info)
+      return not info.description
+    end
+  })
 end
 
 ---Return the target info for the given name, if any.
@@ -128,7 +132,7 @@ end
 ---@field configure     target_preflight_f|nil function run before any other action code
 ---@field run           target_process_f|string function to run the target, possible computed attributed
 ---@field run_high      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
----@field bundle_run    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
+---@field run_bundle    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
 
 ---Register the target with the given name and info
 ---@kvarg kvarg target_register_kvarg_t
@@ -150,7 +154,7 @@ local function register(kvarg, builtin)
     "configure",
     "run_high",
     "run",
-    "bundle_run"
+    "run_bundle"
   ) do
     impl[k] = kvarg[k]
   end
@@ -174,7 +178,7 @@ end
 ---Run the `preflight`.
 ---Return its `main` call if any.
 ---If at bundle top:
----  Return its `bundle_run` call if possible
+---  Return its `run_bundle` call if possible
 ---  Return its `caller` call with the proper target name
 ---Finally return its `run` call.
 ---@param options options_t
@@ -188,6 +192,7 @@ local function process(options, kvarg)
     error("Unknown target name: ".. target)
   end
   local debug = options.debug
+  ---@type target_impl_t
   local impl = info.impl  -- the implementation knows how to
   if not impl then
     local pkg = require(info.package)
@@ -234,11 +239,11 @@ local function process(options, kvarg)
   require("l3build-globals")]]
   local names = options.names
   if kvarg.at_bundle_top then
-    if impl.bundle_run then
+    if impl.run_bundle then
       if debug then
-        print("DEBUG: custom bundle_run ".. target)
+        print("DEBUG: custom run_bundle ".. target)
       end
-      error_level = impl.bundle_run(names)
+      error_level = impl.run_bundle(names)
       print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
       return error_level
     end

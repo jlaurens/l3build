@@ -65,7 +65,7 @@ local G         = l3b_globals.G
 local Dir       = l3b_globals.Dir
 ---@type Files_t
 local Files     = l3b_globals.Files
-local defaults  = l3b_globals.defaults
+local get_global_variable_entry = l3b_globals.get_entry
 
 ---@type l3b_unpk_t
 local l3b_unpk  = require("l3build-unpack")
@@ -161,7 +161,7 @@ local function install_files(root_install_dir, full, dry_run)
 
   -- Collect up all file entries before copying:
   -- ensures no files are lost during clean-up
-  ---@type table<integer, copy_name_kv>
+  ---@type copy_name_kv[]
   local to_copy = {}
 
   local function feed_to_copy(src_dir, type, file_globs, flatten, module)
@@ -174,7 +174,7 @@ local function install_files(root_install_dir, full, dry_run)
       module = "latex"
     end
     local type_module = type .."/".. module
-    ---@type table<integer, copy_name_kv>
+    ---@type copy_name_kv[]
     local candidates = {}
     -- Generate a candidates list
     -- each candidate is a table
@@ -262,7 +262,7 @@ local function install_files(root_install_dir, full, dry_run)
         end
       end
     end
-    ---@type string_list_t
+    ---@type string[]
     local result = {}
     for glob in entries(includes) do
       for p in tree(dir, glob) do
@@ -399,7 +399,11 @@ local function install()
   return install_files(G.texmf_home, options.full, options["dry-run"])
 end
 
-defaults.install_files = install_files
+do
+  ---@type variable_entry_t
+  local entry = get_global_variable_entry("install_files")
+  entry.value = install_files
+end
 
 ---@class l3b_inst_t
 ---@field install_impl    target_impl_t

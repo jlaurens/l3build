@@ -34,6 +34,7 @@ local luatex_revision = status.luatex_revision
 local luatex_version  = status.luatex_version
 
 local concat    = table.concat
+local append    = table.insert
 
 local time      = os.time
 local difftime  = os.difftime
@@ -116,7 +117,13 @@ end
 ---Concat the given strings with `OS.concat`
 ---@vararg string ...
 local function cmd_concat(...)
-  local t = { ... }
+  -- filter out void arguments
+  local t = {}
+  for item in items(...) do
+    if item and item:len() > 0 then
+      append(t, item)
+    end
+  end
   local result
   local success = pcall(function()
     result = concat(t, OS.concat)
@@ -124,7 +131,7 @@ local function cmd_concat(...)
   if success then
     return result
   end
-  for i, v in ipairs(t) do
+  for i, v in ipairs({ ... }) do
     print("i, v  ", i, v)
   end
   print(debug.traceback())

@@ -67,12 +67,12 @@ local Exe         = l3b_globals.Exe
 ---@type Opts_t
 local Opts        = l3b_globals.Opts
 
-local G_defaults  = l3b_globals.defaults
-
 ---Split off from the main unpack so it can be used on a bundle and not
----leave only one modules files
----@param source_dirs string_list_t|nil defaults to the source directory
----@param sources     string_list_t|nil defaults to the source files glob
+---leave only one modules files.
+---Files are unpacked in `Dir.unpack` but this file is cleaned up
+---at each run such that there is no memory between runs of uncpack.
+---@param source_dirs string[]|nil defaults to the source directory
+---@param sources     string[]|nil defaults to the source files glob
 ---@return error_level_n
 local function bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }
@@ -88,19 +88,19 @@ local function bundleunpack(source_dirs, sources)
   end
   for src_dir in entries(source_dirs) do
     for globs in entries(sources) do
-      for glob in entries(globs) do
-        error_level = copy_tree(glob, src_dir, Dir.unpack)
-        if error_level ~= 0 then
-          return error_level
-        end
+      error_level = copy_tree(globs, src_dir, Dir.unpack)
+      if error_level ~= 0 then
+        return error_level
       end
     end
   end
-  for glob in entries(Files.unpacksupp) do
-    error_level = copy_tree(glob, Dir.support, Dir[l3b_globals.LOCAL])
-    if error_level ~= 0 then
-      return error_level
-    end
+  error_level = copy_tree(
+    Files.unpacksupp,
+    Dir.support,
+    Dir[l3b_globals.LOCAL]
+  )
+  if error_level ~= 0 then
+    return error_level
   end
   for glob in entries(Files.unpack) do
     for p in tree(Dir.unpack, glob) do
@@ -128,11 +128,11 @@ local function bundleunpack(source_dirs, sources)
   return 0
 end
 
----@alias unpack_f fun(sources?: string_list_t, source_dirs?: string_list_t): error_level_n
+---@alias unpack_f fun(sources?: string[], source_dirs?: string[]): error_level_n
 ---Unpack the package files using an 'isolated' system: this requires
 ---a copy of the 'basic' DocStrip program, which is used then removed
----@param sources?     string_list_t
----@param source_dirs? string_list_t
+---@param sources?     string[]
+---@param source_dirs? string[]
 ---@return error_level_n
 local function unpack(sources, source_dirs)
   local error_level = deps_install(Deps.unpack)
@@ -143,13 +143,11 @@ local function unpack(sources, source_dirs)
   if error_level ~= 0 then
     return error_level
   end
-  for g in entries(Files.install) do
-    error_level = copy_tree(g, Dir.unpack, Dir[l3b_globals.LOCAL])
-    if error_level ~= 0 then
-      return error_level
-    end
-  end
-  return 0
+  return copy_tree(
+    Files.install,
+    Dir.unpack,
+    Dir[l3b_globals.LOCAL]
+  )
 end
 
 ---Wraps the G.bundleunpack. Naming may change.

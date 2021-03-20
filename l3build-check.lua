@@ -92,6 +92,7 @@ local l3b_aux       = require("l3build-aux")
 local call          = l3b_aux.call
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
 local deps_install  = l3b_aux.deps_install
+local load_unique_config = l3b_aux.load_unique_config
 
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
@@ -148,24 +149,20 @@ local function check_init()
   -- Copy dependencies to the test directory itself: this makes the paths
   -- a lot easier to manage, and is important for dealing with the log and
   -- with file input/output tests
-  for i in all_names(Dir[l3b_globals.LOCAL]) do
-    copy_tree(i, Dir[l3b_globals.LOCAL], Dir.test)
-  end
+  copy_tree(
+    all_names(Dir[l3b_globals.LOCAL]),
+    Dir[l3b_globals.LOCAL],
+    Dir.test
+  )
   G.bundleunpack({ Dir.sourcefile, Dir.testfile })
-  for i in entries(Files.install) do
-    copy_tree(i, Dir.unpack, Dir.test)
-  end
-  for i in entries(Files.check) do
-    copy_tree(i, Dir.unpack, Dir.test)
-  end
-  if directory_exists(Dir.testsupp) then
-    for i in all_names(Dir.testsupp) do
-      copy_tree(i, Dir.testsupp, Dir.test)
-    end
-  end
-  for i in entries(Files.checksupp) do
-    copy_tree(i, Dir.support, Dir.test)
-  end
+  copy_tree(Files.install, Dir.unpack, Dir.test)
+  copy_tree(Files.check,   Dir.unpack, Dir.test)
+  copy_tree(
+    all_names(Dir.testsupp),
+    Dir.testsupp,
+    Dir.test
+  )
+  copy_tree(Files.checksupp, Dir.support, Dir.test)
   execute(OS.ascii .. ">" .. Dir.test .. "/ascii.tcx")
   return G.checkinit_hook()
 end
@@ -682,7 +679,7 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels table<integer, error_level_n>
+---@param err_levels error_level_n[]
 local function rewrite_log(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_log, engine, err_levels)
 end
@@ -691,7 +688,7 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels table<integer, error_level_n>
+---@param err_levels error_level_n[]
 local function rewrite_pdf(path_in, path_out, engine, err_levels)
   rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
 end
@@ -702,7 +699,7 @@ end
 ---@return string
 ---@return string
 local function test_exists(test)
-  ---@type string_list_t
+  ---@type string[]
   local file_names = {}
   for i, kind in ipairs(G.test_order) do
     file_names[i] = test .. G.test_types[kind].test
@@ -836,7 +833,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   end
   -- Ensure there is no stray .log file
   remove_name(Dir.test, name .. Xtn.log)
-  ---@type table<integer, error_level_n>
+  ---@type error_level_n[]
   local err_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
@@ -1061,7 +1058,7 @@ local function check_diff()
 end
 
 ---Check
----@param test_names string_list_t
+---@param test_names string[]
 ---@return error_level_n
 local function check(test_names)
   local error_level = 0
@@ -1080,7 +1077,7 @@ local function check(test_names)
           error('Missing in test_types: '.. kind)
         end
         local ext = G.test_types[kind].test
-        ---@type table<integer, glob_match_f>
+        ---@type glob_match_f[]
         local exclude_glob_matches = {}
         for glob in entries(G.excludetests) do
           append(exclude_glob_matches, to_glob_match(glob .. ext))
@@ -1172,7 +1169,7 @@ local function check(test_names)
 end
 
 ---Prepare material for a forthcoming check.
----@param names string_list_t
+---@param names string[]
 ---@return error_level_n
 local function save(names)
   if names == nil then
@@ -1213,7 +1210,7 @@ local function save(names)
 end
 
 ---Check at module level.
----@param names string_list_t
+---@param names string[]
 ---@return error_level_n
 local function module_check(names)
   if names and #names > 0 then
@@ -1233,7 +1230,7 @@ local function check_high(options)
   if #check_configs > 1 then
     local error_level = 0
     local opts = deep_copy(options)
-    ---@type string_list_t
+    ---@type string[]
     local failed_configs = {}
     local halt_on_error = options["halt-on-error"]
     for config in entries(check_configs) do
@@ -1306,54 +1303,28 @@ local function prepare_check(options)
   return 0
 end
 
----Load the config file, when unique and not "build".
----@return error_level_n
-local function load_unique_config(options)
-  local configs = G.checkconfigs
-  if #configs ~= 1 then
-    return 0
-  end
-  local config_1 = configs[1]
-  if config_1 == "build" then
-    return 0
-  end
-  config_1 = config_1:gsub( ".lua$", "") .. ".lua"
-  local config_path = l3build.work_dir .. config_1
-  if not file_exists(config_path) then
-    config_path = l3build.work_dir .. "config-".. config_1
-  end
-  if file_exists(config_path) then
-    dofile(config_path)
-    Dir.config = "-".. config_1
-    if options.debug then
-      print("DEBUG config: ", config_1)
-    end
-  else
-    print("Error: Missing configuration " .. config_path)
-    return 1
-  end
-  return 0
-end
-
 ---Run before the save operation
 ---@param options options_t
 ---@return error_level_n
 local function configure_save(options)
-  return load_unique_config(options)
+  local configs = G.checkconfigs
+  G.config_suffix = load_unique_config(options, configs)
+  return 0
 end
 
 ---Run before the check operation
 ---@param options options_t
 ---@return error_level_n
 local function configure_check(options)
-  return load_unique_config(options)
+  local configs = G.checkconfigs
+  G.config_suffix = load_unique_config(options, configs)
+  return 0
 end
 
 ---@class l3b_check_t
 ---@field check_impl        target_impl_t
 ---@field module_check_impl target_impl_t
 ---@field save_impl         target_impl_t
----@field load_unique_config  fun(options: options_t): error_level_n
 
 return {
   rewrite_pdf = rewrite_pdf,
@@ -1373,5 +1344,4 @@ return {
     configure = configure_save,
     run       = save,
   },
-  load_unique_config = load_unique_config,
 }

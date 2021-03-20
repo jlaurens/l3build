@@ -143,7 +143,7 @@ end
 
 --[==[ Current directory business ]==]
 
----@type string_list_t
+---@type string[]
 local cwd_list = {}
 
 ---Save the current directory to the top of the
@@ -233,8 +233,8 @@ local function quoted_absolute_path(path)
 end
 
 ---Look for files, directory by directory, and return the first existing
----@param dirs  string_list_t
----@param names string_list_t
+---@param dirs  string[]
+---@param names string[]
 ---@return string
 local function locate(dirs, names)
   for i in entries(dirs) do
@@ -251,9 +251,9 @@ end
 ---or all names if absent. The return value includes files,
 ---directories and whatever `lfs.dir` returns.
 ---Returns an empty list if there is no directory at the given path.
----@param dir_path string
----@param glob string|nil
----@return string_list_t
+---@param dir_path  string
+---@param glob      string|nil
+---@return string[]
 local function file_list(dir_path, glob)
   local files = {}
   if directory_exists(dir_path) then
@@ -274,13 +274,21 @@ local function file_list(dir_path, glob)
   end
   return files
 end
+---@alias string_iterator_f fun(): string|nil
+
+---@class glob_exclude_kv_t
+---@field glob string
+---@field exclude exclude_f
 
 ---Return an iterator of the files and directories at path matching the given glob.
----@param path string
----@param glob string
----@return fun(): string
+---If there is no directory at the given path, a void iterator is returned
+---@param path  string
+---@param glob  string
+---@return string_iterator_f
 local function all_names(path, glob)
-  return entries(file_list(path, glob))
+  return directory_exists(path)
+    and entries(file_list(path, glob))
+    or  function () end
 end
 
 local tree_excluder = function (name) return false end
@@ -317,7 +325,7 @@ local function tree(dir_path, glob)
   local function is_dir(file)
     return attributes(file, "mode") == "directory"
   end
-  ---@type table<integer, tree_entry_t>
+  ---@type tree_entry_t[]
   local result = { {
     src = ".",
     wrk = dir_path,
@@ -452,19 +460,39 @@ local function copy_file(name, source, dest)
 end
 
 ---Copy files 'quietly'.
----@param glob string
+---@param glob string_iterator_f|string[]|string
 ---@param source string
 ---@param dest string
----@return integer
+---@return error_level_n
 local function copy_tree(glob, source, dest)
-  local error_level
-  for p in tree(source, glob) do
-    error_level = copy_core(dest, p.src, p.wrk)
-    if error_level ~= 0 then
-      return error_level
+  local error_level = 0
+  local function helper(g)
+    for p in tree(source, g) do
+      error_level = copy_core(dest, p.src, p.wrk)
+      if error_level ~= 0 then
+        return
+      end
     end
   end
-  return 0
+  ---@type string[]
+  if type(glob) == "function" then
+    for g in glob do
+      helper(g)
+      if error_level ~= 0 then
+        return error_level
+      end
+    end
+  elseif type(glob) == "table" then
+    for g in entries(glob) do
+      helper(g)
+      if error_level ~= 0 then
+        return error_level
+      end
+    end
+  else
+    helper(glob)
+  end
+  return error_level
 end
 
 ---Remove the file or void directory with the given name at the given location.
@@ -524,8 +552,8 @@ end
 ---@field make_directory    fun(path: string):  boolean, exitcode, integer
 ---@field directory_exists  fun(path: string): boolean
 ---@field file_exists       fun(path: string): boolean
----@field locate      fun(dirs: string_list_t, names: string_list_t): string
----@field file_list   fun(dir_path: string, glob: string|nil): string_list_t
+---@field locate      fun(dirs: string[], names: string[]): string
+---@field file_list   fun(dir_path: string, glob: string|nil): string[]
 ---@field all_names   fun(path: string, glob: string): fun(): string
 ---@field set_tree_excluder fun(f: fun(path_wrk: string): boolean)
 ---@field tree        fun(dir_path: string, glob: string): table<string, string>)

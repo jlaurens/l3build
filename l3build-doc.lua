@@ -110,16 +110,10 @@ local function docinit()
   for filetype in items(
     Files.bib, Files.doc, Files.typeset, Files.typesetdemo
   ) do
-    for glob in entries(filetype) do
-      copy_tree(glob, Dir.docfile, Dir.typeset)
-    end
+    copy_tree(filetype, Dir.docfile, Dir.typeset)
   end
-  for glob in entries(Files.source) do
-    copy_tree(glob, Dir.sourcefile, Dir.typeset)
-  end
-  for glob in entries(Files.typesetsupp) do
-    copy_tree(glob, Dir.support, Dir.typeset)
-  end
+  copy_tree(Files.source, Dir.sourcefile, Dir.typeset)
+  copy_tree(Files.typesetsupp, Dir.support, Dir.typeset)
   deps_install(Deps.typeset)
   unpack({ Files.source, Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
@@ -132,7 +126,7 @@ end
 
 ---Typeset all required documents
 ---Uses a set of dedicated auxiliaries that need to be available to others
----@param files? string_list_t
+---@param files? string[]
 ---@return error_level_n
 local function doc(files)
   local error_level = docinit()
@@ -177,7 +171,7 @@ end
 
 ---@class l3b_doc_t
 ---@field doc_impl  target_impl_t
----@field doc       fun(files?: string_list_t): error_level_n
+---@field doc       fun(files?: string[]): error_level_n
 
 return {
   doc_impl  = {

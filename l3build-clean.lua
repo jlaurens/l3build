@@ -23,6 +23,8 @@ for those people who are interested.
 
 --]]
 
+local append = table.insert
+
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
 local entries       = utlib.entries
@@ -49,10 +51,7 @@ local Files     = l3b_globals.Files
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
-
----@type l3b_check_t
-local l3b_check = require("l3build-check")
-local load_unique_config = l3b_check.load_unique_config
+local load_unique_config = l3b_aux.load_unique_config
 
 ---Remove all generated files
 ---@return error_level_n
@@ -63,7 +62,7 @@ local function clean()
   local error_level = remove_directory(Dir.distrib)
                     + make_directory(Dir.distrib)
                     + make_clean_directory(Dir[l3b_globals.LOCAL])
-                    + make_clean_directory(Dir.test)
+                    + make_clean_directory(Dir.test_config)
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
   if error_level ~= 0 then
@@ -77,23 +76,27 @@ local function clean()
     print("- make clean directory at ".. Dir.typeset)
     print("- make clean directory at ".. Dir.unpack)
   end
-  ---@type flag_table_t
-  local clean_list = {}
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
+    ---@type string[]
+    local clean_list = {}
+    ---@type flag_table_t
+    local exclude = {}
     for glob in entries(Files.clean) do
       for p in tree(dir, glob) do
-        clean_list[p.src] = true
+        append(clean_list, p.src)
       end
     end
     for glob in entries(Files.source) do
       for p in tree(dir, glob) do
-        clean_list[p.src] = nil
+        exclude[p.src] = true
       end
     end
-    for p_src in keys(clean_list) do
-      error_level = remove_tree(dir, p_src)
-      if error_level ~= 0 then
-        return error_level
+    for p_src in entries(clean_list, true) do
+      if not exclude[p_src] then
+        error_level = remove_tree(dir, p_src)
+        if error_level ~= 0 then
+          return error_level
+        end
       end
     end
   end
@@ -104,10 +107,13 @@ end
 ---@param options options_t
 ---@return error_level_n
 local function configure_clean(options)
-  return load_unique_config(options)
+  local configs = G.checkconfigs
+  G.config_suffix = load_unique_config(options, configs)
+  return G.config_suffix:len() > 0 and 0 or 1
 end
 
-
+---Clean at the bundle level
+---@return error_level_n
 local function bundle_clean()
   local error_level = call(G.modules, "clean")
   for g in entries(Files.clean) do
@@ -125,6 +131,6 @@ return {
   clean_impl  = {
     run         = clean,
     configure   = configure_clean,
-    bundle_run  = bundle_clean,
+    run_bundle  = bundle_clean,
   }
 }

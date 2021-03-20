@@ -27,11 +27,11 @@ local append = table.insert
 local write  = io.write
 
 ---@type utlib_t
-local utlib           = require("l3b-utillib")
-local entries         = utlib.entries
-local keys            = utlib.keys
-local sorted_entries  = utlib.sorted_entries
-local sorted_pairs    = utlib.sorted_pairs
+local utlib            = require("l3b-utillib")
+local entries          = utlib.entries
+local keys              = utlib.keys
+local compare_ascending = utlib.compare_ascending
+local sorted_pairs      = utlib.sorted_pairs
 
 ---@type fslib_t
 local fslib = require("l3b-fslib")
@@ -153,7 +153,7 @@ local function print_status()
       width = #name
     end
   end
-  for name in sorted_entries(l3b_functions) do
+  for name in entries(l3b_functions, { compare = compare_ascending }) do
     local filler = (" "):rep(width - #name)
     local is_custom = G_defaults[name] ~= G[name]
     print("  ".. name .. filler .. (is_custom and " (*)" or ""))
@@ -388,7 +388,7 @@ local function status_run()
         print("  bundle: ".. bundle)
         print("  path:   ".. absolute_path(Dir.work))
         local mm = {}
-        for m in sorted_entries(modules) do
+        for m in entries(modules, { compare = compare_ascending}) do
           append(mm, ("%s (./%s)"):format(m:lower(), m))
         end
         if #modules > 1 then

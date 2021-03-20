@@ -78,9 +78,7 @@ local function copy_ctan()
   make_directory(ctanpkg_dir)
   local function copy_files(files, source)
     if source == Dir.work or G.flatten then
-      for file_type in entries(files) do
-        copy_tree(file_type, source, ctanpkg_dir)
-      end
+      copy_tree(files, source, ctanpkg_dir)
     else
       for file_type in entries(files) do
         for p in tree(source, file_type) do
@@ -100,9 +98,7 @@ local function copy_ctan()
     copy_files(tab, Dir.docfile)
   end
   copy_files(Files.source, Dir.sourcefile)
-  for file in entries(Files.text) do
-    copy_tree(file, Dir.textfile, ctanpkg_dir)
-  end
+  copy_tree (Files.text, Dir.textfile, ctanpkg_dir)
 end
 
 ---One of the bundle private targets
@@ -153,11 +149,11 @@ local function ctan()
       return error_level
     end
   end
-  for glob in entries(Files.text) do
-    for src_dir in items(Dir.unpack, Dir.textfile) do
-      copy_tree(glob, src_dir, Dir.ctan .. "/"     .. G.ctanpkg)
-      copy_tree(glob, src_dir, Dir.tds  .. "/doc/" .. G.tds_main)
-    end
+  for src_dir in items(Dir.unpack, Dir.textfile) do
+    copy_tree(Files.text, src_dir,
+              Dir.ctan .. "/"     .. G.ctanpkg)
+    copy_tree(Files.text, src_dir,
+              Dir.tds  .. "/doc/" .. G.tds_main)
   end
   -- Rename README if necessary
   local readme = G.ctanreadme

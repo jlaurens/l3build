@@ -73,11 +73,11 @@ local Files       = l3b_globals.Files
 ---@field subheading          string
 ---@field name                string
 ---@field description         string
----@field files               string_list_t|table<integer, string_list_t>
+---@field files               string[]|string[][]
 ---@field dir                 string
 ---@field skipfiledescription boolean
----@field exclude             string_list_t|table<integer, string_list_t>
----@field rename              string_list_t
+---@field exclude             string[]|string[][]
+---@field rename              string[]
 ---@field flag                boolean
 ---@field N                   integer matched files
 ---@field ND                  integer descriptions
@@ -89,7 +89,7 @@ local Files       = l3b_globals.Files
 ---@field Nchar_descr         integer
 
 ---comment
----@return table<integer,manifest_entry_t>
+---@return manifest_entry_t[]
 local function manifest_setup()
   local groups = {
     {
@@ -252,16 +252,16 @@ The following group lists the files included in the CTAN package.
 end
 
 ---Sort
----@param files string_list_t
----@return string_list_t
+---@param files string[]
+---@return string[]
 local function sort_within_match(files)
   sort(files)
   return files
 end
 
 ---Sort
----@param files string_list_t
----@return string_list_t
+---@param files string[]
+---@return string[]
 local function sort_within_group(files)
   --[[
       -- no-op by default; make your own definition to customise. E.g.:

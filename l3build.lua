@@ -306,8 +306,6 @@ fslib.set_working_directory(l3build.work_dir)
 ---@type l3b_globals_t
 local l3b_globals = require("l3build-globals")
 
-l3b_globals.export()
-
 -- Terminate here if in document mode
 if in_document then
   return l3build
@@ -324,12 +322,16 @@ l3b_cli.register_targets()
 
 l3build.options = l3b_cli.parse(arg, function (arg_i)
   -- Private special debugging options "--debug-<key>"
-  local key = arg_i:match("^%-%-debug%-(%w[%w%d_-]*)")
+  local key = arg_i:match("^debug%-(%w[%w%d_-]*)")
   if key then
     l3build.debug[key:gsub("-", "_")] = true
     return true
   end
 end)
+
+l3b_globals.export()
+print(l3build.options, _G.options)
+os.exit(421)
 
 local options   = l3build.options
 
@@ -343,10 +345,6 @@ end
 
 local target = options.target
 
-if target ~= "status" then
-  print(l3b_globals.get_main_variable("bundle"))
-  os.exit(421)
-end
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")
 local help      = l3b_help.help

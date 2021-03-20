@@ -163,7 +163,7 @@ end
 local MT = {}
 
 ---comment
----@param tag_names string_list_t|nil
+---@param tag_names string[]|nil
 local function upload(tag_names)
   tag_names = tag_names or {}
   local controller = setmetatable({}, MT)
@@ -239,7 +239,7 @@ function MT:append_request(str)
 end
 
 ---comment
----@param tag_names string_list_t
+---@param tag_names string[]
 ---@return error_level_n
 function MT:upload(tag_names)
 
@@ -391,7 +391,7 @@ function MT:append_request_field(name, max, desc, mandatory, multi)
 end
 
 ---@class l3b_upld_t
----@field upload fun(tag_names: string_list_t): string
+---@field upload fun(tag_names: string[]): string
 
 return {
   upload  = {

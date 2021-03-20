@@ -48,7 +48,7 @@ local register_target = l3b_targets.register_info
 local GET_MAIN_VARIABLE = "get_main_variable"
 
 ---@class options_t: options_base_t
----@field config    string_list_t
+---@field config    string[]
 ---@field date      string
 ---@field debug     boolean
 ---@field dirty     boolean
@@ -64,7 +64,7 @@ local GET_MAIN_VARIABLE = "get_main_variable"
 ---@field help      boolean
 ---@field last      string
 ---@field message   string
----@field names     string_list_t
+---@field names     string[]
 ---@field quiet     boolean
 ---@field rerun     boolean
 ---@field shuffle   boolean
@@ -217,12 +217,12 @@ local target_list = {
   clean = {
     description   = "Clean out directory tree",
     package       = "l3build-clean",
-    bundle_run    = "bundle_clean",
+    run_bundle    = "bundle_clean",
   },
   ctan = {
     description   = "Create CTAN-ready archive",
     package       = "l3build-ctan",
-    bundle_run    = "ctan",
+    run_bundle    = "ctan",
   },
   doc = {
     description   = "Typesets all documentation files",

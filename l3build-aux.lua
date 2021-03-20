@@ -41,6 +41,10 @@ local run         = oslib.run
 local OS          = oslib.OS
 local quoted_path = oslib.quoted_path
 
+---@type fslib_t
+local fslib = require("l3b-fslib")
+local file_exists = fslib.file_exists
+
 ---@type l3build_t
 local l3build = require("l3build")
 
@@ -58,7 +62,7 @@ local l3build = require("l3build")
 ---@usage private?
 local function set_epoch_cmd(epoch, force)
   return force and cmd_concat(
-    OS.setenv .. " SOURCE_DATE_EPOCH=" .. epoch,
+    OS.setenv .. " SOURCE_DATE_EPOCH=" .. tostring(epoch),
     OS.setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1",
     OS.setenv .. " FORCE_SOURCE_DATE=1"
   ) or ""
@@ -68,7 +72,7 @@ end
 ---A module is the path of a directory relative to the main one.
 ---Uses `run` to launch a command: change to the module directory,
 ---then executes texlua with proper arguments.
----@param modules string_list_t List of modules.
+---@param modules string[] List of modules.
 ---@param target  string
 ---@param opts    options_t|nil
 ---@return error_level_n 0 on proper termination, a non 0 error code otherwise.
@@ -141,13 +145,44 @@ local function deps_install(deps)
   return 0
 end
 
+---Load the config file, when unique and not "build".
+---The return value is used to setup the global `G.config_suffix`.
+---@param options options_t
+---@param configs string[]
+---@return string? config the config suffix
+---@usage `G.config_suffix = load_unique_config(options, configs)`
+local function load_unique_config(options, configs)
+  if #configs ~= 1 then
+    return
+  end
+  local config_1 = configs[1]
+  if config_1 == "build" then
+    return
+  end
+  config_1 = config_1:gsub( ".lua$", "") .. ".lua"
+  local config_path = l3build.work_dir .. config_1
+  if not file_exists(config_path) then
+    config_path = l3build.work_dir .. "config-".. config_1
+  end
+  if not file_exists(config_path) then
+    error("Missing configuration " .. tostring(config_path))
+  end
+  dofile(config_path)
+  if options.debug then
+    print("DEBUG config: ", config_1)
+  end
+  return "-".. config_1
+end
+
 ---@class l3b_aux_t
 ---@field deps_install  fun(deps: table): number
----@field call          fun(modules: string_list_t, target: string, opts: table): number
+---@field call          fun(modules: string[], target: string, opts: table): number
 ---@field set_epoch_cmd fun(epoch: string, force: boolean): string
+---@field load_unique_config  fun(options: options_t): error_level_n
 
 return {
-  deps_install = deps_install,
-  call = call,
-  set_epoch_cmd = set_epoch_cmd,
+  deps_install        = deps_install,
+  call                = call,
+  set_epoch_cmd       = set_epoch_cmd,
+  load_unique_config  = load_unique_config,
 }
