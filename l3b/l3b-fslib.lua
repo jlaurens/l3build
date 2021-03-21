@@ -71,7 +71,7 @@ local Vars = setmetatable({
 })
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
-  return first_of(cmd:gsub( "/", "\\"))
+  return first_of(cmd:gsub("/", "\\"))
 end
 
 ---Convert to host directory separator
@@ -231,7 +231,7 @@ local function absolute_path(path, is_current)
   end
   if ok then
     result = result:gsub("\\", "/")
-    local candidate = result .."/".. base
+    local candidate = result / base
     if attributes(candidate, "mode") then
       return candidate
     end
@@ -259,7 +259,7 @@ end
 local function locate(dirs, names)
   for i in entries(dirs) do
     for j in entries(names) do
-      local path = i .. "/" .. j
+      local path = i / j
       if file_exists(path) then
         return path
       end
@@ -339,7 +339,7 @@ local function tree(dir_path, glob)
     print("DEBUG tree", dir_path, glob)
   end
   local function cropdots(path)
-    return first_of(path:gsub( "^%./", ""):gsub("/%./", "/"))
+    return first_of(path:gsub("^%./", ""):gsub("/%./", "/"))
   end
   dir_path = cropdots(dir_path)
   glob = cropdots(glob)
@@ -369,8 +369,8 @@ local function tree(dir_path, glob)
         end
         if file ~= "." and file ~= ".." then
           local pp = {
-            src = p.src .. "/" .. file,
-            wrk = p.wrk .. "/" .. file,
+            src = p.src / file,
+            wrk = p.wrk / file,
           }
           if not tree_excluder(pp.wrk) then
             if accept(pp.wrk) then
@@ -479,7 +479,7 @@ local function copy_file(name, source, dest)
     name, source, dest = kv.name, kv.source, kv.dest
   end
   local p_src = name
-  local p_wrk = source .."/".. name
+  local p_wrk = source / name
   return copy_core(dest, p_src, p_wrk)
 end
 
@@ -524,7 +524,7 @@ end
 ---@param name string
 ---@return error_level_n
 local function remove_name(dir_path, name)
-  remove(dir_path .. "/" .. name)
+  remove(dir_path / name)
   -- TODO: Is it an error to remove a file that does not exist?
   return 0
 end

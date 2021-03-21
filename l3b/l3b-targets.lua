@@ -63,7 +63,6 @@ Due to code separation, the `run` is not always provided.
 ---@alias target_process_f        fun(names: string[]): error_level_n
 
 ---@class target_impl_t
----@field prepare     target_preflight_f|nil function to run preflight code
 ---@field configure   target_preflight_f|nil function to run preflight code
 ---@field run         target_process_f function to run the target, possible computed attributed
 ---@field run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
@@ -204,15 +203,6 @@ local function process(options, kvarg)
     end
   end
   local error_level = 0
-  if impl.prepare then
-    if debug then
-      print("DEBUG: prepare ".. target)
-    end
-    error_level = impl.prepare(options)
-    if error_level ~= 0 then
-      return error_level
-    end
-  end
   if impl.run_high then -- before configure
     if debug then
       print("DEBUG: run_high ".. target)

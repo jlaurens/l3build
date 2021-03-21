@@ -82,6 +82,7 @@ end
 local tostring  = tostring
 local print     = print
 local append    = table.insert
+local exit      = os.exit
 local os_time   = os.time
 local os_type   = os["type"]
 
@@ -244,7 +245,7 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field at_bundle_top boolean True means we are at the top of the bundle
 ---@field config        string
 ---@field tds_module    string
----@field tds_main      string  G.tdsroot .."/".. G.bundle or G.module
+---@field tds_main      string  G.tdsroot / G.bundle or G.module
 
 ---@type G_t
 local G
@@ -436,7 +437,7 @@ end
 ---@field name        string
 ---@field description string
 ---@field value       any
----@field index       fun(t: table, k: string): any
+---@field index       fun(t: table, k: string): any takes precedence over the value
 ---@field complete    fun(t: table, k: string, v: any): any
 
 ---@class variable_entry_t: pre_variable_entry_t
@@ -602,7 +603,7 @@ declare({
     index = function (t, k)
       return  t.is_standalone
           and t.module
-          or (t.bundle .."/".. t.module)
+          or (t.bundle / t.module)
     end,
   },
   modules = {
@@ -885,6 +886,32 @@ declare({
   checkengines = {
     description = "Engines to check with `check` by default",
     value = { "pdftex", "xetex", "luatex" },
+    complete = function (t, k, result)
+      local options = l3build.options
+      if options.engine then
+        if not options.force then
+          ---@type flags_t
+          local tt = {}
+          for engine in entries(result) do
+            tt[engine] = true
+          end
+          for opt_engine in entries(options.engine) do
+            if not tt[opt_engine] then
+              print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
+              print("\n  Valid values are:")
+              for engine in entries(result) do
+                print("  - " .. engine)
+              end
+              print("")
+              exit(1)
+            end
+          end
+        end
+        result = options.engine
+      end
+      rawset(t, k, result)
+      return result
+    end,
   },
   stdengine = {
     description = "Engine to generate `.tlg` files",
@@ -1548,7 +1575,7 @@ end
 ---@param dir string
 ---@return error_level_n
 local function biber(name, dir)
-  if file_exists(dir .. "/" .. name .. ".bcf") then
+  if file_exists(dir / name .. ".bcf") then
     return G.runcmd(
       Exe.biber .. " " .. Opts.biber .. " " .. name,
       dir,
@@ -1563,7 +1590,7 @@ end
 ---@param dir string
 ---@return error_level_n
 local function bibtex(name, dir)
-  if file_exists(dir .. "/" .. name .. ".aux") then
+  if file_exists(dir / name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
     local grep
@@ -1599,7 +1626,7 @@ end
 ---@return error_level_n
 local function makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "." -- Why is it optional ?
-  if file_exists(dir .. "/" .. name .. in_ext) then
+  if file_exists(dir / name .. in_ext) then
     if style == "" then style = nil end
     return G.runcmd(
       Exe.makeindex .. " " .. Opts.makeindex
@@ -1814,13 +1841,13 @@ local G_index = function (t, k)
   end
   if k == "tds_main" then
     return t.is_standalone
-      and t.tdsroot .."/".. t.module
-      or  t.tdsroot .."/".. t.bundle
+      and t.tdsroot / t.module
+      or  t.tdsroot / t.bundle
   end
   if k == "tds_module" then
     return t.is_standalone
       and t.module
-      or  t.bundle .."/".. t.module
+      or  t.bundle / t.module
   end
 end
 

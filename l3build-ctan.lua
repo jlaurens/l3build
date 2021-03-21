@@ -74,7 +74,7 @@ local install_files = l3b_inst.install_files
 
 -- Copy files to the main CTAN release directory
 local function copy_ctan()
-  local ctanpkg_dir = Dir.ctan .. "/" .. G.ctanpkg
+  local ctanpkg_dir = Dir.ctan / G.ctanpkg
   make_directory(ctanpkg_dir)
   local function copy_files(files, source)
     if source == Dir.work or G.flatten then
@@ -84,7 +84,7 @@ local function copy_ctan()
         for p in tree(source, file_type) do
           local file = p.wrk
           local path = dir_name(file)
-          local ctantarget = ctanpkg_dir .. "/" .. path
+          local ctantarget = ctanpkg_dir / path
           make_directory(ctantarget)
           copy_tree(file, source, ctantarget)
         end
@@ -131,7 +131,7 @@ local function ctan()
     return error_level
   end
   remove_directory(Dir.ctan)
-  make_directory(Dir.ctan .. "/" .. G.ctanpkg)
+  make_directory(Dir.ctan / G.ctanpkg)
   remove_directory(Dir.tds)
   make_directory(Dir.tds)
   if is_embedded then
@@ -151,7 +151,7 @@ local function ctan()
   end
   for src_dir in items(Dir.unpack, Dir.textfile) do
     copy_tree(Files.text, src_dir,
-              Dir.ctan .. "/"     .. G.ctanpkg)
+              Dir.ctan / G.ctanpkg)
     copy_tree(Files.text, src_dir,
               Dir.tds  .. "/doc/" .. G.tds_main)
   end
@@ -160,10 +160,10 @@ local function ctan()
   if readme ~= "" and not readme:lower():match("^readme%.%w+") then
     local newfile = "README." .. readme:match("%.(%w+)$")
     for dir in items(
-      Dir.ctan .. "/" .. G.ctanpkg,
+      Dir.ctan / G.ctanpkg,
       Dir.tds .. "/doc/" .. G.tds_main
     ) do
-      if file_exists(dir .. "/" .. readme) then
+      if file_exists(dir / readme) then
         remove_tree(dir, newfile)
         rename(dir, readme, newfile)
       end

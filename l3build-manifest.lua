@@ -117,7 +117,7 @@ function MT:build_file(entry, this_file)
       entry.Nchar_file = math.max(entry.Nchar_file, this_file:len())
     end
     if not entry.skipfiledescription then
-      local fh = assert(io.open(entry.dir .. "/" .. this_file, "r"))
+      local fh = assert(io.open(entry.dir / this_file, "r"))
       local this_descr = Hook.extract_filedesc(fh, this_file)
       fh:close()
       if this_descr and this_descr ~= "" then
@@ -287,7 +287,7 @@ end
 function MT:manifest()
   -- build list of ctan files
   self.ctan_files = {}
-  for f in all_names(Dir.ctan .."/".. G.ctanpkg, "*.*") do
+  for f in all_names(Dir.ctan / G.ctanpkg, "*.*") do
     self.ctan_files[f] = true
   end
   self.tds_files = {}

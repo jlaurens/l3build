@@ -107,7 +107,7 @@ local function bundleunpack(source_dirs, sources)
       local dir_path, base_name = dir_base(p.src)
       local local_dir = quoted_absolute_path(Dir[l3b_globals.LOCAL])
       local cmd = cmd_concat(
-        "cd " .. Dir.unpack .. "/" .. dir_path,
+        "cd " .. Dir.unpack / dir_path,
         OS.setenv .. " TEXINPUTS=." .. OS.pathsep
           .. local_dir .. (G.unpacksearch and OS.pathsep or ""),
         OS.setenv .. " LUAINPUTS=." .. OS.pathsep
@@ -115,11 +115,12 @@ local function bundleunpack(source_dirs, sources)
         Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
           .. (options.quiet and (" > " .. OS.null) or "")
       )
-      if l3build.options.debug then
+      if options.debug then
         print("DEBUG: ".. cmd)
       end
       local success = popen(cmd, "w")
-        :write(string.rep("y\n", 300)):close()
+        :write(("y\n"):rep(300))
+        :close()
       if not success then
         return 1
       end

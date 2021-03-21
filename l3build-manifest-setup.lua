@@ -241,7 +241,7 @@ The following group lists the files included in the CTAN package.
     },
     {
        name    = "CTAN files",
-       dir     = Dir.ctan.."/"..module,
+       dir     = Dir.ctan/module,
        files   = { "*.*" },
        exclude = { ".", ".." },
        flag    = false,

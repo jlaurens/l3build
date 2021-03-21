@@ -22,6 +22,11 @@ for those people who are interested.
 
 --]]
 
+--[=[ Presentation
+Basic utilities.
+Many iterators.
+--]=]
+
 -- local safety guards and shortcuts
 
 local type    = type
@@ -37,6 +42,11 @@ local concat      = table.concat
 local tbl_unpack  = table.unpack
 
 --[=[ Package implementation ]=]
+
+local MT = getmetatable("")
+function MT.__div(a, b)
+  return a .."/".. b
+end
 
 --[==[ Readonly business
 A readonly table is not immutable because we can always use `rawset`.

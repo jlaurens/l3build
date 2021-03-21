@@ -88,9 +88,9 @@ local function uninstall()
       -- Man files should have a single-digit extension: the type
       local man = "man" .. p_src:match(".$")
       local install_dir = G.texmf_home .. "/doc/man/"  .. man
-      if file_exists(install_dir .. "/" .. p_src) then
+      if file_exists(install_dir / p_src) then
         if dry_run then
-          append(man_files, man .. "/" .. base_name(p_src))
+          append(man_files, man / base_name(p_src))
         else
           error_level = error_level + remove_tree(install_dir, p_src)
         end
@@ -105,7 +105,7 @@ local function uninstall()
   end
   local zap_dir = dry_run
     and function (dir)
-      local install_dir = G.texmf_home .. "/" .. dir
+      local install_dir = G.texmf_home / dir
       local files = file_list(install_dir)
       if not_empty(files) then
         print("\n" .. "For removal from " .. install_dir .. ":")
@@ -116,7 +116,7 @@ local function uninstall()
       return 0
     end
     or function (dir)
-      local install_dir = G.texmf_home .. "/" .. dir
+      local install_dir = G.texmf_home / dir
       if directory_exists(install_dir) then
         return remove_directory(install_dir)
       end
@@ -173,7 +173,7 @@ local function install_files(root_install_dir, full, dry_run)
     then
       module = "latex"
     end
-    local type_module = type .."/".. module
+    local type_module = type / module
     ---@type copy_name_kv[]
     local candidates = {}
     -- Generate a candidates list
@@ -200,8 +200,8 @@ local function install_files(root_install_dir, full, dry_run)
               append(candidates, {
                 name        = name,
                 source      = source_dir,
-                dest        = root_install_dir .."/".. l_dir .. src_path_end,
-                install_dir = root_install_dir .."/".. l_dir, -- for cleanup
+                dest        = root_install_dir / l_dir .. src_path_end,
+                install_dir = root_install_dir / l_dir, -- for cleanup
               })
               matched = true
               break
@@ -212,14 +212,14 @@ local function install_files(root_install_dir, full, dry_run)
               print("NOT MATCHED")
               print(name)
               print(source_dir)
-              print(root_install_dir .."/".. type_module .. src_path_end .. src_path_end)
-              print(root_install_dir .."/".. type_module .. src_path_end)
+              print(root_install_dir / type_module .. src_path_end .. src_path_end)
+              print(root_install_dir / type_module .. src_path_end)
             end
             append(candidates, {
               name        = name,
               source      = source_dir,
-              dest        = root_install_dir .."/".. type_module .. src_path_end,
-              install_dir = root_install_dir .."/".. type_module, -- for cleanup
+              dest        = root_install_dir / type_module .. src_path_end,
+              install_dir = root_install_dir / type_module, -- for cleanup
             })
           end
         end
@@ -343,7 +343,7 @@ local function install_files(root_install_dir, full, dry_run)
       local readme = G.ctanreadme
       if readme ~= "" and not readme:lower():match("^readme%.%w+") then
         local install_dir = root_install_dir .. "/doc/" .. G.tds_module
-        if file_exists(install_dir .. "/" .. readme) then
+        if file_exists(install_dir / readme) then
           rename(install_dir, readme, "README." .. readme:match("%.(%w+)$"))
         end
       end
@@ -355,7 +355,7 @@ local function install_files(root_install_dir, full, dry_run)
         local p_src = p.src
         local man = "man" .. p_src:match(".$")
         if dry_run then
-          print("- doc/man/" .. man .. "/" .. base_name(p_src))
+          print("- doc/man/" .. man / base_name(p_src))
         else
           -- Man files should have a single-digit tail: the type
           local install_dir = root_install_dir .. "/doc/man/"  .. man

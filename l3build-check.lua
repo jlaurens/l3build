@@ -723,8 +723,8 @@ end
 ---@return error_level_n
 local function base_compare(test_type, name, engine, cleanup)
   local test_name = name .. "." .. engine
-  local diff_file = Dir.test .. "/" .. test_name .. test_type.generated .. OS.diffext
-  local gen_file  = Dir.test .. "/" .. test_name .. test_type.generated
+  local diff_file = Dir.test / test_name .. test_type.generated .. OS.diffext
+  local gen_file  = Dir.test / test_name .. test_type.generated
   local ref_file  = locate({ Dir.test }, {
     test_name .. test_type.reference,
     name .. test_type.reference })
@@ -747,10 +747,10 @@ end
 local function show_failed_log(name)
   print("\nCheck failed with log file")
   for i in all_names(Dir.test, name..".log") do
-    print("  - " .. Dir.test .. "/" .. i)
+    print("  - " .. Dir.test / i)
     print("")
     print("-----------------------------------------------------------------------------------")
-    print(read_content(Dir.test .. "/" .. i))
+    print(read_content(Dir.test / i))
     print("-----------------------------------------------------------------------------------")
   end
 end
@@ -758,10 +758,10 @@ end
 local function show_failed_diff()
   print("\nCheck failed with difference file")
   for i in all_names(Dir.test, "*" .. OS.diffext) do
-    print("  - " .. Dir.test .. "/" .. i)
+    print("  - " .. Dir.test / i)
     print("")
     print("-----------------------------------------------------------------------------------")
-    print(read_content(Dir.test .. "/" .. i))
+    print(read_content(Dir.test / i))
     print("-----------------------------------------------------------------------------------")
   end
 end
@@ -779,7 +779,7 @@ end
 local function run_test(name, engine, hide, ext, test_type, breakout)
   local lvt_file = name .. (ext or Xtn.lvt)
   copy_tree(lvt_file,
-    file_exists(Dir.testfile .. "/" .. lvt_file)
+    file_exists(Dir.testfile / lvt_file)
       and Dir.testfile
       or Dir.unpack,
     Dir.test)
@@ -817,7 +817,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     end
   end
 
-  local base_name = Dir.test .. "/" .. name
+  local base_name = Dir.test / name
   local gen_file = base_name .. test_type.generated
   local new_file = base_name .. "." .. engine .. test_type.generated
   local ascii_opt = ""
@@ -865,7 +865,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     -- Break the loop if the result is stable
     if breakout and run_number < G.checkruns then
       if test_type.generated == Xtn.pdf then
-        if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
+        if file_exists(Dir.test / name .. Xtn.dvi) then
           dvi2pdf(name, Dir.test, engine, hide)
         end
       end
@@ -876,7 +876,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     end
   end
   if test_type.generated == Xtn.pdf then
-    if file_exists(Dir.test .. "/" .. name .. Xtn.dvi) then
+    if file_exists(Dir.test / name .. Xtn.dvi) then
       dvi2pdf(name, Dir.test, engine, hide)
     end
     copy_tree(name .. Xtn.pdf, Dir.test, Dir.result)
@@ -888,7 +888,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     for file in all_names(Dir.test, filetype) do
       if match(file, "^" .. name .. "%.[^.]+$") then
         local newname = gsub(file, "(%.[^.]+)$", "." .. engine .. "%1")
-        if file_exists(Dir.test .. "/" .. newname) then
+        if file_exists(Dir.test / newname) then
           remove_name(Dir.test, newname)
         end
         rename(Dir.test, file, newname)
@@ -984,14 +984,10 @@ local function run_check(test_name, hide)
     print("Failed to find input for test " .. test_name)
     return 1
   end
-  local check_engines = G.checkengines
-  if options.engine then
-    check_engines = options.engine
-  end
   -- Used for both .lvt and .pvt tests
   local test_type = G.test_types[kind]
   local error_level = 0
-  for engine in entries(check_engines) do
+  for engine in entries(G.checkengines) do
     setup_check(test_name, engine)
     local errlevel = check_and_diff(test_name, engine, hide, test_type.test, test_type)
     if errlevel ~= 0 and options["halt-on-error"] then
@@ -1024,11 +1020,11 @@ local function compare_tlg(diff_file, tlg_file, log_file, cleanup, name, engine)
   then
     local lua_log_file
     if cleanup then
-      lua_log_file = Dir.test .. "/" .. test_name .. ".tmp" .. Xtn.log
+      lua_log_file = Dir.test / test_name .. ".tmp" .. Xtn.log
     else
       lua_log_file = log_file
     end
-    local lua_tlg_file = Dir.test .. "/" .. test_name .. Xtn.tlg
+    local lua_tlg_file = Dir.test / test_name .. Xtn.tlg
     rewrite(tlg_file, lua_tlg_file, normalize_lua_log)
     rewrite(log_file, lua_log_file, normalize_lua_log, true)
     error_level = execute(OS.diffexe .. " "
@@ -1052,7 +1048,7 @@ end
 local function check_diff()
   print("\n  Check failed with difference files")
   for i in all_names(Dir.test, "*" .. OS.diffext) do
-    print("  - " .. Dir.test .. "/" .. i)
+    print("  - " .. Dir.test / i)
   end
   print("")
 end
@@ -1104,7 +1100,7 @@ local function check(test_names)
               end
             end
             if not is_excluded then
-              if file_exists(Dir.testfile .. "/" .. name) then
+              if file_exists(Dir.testfile / name) then
                 return 1
               end
               append(test_names, job_name(name))
@@ -1148,6 +1144,7 @@ local function check(test_names)
     print("Running checks on")
     for i, name in ipairs(test_names) do
       print("  " .. name .. " (" ..  i .. "/" .. #test_names ..")")
+      print("  " .. name .. " (" ..  i / #test_names ..")")
       local err_level = run_check(name, hide)
       -- Return value must be 1 not errlevel
       if err_level ~= 0 then
@@ -1199,7 +1196,7 @@ local function save(names)
       run_test(name, engine, false, test_type.test, test_type)
       rename(Dir.test, gen_file, out_file)
       copy_file(out_file, Dir.test, Dir.testfile)
-      if file_exists(Dir.unpack .. "/" .. test_type.reference) then
+      if file_exists(Dir.unpack / test_type.reference) then
         print("Saved " .. test_type.reference
           .. " file overrides unpacked version of the same name")
         return 1
@@ -1253,7 +1250,7 @@ local function check_high(options)
           test_dir = test_dir .. "-" .. config
         end
         for name in all_names(test_dir, "*" .. OS.diffext) do
-          print("  - " .. test_dir .. "/" .. name)
+          print("  - " .. test_dir / name)
         end
         print("")
       end
@@ -1262,45 +1259,6 @@ local function check_high(options)
     -- Avoid running the 'main' set of tests twice
     return 0
   end
-end
-
----Sanity check
----@param options options_t
-local function sanitize_engines(options)
-  if options.engine and not options.force then
-    -- Make a lookup table
-    local t = {}
-    for engine in entries(G.checkengines) do
-      t[engine] = true
-    end
-    for opt_engine in entries(options.engine) do
-      if not t[opt_engine] then
-        print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
-        print("\n  Valid values are:")
-        for engine in entries(G.checkengines) do
-          print("  - " .. engine)
-        end
-        print("")
-        exit(1)
-      end
-    end
-  end
-end
-
----Run before the save operation
----@param options options_t
----@return error_level_n
-local function prepare_save(options)
-  sanitize_engines(options)
-  return 0
-end
-
----Run before the check operation
----@param options options_t
----@return error_level_n
-local function prepare_check(options)
-  sanitize_engines(options)
-  return 0
 end
 
 ---Run before the save operation
@@ -1331,7 +1289,6 @@ return {
   rewrite_log = rewrite_log,
   compare_tlg = compare_tlg,
   check_impl  = {
-    prepare     = prepare_check,
     run_high    = check_high,
     configure   = configure_check,
     run         = check,
@@ -1340,7 +1297,6 @@ return {
     run = module_check,
   },
   save_impl = {
-    prepare   = prepare_save,
     configure = configure_save,
     run       = save,
   },

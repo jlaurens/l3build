@@ -192,6 +192,7 @@ local function parse(arg, on_unknown)
     target = "help",
   }
   -- arg[1] is a special case: must be a command or "-h"/"--help"
+  -- arg[1] is a special case: must be a command or "/help"
   -- Deal with this by assuming help and storing only apparently-valid
   -- input
   local a = arg[1]
@@ -263,7 +264,7 @@ local function parse(arg, on_unknown)
           catched(v, result)
         elseif catched then
           if #v > 1 then
-            error("Unexpected option value in ".. arg_i .."/".. v);
+            error("Unexpected option value in ".. arg_i / v);
           end
           if flags.debug then
             print("DEBUG options parse: catched unknown")
@@ -284,7 +285,7 @@ local function parse(arg, on_unknown)
       end
       info:load_value(result, k, v)
     elseif #v > 1 then
-      error("Unexpected option value in ".. arg_i .."/".. v);
+      error("Unexpected option value in ".. arg_i / v);
     else
       info:load_value(result, k, v)
     end
