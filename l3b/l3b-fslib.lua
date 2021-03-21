@@ -28,6 +28,7 @@ local os_type     = os["type"]
 
 local append      = table.insert
 local unappend    = table.remove
+local tbl_unpack  = table.unpack
 
 local lfs         = require("lfs")
 local attributes  = lfs.attributes
@@ -109,6 +110,9 @@ end
 ---@param path string
 ---@return boolean
 local function directory_exists(path)
+  if not path then
+    print(debug.traceback())
+  end
   return attributes(path, "mode") == "directory"
 --[===[ Original implementation
   local errorlevel
@@ -173,6 +177,22 @@ local function pop_current_directory()
   assert(dir)
   local ok, msg = change_current_directory(dir)
   return ok and dir or nil, msg
+end
+
+---Push the current directory, runs `f` and pop it back.
+---returns true followed by whatever f returns
+---packed in one array. Clients will unpack the result before use.
+---or false followed by an error message.
+---@param dir string path of the directory to switch to
+---@param f function function to execute
+---@vararg any       arguments passed to the function
+---@return boolean ok true means success
+---@return string|table msg error message or the packed result of f
+local function push_pop_current_directory(dir, f, ...)
+  push_current_directory(dir)
+  local packed = { pcall(f, ...) }
+  pop_current_directory()
+  return packed[1], { select(2, tbl_unpack(packed)) }
 end
 
 ---Set the working directory. As soon as possible
@@ -291,11 +311,15 @@ local function all_names(path, glob)
     or  function () end
 end
 
-local tree_excluder = function (name) return false end
+---@alias string_exclude_f  fun(value: string): boolean
+
+local tree_excluder = function (name)
+  return false
+end
 
 ---Set the given function as tree excluder.
 ---Can be used to exclude the build directory.
----@param f fun(path_wrk: string): boolean
+---@param f string_exclude_f
 local function set_tree_excluder(f)
   tree_excluder = f
 end
@@ -546,29 +570,30 @@ end
 
 ---@class fslib_t
 ---@field Vars              fslib_vars_t
----@field to_host           fun(cmd: string):   string
----@field absolute_path     fun(path: string):  string
----@field quoted_absolute_path fun(path: string):  string
----@field make_directory    fun(path: string):  boolean, exitcode, integer
----@field directory_exists  fun(path: string): boolean
----@field file_exists       fun(path: string): boolean
----@field locate      fun(dirs: string[], names: string[]): string
----@field file_list   fun(dir_path: string, glob: string|nil): string[]
----@field all_names   fun(path: string, glob: string): fun(): string
----@field set_tree_excluder fun(f: fun(path_wrk: string): boolean)
----@field tree        fun(dir_path: string, glob: string): table<string, string>)
----@field rename      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
----@field copy_file   fun(file: string, source: string, dest: string): integer
----@field copy_tree   fun(glob: string, source: string, dest: string): integer
----@field make_clean_directory      fun(path: string): integer
----@field remove_name fun(dir_path: string, name: string): integer
----@field remove_tree fun(source: string, glob: string): integer
----@field remove_directory          fun(path: string): boolean?, exitcode?, integer?
----@field set_working_directory     fun(path: string)
----@field get_current_directory     fun(): string
----@field change_current_directory  fun(dir: string) raises if dir does not exist
----@field push_current_directory    fun(dir: string): string
----@field pop_current_directory     fun(): string
+---@field to_host                     fun(cmd: string):   string
+---@field absolute_path               fun(path: string):  string
+---@field quoted_absolute_path        fun(path: string):  string
+---@field make_directory              fun(path: string):  boolean, exitcode, integer
+---@field directory_exists            fun(path: string): boolean
+---@field file_exists                 fun(path: string): boolean
+---@field locate                      fun(dirs: string[], names: string[]): string
+---@field file_list                   fun(dir_path: string, glob: string|nil): string[]
+---@field all_names                   fun(path: string, glob: string): fun(): string
+---@field set_tree_excluder           fun(f: string_exclude_f)
+---@field tree                        fun(dir_path: string, glob: string): table<string, string>)
+---@field rename                      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field copy_file                   fun(file: string, source: string, dest: string): integer
+---@field copy_tree                   fun(glob: string, source: string, dest: string): integer
+---@field make_clean_directory        fun(path: string): integer
+---@field remove_name                 fun(dir_path: string, name: string): integer
+---@field remove_tree                 fun(source: string, glob: string): integer
+---@field remove_directory            fun(path: string): boolean?, exitcode?, integer?
+---@field set_working_directory       fun(path: string)
+---@field get_current_directory       fun(): string
+---@field change_current_directory    fun(dir: string) raises if dir does not exist
+---@field push_current_directory      fun(dir: string): string
+---@field pop_current_directory       fun(): string
+---@field push_pop_current_directory  fun(dir:string, f: function, ...): boolean, any
 
 return {
   Vars                  = Vars,
@@ -590,9 +615,10 @@ return {
   remove_name           = remove_name,
   remove_tree           = remove_tree,
   remove_directory      = remove_directory,
-  set_working_directory     = set_working_directory,
-  get_current_directory     = get_current_directory,
-  change_current_directory  = change_current_directory,
-  push_current_directory    = push_current_directory,
-  pop_current_directory     = pop_current_directory,
+  set_working_directory       = set_working_directory,
+  get_current_directory       = get_current_directory,
+  change_current_directory    = change_current_directory,
+  push_current_directory      = push_current_directory,
+  pop_current_directory       = pop_current_directory,
+  push_pop_current_directory  = push_pop_current_directory,
 }

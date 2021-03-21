@@ -46,8 +46,8 @@ local l3b_globals = require("l3build-globals")
 local G     = l3b_globals.G
 ---@type Dir_t
 local Dir   = l3b_globals.Dir
-
-local G_defaults  = l3b_globals.defaults
+local get_vanilla_globals = l3b_globals.get_vanilla
+local all_global_entries = l3b_globals.all_entries
 
 local function version()
   print(
@@ -148,170 +148,34 @@ local function print_status()
   }
   print("Hooks and functions, (*) for custom ones")
   local width = 0
-  for name in entries(l3b_functions) do
-    if #name > width then
-      width = #name
+  for entry in all_global_entries(function (e)
+    return e:get_type() ~= "function"
+  end) do
+    if #entry.name > width then
+      width = #entry.name
     end
   end
-  for name in entries(l3b_functions, { compare = compare_ascending }) do
-    local filler = (" "):rep(width - #name)
-    local is_custom = G_defaults[name] ~= G[name]
-    print("  ".. name .. filler .. (is_custom and " (*)" or ""))
+  for entry in all_global_entries(function (e)
+    return e:get_type() ~= "function"
+  end) do
+    local filler = (" "):rep(width - #entry.name)
+    local is_custom = entry:get_vanilla_value() ~= G[entry.name]
+    print("  ".. entry.name .. filler .. (is_custom and " (*)" or ""), entry:get_type())
   end
 
   ---Display the list of exported variables
-  local l3b_variables = {
-    "module",
-    "bundle",
-    "ctanpkg",
-    --
-    "modules",
-    "exclmodules",
-    --
-    "maindir",
-    "docfiledir",
-    "sourcefiledir",
-    "supportdir",
-    "testfiledir",
-    "testsuppdir",
-    "texmfdir",
-    "textfiledir",
-    --
-    "builddir",
-    "distribdir",
-    "localdir",
-    "resultdir",
-    "testdir",
-    "typesetdir",
-    "unpackdir",
-    --
-    "ctandir",
-    "tdsdir",
-    "tdsroot",
-    --
-    "auxfiles",
-    "bibfiles",
-    "binaryfiles",
-    "bstfiles",
-    "checkfiles",
-    "checksuppfiles",
-    "cleanfiles",
-    "demofiles",
-    "docfiles",
-    "dynamicfiles",
-    "excludefiles",
-    "installfiles",
-    "makeindexfiles",
-    "scriptfiles",
-    "scriptmanfiles",
-    "sourcefiles",
-    "tagfiles",
-    "textfiles",
-    "typesetdemofiles",
-    "typesetfiles",
-    "typesetsuppfiles",
-    "typesetsourcefiles",
-    "unpackfiles",
-    "unpacksuppfiles",
-    --
-    "includetests",
-    "excludetests",
-    --
-    "checkdeps",
-    "typesetdeps",
-    "unpackdeps",
-    --
-    "checkengines",
-    "stdengine",
-    "checkformat",
-    "specialformats",
-    "test_types",
-    "test_order",
-    --
-    "checkconfigs",
-    --
-    "typesetexe",
-    "unpackexe",
-    "zipexe",
-    "biberexe",
-    "bibtexexe",
-    "makeindexexe",
-    "curlexe",
-    --
-    "checkopts",
-    "typesetopts",
-    "unpackopts",
-    "zipopts",
-    "biberopts",
-    "bibtexopts",
-    "makeindexopts",
-    --
-    "checksearch",
-    "typesetsearch",
-    "unpacksearch",
-    --
-    "glossarystyle",
-    "indexstyle",
-    "specialtypesetting",
-    --
-    "forcecheckepoch",
-    "forcedocepoch",
-    --
-    "asciiengines",
-    "checkruns",
-    "ctanreadme",
-    "ctanzip",
-    "epoch",
-    "flatten",
-    "flattentds",
-    "flattenscript",
-    "maxprintline",
-    "packtdszip",
-    "ps2pdfopts",
-    "typesetcmds",
-    "typesetruns",
-    "recordstatus",
-    "manifestfile",
-    --
-    "tdslocations",
-    --
-    "uploadconfig",
-    --"uploadconfig.pkg",
-    --
-    "bakext",
-    "dviext",
-    "lvtext",
-    "tlgext",
-    "tpfext",
-    "lveext",
-    "logext",
-    "pvtext",
-    "pdfext",
-    "psext",
-    "os_pathsep",
-    "os_concat",
-    "os_null",
-    "os_ascii",
-    "os_cmpexe",
-    "os_cmpext",
-    "os_diffexe",
-    "os_diffext",
-    "os_grepexe",
-    "os_setenv",
-    "os_yes",
-    -- private
-    --"texmf_home", can be nil
-    --"typeset_list", can be nil
-  }
   local variables = {}
-  for entry in entries(l3b_variables) do
-    if G[entry] == nil then
-      print("MISSING GLOBAL: ", entry)
+  local variables_n = 0
+  for entry in all_global_entries(function (e)
+    return e:get_type() == "function"
+  end) do
+    variables[entry.name] = G[entry.name]
+    if variables[entry.name] ~= nil then
+      variables_n = variables_n + 1
     end
-    variables[entry] = G[entry]
   end
   print("")
-  print(("Global variables (%d), (*) for custom ones"):format(#l3b_variables))
+  print(("Global variables (%d), (*) for custom ones"):format(variables_n))
 -- Print anything - including nested tables
   local function pretty_print(tt, dflt, indent, done)
     dflt = dflt or {}
@@ -358,7 +222,7 @@ local function print_status()
       write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
     end
   end
-  pretty_print(variables, G_defaults)
+  pretty_print(variables, get_vanilla_globals())
 end
 
 ---High level status runner
@@ -385,8 +249,8 @@ local function status_run()
       local modules = G.modules
       if #modules > 0 then
         -- this is a top bundle
-        print("  bundle: ".. bundle)
-        print("  path:   ".. absolute_path(Dir.work))
+        print(  "  bundle: ".. bundle)
+        print(  "  path:   ".. absolute_path(Dir.work))
         local mm = {}
         for m in entries(modules, { compare = compare_ascending}) do
           append(mm, ("%s (./%s)"):format(m:lower(), m))
@@ -398,17 +262,17 @@ local function status_run()
         end
       else
         -- this is a standalone module (not in a bundle).
-        print("  module: ".. module)
-        print("  path:   ".. absolute_path(Dir.work))
+        print(  "  module: ".. module)
+        print(  "  path:   ".. absolute_path(Dir.work))
       end
     else
       -- a module inside a bundle
-      print("  bundle: ".. bundle)
-      print("  module: ".. module)
-      print("  path:   ".. absolute_path(Dir.work))
+      print(    "  bundle: ".. bundle)
+      print(    "  module: ".. module)
+      print(    "  path:   ".. absolute_path(Dir.work))
     end
-    print("  start:  ".. l3build.start_dir)
-    print("  launch: ".. l3build.launch_dir)
+    print(      "  start:  ".. l3build.start_dir)
+    print(      "  launch: ".. l3build.launch_dir)
   end
   print()
   if l3build.options.debug then
@@ -427,7 +291,8 @@ return {
   version     = version,
   help        = help,
   status_impl = {
-    run_high  = status_high,
-    run       = status_run,
+    run_high    = status_high,
+    run         = status_run,
+    run_bundle  = status_run,
   },
 }

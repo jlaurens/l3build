@@ -176,6 +176,9 @@ local function entries(table, kv)
     local i = 0
     return function ()
       i = i + 1
+      if not t then
+        print(debug.traceback())
+      end
       return t[i]
     end
   end
@@ -196,9 +199,11 @@ local function entries(table, kv)
       local result = iterator()
       if result == nil then -- end of iteration
         return result
-      elseif not already[result] then
-        already[result] = true
-        return result
+      elseif not kv.unique or not already[result] then
+        if not kv.exclude or not kv.exclude(result) then
+          already[result] = true
+          return result
+        end
       end
     until false
   end
@@ -221,18 +226,18 @@ local function unique_items(...)
   return entries({ ... }, { unique = true })
 end
 
----Keys iterator, poosibly sorted.
----No ordering when no comparator is given.
+---Keys iterator, possibly sorted.
+---No defaultordering when no comparator is given.
 ---@generic K, V
 ---@param table     table<K,V>
 ---@param compare?  fun(l: K, r: K): boolean
 ---@return fun(): K|nil
 local function keys(table, compare)
   local kk = {}
-  for k in pairs(table) do
+  for k, _ in pairs(table) do
     append(kk, k)
   end
-  return items(kk, { compare = compare })
+  return entries(kk, { compare = compare })
 end
 
 ---@class sorted_kv_t
@@ -395,8 +400,8 @@ local function bridge(kv)
         if kv.secondary then
           local result_2 = kv.secondary[k_G]
           if  result ~= result_2
+          and type(result)   == "table"
           and type(result_2) == "table"
-          and type(result)    == "table"
           then
             result = bridge({
               primary   = result,

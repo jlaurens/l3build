@@ -54,7 +54,7 @@ local Dir   = l3b_globals.Dir
 ---@type Files_t
 local Files = l3b_globals.Files
 
-local G_defaults = l3b_globals.defaults
+local get_global_variable_entry = l3b_globals.get_entry
 
 local Hook = bridge({
   prefix = "manifest_",
@@ -82,13 +82,23 @@ for item in items(
   "manifest_write_group_file",
   "manifest_write_group_file_descr"
 ) do
+  local entry = get_global_variable_entry(item)
+  assert(entry, "Missing entry for ".. item)
   local k = item:match("manifest_(.*)")
   local v = stp[k]
   assert(v, "Missing manifest hook for key ".. k)
-  G_defaults[item] = v
+  entry.value = v
 end
-G_defaults.manifest_write_subheading    = stp.write_heading
-G_defaults.manifest_write_group_heading = stp.write_heading
+do
+  local item = "manifest_write_subheading"
+  local entry = get_global_variable_entry(item)
+  assert(entry, "Missing entry for ".. item)
+  entry.value = stp.write_heading
+  item = "manifest_write_group_heading"
+  entry = get_global_variable_entry(item)
+  assert(entry, "Missing entry for ".. item)
+  entry.value = stp.write_heading
+end
 
 local MT = {}
 ---comment

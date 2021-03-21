@@ -102,7 +102,6 @@ local gblib   = require("l3b-globlib")
 local utlib             = require("l3b-utillib")
 local bridge            = utlib.bridge
 local entries           = utlib.entries
-local keys              = utlib.keys
 local compare_ascending = utlib.compare_ascending
 local first_of          = utlib.first_of
 local to_quoted_string  = utlib.to_quoted_string
@@ -122,8 +121,7 @@ local directory_exists      = fslib.directory_exists
 local file_exists           = fslib.file_exists
 local all_names             = fslib.all_names
 local quoted_absolute_path  = fslib.quoted_absolute_path
-local get_current_directory = fslib.get_current_directory
-local change_current_directory = fslib.change_current_directory
+local push_pop_current_directory = fslib.push_pop_current_directory
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -156,7 +154,7 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field author        string        Author name (semicolon-separated for multiple)
 ---@field ctanPath      string        CTAN path
 ---@field email         string        Email address of uploader
----@field license       string|string[] Package license(s)\footnote{See \url{https://ctan.org/license}}
+---@field license       string|string[] Package license(s) See https://ctan.org/license
 ---@field pkg           string        Name of the CTAN package (defaults to G.ctanpkg)
 ---@field summary       string        One-line summary
 ---@field uploader      string        Name of uploader
@@ -168,13 +166,13 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field note          string        Internal note to CTAN
 ---@field repository    string|string[] URL(s) of source repositories
 ---@field support       string|string[] URL(s) of support channels
----@field topic         string|string[] Topic(s)\footnote{See \url{https://ctan.org/topics/highscore}}
----@field update        string        Boolean \\texttt{true} for an update, \\texttt{false} for a new package
+---@field topic         string|string[] Topic(s). See https://ctan.org/topics/highscore
+---@field update        string        Boolean `true` for an update, `false` for a new package
 ---@field announcement_file string    Announcement text  file
 ---@field note_file     string        Note text file
 ---@field curlopt_file  string        The filename containing the options passed to curl
 
----@class G_t
+---@class _G_t
 ---@field module        string The name of the module
 ---@field bundle        string The name of the bundle in which the module belongs (where relevant)
 ---@field ctanpkg       string Name of the CTAN package matching this module
@@ -185,26 +183,16 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field epoch         integer Epoch (Unix date) to set for test runs
 ---@field flattentds    boolean Switch to flatten any source structure when creating a TDS structure
 ---@field flattenscript boolean Switch to flatten any script structure when creating a TDS structure
----@field ctanreadme    string  Name of the file to send to CTAN as \\texttt{README.\meta{ext}}s
+---@field ctanreadme    string  Name of the file to send to CTAN as `README.`md
 ---@field ctanupload    boolean Undocumented
 ---@field tdslocations  string[] For non-standard file installations
--- unexposed computed properties
----@field is_embedded   boolean True means the module belongs to a bundle
----@field is_standalone boolean False means the module belongs to a bundle
----@field at_top        boolean True means there is no bundle above
----@field at_bundle_top boolean True means we are at the top of the bundle
----@field config        string
----@field tds_module    string
----@field tds_main      string  G.tdsroot .."/".. G.bundle or G.module
--- unexposed properties
----@field config_suffix string
 -- doc related
----@field typesetsearch boolean Switch to search the system \\texttt{texmf} for during typesetting
+---@field typesetsearch boolean Switch to search the system `texmf` for during typesetting
 ---@field glossarystyle string  MakeIndex style file for glossary/changes creation
 ---@field indexstyle    string  MakeIndex style for index creation
 ---@field specialtypesetting table<string,special_typesetting_t>  Non-standard typesetting combinations
 ---@field forcedocepoch string  Force epoch when typesetting
----@field typesetcmds   string  Instructions to be passed to \TeX{} when doing typesetting
+---@field typesetcmds   string  Instructions to be passed to TeX when doing typesetting
 ---@field typesetruns   integer Number of cycles of typesetting to carry out
 -- functions
 ---@field runcmd        fun(cmd: string, dir: string, vars: table):boolean?, string?, integer?
@@ -216,8 +204,8 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field typeset_demo_tasks  fun(): error_level_n
 ---@field docinit_hook  fun(): error_level_n
 -- check fields
----@field checkengines    string[] Engines to check with \\texttt{check} by default
----@field stdengine       string  Engine to generate \\texttt{.tlg} file from
+---@field checkengines    string[] Engines to check with `check` by default
+---@field stdengine       string  Engine to generate `.tlg` file from
 ---@field checkformat     string  Format to use for tests
 ---@field specialformats  table  Non-standard engine/format combinations
 ---@field test_types      test_types_t  Custom test variants
@@ -226,35 +214,44 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field checkconfigs    table   Configurations to use for tests
 ---@field includetests    string[] Test names to include when checking
 ---@field excludetests    string[] Test names to exclude when checking
----@field recordstatus    boolean Switch to include error level from test runs in \\texttt{.tlg} files
+---@field recordstatus    boolean Switch to include error level from test runs in `.tlg` files
 ---@field forcecheckepoch boolean Force epoch when running tests
 ---@field asciiengines    string[] Engines which should log as pure ASCII
 ---@field checkruns       integer Number of runs to complete for a test before comparing the log
----@field checksearch     boolean Switch to search the system \\texttt{texmf} for during checking
+---@field checksearch     boolean Switch to search the system `texmf` for during checking
 ---@field maxprintline    integer Length of line to use in log files
 ---@field runtest_tasks   fun(test_name: string, run_number: integer): string
 ---@field checkinit_hook  fun(): error_level_n
----@field ps2pdfopt       string  Options for \\texttt{ps2pdf}
----@field unpacksearch    boolean  Switch to search the system \\texttt{texmf} for during unpacking
+---@field ps2pdfopt       string  Options for `ps2pdf`
+---@field unpacksearch    boolean  Switch to search the system `texmf` for during unpacking
 ---@field bundleunpack    bundleunpack_f  bundle unpack overwrite
 ---@field flatten         boolean Switch to flatten any source structure when sending to CTAN
 ---@field packtdszip      boolean Switch to build a TDS-style zip file for CTAN
 ---@field manifestfile    string File name to use for the manifest file
 ---@field curl_debug      boolean
----@field uploadconfig    l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
+---@field uploadconfig    l3b_upld_config_t Metadata to describe the package for CTAN
 ---@field texmf_home      string
 ---@field typeset_list    string[]
 -- tag
 ---@field tag_hook        tag_hook_f
 ---@field update_tag      update_tag_f
 
+---@class G_t: _G_t
+-- unexposed computed properties
+---@field is_embedded   boolean True means the module belongs to a bundle
+---@field is_standalone boolean False means the module belongs to a bundle
+---@field at_top        boolean True means there is no bundle above
+---@field at_bundle_top boolean True means we are at the top of the bundle
+---@field config        string
+---@field tds_module    string
+---@field tds_main      string  G.tdsroot .."/".. G.bundle or G.module
+
 ---@type G_t
 local G
 
 ---@class Dir_t
----@field work        string
----@field current     string
----@field main        string Top level directory for the module/bundle
+---@field work        string Directory with the `build.lua` file.
+---@field main        string Top level directory for the module|bundle
 ---@field docfile     string Directory containing documentation files
 ---@field sourcefile  string Directory containing source files
 ---@field support     string Directory containing general support files
@@ -264,7 +261,7 @@ local G
 ---@field textfile    string Directory containing plain text files
 ---@field build       string Directory for building and testing
 ---@field distrib     string Directory for generating distribution structure
----@field local       string Directory for extracted files in sandboxed \TeX{} runs
+---@field local       string Directory for extracted files in sandboxed TeX runs
 ---@field result      string Directory for PDF files when using PDF-based tests
 ---@field test        string Directory for running tests
 ---@field typeset     string Directory for building documentation
@@ -282,9 +279,9 @@ local Dir
 
 ---@class Files_t
 ---@field aux           string[] Secondary files to be saved as part of running tests
----@field bib           string[] \BibTeX{} database files
+---@field bib           string[] BibTeX database files
 ---@field binary        string[] Files to be added in binary mode to zip files
----@field bst           string[] \BibTeX{} style files
+---@field bst           string[] BibTeX style files
 ---@field check         string[] Extra files unpacked purely for tests
 ---@field checksupp     string[] Files needed for performing regression tests
 ---@field clean         string[] Files to delete when cleaning
@@ -292,19 +289,19 @@ local Dir
 ---@field doc           string[] Files which are part of the documentation but should not be typeset
 ---@field dynamic       string[] Secondary files to cleared before each test is run
 ---@field exclude       string[] Files to ignore entirely (default for Emacs backup files)
----@field install       string[] Files to install to the \\texttt{tex} area of the \\texttt{texmf} tree
+---@field install       string[] Files to install to the `tex` area of the `texmf` tree
 ---@field makeindex     string[] MakeIndex files to be included in a TDS-style zip
----@field script        string[] Files to install to the \\texttt{scripts} area of the \\texttt{texmf} tree
----@field scriptman     string[] Files to install to the \\texttt{doc/man} area of the \\texttt{texmf} tree
+---@field script        string[] Files to install to the `scripts` area of the `texmf` tree
+---@field scriptman     string[] Files to install to the `doc/man` area of the `texmf` tree
 ---@field source        string[] Files to copy for unpacking
 ---@field tag           string[] Files for automatic tagging
 ---@field text          string[] Plain text files to send to CTAN as-is
 ---@field typesetdemo   string[] Files to typeset before the documentation for inclusion in main documentation files
 ---@field typeset       string[] Files to typeset for documentation
----@field typesetsupp   string[] Files needed to support typesetting when \enquote{sandboxed}
+---@field typesetsupp   string[] Files needed to support typesetting when 'sandboxed'
 ---@field typesetsource string[] Files to copy to unpacking when typesetting
 ---@field unpack        string[] Files to run to perform unpacking
----@field unpacksupp    string[] Files needed to support unpacking when \enquote{sandboxed}
+---@field unpacksupp    string[] Files needed to support unpacking when 'sandboxed'
 ---@field _all_typeset  string[] To combine `typeset` files and `typesetdemo` files
 ---@field _all_pdf      string[] Counterpart of "_all_typeset"
 
@@ -324,13 +321,13 @@ local Deps = bridge({
 -- Executable names plus following options
 
 ---@class Exe_t
----@field typeset   string Executable for compiling \\texttt{doc(s)}
----@field unpack    string Executable for running \\texttt{unpack}
----@field zip       string Executable for creating archive with \\texttt{ctan}
+---@field typeset   string Executable for compiling `doc(s)`
+---@field unpack    string Executable for running `unpack`
+---@field zip       string Executable for creating archive with `ctan`
 ---@field biber     string Biber executable
----@field bibtex    string \BibTeX{} executable
+---@field bibtex    string BibTeX executable
 ---@field makeindex string MakeIndex executable
----@field curl      string Curl executable for \\texttt{upload}
+---@field curl      string Curl executable for `upload`
 
 ---@type Exe_t
 local Exe = bridge({
@@ -343,7 +340,7 @@ local Exe = bridge({
 ---@field unpack    string Options passed to engine when unpacking
 ---@field zip       string Options passed to zip program
 ---@field biber     string Biber options
----@field bibtex    string \BibTeX{} options
+---@field bibtex    string BibTeX options
 ---@field makeindex string MakeIndex options
 
 ---@type Opts_t
@@ -360,7 +357,7 @@ local Opts = bridge({
 ---@field tlg string  Extension of test file output
 ---@field tpf string  Extension of PDF-based test output
 ---@field lve string  Extension of auto-generating test file output
----@field log string  Extension of checking output, before processing it into a \\texttt{.tlg}
+---@field log string  Extension of checking output, before processing it into a `.tlg`
 ---@field pvt string  Extension of PDF-based test files
 ---@field pdf string  Extension of PDF file for checking and saving
 ---@field ps  string  Extension of PostScript files
@@ -382,25 +379,31 @@ and      "l3build --get-global-variable maindir"
 ---@param name string
 ---@return string|nil
 local function get_main_variable(name)
-  local cwd = get_current_directory()
-  change_current_directory(l3build.main_dir)
-  local cmd = to_quoted_string({
+  local command = to_quoted_string({
     "texlua",
     quoted_path(l3build.script_path),
     "status",
     "--".. l3b_cli.GET_MAIN_VARIABLE,
     name,
   })
-  local t
-  local ok, msg = pcall(function ()
-    t = read_command(cmd)
-  end)
-  change_current_directory(cwd)
+  local ok, packed = push_pop_current_directory(
+    l3build.main_dir,
+    function (cmd)
+      local result = read_command(cmd)
+      print("t", result)
+      return result
+    end,
+    command
+  )
+  print("t", packed[1])
+  print("l3build.main_dir", l3build.main_dir)
+  print("Dir.main" , Dir.main)
+  print("build.lua", read_content(l3build.main_dir .."build.lua"))
   if ok then
-    local k, v = t:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
+    local k, v = packed[1]:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
     return name == k and v or nil
   else
-    error(msg)
+    error(packed)
   end
 end
 
@@ -411,7 +414,7 @@ end
 ---@return error_level_n
 local function handle_get_main_variable(name, config)
   name = name or "MISSING VARIABLE NAME"
-  local f, msg = loadfile(l3build.work_dir .. "/build.lua")
+  local f, msg = loadfile(l3build.work_dir .. "build.lua")
   if not f then
     error(msg)
   end
@@ -429,22 +432,36 @@ local function NYI()
   error("Missing implementation")
 end
 
----@class variable_entry_t
+---@class pre_variable_entry_t
 ---@field name        string
 ---@field description string
 ---@field value       any
 ---@field index       fun(t: table, k: string): any
 ---@field complete    fun(t: table, k: string, v: any): any
 
+---@class variable_entry_t: pre_variable_entry_t
+---@field get_vanilla_value fun(self: variable_entry_t): any
+---@field get_level         fun(self: variable_entry_t): integer
+---@field get_type          fun(self: variable_entry_t): string
+
 ---@type table<string,variable_entry_t>
-local DB = {}
+local entry_by_name = {}
+---@type variable_entry_t[]
+local entry_by_index = {}
+
+-- All variable entries share the same metatable
+local MT_variable_entry = {}
+MT_variable_entry.__index = MT_variable_entry
+
 ---Declare the given variable
----@param by_name table<string,variable_entry_t>
+---@param by_name table<string,pre_variable_entry_t>
 local function declare(by_name)
   for name, entry in pairs(by_name) do
-    assert(not DB[name], "Duplicate declaration ".. tostring(name))
-    entry.name  = name
-    DB[name]    = entry
+    assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
+    entry.name = name
+    entry_by_name[name] = entry
+    append(entry_by_index, entry)
+    setmetatable(entry, MT_variable_entry)
   end
 end
 
@@ -452,7 +469,7 @@ end
 ---@param name string
 ---@return variable_entry_t
 local function get_entry(name)
-  return DB[name]
+  return entry_by_name[name]
 end
 
 local specialformats = {
@@ -491,9 +508,9 @@ end
 ---The bundle and module variables are not really meant
 ---to change during execution once they are initialized
 ---but this is not a requirement.
----One shot function.
+---@param env table
 ---@usage after the `build.lua` has been executed.
-local function guess_bundle_module()
+local function guess_bundle_module(env)
   -- bundle and module values are very important
   -- because they control the behaviour of somme actions
   -- they also control where things are stored.
@@ -511,10 +528,7 @@ local function guess_bundle_module()
     -- We cannot execute the parent's script because
     -- this script may perform actions and change files (see latex2e)
     -- So we parse the content finger crossed.
-    local s = read_content(l3build.main_dir .."build.lua")
-    s = s:match("%f[%w]bundle%s*=%s*'([^']*)'")
-          or s:match('%f[%w]bundle%s*=%s*"([^"]*)"')
-          or s:match('%f[%w]bundle%s*=%s*%[%[([^]]*)%]%]')
+    local s = get_main_variable("bundle")
     if not s then -- bundle name is required in bundle/module shape
       error('Missing in top `build.lua`: bundle = "<bundle name>"')
     end
@@ -534,13 +548,16 @@ local function guess_bundle_module()
             :format(module, s))
     end
   else -- not an embeded module
-    local modules = G.modules
+    local modules = env.modules
     if #modules > 0 then
       -- this is a top bundle,
       -- the bundle name must be provided
       -- the module name does not make sense
       if not bundle or bundle == "" then
-        error('Missing in top build.lua: bundle = "<bundle name>"')
+        bundle = get_main_variable("bundle")
+        if not bundle then -- bundle name is required in bundle/module shape
+          error('Missing in top `build.lua`: bundle = "<bundle name>"')
+        end
       end
       if module and module ~= "" then
         print("Warning, module name ignored: ".. module)
@@ -561,24 +578,22 @@ local function guess_bundle_module()
     end
   end
   -- MISSING naming constraints
-  rawset(_G, "bundle", bundle)
-  rawset(_G, "module", module)
-  -- One shot function: next call is a do nothing action.
-  guess_bundle_module = function () end
+  rawset(env, "bundle", bundle)
+  rawset(env, "module", module)
 end
 
 declare({
   module = {
     description = "The name of the module",
     index = function (t, k)
-      guess_bundle_module()
+      guess_bundle_module(t)
       return rawget(t, k)
     end,
   },
   bundle = {
     description = "The name of the bundle in which the module belongs (where relevant)",
     index = function (t, k)
-      guess_bundle_module()
+      guess_bundle_module(t)
       return rawget(t, k)
     end,
   },
@@ -602,6 +617,7 @@ declare({
           end
         end
       end
+      rawset(t, k, result)
       return result
     end,
   },
@@ -681,7 +697,7 @@ declare({
   },
   -- Substructure for CTAN release material
   localdir = {
-    description = "Directory for extracted files in \\enquote{sandboxed} \\TeX{} runs",
+    description = "Directory for extracted files in 'sandboxed' TeX runs",
     index = function (t, k)
       return t.builddir .. "/local"
     end
@@ -728,6 +744,12 @@ declare({
       return t.distribdir .. "/tds"
     end
   },
+  workdir = {
+    description = "Working directory",
+    index = function (t, k)
+      return l3build.work_dir:gsub(1, -2) -- no trailing "/"
+    end
+  },
 })
 declare({
   tdsroot = {
@@ -746,7 +768,7 @@ declare({
     value = { "*.aux", "*.lof", "*.lot", "*.toc" },
   },
   bibfiles = {
-    description = "\\BibTeX{} database files",
+    description = "BibTeX database files",
     value = { "*.bib" },
   },
   binaryfiles = {
@@ -794,11 +816,11 @@ declare({
     value = { "*.ist" },
   },
   scriptfiles = {
-    description = "Files to install to the \\texttt{scripts} area of the \\texttt{texmf} tree",
+    description = "Files to install to the `scripts` area of the `texmf` tree",
     value = {},
   },
   scriptmanfiles = {
-    description = "Files to install to the \\texttt{doc/man} area of the \\texttt{texmf} tree",
+    description = "Files to install to the `doc/man` area of the `texmf` tree",
     value = {},
   },
   sourcefiles = {
@@ -834,7 +856,7 @@ declare({
     value = { "*.ins" },
   },
   unpacksuppfiles = {
-    description = "Files needed to support unpacking when \\enquote{sandboxed}",
+    description = "Files needed to support unpacking when 'sandboxed'",
     value = {},
   },
 })
@@ -861,7 +883,7 @@ declare({
     value = {},
   },
   checkengines = {
-    description = "Engines to check with \\texttt{check} by default",
+    description = "Engines to check with `check` by default",
     value = { "pdftex", "xetex", "luatex" },
   },
   stdengine = {
@@ -1070,7 +1092,7 @@ declare({
     value = 1,
   },
   ctanreadme = {
-    description = "Name of the file to send to CTAN as \\texttt{README.\\meta{ext}}",
+    description = "Name of the file to send to CTAN as `README`.md",
     value = "README.md",
   },
   ctanzip = {
@@ -1083,7 +1105,7 @@ declare({
     description = "Epoch (Unix date) to set for test runs",
     index = function (t, k)
       local options = l3build.options
-      return options.epoch or _G.epoch or 1463734800
+      return options.epoch or rawget(_G, "epoch") or 1463734800
     end,
     complete = function (t, k, result)
       return normalise_epoch(result)
@@ -1137,7 +1159,7 @@ declare({
   },
   uploadconfig = {
     value = {},
-    description = "Metadata to describe the package for CTAN (see Table~\\ref{tab:upload-setup})",
+    description = "Metadata to describe the package for CTAN",
     index =  function (t, k)
       return setmetatable({}, {
         __index = function (tt, kk)
@@ -1176,7 +1198,7 @@ declare({
     value = ".lve",
   },
   logext = {
-    description = "Extension of checking output, before processing it into a \\texttt{.tlg}",
+    description = "Extension of checking output, before processing it into a `.tlg`",
     value = ".log",
   },
   pvtext = {
@@ -1417,6 +1439,72 @@ declare({
   os_grepexe = {
     -- description = "",
     value = OS.grepexe,
+  },
+})
+-- global fields
+declare({
+  ["uploadconfig.announcement"] = {
+    description = "Announcement text",
+  },
+  ["uploadconfig.author"] = {
+    description = "Author name (semicolon-separated for multiple)",
+  },
+  ["uploadconfig.ctanPath"] = {
+    description = "CTAN path",
+  },
+  ["uploadconfig.email"] = {
+    description = "Email address of uploader",
+  },
+  ["uploadconfig.license"] = {
+    description = "Package license(s). See https://ctan.org/license",
+  },
+  ["uploadconfig.pkg"] = {
+    description = "Name of the CTAN package (defaults to G.ctanpkg)",
+  },
+  ["uploadconfig.summary"] = {
+    description = "One-line summary",
+  },
+  ["uploadconfig.uploader"] = {
+    description = "Name of uploader",
+  },
+  ["uploadconfig.version"] = {
+    description = "Package version",
+  },
+  ["uploadconfig.bugtracker"] = {
+    description = "URL(s) of bug tracker",
+  },
+  ["uploadconfig.description"] = {
+    description = "Short description/abstract",
+  },
+  ["uploadconfig.development"] = {
+    description = "URL(s) of development channels",
+  },
+  ["uploadconfig.home"] = {
+    description = "URL(s) of home page",
+  },
+  ["uploadconfig.note"] = {
+    description = "Internal note to CTAN",
+  },
+  ["uploadconfig.repository"] = {
+    description = "URL(s) of source repositories",
+  },
+  ["uploadconfig.support"] = {
+    description = "URL(s) of support channels",
+  },
+  ["uploadconfig.topic"] = {
+    description = "Topic(s), see https://ctan.org/topics/highscore",
+  },
+  ["uploadconfig.update"] = {
+    description = "Boolean `true` for an update, `false` for a new package",
+  },
+  ["uploadconfig.announcement_file"] = {
+    description = "Announcement text file",
+  },
+  ["uploadconfig.note_file"] = {
+    description = "Note text file",
+  },
+  ["uploadconfig.curlopt_file"] = {
+    description = "The filename containing the options passed to curl",
   },
 })
 
@@ -1740,8 +1828,8 @@ G = bridge({
   index     = G_index,
   complete = function (t, k, result)
     local entry = get_entry(k)
-    if entry then
-      return entry.complete and entry.complete(t, k, result)
+    if entry and entry.complete then
+      return entry.complete(t, k, result)
     end
     return result
   end,
@@ -1798,14 +1886,6 @@ Files = bridge({
   end
 })
 
----Iterator over all the global variable names
----@return string_iterator_f
-local function all_variable_names()
-  return keys(DB, { compare = function (a, b)
-  return a < b
-  end })
-end
-
 ---Get the description of the named global variable
 ---@param name string
 ---@return string
@@ -1819,7 +1899,9 @@ end
 ---Export globals in the metatable of the given table.
 ---At the end, `env` will know about any variable
 ---that was previously `declare`d.
----@param env? table defaults to `_G`
+---@generic T
+---@param env? T defaults to `_G`
+---@return T
 local function export(env)
   env = env or _G
   -- if there is already an __index function metamethod, we amend it
@@ -1844,7 +1926,7 @@ local function export(env)
       -- fall back to the static value
       return entry.value
     end
-    -- use the previous metamethod, if any
+    -- use the original metamethod, if any
     if t_index then
       result = t_index[k]
     elseif f_index then
@@ -1855,14 +1937,91 @@ local function export(env)
   return setmetatable(env, MT)
 end
 
+local vanilla
+---Get the vanilla global environment
+---@return table
+local function get_vanilla()
+  if not vanilla then
+    vanilla = {}
+    export(vanilla)
+  end
+  return vanilla
+end
+
+local VANILLA_VALUE = {}
+---Get the value of the receiver in the vanilla environment
+---@return any
+function MT_variable_entry:get_vanilla_value()
+  if self[VANILLA_VALUE] == nil then
+    self[VANILLA_VALUE] = get_vanilla()[self.name]
+  end
+  return self[VANILLA_VALUE]
+end
+
+local TYPE = {}
+---Get the level of the receiver
+---@param self variable_entry_t
+---@return integer
+function MT_variable_entry.get_type(self)
+  if self[TYPE] == nil then
+    self[TYPE] = type(self:get_vanilla_value())
+  end
+  return self[TYPE]
+end
+
+local level_by_type = {
+  ["nil"] = 5,
+  ["number"] = 2,
+  ["string"] = 2,
+  ["boolean"] = 2,
+  ["table"] = 2,
+  ["function"] = 1,
+  ["thread"] = 3,
+  ["userdata"] = 4,
+}
+
+local LEVEL = {}
+---Get the level of the receiver
+---@param self variable_entry_t
+---@return integer
+function MT_variable_entry.get_level(self)
+  if self[LEVEL] == nil then
+    self[LEVEL] = level_by_type[self:get_type()]
+  end
+  return self[LEVEL]
+end
+
+---metamethod to compare 2 variable entries
+---@param lhs variable_entry_t
+---@param rhs variable_entry_t
+---@return boolean
+function MT_variable_entry.__lt(lhs, rhs)
+  local lhs_level = lhs:get_level()
+  local rhs_level = rhs:get_level()
+  if lhs_level < rhs_level then
+    return true
+  elseif lhs_level > rhs_level then
+    return false
+  else
+    return lhs.name < rhs.name
+  end
+end
+
+---@alias entry_exclude_f fun(entry: variable_entry_t): boolean
+---@alias entry_enumerator_f fun(): variable_entry_t
+
+---Iterator over all the global variable names
+---@param exclude? entry_exclude_f
+---@return entry_enumerator_f
+local function all_entries(exclude)
+  return entries(entry_by_index, {
+    compare = compare_ascending,
+    exclude = exclude,
+  })
+end
+
 ---@class l3b_globals_t
 ---@field LOCAL     any
----@field export    function
----@field all_variable_names        string_iterator_f
----@field get_descriptions          fun(name: string): string
----@field get_main_variable         fun(name: string, dir: string): string
----@field handle_get_main_variable  fun(name: string): error_level_n
----@field get_entry                 fun(name: string): variable_entry_t
 ---@field G         G_t
 ---@field Dir       Dir_t
 ---@field Files     Files_t
@@ -1870,15 +2029,16 @@ end
 ---@field Exe       Exe_t
 ---@field Opts      Opts_t
 ---@field Xtn       Xtn_t
+---@field get_main_variable         fun(name: string, dir: string): string
+---@field handle_get_main_variable  fun(name: string): error_level_n
+---@field export                    function
+---@field get_vanilla               fun(): table
+---@field get_entry                 fun(name: string): variable_entry_t
+---@field get_descriptions          fun(name: string): string
+---@field all_entries               fun(exclude: entry_exclude_f): entry_enumerator_f
 
 return {
   LOCAL                 = LOCAL,
-  all_variable_names    = all_variable_names,
-  get_description       = get_description,
-  export                = export,
-  get_main_variable     = get_main_variable,
-  handle_get_main_variable = handle_get_main_variable,
-  get_entry             = get_entry,
   G                     = G,
   Dir                   = Dir,
   Files                 = Files,
@@ -1886,4 +2046,11 @@ return {
   Exe                   = Exe,
   Opts                  = Opts,
   Xtn                   = Xtn,
+  get_main_variable     = get_main_variable,
+  handle_get_main_variable = handle_get_main_variable,
+  export                = export,
+  get_vanilla           = get_vanilla,
+  get_entry             = get_entry,
+  get_description       = get_description,
+  all_entries           = all_entries,
 }

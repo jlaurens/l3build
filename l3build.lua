@@ -330,8 +330,6 @@ l3build.options = l3b_cli.parse(arg, function (arg_i)
 end)
 
 l3b_globals.export()
-print(l3build.options, _G.options)
-os.exit(421)
 
 local options   = l3build.options
 
