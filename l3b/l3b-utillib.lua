@@ -94,7 +94,7 @@ end
 --[==[ End of the readonly business ]==]
 
 ---@class utlib_vars_t
----@field public debug flag_table_t
+---@field public debug flags_t
 
 ---@type utlib_vars_t
 local Vars = {
@@ -105,7 +105,7 @@ local Vars = {
 
 ---Turn the string list into quoted items separated by a sep
 ---@param table table
----@param separator string|nil defaults to " "
+---@param separator string|nil @defaults to " "
 ---@return string
 local function to_quoted_string(table, separator)
   local t = {}
@@ -127,7 +127,7 @@ end
 ---Iterator for the indices of a sequencial table.
 ---Purely syntactic sugar for people preferring `for in` loops.
 ---@param table table
----@param reverse boolean true for reverse ordering
+---@param reverse boolean @true for reverse ordering
 ---@return fun(): integer|nil
 ---@usage `for i in indices(t) do ... end` instead of `for i = 1, #t do ... end`
 local function indices(table, reverse)
@@ -148,8 +148,8 @@ end
 
 ---@alias compare_f  fun(a: any, b: any): boolean
 ---Compare function to sort in reverse order
----@param a any comparable with <
----@param b any comparable with <
+---@param a any @comparable with <
+---@param b any @comparable with <
 ---@return boolean
 local function compare_descending(a, b)
   return a > b
@@ -158,8 +158,8 @@ end
 -- Ascending counterpart. Implemented for balancing reasons
 -- despite it is the default behavior in `table.sort`.
 ---Compare function to sort in default order.
----@param a any comparable with <
----@param b any comparable with <
+---@param a any @comparable with <
+---@param b any @comparable with <
 ---@return boolean
 local function compare_ascending(a, b)
   return a < b
@@ -323,10 +323,10 @@ end
 
 ---Merge in place `holder` with `addendum`.
 ---@generic K, V
----@param holder table<K,V> The receiver
----@param addendum table<K,V> What is merged into the receiver
----@param can_overwrite? boolean if falsy overwriting is an error
----@return table<K,V> holder
+---@param holder table<K,V> @The receiver
+---@param addendum table<K,V> @What is merged into the receiver
+---@param can_overwrite? boolean @if falsy overwriting is an error
+---@return table<K,V> @holder
 local function extend_with(holder, addendum, can_overwrite)
   for key, value in pairs(addendum) do
     assert(can_overwrite or not holder[key], "Conflicting symbol ".. tostring(key))
@@ -380,8 +380,8 @@ with supplemental computed properties given by index.
 ---@field public newindex  fun(t: table, k: any, result: any): boolean
 ---@field public complete  fun(t: table, k: any, result: any): any
 ---@field public map       table<string,string>
----@field public primary   table the main object, defaults to _G
----@field public secondary table the secondary object
+---@field public primary   table @the main object, defaults to _G
+---@field public secondary table @the secondary object
 
 ---Return a bridge to "global" variables
 ---@param kv bridge_kv_t

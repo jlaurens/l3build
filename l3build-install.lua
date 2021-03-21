@@ -145,7 +145,7 @@ end
 
 ---Install files
 ---@param root_install_dir string
----@param full boolean, true means with documentation and man pages
+---@param full boolean, @true means with documentation and man pages
 ---@param dry_run boolean
 ---@return error_level_n
 local function install_files(root_install_dir, full, dry_run)
@@ -156,12 +156,12 @@ local function install_files(root_install_dir, full, dry_run)
   end
 
     -- Needed so paths are only cleaned out once
-  ---@type flag_table_t
+  ---@type flags_t
   local already_cleaned = {}
 
   -- Collect up all file entries before copying:
   -- ensures no files are lost during clean-up
-  ---@type copy_name_kv[]
+  ---@type copy_name_kv_t[]
   local to_copy = {}
 
   local function feed_to_copy(src_dir, type, file_globs, flatten, module)
@@ -174,7 +174,7 @@ local function install_files(root_install_dir, full, dry_run)
       module = "latex"
     end
     local type_module = type / module
-    ---@type copy_name_kv[]
+    ---@type copy_name_kv_t[]
     local candidates = {}
     -- Generate a candidates list
     -- each candidate is a table
@@ -253,7 +253,7 @@ local function install_files(root_install_dir, full, dry_run)
   -- Creates a 'controlled' list of files
   local function create_file_list(dir, includes, excludes)
     dir = dir or Dir.work
-    ---@type flag_table_t
+    ---@type flags_t
     local exclude_list = {}
     for glob_table in entries(excludes) do
       for glob in entries(glob_table) do

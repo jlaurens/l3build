@@ -72,10 +72,10 @@ end
 ---A module is the path of a directory relative to the main one.
 ---Uses `run` to launch a command: change to the module directory,
 ---then executes texlua with proper arguments.
----@param modules string[] List of modules.
+---@param modules string[] @List of modules.
 ---@param target  string
 ---@param opts    options_t|nil
----@return error_level_n 0 on proper termination, a non 0 error code otherwise.
+---@return error_level_n @0 on proper termination, a non 0 error code otherwise.
 ---@see many places, including latex2e/build.lua
 ---@usage Public
 local function call(modules, target, opts)
@@ -129,8 +129,8 @@ end
 
 ---Unpack the given dependencies.
 ---A dependency is the path of a directory relative to the main one.
----@param deps table regular array of dependencies. See `Deps`fields.
----@return number 0 on proper termination, a non 0 error code otherwise.
+---@param deps table @regular array of dependencies. See `Deps`fields.
+---@return number @0 on proper termination, a non 0 error code otherwise.
 ---@see stdmain, check, unpack, typesetting
 ---@usage Private?
 local function deps_install(deps)
@@ -149,7 +149,7 @@ end
 ---The return value is used to setup the global `G.config_suffix`.
 ---@param options options_t
 ---@param configs string[]
----@return string? config the config suffix
+---@return string? @config the config suffix
 ---@usage `G.config_suffix = load_unique_config(options, configs)`
 local function load_unique_config(options, configs)
   if #configs ~= 1 then

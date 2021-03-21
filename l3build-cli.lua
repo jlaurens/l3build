@@ -52,7 +52,7 @@ local GET_MAIN_VARIABLE = "get_main_variable"
 ---@field public date      string
 ---@field public debug     boolean
 ---@field public dirty     boolean
----@field public dry_run   boolean -- real name "dry-run"
+---@field public dry_run   boolean @-- real name "dry-run"
 ---@field public email     string
 ---@field public engine    table
 ---@field public epoch     string
@@ -60,7 +60,7 @@ local GET_MAIN_VARIABLE = "get_main_variable"
 ---@field public first     string
 ---@field public force     boolean
 ---@field public full      boolean
----@field public halt_on_error boolean -- real name "halt-on-error"
+---@field public halt_on_error boolean @-- real name "halt-on-error"
 ---@field public help      boolean
 ---@field public last      string
 ---@field public message   string

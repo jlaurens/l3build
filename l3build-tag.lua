@@ -128,7 +128,7 @@ local function tag(tag_names)
 end
 
 ---Target tag
----@param tag_names string[]|nil, singleton list
+---@param tag_names string[]|nil, @singleton list
 ---@return error_level_n
 local function bundle_tag(tag_names)
   local error_level = call(G.modules, "tag")

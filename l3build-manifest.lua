@@ -204,7 +204,7 @@ function MT:build_list(entry)
 end
 
 ---comment
----@param fh table file handle
+---@param fh table @file handle
 ---@param entry table
 function MT:write_group(fh, entry)
   local writer = Hook.write_group_heading

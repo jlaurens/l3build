@@ -56,7 +56,7 @@ local quoted_path = oslib.quoted_path
 -- implementation
 
 ---@class fslib_vars_t
----@field public debug     flag_table_t
+---@field public debug     flags_t
 
 ---@type fslib_vars_t
 local Vars = setmetatable({
@@ -75,6 +75,7 @@ local function unix_to_win(cmd)
 end
 
 ---Convert to host directory separator
+---@function to_host
 ---@param cmd string
 ---@return string
 local function to_host(cmd)
@@ -85,10 +86,11 @@ local function to_host(cmd)
 end
 
 ---Make a directory at the given path
+---@function make_directory
 ---@param path string
----@return boolean? suc
----@return exitcode? "exit"|"signal"
----@return integer? code
+---@return boolean? @suc
+---@return exitcode? @"exit"|"signal"
+---@return integer? @code
 local function make_directory(path)
   if not path then
     print(debug.traceback())
@@ -107,6 +109,7 @@ local function make_directory(path)
 end
 
 ---Whether there is a directory at the given path
+---@function directory_exists
 ---@param path string
 ---@return boolean
 local function directory_exists(path)
@@ -130,6 +133,7 @@ local function directory_exists(path)
 end
 
 ---Whether there is a file at the given path
+---@function file_exists
 ---@param path string
 ---@return boolean
 local function file_exists(path)
@@ -153,9 +157,10 @@ local cwd_list = {}
 ---Save the current directory to the top of the
 ---current directory stack then change the
 ---current directory to the given one.
----@param dir string path of the directory to switch to
----@return boolean ok true means success
----@return string msg error message
+---@function push_current_directory
+---@param dir string @path of the directory to switch to
+---@return boolean @ok true means success
+---@return string @msg error message
 local function push_current_directory(dir)
   if not directory_exists(dir) then
     print(debug.traceback())
@@ -167,8 +172,9 @@ end
 
 ---Remove the top entry from the directory stack,
 ---then change back current directory to this removed value and return it.
----@return string|nil dir the new current directory on success, nil on error
----@return nil|string msg nil on success, error message on error
+---@function pop_current_directory
+---@return string|nil @dir the new current directory on success, nil on error
+---@return nil|string @msg nil on success, error message on error
 local function pop_current_directory()
   local dir = unappend(cwd_list)
   if not dir then
@@ -183,11 +189,12 @@ end
 ---returns true followed by whatever f returns
 ---packed in one array. Clients will unpack the result before use.
 ---or false followed by an error message.
----@param dir string path of the directory to switch to
----@param f function function to execute
+---@function push_pop_current_directory
+---@param dir string @path of the directory to switch to
+---@param f function @function to execute
 ---@vararg any       arguments passed to the function
----@return boolean ok true means success
----@return string|table msg error message or the packed result of f
+---@return boolean @ok true means success
+---@return string|table @msg error message or the packed result of f
 local function push_pop_current_directory(dir, f, ...)
   push_current_directory(dir)
   local packed = { pcall(f, ...) }
@@ -196,6 +203,7 @@ local function push_pop_current_directory(dir, f, ...)
 end
 
 ---Set the working directory. As soon as possible
+---@function set_working_directory
 ---@param dir string
 local function set_working_directory(dir)
   assert(not dir:match("^%."),
@@ -211,9 +219,10 @@ end
 ---to the current directory when not absolute.
 ---If `is_current` is false, the given path is relative
 ---to the working directory when not absolute.
+---@function absolute_path
 ---@see `set_working_directory`.
 ---@param path string
----@param is_current boolean whether `path` is relative to the current directory
+---@param is_current boolean @whether `path` is relative to the current directory
 ---@return string
 local function absolute_path(path, is_current)
   local dir, base = dir_base(path)
@@ -242,6 +251,7 @@ end
 
 ---Return a quoted absolute path from a relative one
 ---Due to chdir, path must exist and be accessible.
+---@function quoted_absolute_path
 ---@param path string
 ---@return string
 local function quoted_absolute_path(path)
@@ -253,6 +263,7 @@ local function quoted_absolute_path(path)
 end
 
 ---Look for files, directory by directory, and return the first existing
+---@function locate
 ---@param dirs  string[]
 ---@param names string[]
 ---@return string
@@ -271,6 +282,7 @@ end
 ---or all names if absent. The return value includes files,
 ---directories and whatever `lfs.dir` returns.
 ---Returns an empty list if there is no directory at the given path.
+---@function file_list
 ---@param dir_path  string
 ---@param glob      string|nil
 ---@return string[]
@@ -294,6 +306,7 @@ local function file_list(dir_path, glob)
   end
   return files
 end
+
 ---@alias string_iterator_f fun(): string|nil
 
 ---@class glob_exclude_kv_t
@@ -302,6 +315,7 @@ end
 
 ---Return an iterator of the files and directories at path matching the given glob.
 ---If there is no directory at the given path, a void iterator is returned
+---@function all_names
 ---@param path  string
 ---@param glob  string
 ---@return string_iterator_f
@@ -319,18 +333,20 @@ end
 
 ---Set the given function as tree excluder.
 ---Can be used to exclude the build directory.
+---@function set_tree_excluder
 ---@param f string_exclude_f
 local function set_tree_excluder(f)
   tree_excluder = f
 end
 
 ---@class tree_entry_t
----@field public src string path relative to the source directory
----@field public wrk string path counterpart relative to the current working directory
+---@field public src string @path relative to the source directory
+---@field public wrk string @path counterpart relative to the current working directory
 
 ---Does what filelist does, but can also glob subdirectories.
 ---In the returned table, the keys are paths relative to the given source path,
 ---the values are their counterparts relative to the current working directory.
+---@function tree
 ---@param dir_path string
 ---@param glob string
 ---@return fun(): tree_entry_t|nil
@@ -357,7 +373,7 @@ local function tree(dir_path, glob)
   for glob_part, sep in glob:gmatch("([^/]+)(/?)/*") do
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
-    ---@param p tree_entry_t path counterpart relative to the current working directory
+    ---@param p tree_entry_t @path counterpart relative to the current working directory
     ---@param table table
     local function fill(p, table)
       if Vars.debug.tree then
@@ -414,12 +430,13 @@ local function tree(dir_path, glob)
 end
 
 ---Rename. Whether paths are properly escaped is another story...
+---@function rename
 ---@param dir_path string
----@param source string the base name of the source
----@param dest string the base name of the destination
----@return boolean?  suc
----@return exitcode? exitcode
----@return integer?  code
+---@param source string @the base name of the source
+---@param dest string @the base name of the destination
+---@return boolean?  @suc
+---@return exitcode? @exitcode
+---@return integer?  @code
 local function rename(dir_path, source, dest)
   dir_path = dir_path .. "/"
   if os_type == "windows" then
@@ -432,6 +449,7 @@ local function rename(dir_path, source, dest)
 end
 
 ---Private function.
+---@function copy_core
 ---@param dest string
 ---@param p_src any
 ---@param p_wrk string
@@ -462,19 +480,20 @@ local function copy_core(dest, p_src, p_wrk)
 return execute(cmd) and 0 or 1
 end
 
----@class copy_name_kv -- copy_file key/value arguments
+---@class copy_name_kv_t @copy_file key/value arguments
 ---@field public name    string
 ---@field public source  string
 ---@field public dest    string
 
 ---Copy files 'quietly'.
----@param name copy_name_kv|string base name of kv arguments
----@param source? string path of the source directory, required when name is not a table
----@param dest? string path of the destination directory, required when name is not a table
+---@function copy_file
+---@param name copy_name_kv_t|string @base name of kv arguments
+---@param source? string @path of the source directory, required when name is not a table
+---@param dest? string @path of the destination directory, required when name is not a table
 ---@return error_level_n
 local function copy_file(name, source, dest)
   if type(name) == "table" then
-    ---@type copy_name_kv
+    ---@type copy_name_kv_t
     local kv = name
     name, source, dest = kv.name, kv.source, kv.dest
   end
@@ -484,6 +503,7 @@ local function copy_file(name, source, dest)
 end
 
 ---Copy files 'quietly'.
+---@function copy_tree
 ---@param glob string_iterator_f|string[]|string
 ---@param source string
 ---@param dest string
@@ -520,6 +540,7 @@ local function copy_tree(glob, source, dest)
 end
 
 ---Remove the file or void directory with the given name at the given location.
+---@function remove_name
 ---@param dir_path string
 ---@param name string
 ---@return error_level_n
@@ -531,6 +552,7 @@ end
 
 ---Remove the files matching glob starting at source
 ---Empties directories but do not remove them.
+---@function remove_tree
 ---@param source string
 ---@param glob string
 ---@return error_level_n
@@ -543,6 +565,7 @@ local function remove_tree(source, glob)
 end
 
 ---For cleaning out a directory, which also ensures that it exists
+---@function make_clean_directory
 ---@param path string
 ---@return error_level_n
 local function make_clean_directory(path)
@@ -554,10 +577,11 @@ local function make_clean_directory(path)
 end
 
 ---Remove a directory tree.
----@param path string Must be properly escaped.
----@return boolean?  suc
----@return exitcode? exitcode
----@return integer?  code
+---@function remove_directory
+---@param path string @Must be properly escaped.
+---@return boolean?  @suc
+---@return exitcode? @exitcode
+---@return integer?  @code
 local function remove_directory(path)
   -- First, make sure it exists to avoid any errors
   if os_type == "windows" then
@@ -569,31 +593,31 @@ local function remove_directory(path)
 end
 
 ---@class fslib_t
----@field public Vars              fslib_vars_t
----@field public to_host                     fun(cmd: string):   string
----@field public absolute_path               fun(path: string):  string
----@field public quoted_absolute_path        fun(path: string):  string
----@field public make_directory              fun(path: string):  boolean, exitcode, integer
----@field public directory_exists            fun(path: string): boolean
----@field public file_exists                 fun(path: string): boolean
----@field public locate                      fun(dirs: string[], names: string[]): string
----@field public file_list                   fun(dir_path: string, glob: string|nil): string[]
----@field public all_names                   fun(path: string, glob: string): fun(): string
----@field public set_tree_excluder           fun(f: string_exclude_f)
----@field public tree                        fun(dir_path: string, glob: string): table<string, string>)
----@field public rename                      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
----@field public copy_file                   fun(file: string, source: string, dest: string): integer
----@field public copy_tree                   fun(glob: string, source: string, dest: string): integer
----@field public make_clean_directory        fun(path: string): integer
----@field public remove_name                 fun(dir_path: string, name: string): integer
----@field public remove_tree                 fun(source: string, glob: string): integer
----@field public remove_directory            fun(path: string): boolean?, exitcode?, integer?
----@field public set_working_directory       fun(path: string)
----@field public get_current_directory       fun(): string
----@field public change_current_directory    fun(dir: string) raises if dir does not exist
----@field public push_current_directory      fun(dir: string): string
----@field public pop_current_directory       fun(): string
----@field public push_pop_current_directory  fun(dir:string, f: function, ...): boolean, any
+---@field public Vars                       fslib_vars_t
+---@field public to_host                    fun(cmd: string):   string
+---@field public absolute_path              fun(path: string):  string
+---@field public quoted_absolute_path       fun(path: string):  string
+---@field public make_directory             fun(path: string):  boolean, exitcode, integer
+---@field public directory_exists           fun(path: string): boolean
+---@field public file_exists                fun(path: string): boolean
+---@field public locate                     fun(dirs: string[], names: string[]): string
+---@field public file_list                  fun(dir_path: string, glob: string|nil): string[]
+---@field public all_names                  fun(path: string, glob: string): fun(): string
+---@field public set_tree_excluder          fun(f: string_exclude_f)
+---@field public tree                       fun(dir_path: string, glob: string): table<string, string>)
+---@field public rename                     fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field public copy_file                  fun(file: string, source: string, dest: string): integer
+---@field public copy_tree                  fun(glob: string, source: string, dest: string): integer
+---@field public make_clean_directory       fun(path: string): integer
+---@field public remove_name                fun(dir_path: string, name: string): integer
+---@field public remove_tree                fun(source: string, glob: string): integer
+---@field public remove_directory           fun(path: string): boolean?, exitcode?, integer?
+---@field public set_working_directory      fun(path: string)
+---@field public get_current_directory      fun(): string
+---@field public change_current_directory   fun(dir: string) raises if dir does not exist
+---@field public push_current_directory     fun(dir: string): string
+---@field public pop_current_directory      fun(): string
+---@field public push_pop_current_directory fun(dir:string, f: function, ...): boolean, any
 
 return {
   Vars                  = Vars,

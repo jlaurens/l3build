@@ -47,14 +47,14 @@ local flags = {}
 ---@alias option_type_f fun(options: table, key: string, value: string): error_level_n
 
 ---@class option_info_t
----@field public description  string  short description
----@field public type  string|option_type_f|nil How to manage values.
----@field public short string|nil  short CLI key
----@field public long  string  long CLI key
----@field public name  string  name in the options table
----@field public expect_value  boolean False for boolean type, true for the others.
+---@field public description  string  @short description
+---@field public type  string|option_type_f|nil @How to manage values.
+---@field public short string|nil  @short CLI key
+---@field public long  string  @long CLI key
+---@field public name  string  @name in the options table
+---@field public expect_value  boolean @False for boolean type, true for the others.
 ---@field public load_value    fun(options: table, key: string, value?: string): error_level_n load the given value
----@field public builtin       boolean whether the option is builtin
+---@field public builtin       boolean @whether the option is builtin
 
 ---@type table<string, option_info_t>
 local by_key = {}
@@ -83,7 +83,7 @@ end
 
 ---Enumerator of all the target infos.
 ---Sorted by name
----@param hidden boolean true to list all hidden targets too.
+---@param hidden boolean @true to list all hidden targets too.
 ---@return function
 local function get_all_info(hidden)
   return values(by_long, {
@@ -302,7 +302,7 @@ end
 
 ---@class l3b_options_t
 ---@field public ut_flags_t        options_flags_t
----@field public get_all_info      fun(hidden:  boolean): fun(): option_info_t|nil
+---@field public get_all_info      fun(hidden:  @boolean): fun(): option_info_t|nil
 ---@field public get_info_by_key   fun(key:  string): option_info_t
 ---@field public get_info_by_name  fun(name: string): option_info_t
 ---@field public register          fun(info: option_info_t, builtin: boolean)

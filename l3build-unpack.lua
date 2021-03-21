@@ -71,8 +71,8 @@ local Opts        = l3b_globals.Opts
 ---leave only one modules files.
 ---Files are unpacked in `Dir.unpack` but this file is cleaned up
 ---at each run such that there is no memory between runs of uncpack.
----@param source_dirs string[]|nil defaults to the source directory
----@param sources     string[]|nil defaults to the source files glob
+---@param source_dirs string[]|nil @defaults to the source directory
+---@param sources     string[]|nil @defaults to the source files glob
 ---@return error_level_n
 local function bundleunpack(source_dirs, sources)
   source_dirs = source_dirs or { Dir.sourcefile }

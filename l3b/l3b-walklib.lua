@@ -31,7 +31,7 @@ local second_of   = utlib.second_of
 ---The base part includes the file extension if any.
 ---The dir part does not contain the trailing '/'.
 ---@param path string
----@return string dir is the part before the last '/' if any, "." otherwise.
+---@return string @dir is the part before the last '/' if any, "." otherwise.
 ---@return string
 local function dir_base(path)
   local dir, base = path:match("^(.*)/([^/]*)$")

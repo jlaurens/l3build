@@ -46,7 +46,7 @@ local first_of  = utlib.first_of
 local print_diff_time = utlib.print_diff_time
 
 ---@class oslib_vars_t
----@field public debug flag_table_t
+---@field public debug flags_t
 
 local Vars = setmetatable({
   debug = {}
@@ -185,7 +185,7 @@ end
 ---The content is converted to unix line ending when not binary.
 ---@param file_path string
 ---@param is_binary boolean
----@return string? content the content of the file
+---@return string? @content the content of the file
 local function read_content(file_path, is_binary)
   if file_path then
     local fh = open(file_path, is_binary and "rb" or "r")

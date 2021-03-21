@@ -67,38 +67,33 @@ local work_dir    -- the directory containing the closest "build.lua" and friend
 ---@type dir_path_s
 local main_dir    -- the directory containing the topmost "build.lua" and friends
 
----@alias flag_table_t table<string, boolean>
-
 ---@class l3build_debug_t
 ---@field public run              boolean
 ---@field public require          boolean
 ---@field public call             boolean
 ---@field public no_curl_posting  boolean
 ---@field public copy_core        boolean
-
----@class l3build_data_t
+local the_debug = {}
 
 ---@class l3build_t
----@field public debug       l3build_debug_t the special --debug-foo CLI arguments
----@field public PACKAGE     string        "l3build", `package.loaded` key
----@field public NAME        string        "l3build", display name
----@field public PATH        string        synonym of `launch_dir` .. "/l3build.lua"
----@field public is_main     boolean       True means "l3build" is the main controller.
----@field public in_document boolean       True means no "build.lua"
----@field public work_dir    dir_path_s|nil  where the closest "build.lua" lives, nil means not in_document
----@field public main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
----@field public launch_dir  dir_path_s      where "l3build.lua" and friends live
----@field public start_dir   dir_path_s      the current directory at load time
----@field public script_path string        the path of the `l3build.lua` in action.
+---@field public debug       l3build_debug_t  @the special --debug-foo CLI arguments
+---@field public PACKAGE     string           @"l3build", `package.loaded` key
+---@field public NAME        string           @"l3build", display name
+---@field public PATH        string           @synonym of `launch_dir` .. "/l3build.lua"
+---@field public is_main     boolean          @True means "l3build" is the main controller.
+---@field public in_document boolean          @True means no "build.lua"
+---@field public work_dir    dir_path_s|nil   @where the closest "build.lua" lives, nil means not in_document
+---@field public main_dir    dir_path_s|nil   @where the topmost "build.lua" lives, nil means not in_document
+---@field public launch_dir  dir_path_s       @where "l3build.lua" and friends live
+---@field public start_dir   dir_path_s       @the current directory at load time
+---@field public script_path string           @the path of the `l3build.lua` in action.
 ---@field public options     options_t
----@field public flags       flag_table_t
----@field public data        l3build_data_t
----@field public G           table           Global environment for build.lua and configs
+---@field public flags       flags_t
+---@field public G           table            @Global environment for build.lua and configs
 
 local l3build = { -- global data available as package.
-  debug = {}, -- storage for special debug flags (private UI)
+  debug = the_debug, -- storage for special debug flags (private UI)
   flags = {}, -- various shared flags
-  data = {},  -- shared data
 }
 
 print(in_document and "Document mode" or "Bundle mode")
@@ -133,9 +128,9 @@ do
   ---The max number of trials is the number of components
   ---of the absolute path of `dir`, which majorated in the for loop
   ---Intermediate directories must exist.
-  ---@param dir   string must end with '/'
-  ---@param base  string relative file or directory name
-  ---@return string? dir ends with '/' when non nil
+  ---@param dir   string @must end with '/'
+  ---@param base  string @relative file or directory name
+  ---@return string? @dir ends with '/' when non nil
   local function container(dir, base)
     for _ in gmatch(dir .. currentdir(), "[^/]+") do -- tricky loop
       local p = dir .. base
@@ -206,12 +201,13 @@ do
   end
   -- work_dir and main_dir are absolute as well, if any
   
+  ---@function register
   ---Register the given pakage in `package.loaded`.
   ---Lua's require function return either true or a table.
   ---Here we always return a table.
   ---@param pkg       table|boolean
-  ---@param pkg_name  string key in `package.loaded`
-  ---@param name      string display name
+  ---@param pkg_name  string @key in `package.loaded`
+  ---@param name      string @display name
   ---@param path      string
   local function register(pkg, pkg_name, name, path)
     if type(pkg) ~= "table" then pkg = {} end
@@ -243,6 +239,7 @@ do
     end
   end
   
+  ---@function require
   ---Overwrites global `require`.
   ---When `pkg_name` is "l3build-<name>",
   ---looks for "<l3b_dir>l3build-<name>.lua".

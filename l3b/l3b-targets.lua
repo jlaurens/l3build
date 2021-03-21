@@ -63,18 +63,18 @@ Due to code separation, the `run` is not always provided.
 ---@alias target_process_f        fun(names: string[]): error_level_n
 
 ---@class target_impl_t
----@field public configure   target_preflight_f|nil function to run preflight code
----@field public run         target_process_f function to run the target, possible computed attributed
----@field public run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
----@field public run_bundle  target_process_f|nil function to run the target, used at top level, possible computed attributed
+---@field public configure   target_preflight_f|nil @function to run preflight code
+---@field public run         target_process_f @function to run the target, possible computed attributed
+---@field public run_high    run_high_f|nil @function to run the target, not config loaded, possible computed attributed
+---@field public run_bundle  target_process_f|nil @function to run the target, used at top level, possible computed attributed
 
 ---@class target_info_t -- model for a target
----@field public description string description
----@field public package     string controller package name
----@field public name        string name
----@field public alias       string alias, to support old naming
----@field public builtin     boolean whether the target is builtin
----@field public impl        target_impl_t the target implementation
+---@field public description string @description
+---@field public package     string @controller package name
+---@field public name        string @name
+---@field public alias       string @alias, to support old naming
+---@field public builtin     boolean @whether the target is builtin
+---@field public impl        target_impl_t @the target implementation
 
 ---@type table<string, target_info_t>
 local DB = {}
@@ -125,13 +125,13 @@ local function register_info(info, builtin)
 end
 
 ---@class target_register_kvarg_t
----@field public description   string|nil description
----@field public name          string name
----@field public prepare       target_preflight_f|nil function run before any other action code
----@field public configure     target_preflight_f|nil function run before any other action code
----@field public run           target_process_f|string function to run the target, possible computed attributed
----@field public run_high      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
----@field public run_bundle    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
+---@field public description   string|nil @description
+---@field public name          string @name
+---@field public prepare       target_preflight_f|nil @function run before any other action code
+---@field public configure     target_preflight_f|nil @function run before any other action code
+---@field public run           target_process_f|string @function to run the target, possible computed attributed
+---@field public run_high      target_process_f|string|nil @function to run the target, not config loaded, possible computed attributed
+---@field public run_bundle    target_process_f|string|nil @function to run the target, used at top level, possible computed attributed
 
 ---Register the target with the given name and info
 ---@kvarg kvarg target_register_kvarg_t

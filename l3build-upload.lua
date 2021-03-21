@@ -87,7 +87,7 @@ with a configuration table `uploadconfig`
 
 ---@class l3b_upld_vars_t
 ---@field public curl_debug    boolean
----@field public uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
+---@field public uploadconfig  l3b_upld_config_t @Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
 
 -- function for interactive multiline fields
 local function input_multi_line_field(name)
@@ -120,10 +120,10 @@ local function input_single_line_field(name)
 end
 
 ---Input one field
----@param name string field name
----@param value any field value
----@param max number max size
----@param desc string description
+---@param name string @field name
+---@param value any @field value
+---@param max number @max size
+---@param desc string @description
 ---@param mandatory boolean
 ---@return string
 local function single_field(name, value, max, desc, mandatory)

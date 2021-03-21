@@ -79,7 +79,7 @@ local function clean()
   for dir in unique_items(Dir.main, Dir.sourcefile, Dir.docfile) do
     ---@type string[]
     local clean_list = {}
-    ---@type flag_table_t
+    ---@type flags_t
     local exclude = {}
     for glob in entries(Files.clean) do
       for p in tree(dir, glob) do

@@ -79,8 +79,8 @@ local Files       = l3b_globals.Files
 ---@field public exclude             string[]|string[][]
 ---@field public rename              string[]
 ---@field public flag                boolean
----@field public N                   integer matched files
----@field public ND                  integer descriptions
+---@field public N                   integer @matched files
+---@field public ND                  integer @descriptions
 ---@field public matches             table
 ---@field public excludes            table
 ---@field public files_ordered       table
@@ -279,7 +279,7 @@ It is automatically generated with `texlua build.lua manifest`.
 end
 
 ---Write subheading
----@param fh table file handle
+---@param fh table @file handle
 ---@param heading string
 ---@param description string
 local function write_heading(fh, heading, description)
@@ -290,17 +290,17 @@ local function write_heading(fh, heading, description)
 end
 
 ---@class manifest_param_t
----@field public dir          string    the directory of the file
----@field public count        integer   the count of the filename to be written
----@field public filemaxchar  integer   the maximum number of chars of all filenames in this group
----@field public descmaxchar  integer   the maximum number of chars of all descriptions in this group
----@field public flag         boolean|string  false OR string for indicating CTAN/TDS location
----@field public ctanfile     boolean   if file is in CTAN dir
----@field public tdsfile      boolean   if file is in TDS dir
+---@field public dir          string    @the directory of the file
+---@field public count        integer   @the count of the filename to be written
+---@field public filemaxchar  integer   @the maximum number of chars of all filenames in this group
+---@field public descmaxchar  integer   @the maximum number of chars of all descriptions in this group
+---@field public flag         boolean|string  @false OR string for indicating CTAN/TDS location
+---@field public ctanfile     boolean   @if file is in CTAN dir
+---@field public tdsfile      boolean   @if file is in TDS dir
 
 ---comment
----@param fh       table write file handle
----@param filename string the name of the file to write
+---@param fh       table @write file handle
+---@param filename string @the name of the file to write
 ---@param param    manifest_param_t
 local function write_group_file(fh, filename, param)
   -- no file description: plain bullet list item:
@@ -313,9 +313,9 @@ local function write_group_file(fh, filename, param)
 end
 
 ---comment
----@param fh table write file handle
----@param filename   string the name of the file to write
----@param descr string description of the file to write
+---@param fh table @write file handle
+---@param filename   string @the name of the file to write
+---@param descr string @description of the file to write
 ---@param param manifest_param_t
 local function write_group_file_descr(fh, filename, descr, param)
   -- filename+description: Github-flavoured Markdown table
@@ -331,7 +331,7 @@ end
 --]]
 
 ---Extract file description
----@param fh table file handle
+---@param fh table @file handle
 local function extract_filedesc(fh)
 
   -- no-op by default; two examples below

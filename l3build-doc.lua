@@ -133,7 +133,7 @@ local function doc(files)
   if error_level ~= 0 then
     return error_level
   end
-  ---@type flag_table_t
+  ---@type flags_t
   local done = {}
   for typeset_globs in items(Files.typesetdemo, Files.typeset) do
     for glob in entries(typeset_globs) do

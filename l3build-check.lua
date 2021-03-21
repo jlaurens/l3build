@@ -950,11 +950,11 @@ local function setup_check(name, engine)
 end
 
 ---Used by run_check
----@param name string test name
+---@param name string @test name
 ---@param engine string
 ---@param hide boolean
----@param ext string extension
----@param type string test type
+---@param ext string @extension
+---@param type string @test type
 ---@return error_level_n
 local function check_and_diff(name, engine, hide, ext, type)
   run_test(name, engine, hide, ext, type, true)
