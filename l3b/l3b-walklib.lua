@@ -65,10 +65,10 @@ local function job_name(file)
 end
 
 ---@class wklib_t
----@field dir_base  fun(path: string): string, string
----@field dir_name  fun(path: string): string
----@field base_name fun(path: string): string
----@field job_name  fun(path: string): string
+---@field public dir_base  fun(path: string): string, string
+---@field public dir_name  fun(path: string): string
+---@field public base_name fun(path: string): string
+---@field public job_name  fun(path: string): string
 
 return {
   dir_base  = dir_base,

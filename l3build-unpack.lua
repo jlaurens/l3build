@@ -162,9 +162,9 @@ local function module_unpack()
 end
 
 ---@class l3b_unpk_t
----@field unpack        unpack_f
----@field unpack_impl   target_impl_t
----@field module_unpack_impl target_impl_t
+---@field public unpack        unpack_f
+---@field public unpack_impl   target_impl_t
+---@field public module_unpack_impl target_impl_t
 
 return {
   unpack        = unpack,

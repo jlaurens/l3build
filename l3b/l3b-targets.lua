@@ -63,18 +63,18 @@ Due to code separation, the `run` is not always provided.
 ---@alias target_process_f        fun(names: string[]): error_level_n
 
 ---@class target_impl_t
----@field configure   target_preflight_f|nil function to run preflight code
----@field run         target_process_f function to run the target, possible computed attributed
----@field run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
----@field run_bundle  target_process_f|nil function to run the target, used at top level, possible computed attributed
+---@field public configure   target_preflight_f|nil function to run preflight code
+---@field public run         target_process_f function to run the target, possible computed attributed
+---@field public run_high    run_high_f|nil function to run the target, not config loaded, possible computed attributed
+---@field public run_bundle  target_process_f|nil function to run the target, used at top level, possible computed attributed
 
 ---@class target_info_t -- model for a target
----@field description string description
----@field package     string controller package name
----@field name        string name
----@field alias       string alias, to support old naming
----@field builtin     boolean whether the target is builtin
----@field impl        target_impl_t the target implementation
+---@field public description string description
+---@field public package     string controller package name
+---@field public name        string name
+---@field public alias       string alias, to support old naming
+---@field public builtin     boolean whether the target is builtin
+---@field public impl        target_impl_t the target implementation
 
 ---@type table<string, target_info_t>
 local DB = {}
@@ -125,13 +125,13 @@ local function register_info(info, builtin)
 end
 
 ---@class target_register_kvarg_t
----@field description   string|nil description
----@field name          string name
----@field prepare       target_preflight_f|nil function run before any other action code
----@field configure     target_preflight_f|nil function run before any other action code
----@field run           target_process_f|string function to run the target, possible computed attributed
----@field run_high      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
----@field run_bundle    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
+---@field public description   string|nil description
+---@field public name          string name
+---@field public prepare       target_preflight_f|nil function run before any other action code
+---@field public configure     target_preflight_f|nil function run before any other action code
+---@field public run           target_process_f|string function to run the target, possible computed attributed
+---@field public run_high      target_process_f|string|nil function to run the target, not config loaded, possible computed attributed
+---@field public run_bundle    target_process_f|string|nil function to run the target, used at top level, possible computed attributed
 
 ---Register the target with the given name and info
 ---@kvarg kvarg target_register_kvarg_t
@@ -165,9 +165,9 @@ end
 ---@alias target_process_top_callback_f fun(module_target: string): error_level_n call the target against all the modules
 
 ---@class target_process_kvarg_t
----@field preflight     fun(): error_level_n
----@field at_bundle_top nil|boolean
----@field top_callback  nil|target_process_top_callback_f
+---@field public preflight     fun(): error_level_n
+---@field public at_bundle_top nil|boolean
+---@field public top_callback  nil|target_process_top_callback_f
 
 ---Raises an error when the target is unknown.
 ---Get the implementation table of the target.
@@ -260,11 +260,11 @@ local function process(options, kvarg)
 end
 
 ---@class l3b_targets_t
----@field get_all_info  fun(hidden: boolean): fun(): target_info_t|nil
----@field get_info      fun(key: string): target_info_t
----@field register      fun(info: target_info_t, builtin: boolean)
----@field register_info fun(info: target_info_t, builtin: boolean)
----@field process       target_process_f
+---@field public get_all_info  fun(hidden: boolean): fun(): target_info_t|nil
+---@field public get_info      fun(key: string): target_info_t
+---@field public register      fun(info: target_info_t, builtin: boolean)
+---@field public register_info fun(info: target_info_t, builtin: boolean)
+---@field public process       target_process_f
 
 return {
   get_all_info  = get_all_info,

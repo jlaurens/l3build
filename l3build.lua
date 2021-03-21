@@ -24,6 +24,8 @@ for those people who are interested.
 
 --]]
 
+--@module l3build
+
 local assert  = assert
 local print   = print
 
@@ -68,30 +70,30 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@alias flag_table_t table<string, boolean>
 
 ---@class l3build_debug_t
----@field run       boolean
----@field require   boolean
----@field call      boolean
----@field no_curl_posting boolean
----@field copy_core boolean
+---@field public run              boolean
+---@field public require          boolean
+---@field public call             boolean
+---@field public no_curl_posting  boolean
+---@field public copy_core        boolean
 
 ---@class l3build_data_t
 
 ---@class l3build_t
----@field debug       l3build_debug_t the special --debug-foo CLI arguments
----@field PACKAGE     string        "l3build", `package.loaded` key
----@field NAME        string        "l3build", display name
----@field PATH        string        synonym of `launch_dir` .. "/l3build.lua"
----@field is_main     boolean       True means "l3build" is the main controller.
----@field in_document boolean       True means no "build.lua"
----@field work_dir    dir_path_s|nil  where the closest "build.lua" lives, nil means not in_document
----@field main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
----@field launch_dir  dir_path_s      where "l3build.lua" and friends live
----@field start_dir   dir_path_s      the current directory at load time
----@field script_path string        the path of the `l3build.lua` in action.
----@field options     options_t
----@field flags       flag_table_t
----@field data        l3build_data_t
----@field G           table           Global environment for build.lua and configs
+---@field public debug       l3build_debug_t the special --debug-foo CLI arguments
+---@field public PACKAGE     string        "l3build", `package.loaded` key
+---@field public NAME        string        "l3build", display name
+---@field public PATH        string        synonym of `launch_dir` .. "/l3build.lua"
+---@field public is_main     boolean       True means "l3build" is the main controller.
+---@field public in_document boolean       True means no "build.lua"
+---@field public work_dir    dir_path_s|nil  where the closest "build.lua" lives, nil means not in_document
+---@field public main_dir    dir_path_s|nil  where the topmost "build.lua" lives, nil means not in_document
+---@field public launch_dir  dir_path_s      where "l3build.lua" and friends live
+---@field public start_dir   dir_path_s      the current directory at load time
+---@field public script_path string        the path of the `l3build.lua` in action.
+---@field public options     options_t
+---@field public flags       flag_table_t
+---@field public data        l3build_data_t
+---@field public G           table           Global environment for build.lua and configs
 
 local l3build = { -- global data available as package.
   debug = {}, -- storage for special debug flags (private UI)

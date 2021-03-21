@@ -70,23 +70,23 @@ local Dir         = l3b_globals.Dir
 local Files       = l3b_globals.Files
 
 ---@class manifest_entry_t
----@field subheading          string
----@field name                string
----@field description         string
----@field files               string[]|string[][]
----@field dir                 string
----@field skipfiledescription boolean
----@field exclude             string[]|string[][]
----@field rename              string[]
----@field flag                boolean
----@field N                   integer matched files
----@field ND                  integer descriptions
----@field matches             table
----@field excludes            table
----@field files_ordered       table
----@field descr               table
----@field Nchar_file          integer
----@field Nchar_descr         integer
+---@field public subheading          string
+---@field public name                string
+---@field public description         string
+---@field public files               string[]|string[][]
+---@field public dir                 string
+---@field public skipfiledescription boolean
+---@field public exclude             string[]|string[][]
+---@field public rename              string[]
+---@field public flag                boolean
+---@field public N                   integer matched files
+---@field public ND                  integer descriptions
+---@field public matches             table
+---@field public excludes            table
+---@field public files_ordered       table
+---@field public descr               table
+---@field public Nchar_file          integer
+---@field public Nchar_descr         integer
 
 ---comment
 ---@return manifest_entry_t[]
@@ -290,13 +290,13 @@ local function write_heading(fh, heading, description)
 end
 
 ---@class manifest_param_t
----@field dir          string    the directory of the file
----@field count        integer   the count of the filename to be written
----@field filemaxchar  integer   the maximum number of chars of all filenames in this group
----@field descmaxchar  integer   the maximum number of chars of all descriptions in this group
----@field flag         boolean|string  false OR string for indicating CTAN/TDS location
----@field ctanfile     boolean   if file is in CTAN dir
----@field tdsfile      boolean   if file is in TDS dir
+---@field public dir          string    the directory of the file
+---@field public count        integer   the count of the filename to be written
+---@field public filemaxchar  integer   the maximum number of chars of all filenames in this group
+---@field public descmaxchar  integer   the maximum number of chars of all descriptions in this group
+---@field public flag         boolean|string  false OR string for indicating CTAN/TDS location
+---@field public ctanfile     boolean   if file is in CTAN dir
+---@field public tdsfile      boolean   if file is in TDS dir
 
 ---comment
 ---@param fh       table write file handle
@@ -370,14 +370,14 @@ end
 ]]--
 
 ---@class l3b_mfst_setup_t
----@field setup function
----@field sort_within_match function
----@field sort_within_group function
----@field write_opening function
----@field write_heading function
----@field write_group_file function
----@field write_group_file_descr function
----@field extract_filedesc function
+---@field public setup function
+---@field public sort_within_match function
+---@field public sort_within_group function
+---@field public write_opening function
+---@field public write_heading function
+---@field public write_group_file function
+---@field public write_group_file_descr function
+---@field public extract_filedesc function
 
 return {
   setup              = manifest_setup,

@@ -140,9 +140,9 @@ local function bundle_tag(tag_names)
 end
 
 ---@class l3b_tag_t
----@field tag_impl    target_impl_t
----@field update_tag  update_tag_f
----@field tag_hook    tag_hook_f
+---@field public tag_impl    target_impl_t
+---@field public update_tag  update_tag_f
+---@field public tag_hook    tag_hook_f
 
 return {
   tag_hook    = tag_hook,

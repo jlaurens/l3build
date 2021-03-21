@@ -170,8 +170,8 @@ local function doc(files)
 end
 
 ---@class l3b_doc_t
----@field doc_impl  target_impl_t
----@field doc       fun(files?: string[]): error_level_n
+---@field public doc_impl  target_impl_t
+---@field public doc       fun(files?: string[]): error_level_n
 
 return {
   doc_impl  = {

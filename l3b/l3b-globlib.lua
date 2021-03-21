@@ -121,8 +121,8 @@ end
 ---@alias glob_match_f fun(name: string): boolean
 
 ---@class gblib_t
----@field glob_to_pattern fun(glob: string): string
----@field to_glob_match fun(glob: string): glob_match_f
+---@field public glob_to_pattern fun(glob: string): string
+---@field public to_glob_match fun(glob: string): glob_match_f
 
 return {
   glob_to_pattern = glob_to_pattern,

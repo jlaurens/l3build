@@ -86,8 +86,8 @@ with a configuration table `uploadconfig`
 
 
 ---@class l3b_upld_vars_t
----@field curl_debug    boolean
----@field uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
+---@field public curl_debug    boolean
+---@field public uploadconfig  l3b_upld_config_t Metadata to describe the package for CTAN (see Table~\ref{tab:upload-setup})
 
 -- function for interactive multiline fields
 local function input_multi_line_field(name)
@@ -391,7 +391,7 @@ function MT:append_request_field(name, max, desc, mandatory, multi)
 end
 
 ---@class l3b_upld_t
----@field upload fun(tag_names: string[]): string
+---@field public upload fun(tag_names: string[]): string
 
 return {
   upload  = {

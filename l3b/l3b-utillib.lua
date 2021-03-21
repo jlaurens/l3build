@@ -94,7 +94,7 @@ end
 --[==[ End of the readonly business ]==]
 
 ---@class utlib_vars_t
----@field debug flag_table_t
+---@field public debug flag_table_t
 
 ---@type utlib_vars_t
 local Vars = {
@@ -169,9 +169,9 @@ end
 ---@alias exclude_f  fun(value: any): boolean
 
 ---@class iterator_kv_t
----@field unique boolean
----@field compare compare_f
----@field exclude exclude_f
+---@field public unique boolean
+---@field public compare compare_f
+---@field public exclude exclude_f
 
 ---@alias iterator_f fun(): any
 
@@ -251,8 +251,8 @@ local function keys(table, compare)
 end
 
 ---@class sorted_kv_t
----@field compare compare_f
----@field exclude exclude_f
+---@field public compare compare_f
+---@field public exclude exclude_f
 
 ---Iterates over the values of the table.
 ---Values are sorted according to the keys ordering.
@@ -374,14 +374,14 @@ with supplemental computed properties given by index.
 --]==]
 
 ---@class bridge_kv_t
----@field prefix    string
----@field suffix    string
----@field index     fun(t: table, k: any): any
----@field newindex  fun(t: table, k: any, result: any): boolean
----@field complete  fun(t: table, k: any, result: any): any
----@field map       table<string,string>
----@field primary   table the main object, defaults to _G
----@field secondary table the secondary object
+---@field public prefix    string
+---@field public suffix    string
+---@field public index     fun(t: table, k: any): any
+---@field public newindex  fun(t: table, k: any, result: any): boolean
+---@field public complete  fun(t: table, k: any, result: any): any
+---@field public map       table<string,string>
+---@field public primary   table the main object, defaults to _G
+---@field public secondary table the secondary object
 
 ---Return a bridge to "global" variables
 ---@param kv bridge_kv_t
@@ -487,29 +487,29 @@ end
 local flags = {}
 
 ---@class utlib_t
----@field Vars                utlib_vars_t
----@field flags               flags_t
----@field to_quoted_string    fun(table: table, separator: string|nil): string
----@field indices             fun(table: table, reverse: boolean): fun(): integer
----@field compare_ascending   compare_f
----@field compare_descending  compare_f
----@field entries             fun(table: table, kv: sorted_kv_t): iterator_f
----@field items               fun(...): iterator_f
----@field unique_items        fun(...): iterator_f
----@field keys                fun(table: table, compare: compare_f): iterator_f
----@field sorted_pairs        fun(table: table, kv: sorted_kv_t): fun(): any, any
----@field values              fun(table: table, kv: sorted_kv_t): iterator_f
----@field first_of            fun(...): any
----@field second_of           fun(...): any
----@field trim                fun(in: string): string
----@field extend_with         fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
----@field readonly            fun(t: table, quiet: boolean): table
----@field is_readonly         fun(t: table): boolean
----@field shallow_copy        fun(original: any): any
----@field deep_copy           fun(original: any): any
----@field bridge              fun(kv: bridge_kv_t): table
----@field to_ymd_hms          fun(diff: integer): string
----@field print_diff_time     fun(format: string, diff: integer)
+---@field public Vars                utlib_vars_t
+---@field public flags               flags_t
+---@field public to_quoted_string    fun(table: table, separator: string|nil): string
+---@field public indices             fun(table: table, reverse: boolean): fun(): integer
+---@field public compare_ascending   compare_f
+---@field public compare_descending  compare_f
+---@field public entries             fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public items               fun(...): iterator_f
+---@field public unique_items        fun(...): iterator_f
+---@field public keys                fun(table: table, compare: compare_f): iterator_f
+---@field public sorted_pairs        fun(table: table, kv: sorted_kv_t): fun(): any, any
+---@field public values              fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public first_of            fun(...): any
+---@field public second_of           fun(...): any
+---@field public trim                fun(in: string): string
+---@field public extend_with         fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
+---@field public readonly            fun(t: table, quiet: boolean): table
+---@field public is_readonly         fun(t: table): boolean
+---@field public shallow_copy        fun(original: any): any
+---@field public deep_copy           fun(original: any): any
+---@field public bridge              fun(kv: bridge_kv_t): table
+---@field public to_ymd_hms          fun(diff: integer): string
+---@field public print_diff_time     fun(format: string, diff: integer)
 
 return {
   Vars                = Vars,

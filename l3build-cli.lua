@@ -48,29 +48,29 @@ local register_target = l3b_targets.register_info
 local GET_MAIN_VARIABLE = "get_main_variable"
 
 ---@class options_t: options_base_t
----@field config    string[]
----@field date      string
----@field debug     boolean
----@field dirty     boolean
----@field dry_run   boolean -- real name "dry-run"
----@field email     string
----@field engine    table
----@field epoch     string
----@field file      string
----@field first     string
----@field force     boolean
----@field full      boolean
----@field halt_on_error boolean -- real name "halt-on-error"
----@field help      boolean
----@field last      string
----@field message   string
----@field names     string[]
----@field quiet     boolean
----@field rerun     boolean
----@field shuffle   boolean
----@field target    string
----@field texmfhome string
----@field get_main_variable string
+---@field public config    string[]
+---@field public date      string
+---@field public debug     boolean
+---@field public dirty     boolean
+---@field public dry_run   boolean -- real name "dry-run"
+---@field public email     string
+---@field public engine    table
+---@field public epoch     string
+---@field public file      string
+---@field public first     string
+---@field public force     boolean
+---@field public full      boolean
+---@field public halt_on_error boolean -- real name "halt-on-error"
+---@field public help      boolean
+---@field public last      string
+---@field public message   string
+---@field public names     string[]
+---@field public quiet     boolean
+---@field public rerun     boolean
+---@field public shuffle   boolean
+---@field public target    string
+---@field public texmfhome string
+---@field public get_main_variable string
 
 local option_list = {
   config = {
@@ -271,11 +271,11 @@ local function register_targets()
 end
 
 ---@class l3b_cli_t
----@field GET_MAIN_VARIABLE         string
----@field register_builtin_options  fun()
----@field register_custom_options   fun()
----@field register_targets          fun()
----@field parse                     l3b_options_parse_f
+---@field public GET_MAIN_VARIABLE         string
+---@field public register_builtin_options  fun()
+---@field public register_custom_options   fun()
+---@field public register_targets          fun()
+---@field public parse                     l3b_options_parse_f
 
 return {
   GET_MAIN_VARIABLE         = GET_MAIN_VARIABLE,

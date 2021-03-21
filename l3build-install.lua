@@ -406,9 +406,9 @@ do
 end
 
 ---@class l3b_inst_t
----@field install_impl    target_impl_t
----@field uninstall_impl  target_impl_t
----@field install_files   fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
+---@field public install_impl    target_impl_t
+---@field public uninstall_impl  target_impl_t
+---@field public install_files   fun(root_install_dir: string, full: boolean, dry_run: boolean): integer
 
 return {
   install_impl    = {

@@ -198,8 +198,8 @@ local function ctan()
 end
 
 ---@class l3b_ctan_t
----@field ctan_impl         target_impl_t
----@field module_ctan_impl  target_impl_t
+---@field public ctan_impl         target_impl_t
+---@field public module_ctan_impl  target_impl_t
 
 return {
   ctan_impl         = {

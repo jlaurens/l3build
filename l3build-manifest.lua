@@ -322,7 +322,7 @@ local function manifest()
 end
 
 ---@class l3b_mfst_t
----@field manifest_impl target_impl_t
+---@field public manifest_impl target_impl_t
 
 return {
   hook          = Hook,

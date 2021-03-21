@@ -125,7 +125,7 @@ local function bundle_clean()
 end
 
 ---@class l3b_clean_t
----@field clean_impl  target_impl_t
+---@field public clean_impl  target_impl_t
 
 return {
   clean_impl  = {

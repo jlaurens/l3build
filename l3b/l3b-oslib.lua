@@ -46,7 +46,7 @@ local first_of  = utlib.first_of
 local print_diff_time = utlib.print_diff_time
 
 ---@class oslib_vars_t
----@field debug flag_table_t
+---@field public debug flag_table_t
 
 local Vars = setmetatable({
   debug = {}
@@ -62,17 +62,17 @@ local Vars = setmetatable({
 -- the support functions
 
 ---@class OS_t
----@field pathsep string
----@field concat  string
----@field null    string
----@field ascii   string
----@field cmpexe  string
----@field cmpext  string
----@field diffexe string
----@field diffext string
----@field grepexe string
----@field setenv  string
----@field yes     string
+---@field public pathsep string
+---@field public concat  string
+---@field public null    string
+---@field public ascii   string
+---@field public cmpexe  string
+---@field public cmpext  string
+---@field public diffexe string
+---@field public diffext string
+---@field public grepexe string
+---@field public setenv  string
+---@field public yes     string
 
 ---@type OS_t
 local OS
@@ -232,14 +232,14 @@ local function read_command(command)
 end
 
 ---@class oslib_t
----@field osdate      OS_t
----@field Vars        oslib_vars_t
----@field cmd_concat  fun(...): string
----@field run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
----@field quoted_path fun(path: string): string
----@field read_content  fun(file_path: string, is_binary: boolean): string|nil
----@field write_content fun(file_path: string, content: string): error_level_n
----@field read_command  fun(command: string): string
+---@field public osdate      OS_t
+---@field public Vars        oslib_vars_t
+---@field public cmd_concat  fun(...): string
+---@field public run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
+---@field public quoted_path fun(path: string): string
+---@field public read_content  fun(file_path: string, is_binary: boolean): string|nil
+---@field public write_content fun(file_path: string, content: string): error_level_n
+---@field public read_command  fun(command: string): string
 
 return {
   Vars        = Vars,

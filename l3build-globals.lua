@@ -141,135 +141,135 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@alias typeset_f   fun(file: string, dir: string, cmd: string|nil): error_level_n
 
 ---@class special_typesetting_t
----@field func  typeset_f
----@field cmd   string
+---@field public func  typeset_f
+---@field public cmd   string
 
 ---@class test_types_t
----@field log table<string,string|function>
----@field pdf table<string,string|function>
+---@field public log table<string,string|function>
+---@field public pdf table<string,string|function>
 
 ---@alias bundleunpack_f fun(source_dirs: string[], sources: string[]): error_level_n
 
 ---@class l3b_upld_config_t
----@field announcement  string        Announcement text
----@field author        string        Author name (semicolon-separated for multiple)
----@field ctanPath      string        CTAN path
----@field email         string        Email address of uploader
----@field license       string|string[] Package license(s) See https://ctan.org/license
----@field pkg           string        Name of the CTAN package (defaults to G.ctanpkg)
----@field summary       string        One-line summary
----@field uploader      string        Name of uploader
----@field version       string        Package version
----@field bugtracker    string|string[] URL(s) of bug tracker
----@field description   string        Short description/abstract
----@field development   string|string[] URL(s) of development channels
----@field home          string|string[] URL(s) of home page
----@field note          string        Internal note to CTAN
----@field repository    string|string[] URL(s) of source repositories
----@field support       string|string[] URL(s) of support channels
----@field topic         string|string[] Topic(s). See https://ctan.org/topics/highscore
----@field update        string        Boolean `true` for an update, `false` for a new package
----@field announcement_file string    Announcement text  file
----@field note_file     string        Note text file
----@field curlopt_file  string        The filename containing the options passed to curl
+---@field public announcement  string        Announcement text
+---@field public author        string        Author name (semicolon-separated for multiple)
+---@field public ctanPath      string        CTAN path
+---@field public email         string        Email address of uploader
+---@field public license       string|string[] Package license(s) See https://ctan.org/license
+---@field public pkg           string        Name of the CTAN package (defaults to G.ctanpkg)
+---@field public summary       string        One-line summary
+---@field public uploader      string        Name of uploader
+---@field public version       string        Package version
+---@field public bugtracker    string|string[] URL(s) of bug tracker
+---@field public description   string        Short description/abstract
+---@field public development   string|string[] URL(s) of development channels
+---@field public home          string|string[] URL(s) of home page
+---@field public note          string        Internal note to CTAN
+---@field public repository    string|string[] URL(s) of source repositories
+---@field public support       string|string[] URL(s) of support channels
+---@field public topic         string|string[] Topic(s). See https://ctan.org/topics/highscore
+---@field public update        string        Boolean `true` for an update, `false` for a new package
+---@field public announcement_file string    Announcement text  file
+---@field public note_file     string        Note text file
+---@field public curlopt_file  string        The filename containing the options passed to curl
 
 ---@class _G_t
----@field module        string The name of the module
----@field bundle        string The name of the bundle in which the module belongs (where relevant)
----@field ctanpkg       string Name of the CTAN package matching this module
----@field modules       string[] The list of all modules in a bundle (when not auto-detecting)
----@field exclmodules   string[] Directories to be excluded from automatic module detection
----@field tdsroot       string
----@field ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
----@field epoch         integer Epoch (Unix date) to set for test runs
----@field flattentds    boolean Switch to flatten any source structure when creating a TDS structure
----@field flattenscript boolean Switch to flatten any script structure when creating a TDS structure
----@field ctanreadme    string  Name of the file to send to CTAN as `README.`md
----@field ctanupload    boolean Undocumented
----@field tdslocations  string[] For non-standard file installations
+---@field public module        string The name of the module
+---@field public bundle        string The name of the bundle in which the module belongs (where relevant)
+---@field public ctanpkg       string Name of the CTAN package matching this module
+---@field public modules       string[] The list of all modules in a bundle (when not auto-detecting)
+---@field public exclmodules   string[] Directories to be excluded from automatic module detection
+---@field public tdsroot       string
+---@field public ctanzip       string  Name of the zip file (without extension) created for upload to CTAN
+---@field public epoch         integer Epoch (Unix date) to set for test runs
+---@field public flattentds    boolean Switch to flatten any source structure when creating a TDS structure
+---@field public flattenscript boolean Switch to flatten any script structure when creating a TDS structure
+---@field public ctanreadme    string  Name of the file to send to CTAN as `README.`md
+---@field public ctanupload    boolean Undocumented
+---@field public tdslocations  string[] For non-standard file installations
 -- doc related
----@field typesetsearch boolean Switch to search the system `texmf` for during typesetting
----@field glossarystyle string  MakeIndex style file for glossary/changes creation
----@field indexstyle    string  MakeIndex style for index creation
----@field specialtypesetting table<string,special_typesetting_t>  Non-standard typesetting combinations
----@field forcedocepoch string  Force epoch when typesetting
----@field typesetcmds   string  Instructions to be passed to TeX when doing typesetting
----@field typesetruns   integer Number of cycles of typesetting to carry out
+---@field public typesetsearch boolean Switch to search the system `texmf` for during typesetting
+---@field public glossarystyle string  MakeIndex style file for glossary/changes creation
+---@field public indexstyle    string  MakeIndex style for index creation
+---@field public specialtypesetting table<string,special_typesetting_t>  Non-standard typesetting combinations
+---@field public forcedocepoch string  Force epoch when typesetting
+---@field public typesetcmds   string  Instructions to be passed to TeX when doing typesetting
+---@field public typesetruns   integer Number of cycles of typesetting to carry out
 -- functions
----@field runcmd        fun(cmd: string, dir: string, vars: table):boolean?, string?, integer?
----@field biber         biber_f
----@field bibtex        bibtex_f
----@field makeindex     makeindex_f
----@field tex           tex_f
----@field typeset       typeset_f
----@field typeset_demo_tasks  fun(): error_level_n
----@field docinit_hook  fun(): error_level_n
+---@field public runcmd        fun(cmd: string, dir: string, vars: table):boolean?, string?, integer?
+---@field public biber         biber_f
+---@field public bibtex        bibtex_f
+---@field public makeindex     makeindex_f
+---@field public tex           tex_f
+---@field public typeset       typeset_f
+---@field public typeset_demo_tasks  fun(): error_level_n
+---@field public docinit_hook  fun(): error_level_n
 -- check fields
----@field checkengines    string[] Engines to check with `check` by default
----@field stdengine       string  Engine to generate `.tlg` file from
----@field checkformat     string  Format to use for tests
----@field specialformats  table  Non-standard engine/format combinations
----@field test_types      test_types_t  Custom test variants
----@field test_order      string[] Which kinds of tests to evaluate
+---@field public checkengines    string[] Engines to check with `check` by default
+---@field public stdengine       string  Engine to generate `.tlg` file from
+---@field public checkformat     string  Format to use for tests
+---@field public specialformats  table  Non-standard engine/format combinations
+---@field public test_types      test_types_t  Custom test variants
+---@field public test_order      string[] Which kinds of tests to evaluate
 -- Configs for testing
----@field checkconfigs    table   Configurations to use for tests
----@field includetests    string[] Test names to include when checking
----@field excludetests    string[] Test names to exclude when checking
----@field recordstatus    boolean Switch to include error level from test runs in `.tlg` files
----@field forcecheckepoch boolean Force epoch when running tests
----@field asciiengines    string[] Engines which should log as pure ASCII
----@field checkruns       integer Number of runs to complete for a test before comparing the log
----@field checksearch     boolean Switch to search the system `texmf` for during checking
----@field maxprintline    integer Length of line to use in log files
----@field runtest_tasks   fun(test_name: string, run_number: integer): string
----@field checkinit_hook  fun(): error_level_n
----@field ps2pdfopt       string  Options for `ps2pdf`
----@field unpacksearch    boolean  Switch to search the system `texmf` for during unpacking
----@field bundleunpack    bundleunpack_f  bundle unpack overwrite
----@field flatten         boolean Switch to flatten any source structure when sending to CTAN
----@field packtdszip      boolean Switch to build a TDS-style zip file for CTAN
----@field manifestfile    string File name to use for the manifest file
----@field curl_debug      boolean
----@field uploadconfig    l3b_upld_config_t Metadata to describe the package for CTAN
----@field texmf_home      string
----@field typeset_list    string[]
+---@field public checkconfigs    table   Configurations to use for tests
+---@field public includetests    string[] Test names to include when checking
+---@field public excludetests    string[] Test names to exclude when checking
+---@field public recordstatus    boolean Switch to include error level from test runs in `.tlg` files
+---@field public forcecheckepoch boolean Force epoch when running tests
+---@field public asciiengines    string[] Engines which should log as pure ASCII
+---@field public checkruns       integer Number of runs to complete for a test before comparing the log
+---@field public checksearch     boolean Switch to search the system `texmf` for during checking
+---@field public maxprintline    integer Length of line to use in log files
+---@field public runtest_tasks   fun(test_name: string, run_number: integer): string
+---@field public checkinit_hook  fun(): error_level_n
+---@field public ps2pdfopt       string  Options for `ps2pdf`
+---@field public unpacksearch    boolean  Switch to search the system `texmf` for during unpacking
+---@field public bundleunpack    bundleunpack_f  bundle unpack overwrite
+---@field public flatten         boolean Switch to flatten any source structure when sending to CTAN
+---@field public packtdszip      boolean Switch to build a TDS-style zip file for CTAN
+---@field public manifestfile    string File name to use for the manifest file
+---@field public curl_debug      boolean
+---@field public uploadconfig    l3b_upld_config_t Metadata to describe the package for CTAN
+---@field public texmf_home      string
+---@field public typeset_list    string[]
 -- tag
----@field tag_hook        tag_hook_f
----@field update_tag      update_tag_f
+---@field public tag_hook        tag_hook_f
+---@field public update_tag      update_tag_f
 
 ---@class G_t: _G_t
 -- unexposed computed properties
----@field is_embedded   boolean True means the module belongs to a bundle
----@field is_standalone boolean False means the module belongs to a bundle
----@field at_top        boolean True means there is no bundle above
----@field at_bundle_top boolean True means we are at the top of the bundle
----@field config        string
----@field tds_module    string
----@field tds_main      string  G.tdsroot / G.bundle or G.module
+---@field public is_embedded   boolean True means the module belongs to a bundle
+---@field public is_standalone boolean False means the module belongs to a bundle
+---@field public at_top        boolean True means there is no bundle above
+---@field public at_bundle_top boolean True means we are at the top of the bundle
+---@field public config        string
+---@field public tds_module    string
+---@field public tds_main      string  G.tdsroot / G.bundle or G.module
 
 ---@type G_t
 local G
 
 ---@class Dir_t
----@field work        string Directory with the `build.lua` file.
----@field main        string Top level directory for the module|bundle
----@field docfile     string Directory containing documentation files
----@field sourcefile  string Directory containing source files
----@field support     string Directory containing general support files
----@field testfile    string Directory containing test files
----@field testsupp    string Directory containing test-specific support files
----@field texmf       string Directory containing support files in tree form
----@field textfile    string Directory containing plain text files
----@field build       string Directory for building and testing
----@field distrib     string Directory for generating distribution structure
----@field local       string Directory for extracted files in sandboxed TeX runs
----@field result      string Directory for PDF files when using PDF-based tests
----@field test        string Directory for running tests
----@field typeset     string Directory for building documentation
----@field unpack      string Directory for unpacking sources
----@field ctan        string Directory for organising files for CTAN
----@field tds         string Directory for organised files into TDS structure
----@field test_config string Computed directory for running tests
+---@field public work        string Directory with the `build.lua` file.
+---@field public main        string Top level directory for the module|bundle
+---@field public docfile     string Directory containing documentation files
+---@field public sourcefile  string Directory containing source files
+---@field public support     string Directory containing general support files
+---@field public testfile    string Directory containing test files
+---@field public testsupp    string Directory containing test-specific support files
+---@field public texmf       string Directory containing support files in tree form
+---@field public textfile    string Directory containing plain text files
+---@field public build       string Directory for building and testing
+---@field public distrib     string Directory for generating distribution structure
+---@field public local       string Directory for extracted files in sandboxed TeX runs
+---@field public result      string Directory for PDF files when using PDF-based tests
+---@field public test        string Directory for running tests
+---@field public typeset     string Directory for building documentation
+---@field public unpack      string Directory for unpacking sources
+---@field public ctan        string Directory for organising files for CTAN
+---@field public tds         string Directory for organised files into TDS structure
+---@field public test_config string Computed directory for running tests
 
 ---@type Dir_t
 local Dir
@@ -279,40 +279,40 @@ local Dir
 -- All of these may be set earlier, so a initialised conditionally
 
 ---@class Files_t
----@field aux           string[] Secondary files to be saved as part of running tests
----@field bib           string[] BibTeX database files
----@field binary        string[] Files to be added in binary mode to zip files
----@field bst           string[] BibTeX style files
----@field check         string[] Extra files unpacked purely for tests
----@field checksupp     string[] Files needed for performing regression tests
----@field clean         string[] Files to delete when cleaning
----@field demo          string[] Files which show how to use a module
----@field doc           string[] Files which are part of the documentation but should not be typeset
----@field dynamic       string[] Secondary files to cleared before each test is run
----@field exclude       string[] Files to ignore entirely (default for Emacs backup files)
----@field install       string[] Files to install to the `tex` area of the `texmf` tree
----@field makeindex     string[] MakeIndex files to be included in a TDS-style zip
----@field script        string[] Files to install to the `scripts` area of the `texmf` tree
----@field scriptman     string[] Files to install to the `doc/man` area of the `texmf` tree
----@field source        string[] Files to copy for unpacking
----@field tag           string[] Files for automatic tagging
----@field text          string[] Plain text files to send to CTAN as-is
----@field typesetdemo   string[] Files to typeset before the documentation for inclusion in main documentation files
----@field typeset       string[] Files to typeset for documentation
----@field typesetsupp   string[] Files needed to support typesetting when 'sandboxed'
----@field typesetsource string[] Files to copy to unpacking when typesetting
----@field unpack        string[] Files to run to perform unpacking
----@field unpacksupp    string[] Files needed to support unpacking when 'sandboxed'
----@field _all_typeset  string[] To combine `typeset` files and `typesetdemo` files
----@field _all_pdf      string[] Counterpart of "_all_typeset"
+---@field public aux           string[] Secondary files to be saved as part of running tests
+---@field public bib           string[] BibTeX database files
+---@field public binary        string[] Files to be added in binary mode to zip files
+---@field public bst           string[] BibTeX style files
+---@field public check         string[] Extra files unpacked purely for tests
+---@field public checksupp     string[] Files needed for performing regression tests
+---@field public clean         string[] Files to delete when cleaning
+---@field public demo          string[] Files which show how to use a module
+---@field public doc           string[] Files which are part of the documentation but should not be typeset
+---@field public dynamic       string[] Secondary files to cleared before each test is run
+---@field public exclude       string[] Files to ignore entirely (default for Emacs backup files)
+---@field public install       string[] Files to install to the `tex` area of the `texmf` tree
+---@field public makeindex     string[] MakeIndex files to be included in a TDS-style zip
+---@field public script        string[] Files to install to the `scripts` area of the `texmf` tree
+---@field public scriptman     string[] Files to install to the `doc/man` area of the `texmf` tree
+---@field public source        string[] Files to copy for unpacking
+---@field public tag           string[] Files for automatic tagging
+---@field public text          string[] Plain text files to send to CTAN as-is
+---@field public typesetdemo   string[] Files to typeset before the documentation for inclusion in main documentation files
+---@field public typeset       string[] Files to typeset for documentation
+---@field public typesetsupp   string[] Files needed to support typesetting when 'sandboxed'
+---@field public typesetsource string[] Files to copy to unpacking when typesetting
+---@field public unpack        string[] Files to run to perform unpacking
+---@field public unpacksupp    string[] Files needed to support unpacking when 'sandboxed'
+---@field public _all_typeset  string[] To combine `typeset` files and `typesetdemo` files
+---@field public _all_pdf      string[] Counterpart of "_all_typeset"
 
 ---@type Files_t
 local Files
 
 ---@class Deps_t
----@field check   string[] -- List of dependencies for running checks
----@field typeset string[] -- List of dependencies for typesetting docs
----@field unpack  string[] -- List of dependencies for unpacking
+---@field public check   string[] -- List of dependencies for running checks
+---@field public typeset string[] -- List of dependencies for typesetting docs
+---@field public unpack  string[] -- List of dependencies for unpacking
 
 ---@type Deps_t
 local Deps = bridge({
@@ -322,13 +322,13 @@ local Deps = bridge({
 -- Executable names plus following options
 
 ---@class Exe_t
----@field typeset   string Executable for compiling `doc(s)`
----@field unpack    string Executable for running `unpack`
----@field zip       string Executable for creating archive with `ctan`
----@field biber     string Biber executable
----@field bibtex    string BibTeX executable
----@field makeindex string MakeIndex executable
----@field curl      string Curl executable for `upload`
+---@field public typeset   string Executable for compiling `doc(s)`
+---@field public unpack    string Executable for running `unpack`
+---@field public zip       string Executable for creating archive with `ctan`
+---@field public biber     string Biber executable
+---@field public bibtex    string BibTeX executable
+---@field public makeindex string MakeIndex executable
+---@field public curl      string Curl executable for `upload`
 
 ---@type Exe_t
 local Exe = bridge({
@@ -336,13 +336,13 @@ local Exe = bridge({
 })
 
 ---@class Opts_t
----@field check     string Options passed to engine when running checks
----@field typeset   string Options passed to engine when typesetting
----@field unpack    string Options passed to engine when unpacking
----@field zip       string Options passed to zip program
----@field biber     string Biber options
----@field bibtex    string BibTeX options
----@field makeindex string MakeIndex options
+---@field public check     string Options passed to engine when running checks
+---@field public typeset   string Options passed to engine when typesetting
+---@field public unpack    string Options passed to engine when unpacking
+---@field public zip       string Options passed to zip program
+---@field public biber     string Biber options
+---@field public bibtex    string BibTeX options
+---@field public makeindex string MakeIndex options
 
 ---@type Opts_t
 local Opts = bridge({
@@ -352,16 +352,16 @@ local Opts = bridge({
 -- Extensions for various file types: used to abstract out stuff a bit
 
 ---@class Xtn_t
----@field bak string  Extension of backup files
----@field dvi string  Extension of DVI files
----@field lvt string  Extension of log-based test files
----@field tlg string  Extension of test file output
----@field tpf string  Extension of PDF-based test output
----@field lve string  Extension of auto-generating test file output
----@field log string  Extension of checking output, before processing it into a `.tlg`
----@field pvt string  Extension of PDF-based test files
----@field pdf string  Extension of PDF file for checking and saving
----@field ps  string  Extension of PostScript files
+---@field public bak string  Extension of backup files
+---@field public dvi string  Extension of DVI files
+---@field public lvt string  Extension of log-based test files
+---@field public tlg string  Extension of test file output
+---@field public tpf string  Extension of PDF-based test output
+---@field public lve string  Extension of auto-generating test file output
+---@field public log string  Extension of checking output, before processing it into a `.tlg`
+---@field public pvt string  Extension of PDF-based test files
+---@field public pdf string  Extension of PDF file for checking and saving
+---@field public ps  string  Extension of PostScript files
 
 ---@type Xtn_t
 local Xtn = bridge({
@@ -434,16 +434,16 @@ local function NYI()
 end
 
 ---@class pre_variable_entry_t
----@field name        string
----@field description string
----@field value       any
----@field index       fun(t: table, k: string): any takes precedence over the value
----@field complete    fun(t: table, k: string, v: any): any
+---@field public name        string
+---@field public description string
+---@field public value       any
+---@field public index       fun(t: table, k: string): any takes precedence over the value
+---@field public complete    fun(t: table, k: string, v: any): any
 
 ---@class variable_entry_t: pre_variable_entry_t
----@field get_vanilla_value fun(self: variable_entry_t): any
----@field get_level         fun(self: variable_entry_t): integer
----@field get_type          fun(self: variable_entry_t): string
+---@field public get_vanilla_value fun(self: variable_entry_t): any
+---@field public get_level         fun(self: variable_entry_t): integer
+---@field public get_type          fun(self: variable_entry_t): string
 
 ---@type table<string,variable_entry_t>
 local entry_by_name = {}
@@ -2048,21 +2048,21 @@ local function all_entries(exclude)
 end
 
 ---@class l3b_globals_t
----@field LOCAL     any
----@field G         G_t
----@field Dir       Dir_t
----@field Files     Files_t
----@field Deps      Deps_t
----@field Exe       Exe_t
----@field Opts      Opts_t
----@field Xtn       Xtn_t
----@field get_main_variable         fun(name: string, dir: string): string
----@field handle_get_main_variable  fun(name: string): error_level_n
----@field export                    function
----@field get_vanilla               fun(): table
----@field get_entry                 fun(name: string): variable_entry_t
----@field get_descriptions          fun(name: string): string
----@field all_entries               fun(exclude: entry_exclude_f): entry_enumerator_f
+---@field public LOCAL     any
+---@field public G         G_t
+---@field public Dir       Dir_t
+---@field public Files     Files_t
+---@field public Deps      Deps_t
+---@field public Exe       Exe_t
+---@field public Opts      Opts_t
+---@field public Xtn       Xtn_t
+---@field public get_main_variable         fun(name: string, dir: string): string
+---@field public handle_get_main_variable  fun(name: string): error_level_n
+---@field public export                    function
+---@field public get_vanilla               fun(): table
+---@field public get_entry                 fun(name: string): variable_entry_t
+---@field public get_descriptions          fun(name: string): string
+---@field public all_entries               fun(exclude: entry_exclude_f): entry_enumerator_f
 
 return {
   LOCAL                 = LOCAL,

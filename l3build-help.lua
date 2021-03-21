@@ -283,9 +283,9 @@ local function status_run()
 end
 
 ---@class l3b_help_t
----@field version     fun()
----@field help        fun()
----@field status_impl target_impl_t
+---@field public version     fun()
+---@field public help        fun()
+---@field public status_impl target_impl_t
 
 return {
   version     = version,

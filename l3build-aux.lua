@@ -175,10 +175,10 @@ local function load_unique_config(options, configs)
 end
 
 ---@class l3b_aux_t
----@field deps_install  fun(deps: table): number
----@field call          fun(modules: string[], target: string, opts: table): number
----@field set_epoch_cmd fun(epoch: string, force: boolean): string
----@field load_unique_config  fun(options: options_t): error_level_n
+---@field public deps_install  fun(deps: table): number
+---@field public call          fun(modules: string[], target: string, opts: table): number
+---@field public set_epoch_cmd fun(epoch: string, force: boolean): string
+---@field public load_unique_config  fun(options: options_t): error_level_n
 
 return {
   deps_install        = deps_install,

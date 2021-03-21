@@ -1280,9 +1280,9 @@ local function configure_check(options)
 end
 
 ---@class l3b_check_t
----@field check_impl        target_impl_t
----@field module_check_impl target_impl_t
----@field save_impl         target_impl_t
+---@field public check_impl        target_impl_t
+---@field public module_check_impl target_impl_t
+---@field public save_impl         target_impl_t
 
 return {
   rewrite_pdf = rewrite_pdf,

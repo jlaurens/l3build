@@ -1,8 +1,8 @@
 build
 examples/**/build
-
+_*
 *.zip
-
+**/.DS_Store
 *.pdf
 !*/testfiles/*.pdf
 

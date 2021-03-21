@@ -56,7 +56,7 @@ local quoted_path = oslib.quoted_path
 -- implementation
 
 ---@class fslib_vars_t
----@field debug     flag_table_t
+---@field public debug     flag_table_t
 
 ---@type fslib_vars_t
 local Vars = setmetatable({
@@ -297,8 +297,8 @@ end
 ---@alias string_iterator_f fun(): string|nil
 
 ---@class glob_exclude_kv_t
----@field glob string
----@field exclude exclude_f
+---@field public glob string
+---@field public exclude exclude_f
 
 ---Return an iterator of the files and directories at path matching the given glob.
 ---If there is no directory at the given path, a void iterator is returned
@@ -325,8 +325,8 @@ local function set_tree_excluder(f)
 end
 
 ---@class tree_entry_t
----@field src string path relative to the source directory
----@field wrk string path counterpart relative to the current working directory
+---@field public src string path relative to the source directory
+---@field public wrk string path counterpart relative to the current working directory
 
 ---Does what filelist does, but can also glob subdirectories.
 ---In the returned table, the keys are paths relative to the given source path,
@@ -463,9 +463,9 @@ return execute(cmd) and 0 or 1
 end
 
 ---@class copy_name_kv -- copy_file key/value arguments
----@field name    string
----@field source  string
----@field dest    string
+---@field public name    string
+---@field public source  string
+---@field public dest    string
 
 ---Copy files 'quietly'.
 ---@param name copy_name_kv|string base name of kv arguments
@@ -569,31 +569,31 @@ local function remove_directory(path)
 end
 
 ---@class fslib_t
----@field Vars              fslib_vars_t
----@field to_host                     fun(cmd: string):   string
----@field absolute_path               fun(path: string):  string
----@field quoted_absolute_path        fun(path: string):  string
----@field make_directory              fun(path: string):  boolean, exitcode, integer
----@field directory_exists            fun(path: string): boolean
----@field file_exists                 fun(path: string): boolean
----@field locate                      fun(dirs: string[], names: string[]): string
----@field file_list                   fun(dir_path: string, glob: string|nil): string[]
----@field all_names                   fun(path: string, glob: string): fun(): string
----@field set_tree_excluder           fun(f: string_exclude_f)
----@field tree                        fun(dir_path: string, glob: string): table<string, string>)
----@field rename                      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
----@field copy_file                   fun(file: string, source: string, dest: string): integer
----@field copy_tree                   fun(glob: string, source: string, dest: string): integer
----@field make_clean_directory        fun(path: string): integer
----@field remove_name                 fun(dir_path: string, name: string): integer
----@field remove_tree                 fun(source: string, glob: string): integer
----@field remove_directory            fun(path: string): boolean?, exitcode?, integer?
----@field set_working_directory       fun(path: string)
----@field get_current_directory       fun(): string
----@field change_current_directory    fun(dir: string) raises if dir does not exist
----@field push_current_directory      fun(dir: string): string
----@field pop_current_directory       fun(): string
----@field push_pop_current_directory  fun(dir:string, f: function, ...): boolean, any
+---@field public Vars              fslib_vars_t
+---@field public to_host                     fun(cmd: string):   string
+---@field public absolute_path               fun(path: string):  string
+---@field public quoted_absolute_path        fun(path: string):  string
+---@field public make_directory              fun(path: string):  boolean, exitcode, integer
+---@field public directory_exists            fun(path: string): boolean
+---@field public file_exists                 fun(path: string): boolean
+---@field public locate                      fun(dirs: string[], names: string[]): string
+---@field public file_list                   fun(dir_path: string, glob: string|nil): string[]
+---@field public all_names                   fun(path: string, glob: string): fun(): string
+---@field public set_tree_excluder           fun(f: string_exclude_f)
+---@field public tree                        fun(dir_path: string, glob: string): table<string, string>)
+---@field public rename                      fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field public copy_file                   fun(file: string, source: string, dest: string): integer
+---@field public copy_tree                   fun(glob: string, source: string, dest: string): integer
+---@field public make_clean_directory        fun(path: string): integer
+---@field public remove_name                 fun(dir_path: string, name: string): integer
+---@field public remove_tree                 fun(source: string, glob: string): integer
+---@field public remove_directory            fun(path: string): boolean?, exitcode?, integer?
+---@field public set_working_directory       fun(path: string)
+---@field public get_current_directory       fun(): string
+---@field public change_current_directory    fun(dir: string) raises if dir does not exist
+---@field public push_current_directory      fun(dir: string): string
+---@field public pop_current_directory       fun(): string
+---@field public push_pop_current_directory  fun(dir:string, f: function, ...): boolean, any
 
 return {
   Vars                  = Vars,
