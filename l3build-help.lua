@@ -250,7 +250,7 @@ local function status_run()
       if #modules > 0 then
         -- this is a top bundle
         print(  "  bundle: ".. bundle)
-        print(  "  path:   ".. absolute_path(Dir.work))
+        print(  "  path:  ".. absolute_path(Dir.work))
         local mm = {}
         for m in entries(modules, { compare = compare_ascending}) do
           append(mm, ("%s (./%s)"):format(m:lower(), m))
@@ -263,15 +263,15 @@ local function status_run()
       else
         -- this is a standalone module (not in a bundle).
         print(  "  module: ".. module)
-        print(  "  path:   ".. absolute_path(Dir.work))
+        print(  "  path:  ".. absolute_path(Dir.work))
       end
     else
       -- a module inside a bundle
       print(    "  bundle: ".. bundle)
       print(    "  module: ".. module)
-      print(    "  path:   ".. absolute_path(Dir.work))
+      print(    "  path:  ".. absolute_path(Dir.work))
     end
-    print(      "  start:  ".. l3build.start_dir)
+    print(      "  start: ".. l3build.start_dir)
     print(      "  launch: ".. l3build.launch_dir)
   end
   print()

@@ -115,6 +115,7 @@ else
 end
 
 ---Concat the given strings with `OS.concat`
+---@function cmd_concat
 ---@vararg string ...
 local function cmd_concat(...)
   -- filter out void arguments
@@ -139,6 +140,7 @@ local function cmd_concat(...)
 end
 
 ---Run a command in a given directory
+---@function run
 ---@param dir string
 ---@param cmd string
 ---@return error_level_n
@@ -165,6 +167,7 @@ local function run(dir, cmd)
 end
 
 ---Return a quoted version or properly escaped
+---@function quoted_path
 ---@param path string
 ---@return string
 local function quoted_path(path)
@@ -183,6 +186,7 @@ end
 
 ---if filename is non nil and file readable return contents otherwise nil.
 ---The content is converted to unix line ending when not binary.
+---@function read_content
 ---@param file_path string
 ---@param is_binary boolean
 ---@return string? @content the content of the file
@@ -202,6 +206,7 @@ end
 
 ---if filename is non nil and file readable return contents otherwise nil
 ---Before write, the content is converted to host line ending.
+---@function write_content
 ---@param file_path string
 ---@param content string
 ---@return error_level_n
@@ -221,6 +226,7 @@ local function write_content(file_path, content)
 end
 
 ---Execute the given command and returns the output
+---@function read_command
 ---@param command string
 ---@return string
 local function read_command(command)

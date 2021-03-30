@@ -410,7 +410,7 @@ local function tree(dir_path, glob)
     local new_result = {}
     if glob_part == "**" then
       local i = 1
-      repeat -- forever
+      repeat
         local p = result[i]
         i = i + 1
         if not p then
@@ -594,10 +594,10 @@ end
 
 ---@class fslib_t
 ---@field public Vars                       fslib_vars_t
----@field public to_host                    fun(cmd: string):   string
----@field public absolute_path              fun(path: string):  string
----@field public quoted_absolute_path       fun(path: string):  string
----@field public make_directory             fun(path: string):  boolean, exitcode, integer
+---@field public to_host                    fun(cmd: string):  string
+---@field public absolute_path              fun(path: string): string
+---@field public quoted_absolute_path       fun(path: string): string
+---@field public make_directory             fun(path: string): boolean, exitcode, integer
 ---@field public directory_exists           fun(path: string): boolean
 ---@field public file_exists                fun(path: string): boolean
 ---@field public locate                     fun(dirs: string[], names: string[]): string
@@ -605,7 +605,7 @@ end
 ---@field public all_names                  fun(path: string, glob: string): fun(): string
 ---@field public set_tree_excluder          fun(f: string_exclude_f)
 ---@field public tree                       fun(dir_path: string, glob: string): table<string, string>)
----@field public rename                     fun(dir_path: string, source: string, dest: string):  boolean?, exitcode?, integer?
+---@field public rename                     fun(dir_path: string, source: string, dest: string): boolean?, exitcode?, integer?
 ---@field public copy_file                  fun(file: string, source: string, dest: string): integer
 ---@field public copy_tree                  fun(glob: string, source: string, dest: string): integer
 ---@field public make_clean_directory       fun(path: string): integer

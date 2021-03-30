@@ -205,7 +205,7 @@ local function entries(table, kv)
   end
   local already = {}
   return function ()
-    repeat -- forever
+    repeat
       local result = iterator()
       if result == nil then -- end of iteration
         return result
@@ -265,7 +265,7 @@ local function sorted_pairs(table, kv)
   kv = kv or {}
   local iterator = keys(table, kv.compare)
   return function ()
-    repeat -- forever
+    repeat
       local k = iterator()
       if k == nil then
         return
@@ -288,7 +288,7 @@ end
 local function values(table, kv)
   local iterator = sorted_pairs(table, kv)
   return function ()
-    repeat -- forever
+    repeat
       local _, v = iterator()
       return v
     until false

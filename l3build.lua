@@ -177,9 +177,9 @@ do
     if not work_dir then
       on_debug(function ()
         print(arg[0])
-        print("  start:  ".. start_dir)
-        -- print("  work:   ".. work_dir)
-        print("  kpse:   ".. kpse_dir)
+        print("  start: ".. start_dir)
+        -- print("  work:  ".. work_dir)
+        print("  kpse:  ".. kpse_dir)
         print("  launch: ".. launch_dir)
         local dir, base = start_dir, "build.lua"
         for _ in gmatch(dir .. currentdir(), "[^/]+") do

@@ -302,8 +302,8 @@ end
 
 ---@class l3b_options_t
 ---@field public ut_flags_t        options_flags_t
----@field public get_all_info      fun(hidden:  @boolean): fun(): option_info_t|nil
----@field public get_info_by_key   fun(key:  string): option_info_t
+---@field public get_all_info      fun(hidden: boolean): fun(): option_info_t|nil
+---@field public get_info_by_key   fun(key: string): option_info_t
 ---@field public get_info_by_name  fun(name: string): option_info_t
 ---@field public register          fun(info: option_info_t, builtin: boolean)
 ---@field public parse             l3b_options_parse_f
