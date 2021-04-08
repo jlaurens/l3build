@@ -123,11 +123,14 @@ local V           = lpeg.V
 local B           = lpeg.B
 local Cb          = lpeg.Cb
 local Cc          = lpeg.Cc
-local Cf          = lpeg.Cf
 local Cg          = lpeg.Cg
 local Cmt         = lpeg.Cmt
 local Cp          = lpeg.Cp
 local Ct          = lpeg.Ct
+
+-- Namespace
+
+local AD = {}
 
 -- Implementation
 
@@ -140,746 +143,1048 @@ to recognize embedded documentation.
 
 --[[ The embedded documentation grammar
 
+We must look for the lua scope in order to resolve some
+missing names. Function names must sometimes be guessed
+from the code, which implies some parsing.
+
+For that, we mainly recognize lua comments and literals,
+everything else is a code chunk.
+
+We keep track of the parser position in named captures.
+
+`Cb("chunk_min")` is the first index of the current chunk
+whereas `Cb("chunk_max")` is after the last one.
+
 --]]
 
---[[ lpeg patterns
-All forthcoming variables with suffix "_p" are
-lpeg patterns or functions that return a lpeg pattern.
-These patterns implement a subset of lua grammar
-to recognize embedded documentation.
---]]
+---@class lpeg.Pattern @ convenient type
 
----@class lpeg.pattern @ convenient type
+---@type lpeg.Pattern
+local white_p = S(" \t")          -- exclude "\n", no unicode space neither.
 
----@type lpeg.pattern
-local white_p = S(" \t")        -- exclude "\n", no unicode space neither.
----@type lpeg.pattern
-local black_p = 1 - S(" \t\n")  -- non space, non LF
+---@type lpeg.Pattern
+local black_p = P(1) - S(" \t\n") -- non space, non LF
 
----@type lpeg.pattern
-local eol_p = P("\n")^-1        -- 0 or 1 end of line
+---@type lpeg.Pattern
+local eol_p   = (
+    P("\n")   -- consume an eol
+)^-1          -- 0 or 1 end of line
 
-local white_and_eol_p = white_p^0 * eol_p
+-- Named captures must exist before use.
+---@type lpeg.Pattern
+local init_chunk_p =
+    Cg(Cp(), "chunk_min")
+  * Cg(0,    "chunk_max")
 
+---Prepare the match of a new chunk
+---In order to further insert a code chunk info if necessary
+---create it and save it as capture named "code_before".
+---@type lpeg.Pattern
+local chunk_begin_p =
+  Cg(
+      Cb("min")
+    * Cb("max")
+    / function (min, max)
+        if min <= max then
+          return AD.Code({ -- new code between min and max has been registered
+            min = min,
+            max = max,
+          })
+        end
+      end,
+    "code_before"
+  )
+  * Cg(
+    Cb("max")
+    / function (c)
+        return c + 1
+      end,
+    "min"
+  ) -- now we have somehow Cb("min") == Cb("max") + 1
+
+---End of chunk pattern
+--[===[
+This pattern is used at the end of the current logical chunk.
+--]===]
+---@type lpeg.Pattern
+local chunk_end_p =
+    white_p^0
+  * eol_p
+  * Cg(
+    Cp(),
+    "min"
+  ) -- the current position becomes the next chunk min
+
+---@type lpeg.Pattern
+local one_line_chunk_end_p =
+  (1 - P("\n"))^0 -- anything but a newline
+  * chunk_end_p
 
 local module_name_p =
-  ( R("az") + R("09") + S("_-") )^1 -- 
+  (R("az", "09") + S("_-"))^1
 
 local variable_p =
-    ( "_" + locale.alpha )      -- ascii letter, or "_"
-  * ( "_" + locale.alnum )^0    -- ascii letter, or "_" or digit
+    ("_" + locale.alpha)      -- ascii letter, or "_"
+  * ("_" + locale.alnum)^0    -- ascii letter, or "_" or digit
 
   -- for a class, type name
 local identifier_p =
-  variable_p * ( "." * variable_p )^0
+  variable_p * ("." * variable_p)^0
 
-local capture_text_p  =         -- capture text between horizontal spaces
-    white_p^0                   -- more spaces
-  * C(black_p^0                 -- Capture the text from black to black
-    * (
-        white_p^1
-      * black_p^1
-    )^0
-  )                             -- no newline
-  * white_p^0                   -- more spaces
-
-  ---id of source chunk for extra line break
----The other code chunk will end with exactly one line break
----except at the end
-local BREAK         = "BREAK"
----id of source chunk for line code
-local CODE          = "CODE"
----id of source chunk for short literals
-local SHORT_LITERAL = "SHORT_LITERAL"
----id of source chunk for long literals
-local LONG_LITERAL  = "LONG_LITERALOC"
----id of source chunk for embedded documentation
-local DOC           = "DOC"
----id of source chunk for comment
-local LINE_COMMENT  = "COMMENT"
----id of source chunk for long comments
-local LONG_COMMENT  = "LONG_COMMENT"
-
--- Annotation id
-
-local GLOBAL    = "global"
-local MODULE    = "module"
-local TYPE      = "type"
-local ALIAS     = "alias"
-local CLASS     = "class"
-local FIELD     = "field"
-local GENERIC   = "vararg"
-local FUNCTION  = "function"
-local PARAM     = "param"
-local VARARG    = "vararg"
-local RETURN    = "return"
-local SEE       = "see"
-
-local AD = {}
-
----@class AD.ShortLiteral
----@field public id string | "short literal"
----@field public min integer
----@field public max integer
-
----The return match is an instance of AD.ShortLiteral
-local short_literal_p
-do
-  ---@param del string | '"' | "'"
-  ---@return lpeg.pattern
-  local function get_short_literal_p (del)
-    return
-        del
-      * ( P([[\]]) * 1    -- escape sequences
-        + ( 1 - P(del) )  -- no single quotes
-      )^0
-      * del
-  end
-  ---@type lpeg.pattern
-  short_literal_p = Cmt(
-      white_p^0
-    * Cp()                      -- capture before
-    * ( get_short_literal_p("'")
-      + get_short_literal_p('"')
-    )
-    * Cp()                      -- capture after
-    * white_and_eol_p,
-    ---@return integer
-    ---@return AD.ShortLiteral
-    function (_s, i, before, after)
-      return i, {
-        id  = SHORT_LITERAL,
-        min = before + 1,
-        max = after - 2,
-      }
-    end
-  )
+---Capture the current position under the given name with the given shifht
+---@param s string
+---@param d number
+---@return lpeg.Pattern
+local function named_pos_p(s, d)
+  return  Cg(d
+      and Cp() / function (i) return i - d end
+      or  Cp(),
+    s)
 end
 
+local code_p =
+    1                           -- one character
+  - P("--")                     -- negative lookahed: not a comment
+  - S([['"]])                   -- not a short string literal
+  - P("[") * P("=")^0 * P("[")  -- not a long string literal
 
----@class AD.LongLiteral
----@field public id string | "long literal"
----@field public min integer
----@field public max integer
-
----The return match is an instance of AD.LongLiteral
-local long_literal_p
-do
-  -- next patterns are used for both long literals and long comments
-  local open_p =
-      "["
-    * Cg(P("=")^0, "open")  -- named capture of the equals
-    * "["
-    * eol_p                 -- optional EOL
-  local close_p =
-      "]"
-    * C(P("=")^0)           -- capture the closing equals
-    * "]"
-  local will_close_p = Cmt(
-    close_p * Cb("open"),
-    function (_s, _i, close_arg, open_arg)
-      return close_arg == open_arg
-    end
-  )
-  long_literal_p = Cmt(
-      open_p
-    * Cp()
-    * (1 - will_close_p)^0
-    * close_p,
-  ---@return integer
-  ---@return AD.LongLiteral
-  function (s, i, min)
-      return i, {
-        id = LONG_LITERAL,
-        min = min,
-        max = i - 2,
-      }
-    end
-  )
-end
-
----@type lpeg.pattern
-local capture_eol_p =
-    Cp()           -- capture the current position
-  * white_and_eol_p
-
----@class AD.Line_comment
----@field public id string | "line comment"
----@field public min integer
----@field public max integer
-
-local line_comment_p = Cmt(
-  ( white_p^1 + -B("-") )             -- 1+ spaces or no "-" before
-  * ( P("--") * -P("-") + P("-")^4 )  -- >1 dashes, but not 3
-  * white_p^0
-  * Cp()                              -- position of the first black character if any
-  * black_p^0 * ( white_p^1 * black_p^1 )^0
-  * capture_eol_p,
-  ---@return integer
-  ---@return AD.Line_comment
-  function (s, i, min, after)
-    return i, {
-      id  = LINE_COMMENT,
-      min = min,
-      max = after - 1,
-    }
-  end
-)
-
----@class AD.Long_comment
----@field public id string | "long comment"
----@field public min integer
----@field public max integer
-
-local long_comment_p = Cmt(
-  ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
-  * P("--") * -P("-")     -- exactly 2 dashes
-  * long_literal_p
-  * white_and_eol_p,
-  ---@return integer
-  ---@return AD.Long_comment
-  function (s, i, t)
-    t.id = LONG_COMMENT
-    return i, t
-  end
-)
-
-local doc_begin_p =
-  ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
+local special_begin_p =
+  (white_p^1 + -B("-")) -- 1+ spaces or negative lookbehind: no "-" behind
   * P("---") * -P("-")
   * white_p^0
 
-local function capture_min_p(t)
-  return
-      doc_begin_p
-    * "@".. t
-    * white_p^1
-    * Cp()  -- Capture the position of the first back character if any
-end
-
-local capture_comment_and_eol_p =
-    white_p^0
-  * (
-    "@"
-    * capture_text_p  -- capture the text
-  )^-1
-  * capture_eol_p
-
 ---Pattern with horizontal spaces before and after
----@param del string|number|table|lpeg.pattern
----@return lpeg.pattern
+---@param del string|number|table|lpeg.Pattern
+---@return lpeg.Pattern
 local function get_spaced_p(del)
   return white_p^0 * del * white_p^0
 end
 
----@type lpeg.pattern
+---@type lpeg.Pattern
 local colon_p = get_spaced_p(":")
----@type lpeg.pattern
+
+---@type lpeg.Pattern
 local comma_p = get_spaced_p(",")
 
----@type lpeg.pattern
-local capture_black_code_p = Cmt(
-  ( white_p^1 + line_comment_p + long_comment_p )^0 -- two captures
-  * -doc_begin_p
-  * Cp()              -- capture the position of the first back character
-  * black_p
-  * ( -eol_p )^0 * eol_p,
-  function (s, i, comment_1, comment_2, black_code_n)
-    return i, black_code_n  -- keep only the last pattern
-  end
-)
+---@type lpeg.Pattern
+local capture_comment_p =
+    get_spaced_p("@")
+  * named_pos_p("comment_min")
+  * black_p^0
+  * ( white_p^1 * black_p^1 )^0
+  * named_pos_p("comment_max", 1)
+  * white_p^0
+  * -black_p      -- no black character except "@" comment
 
----@type lpeg.pattern
-local type_p = P({
-  "table",
-  "fun_param",
-  "fun_params",
-  "fun_vararg",
-  "fun_return",
-  "fun",
+---Sub grammar for lua types
+---@type lpeg.Pattern
+local lua_type_p = P({
   "type",
-  table = "table"   -- table<foo,bar>
-    + ( get_spaced_p("<")
+  type =
+    (V("table")
+    + V("fun")
+    + identifier_p
+    )
+    * (get_spaced_p("[") -- for an array: `string[]`
+      * get_spaced_p("]")
+    )^0,
+  table =
+    P("table")   -- table<foo,bar>
+    * (get_spaced_p("<")
       * V("type")
       * comma_p
       * V("type")
       * get_spaced_p(">")
     )^-1,
-  fun_param =
-      variable_p
-    * colon_p
-    * V("type"),
-  fun_params =
-    V("fun_param") * (
-        comma_p
-      * V("fun_param")
-    )^0,
-  fun_vararg =
-      "..."
-    * colon_p
-    * V("type"),
-  fun_return =
-      colon_p
-    * V("type")
-    * ( comma_p * V("type") )^0,
   fun =
-    "fun"
+      P("fun")
     * get_spaced_p("(")
-    * ( V("fun_vararg")^-1
-      + V("fun_params") * (
-        comma_p * V("fun_vararg")
-      )^-1
+    * (
+        V("fun_params") * comma_p * V("fun_vararg")
+      + V("fun_params")
+      + V("fun_vararg")^-1
     )
     * get_spaced_p(")")
     * V("fun_return")^-1,
-  type =
-      V("table")
-    + V("fun")
-    + ( identifier_p        -- eg `string`
-      * ( get_spaced_p("[") -- for an array: `string[]`
-        * get_spaced_p("]")
-      )^-1                  -- eventually
+  fun_vararg =
+    P("...") * colon_p * V("type"),
+  fun_param =
+    variable_p * colon_p * V("type"),
+  fun_params =
+    V("fun_param") * (comma_p * V("fun_param"))^0,
+  fun_return =
+      colon_p
+    * V("type")
+    * (comma_p * V("type"))^0,
+})
+
+---@type lpeg.Pattern
+local named_types_p = Cg(Ct(-- collect all the captures in an array
+    C(lua_type_p)
+  * (get_spaced_p("|") * C(lua_type_p))^0
+), "types")
+
+---@class AD.Object @ fake class
+---@field public initialize fun(self: AD.Object, ...)
+---@field public finalize   fun(self: AD.Object)
+
+---Class making utility
+---@generic T: AD.Object
+---@param Super?  table
+---@param data?   T
+---@return T
+local function make_class(Super, data)
+  ---@type AD.Object
+  data = data or {}
+  data.ID = {}        -- unique id by class
+  data.__index = data
+  data.__Class = data -- more readable than __index
+  local function __call(self, d, ...)  -- self is a constructor
+    d = d or {}
+    setmetatable(d, self)
+    if d.initialize then
+      d:initialize(...)
+    end
+    return d
+  end
+  if Super then
+    data.__Super = Super
+    setmetatable(data, {
+      __index = Super,
+      __call  = __call,
+    })
+  else
+    setmetatable(data, {
+      __call  = __call,
+    })
+  end
+  if data.finalize then
+    data:finalize()
+  end
+  return data
+end
+
+---Records info about code chunks.
+---The source is splitted into contiguous code chunks.
+---Each code chunk has a chunk range from `min` to
+---`max` included.
+---@class AD.Info: AD.Object @ abstract class
+---@field public id           string
+---@field public min          integer
+---@field public max          integer
+---@field public match        lpeg.Pattern
+---@field public code_before  AD.Info
+---@field public capture      lpeg.Pattern @ all capture are sent at "chunk_max" location
+
+AD.Info = make_class({
+  min       =  1, -- the first index
+  max       =  0, -- min > max => void range
+  -- Next fields are defined by subclassers, see finalize
+  -- match     = nil
+  -- capture   = nil,
+})
+
+---@class AD.At: AD.Info  @ For embedded annotations `---@foo ...`
+---@field public description            AD.Description
+---@field public content_min            integer
+---@field public content_max            integer
+---@field public complete               lpeg.Pattern  @ complete pattern, see `finalize`.
+---@field public get_short_description  fun(self: AD.At, s: string): string @ redundant declaration
+---@field public get_long_description   fun(self: AD.At, s: string): string @ redundant declaration
+
+---@type AD.At
+AD.At = make_class(AD.Info, {
+  description = AD.Description(),
+  content_min = 1, -- only valid when content_min > min
+  content_max = 0,
+  -- Next fields are defined by subclassers, see `finalize`
+  -- complete = nil
+})
+
+---Finalize the reveiver.
+---Create a `complete` pattern from the `capture` pattern
+---when not already defined.
+---Both patterns must span over space characters to
+---the next newline character when possible.
+function AD.At:finalize()
+  if not self.complete then
+    self.complete =
+      AD.Description.capture^-1
+    * self.capture
+    / function (desc_or_at, at)
+        if at then -- 2 captures
+          at.description = desc_or_at
+          return at
+        end
+        return desc_or_at -- only one capture
+      end
+  end
+  AD.At.__Super.finalize(self)
+end
+
+---Get the short description
+---@param s string
+---@return string
+function AD.At:get_short_description(s)
+  return self.description:get_short_value(s)
+end
+
+---Get the long description
+---@param s string
+---@return string
+function AD.At:get_long_description(s)
+  return self.description:get_long_value(s)
+end
+
+---Capture the pattern "---@<name>..."
+---@param name string
+---@return lpeg.Pattern
+local function at_match_p(name)
+  return
+      special_begin_p
+    * P("@".. name)
+    * -black_p
+    * white_p^0
+end
+
+---@class AD.Source: AD.Info @ The main source info.
+---@field public infos AD.Info[]
+
+do
+  local more_utf8_p = R("\x80\xBF")
+  local consume_one_character_p = (
+      R("\x00\x7F") - P("\n") -- ones ascii char but a newline
+    + R("\xC2\xDF") * more_utf8_p
+    + P("\xE0")     * R("\xA0\xBF") * more_utf8_p
+    + P("\xED")     * R("\x80\x9F") * more_utf8_p
+    + R("\xE1\xEF") * more_utf8_p   * more_utf8_p
+    + P("\xF0")     * R("\x90\xBF") * more_utf8_p * more_utf8_p
+    + P("\xF4")     * R("\x80\x8F") * more_utf8_p * more_utf8_p
+    + R("\xF1\xF3") * more_utf8_p   * more_utf8_p * more_utf8_p
+    + Cmt((1 - P("\n")),   -- and consume one erroneous UTF8 character
+      function (s, i) print("UTF8 problem ".. s:sub(i-1, i-1)) end
     )
-    + ( get_spaced_p("(")   -- `(fun():integer)
-      * V("type")
-      * get_spaced_p(")")
-    ),
+  )
+  * white_p^0
+  * eol_p
+
+  -- We capture the current begin of line position with name "bol"
+  ---@type lpeg.Pattern
+  local loop_p =
+    (
+      AD.LineComment.capture
+    + AD.LongComment.capture
+    + AD.At.Module.complete
+    + AD.At.Class.complete
+    + AD.At.Function.complete
+    + AD.At.Generic.complete
+    + AD.At.Param.complete
+    + AD.At.Vararg.complete
+    + AD.At.Return.complete
+    + AD.At.See.complete
+    + AD.At.Global.complete
+    + AD.At.Alias.complete
+    + AD.LineDoc.capture
+    + AD.LongDoc.capture
+    + AD.At.Field.capture     -- OK standalone field are ignored
+    + AD.At.Type.capture      -- OK type annotation are unused in documentation
+    + AD.ShortLiteral.capture -- OK
+    + AD.LongLiteral.capture  -- OK
+    + consume_one_character_p
+  )
+  * AD.Break.capture
+  * Cg(Cp(), "max")         -- advance "max" to the current position
+
+  ---@type AD.Source
+  AD.Source = make_class(AD.Info, {
+    capture =
+        init_chunk_p
+      * Cg(Ct(loop_p^0), "infos")
+      / function (t)
+          return AD.Source(t)
+        end
+  })
+end
+
+-- One line inline comments
+
+---@class AD.LineComment: AD.Info
+
+---@type AD.LineComment
+AD.LineComment = make_class(AD.Info, {
+  capture =
+    (white_p^1 + -B("-"))             -- 1+ spaces or no "-" before, the back test should never be reached
+    * (P("-")^4
+      + P("--")
+      * -P("-")                         -- >1 dashes, but not 3
+      * -(P("[") * P("=")^0 * P("[")) -- no long comment
+    )
+    * white_p^0
+    * Ct(
+        chunk_begin_p
+      * black_p^0 * (white_p^1 * black_p^1)^0
+      * named_pos_p("after", 1)
+    )
+    * white_p^0
+    * chunk_end_p
+    / function (t)
+        return AD.LineComment(t)
+      end,
 })
 
 -- --- blah blah blah
----@class AD.Doc
----@field public id string | "doc"
+---@class AD.LineDoc: AD.Info
 
-local annotation_doc_p = Cmt(
-    doc_begin_p
-  * Cp()
-  * black_p^0                 -- Capture the text from black to black
-  * ( white_p^1 * black_p^1 )^0
-  * capture_eol_p,
-  function (s, i, min, eol_n)
-    return i, {
-      id = CODE,
-      min = min,
-      max = eol_n - 1,
-    }
+---@type AD.LineDoc
+AD.LineDoc = make_class(AD.Info, {
+  capture =
+      special_begin_p
+    * -P("@")       -- negative lookahead: not an annotation
+    * Ct(
+        chunk_begin_p
+      * white_p^0
+      * named_pos_p("content_min")
+      * black_p^0
+      * (white_p^1 * black_p^1)^0
+      * named_pos_p("content_max", 1)
+    ) / function (t)
+          return AD.LineDoc(t)
+        end
+    * chunk_end_p,
+})
+
+---@class AD.ShortLiteral: AD.Info
+
+do
+  local tag_del = {}
+  ---@type AD.ShortLiteral
+  AD.ShortLiteral = make_class(AD.Info, {
+    capture = Ct(
+        white_p^0
+      * Cg([['"]], tag_del)
+      * named_pos_p("content_min")
+      * chunk_begin_p
+      * Cg(Cmt(
+        Cb(tag_del),
+        function (s, i, del)
+          repeat
+            local c = s:sub(i, i)
+            if c == del then
+              return i + 1, i - 1 -- capture also `content_max`
+            elseif c == [[\]] then
+              i = i + 2
+            elseif c then
+              i = i + 1
+            else
+              error("Missing closing delimiter ".. del)
+            end
+          until false
+        end
+      ), "content_max")
+      * chunk_end_p
+      * Cg(nil, tag_del)
+    ) / function (t)
+          return AD.ShortLiteral(t)
+        end,
+  })
+end
+
+---@class AD.LongLiteral: AD.Info
+---@field public level integer
+
+do
+  local tag_equal = {}
+  -- next patterns are used for both long literals and long comments
+  local open_p =
+      "["
+    * Cg(P("=")^0, tag_equal) -- tagged capture of the equals
+    * "["
+    * eol_p                   -- optional EOL
+    * named_pos_p("content_min")
+
+  local close_p = Cg(Cmt(   -- scan the string by hand
+    Cb(tag_equal),
+    function (s, i, equal)
+      local p = P("]") * equal * P("]")
+      for j = i, #s - 1 - #equal do
+        if p:match(s, j) then
+          return j + #equal + 2, j - 1, #equal -- 2 captures for content_max and level
+        end
+      end
+      error("Missing delimiter `]".. equal .."]`")
+    end
+  ), tag_equal)
+  * Cg(
+      Cb(tag_equal)
+    / function (content_max, _)
+        return content_max -- only the first captured value
+      end,
+    "content_max"
+  )
+  * Cg(
+      Cb(tag_equal)
+    / function (_, level)
+        return level -- only the second captured value
+      end,
+    "level"
+  )
+  * Cg(nil, tag_equal) -- clean this named capture
+
+  ---@type AD.LongLiteral
+  AD.LongLiteral = make_class(AD.Info, {
+    level = 0,
+    capture = Ct(
+        open_p
+      * chunk_begin_p
+      * close_p
+      * chunk_end_p
+    ) / function (t)
+          return AD.LongLiteral(t)
+        end
+  })
+end
+
+---@class AD.LongComment: AD.Info
+---@field public level integer @ level 3 is for long doc
+
+do
+  -- next patterns are used for both long literals and long comments
+  local tag_equal = {}
+  local open_p =
+      "["
+    * Cg(P("=")^-2 + P("=")^4, tag_equal) -- tagged capture of the equals
+    * "["
+    * eol_p                               -- optional EOL
+    * named_pos_p("content_min")
+
+  local close_p = Cg(Cmt(               -- scan the string by hand
+    Cb(tag_equal),
+    function (s, i, equal)
+      local p = P("]") * equal * P("]")
+      for j = i, #s - 1 - #equal do
+        if p:match(s, j) then
+          return j + #equal + 2, j - 1, #equal -- 2 captured values: content_max and level
+        end
+      end
+      error("Missing delimiter `]".. equal .."]`")
+    end
+  ), tag_equal)
+  * Cg(
+      Cb(tag_equal)
+    / function (content_max, _)
+        return content_max -- only the first captured value
+      end,
+    "content_max"
+  )
+  * Cg(
+      Cb(tag_equal)
+    / function (_, level)
+        return level -- only the second captured value
+      end,
+    "level"
+  )
+  * Cg(nil, tag_equal) -- clean this named capture
+
+  ---@type lpeg.Pattern @ what makes the difference with a long literal
+  local prefix =
+  (white_p^1 + -B("-")) -- 1+ spaces or no "-" before
+  * P("--")
+---@type AD.LongComment
+  AD.LongComment = make_class(AD.Info, {
+    level = 0,
+    capture = Ct(
+        prefix
+      * open_p
+      * chunk_begin_p
+      * close_p
+      * chunk_end_p
+    ) / function (t)
+          return AD.LongComment(t)
+        end
+  })
+end
+
+---@class AD.LongDoc: AD.Info
+
+---@type AD.LongDoc
+AD.LongDoc = make_class(AD.Info, {
+  level = 0,
+  capture = Ct(
+    (white_p^1 + -B("-")) -- 1+ spaces or no "-" before
+    * P("--[===[")
+    * eol_p
+    * named_pos_p("content_min")
+    * chunk_begin_p
+    * Cg(Cmt(
+      P(0),
+      function (s, i)
+        local p = white_p^0 * P("-")^0 * P("]===]")
+        for j = i, #s - 1 - 3 do
+          local result = p:match(s, j)
+          if result then
+            return result, j - 1 -- capture `content_max`
+          end
+        end
+      end
+    ), "content_max")
+    * chunk_end_p
+  ) / function (t)
+        return AD.LongDoc(t)
+      end
+})
+
+---@alias AD.AllDoc AD.LongDoc|AD.LineDoc
+
+---@class AD.Description: AD.Info
+---@field public short            AD.LineDoc
+---@field public long             AD.AllDoc[]
+---@field public ignores          AD.AllDoc[]
+---@field public get_short_value  fun(self: AD.Description, s: string): string @ redundant declaration
+---@field public get_long_value   fun(self: AD.Description, s: string): string @ redundant declaration
+
+do
+  local tag_desc = {} -- unique tag
+  AD.Description = make_class(AD.Info, {
+    short   = AD.LineDoc(),
+    long    = {},
+    ignores = {},
+    capture = Cg(
+        -- start with a line documentation
+        AD.LineDoc.capture
+      / function (short)
+          return AD.Description({
+            short = short
+          })
+        end,
+      tag_desc
+    )
+    * (
+        -- next documentation is part of the "long" documentation
+        (AD.LineDoc.capture + AD.LongDoc.capture)
+      * Cb(tag_desc)
+      / function (doc, desc)
+          append(desc.long, doc)
+        end
+      -- other comments are recorded as ignored
+      + (AD.LineComment.capture + AD.LongComment.capture)
+      * Cb(tag_desc)
+      / function (comment, desc)
+          append(desc.ignores, comment)
+        end
+    )^0
+    * Cb(tag_desc) -- the unique resulting capture
+    * Cg(nil, tag_desc)
+  })
+end
+
+---Get the short description
+---@param s string
+---@return string
+function AD.Description:get_short_value(s)
+  return s:sub(self.short.content_min, self.short.content_min)
+end
+
+---Get the long description
+---@param s string
+---@return string
+function AD.Description:get_long_value(s)
+  local t = {}
+  for _, d in ipairs(self.long) do
+    append(t, s:sub(d.content_min, d.content_max))
+  end
+  return concat(t, "\n")
+end
+
+local error_annotation_p = Cmt(
+    Cp()
+  * one_line_chunk_end_p,
+  function (s, to, from)
+    error("Bad annotation ".. s:sub(from, to))
   end
 )
 
----@type lpeg.pattern
-local capture_types_p = Ct( -- collect all the captures in an array
-    C(type_p)
-  * ( get_spaced_p("|") * C(type_p) )^0
-)
-
----@class AD.Field
----@field public id         string | "field"
+---@class AD.At.Field: AD.At
 ---@field public visibility string | "public" | "protected" | "private"
 ---@field public name       string
 ---@field public types      string[]
----@field public comment    string
----@field public min        integer   @ first index of characters to hide in pure code
----@field public max        integer   @ last index of characters to hide in pure code
 
--- @field [public|protected|private] field_name FIELD_TYPE[|OTHER_TYPE] [@comment]
-local annotation_field_p = Cmt(
-    capture_min_p(FIELD)
-  * C( P("public") + "protected" + "private" ) -- capture visibility
-  * white_p^1
-  * C(variable_p)                              -- capture name
-  * white_p^1
-  * capture_types_p
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Field
-  function (s, i, min, visibility, name, types, comment, eol_n)
-    return i, {
-      id = "field",
-      min = min,
-      visibility = visibility,
-      name = name,
-      types = types,
-      comment = comment,
-      max = eol_n - 1,
-    }
-  end
-)
-
-local capture_fields_p = Cmt(
-  Ct(                               -- capture fields
-    ( annotation_field_p
-    + line_comment_p
-    + long_comment_p
-    )^0
-  ),
-  ---@return integer
-  ---@return AD.Field[]
-  function (s, i, t)
-    local tt = {}
-    for _, f in ipairs(t) do
-      if f.id == FIELD then
-        append(t, f)
-      end
-    end
-    return i, tt
-  end
-)
+---@type AD.At.Field
+AD.At.Field = make_class(AD.At, {
+  visibility = "public",
+  name = "",
+  types = { "UNKNOWN" },
+  -- @field [public|protected|private] field_name FIELD_TYPE[|OTHER_TYPE] [@comment]
+  match = at_match_p("field")
+    * one_line_chunk_end_p,
+  capture = at_match_p("field") * (
+    Ct( chunk_begin_p
+      * Cg(
+        P("public") + "protected" + "private",
+        "visibility"
+      )
+      * white_p^1
+      * Cg(
+        variable_p,
+        "name"
+      )
+      * white_p^1
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Field(at)
+        end
+    + error_annotation_p
+  )
+})
 
 -- @see references
----@class AD.See
----@field public id         string  @ id of the annotation, one of the constants above
+---@class AD.At.See: AD.At
 ---@field public references string  @ the references
----@field public min        integer @ first index of characters to hide in pure code
----@field public max        integer @ last index of characters to hide in pure code
 
-local annotation_see_p = Cmt(
-    capture_min_p(SEE)
-  * capture_text_p              -- capture refs
-  * capture_eol_p,
-  function (s, i, min, refs, after)
-    return i, {
-      id          = SEE,
-      min         = min,
-      references  = refs,
-      max         = after - 1,
-    }
-  end
-)
+---@type AD.At.See
+AD.At.See = make_class(AD.At, {
+  references = "",
+  capture = at_match_p("see") * (
+    Ct( named_pos_p("content_min", 1)
+      * chunk_begin_p
+      * black_p^0
+      * ( white_p^1 * black_p^1 )^0
+      * named_pos_p("content_max", 1)
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.See(at)
+        end
+    + error_annotation_p
+  ),
+})
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
----@class AD.Class
----@field public id         string      @ id of the annotation, one of the constants above
----@field public name       string      @ the name of the receiver
----@field public parent     string      @ the parent class if any, for class
----@field public comment    string      @ associate comment
----@field public fields     AD.Field[]  @ List of field annotations
----@field public see        string      @ references
----@field public black_code integer     @ first index of black code after the documentation
----@field public min        integer     @ first index of characters to hide in pure code
----@field public max        integer     @ last index of characters to hide in pure code
+---@class AD.At.Class: AD.At
+---@field public name         string        @ the name of the receiver
+---@field public parent       string|nil    @ the parent class if any, for class
+---@field public fields       AD.At.Field[] @ list of fields
+---@field public see          AD.At.See     @ references
 
-local annotation_class_p = Cmt(
-    capture_min_p(CLASS)
-  * C(identifier_p)                   -- capture name
-  * ( colon_p * C(identifier_p) )^-1  -- capture parent
-  * capture_comment_and_eol_p
-  * capture_fields_p
-  * annotation_see_p^-1               -- capture see
-  * capture_black_code_p^-1,
-  ---@return integer
-  ---@return AD.Class
-  function (s, i, min, name, parent, comment, eol_n, fields, see, black_code_n)
-    return i, {
-      id            = CLASS,
-      name          = name,
-      parent        = parent,
-      min           = min,
-      comment       = comment,
-      max           = eol_n - 1,
-      fields        = fields,
-      see           = see,
-      black_code_n  = black_code_n,
-    }
-  end
-)
+---@type AD.At.Class
+AD.At.Class = make_class(AD.At, {
+  name = "UNKNOWN",
+  capture = at_match_p("class") * (
+    Ct( chunk_begin_p
+      * Cg(identifier_p, "name")
+      * (colon_p * Cg(identifier_p, "parent"))^-1                 -- or nil
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Class(at)
+        end
+    + error_annotation_p
+  ),
+  -- class needs a custom complete method
+  complete =
+    -- capture a description or create a void one)
+    (AD.Description.capture
+    + Cc(AD.Description()))
+    -- captupe a raw class annotation:
+    -- create an AD.At.Class instance
+    -- capture it with the name "at"
+    * Cg(AD.At.Class.capture, "at")
+    / function (desc, at)
+        at.description = desc
+      end
+    * (
+        AD.At.Field.complete
+      * Cb("at")
+      / function (at_field, at)
+          append(at.fields, at_field)
+        end
+      + AD.At.See.complete
+      * Cb("at")
+      / function (at_see, at)
+          at.see = at_see
+        end
+      + (AD.LineComment.capture + AD.LongComment.capture)
+      * Cb("at")
+      / function (ignore, at)
+          append(at.ignores, ignore)
+        end
+    )^0
+    -- No capture was made so far
+    -- capture the current position, record it
+    -- and return an AD.At.Class instance as sole capture
+    * Cp()
+    * Cb("at")
+    / function (next_min, at)
+        at.next_min = next_min
+        return at
+      end
+})
 
 -- @type MY_TYPE[|OTHER_TYPE] [@comment]
----@class AD.Type
----@field public id       string    @ id of the annotation, one of the constants above
----@field public types    string[]  @ List of types
----@field public comment  string    @ associated comment
----@field public min      integer   @ first index of characters to hide in pure code
----@field public max      integer   @ last index of characters to hide in pure code
+---@class AD.At.Type: AD.At
+---@field public types        string[]    @ List of types
 
-local annotation_type_p = Cmt(
-    capture_min_p(TYPE)   
-  * capture_types_p
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Type
-  function (s, i, min, types, comment, eol_n)
-    return i, {
-      id      = TYPE,
-      min     = min,
-      types   = types,
-      comment = comment,
-      max     = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Type
+AD.At.Type = make_class(AD.At, {
+  types   = { "UNKNOWN" },
+  match   = at_match_p("type")
+    * one_line_chunk_end_p,
+  capture = at_match_p("type") * (
+    Ct( chunk_begin_p
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Type(at)
+        end
+    + error_annotation_p
+  )
+})
 
 -- @alias NEW_NAME TYPE [@ comment]
----@class AD.Alias
----@field public id     string  @ id of the annotation, one of the constants above
----@field public name   string  @ the name of the alias
----@field public type   string  @ the target type
----@field public min    integer @ first index of characters to hide in pure code
----@field public max    integer @ last index of characters to hide in pure code
-
-local alias_p = Cmt(
-    capture_min_p(ALIAS)
-  * C(identifier_p)               -- capture name
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Alias
-  function (s, i, min, name, comment, eol_n)
-    return i, {
-      id      = ALIAS,
-      min     = min,
-      name    = name,
-      comment = comment,
-      max     = eol_n - 1,
-    }
-  end
-)
-
--- @param param_name MY_TYPE[|other_type] [@comment]
----@class AD.Param
----@field public id       string    @ id of the annotation, one of the constants above
+---@class AD.At.Alias: AD.At
 ---@field public name     string    @ the name of the alias
----@field public types    string[]  @ List of types
----@field public comment  string    @ associated comment
----@field public min      integer   @ first index of characters to hide in pure code
----@field public max      integer   @ last index of characters to hide in pure code
+---@field public types    string[]  @ the target types
 
-local annotation_param_p = Cmt(
-    capture_min_p(PARAM)
-  * C(variable_p)                 -- capture name
-  * white_p^1
-  * capture_types_p
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Param
-  function (s, i, min, name, types, comment, eol_n)
-    return i, {
-      id      = PARAM,
-      min     = min,
-      name    = name,
-      types   = types,
-      comment = comment,
-      max     = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Alias
+AD.At.Alias = make_class(AD.At, {
+  name    = "UNKNOWN",
+  types   = { "UNKNOWN" },
+  match   = at_match_p("alias")
+    * one_line_chunk_end_p,
+  capture = at_match_p("alias") * (
+    Ct( chunk_begin_p
+      * Cg(identifier_p, "name")  -- capture name
+      * white_p^1
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Alias(at)
+        end
+    + error_annotation_p
+  ),
+})
 
 -- @return MY_TYPE[|OTHER_TYPE] [@comment]
----@class AD.Return
----@field public id       string    @ id of the annotation, one of the constants above
----@field public value    string    @ value of the annotation
----@field public comment  string    @ associated comment
----@field public types    string[]  @ List of types
----@field public min      integer   @ first index of characters to hide in pure code
----@field public max      integer   @ last index of characters to hide in pure code
+---@class AD.At.Return: AD.At
+---@field public types  string[]  @ List of types
 
-local annotation_return_p = Cmt(
-    capture_min_p(RETURN)
-  * capture_types_p
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Return
-  function (s, i, min, types, comment, eol_n)
-    return i, {
-      id = RETURN,
-      min = min,
-      types = types,
-      comment = comment,
-      max = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Return
+AD.At.Return = make_class(AD.At, {
+  types = { "UNKNOWN" },
+  match   = at_match_p("return")
+  * one_line_chunk_end_p,
+  capture = at_match_p("return") * (
+    Ct( chunk_begin_p
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Return(at)
+        end
+    + error_annotation_p
+  )
+})
 
--- @generic T1 [: PARENT_TYPE] [, T2 [: PARENT_TYPE]]
----@class AD.Generic
----@field public id       string  @ id of the annotation, one of the constants above
----@field public value    string  @ value of the annotation
----@field public type_1   string  @ First type of generic annotations
----@field public parent_1 string  @ First type of generic annotations
----@field public type_2   string  @ Second type of generic annotations
----@field public parent_2 string  @ Second type of generic annotations
----@field public min      integer @ first index of characters to hide in pure code
----@field public max      integer @ last index of characters to hide in pure code
+-- @generic T1 [: PARENT_TYPE] [, T2 [: PARENT_TYPE]] [ @ comment ]
+---@class AD.At.Generic: AD.At
+---@field public type_1   string      @ First type of generic annotations
+---@field public parent_1 string|nil  @ First type of generic annotations
+---@field public type_2   string|nil  @ Second type of generic annotations
+---@field public parent_2 string|nil  @ Second type of generic annotations
 
-local annotation_generic_p = Cmt(
-    capture_min_p(GENERIC)
-  * C(variable_p)                     -- capture type_1
-  * ( colon_p * C(identifier_p) )^-1  -- capture parent_1
-  * C(variable_p)                     -- capture type_2
-  * ( colon_p * C(identifier_p) )^-1  -- capture parent_2
-  * capture_eol_p,
-  ---@return integer
-  ---@return AD.Generic
-  function (s, i, min, type_1, parent_1, type_2, parent_2, eol_n)
-    return i, {
-      id        = GENERIC,
-      min       = min,
-      type_1    = type_1,
-      parent_1  = parent_1,
-      type_2    = type_2,
-      parent_2  = parent_2,
-      max = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Generic
+AD.At.Generic = make_class(AD.At, {
+  type_1 = "UNKNOWN",
+  match   = at_match_p("generic")
+    * one_line_chunk_end_p,
+  capture = at_match_p("generic") * (
+    Ct( chunk_begin_p
+      * Cg(variable_p, "type_1")            -- capture type_1
+      * (colon_p
+        * Cg(identifier_p, "parent_1")      -- and capture parent_1
+      )^-1
+      * (comma_p * (
+          Cg(variable_p, "type_2")        -- capture type_2
+        * (colon_p
+          * Cg(identifier_p, "parent_2")  -- and capture parent_2
+        )^-1
+      ))^-1
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Generic(at)
+        end
+    + error_annotation_p
+  )
+})
 
--- @vararg TYPE
----@class AD.Vararg
----@field public id   string  @ id of the annotation, one of the constants above
----@field public type string  @ the type of the variadic arguments
----@field public min  integer @ first index of characters to hide in pure code
----@field public max  integer @ last index of characters to hide in pure code
+-- @param param_name MY_TYPE[|other_type] [@comment]
+---@class AD.At.Param: AD.At
+---@field public name     string      @ the name of the alias
+---@field public types    string[]    @ List of types
 
-local annotation_vararg_p = Cmt(
-    capture_min_p(VARARG)
-  * C(identifier_p)
-  * capture_eol_p,
-  ---@return integer
-  ---@return AD.Vararg
-  function (s, i, min, type, eol_n)
-    return i, {
-      id = VARARG,
-      min = min,
-      type = type,
-      max = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Param
+AD.At.Param = make_class(AD.At, {
+  name    = "UNKNOWN",
+  types   = { "UNKNOWN" },
+  match   = at_match_p("param")
+    * one_line_chunk_end_p,
+  capture = at_match_p("param") * (
+    Ct( chunk_begin_p
+      * Cg(variable_p, "name")                -- capture name
+      * white_p^0 * Cg(P("?")^-1, "optional") -- capture optional
+      * white_p^1
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Param(at)
+        end
+    + error_annotation_p
+  )
+})
+
+-- @vararg TYPE[|OTHER_TYPE] [ @ comment ]
+---@class AD.At.Vararg: AD.At
+---@field public types    string[]    @ the types of the variadic arguments
+
+---@type AD.At.Vararg
+AD.At.Vararg = make_class(AD.At, {
+  types = { "UNKNOWN" },
+  match   = at_match_p("vararg")
+    * one_line_chunk_end_p,
+  capture = at_match_p("vararg") * (
+    Ct( chunk_begin_p
+      * named_types_p
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Vararg(at)
+        end
+    + error_annotation_p
+  )
+})
 
 -- @module name [@ comment]
----@class AD.Module
----@field public id         string  @ id of the annotation, one of the constants above
----@field public name       string  @ name of the module
----@field public min  integer @ first index of characters to hide in pure code
----@field public max  integer @ last index of characters to hide in pure code
+---@class AD.At.Module: AD.At
+---@field public name     string      @ name of the module
 
-local annotation_module_p = Cmt(
-    capture_min_p(MODULE)
-  * C(module_name_p)
-  * capture_comment_and_eol_p,
-  function (s, i, min, name, comment, eol_n)
-    return i, {
-      id      = MODULE,
-      min     = min,
-      name    = name,
-      comment = comment,
-      max     = eol_n - 1,
-    }
-  end
-)
-
--- @function name [@ comment]
----@class AD.Function
----@field public id   string  @ id of the annotation, one of the constants above
----@field public name string  @ name of the function
----@field public min  integer @ first index of characters to hide in pure code
----@field public max  integer @ last index of characters to hide in pure code
-
-local annotation_function_p = Cmt(
-    capture_min_p(FUNCTION)
-  * C(identifier_p)         -- capture the name
-  * capture_comment_and_eol_p,
-  ---@return integer
-  ---@return AD.Function
-  function (s, i, min, name, comment, eol_n)
-    return i, {
-      id      = FUNCTION,
-      min     = min,
-      name    = name,
-      comment = comment,
-      max     = eol_n - 1,
-    }
-  end
-)
+---@type AD.At.Module
+AD.At.Module = make_class(AD.At, {
+  name = "UNKNOWN",
+  capture = at_match_p("module") * (
+    Ct( chunk_begin_p
+      * Cg(module_name_p, "name")
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Module(at)
+        end
+    + error_annotation_p
+  )
+})
 
 -- @global name [@ comment]
----@class AD.Global
----@field public id   string  @ id of the annotation, one of the constants above
----@field public name string  @ name of the global variable
----@field public min  integer @ first index of characters to hide in pure code
----@field public max  integer @ last index of characters to hide in pure code
+---@class AD.At.Global: AD.At
+---@field public name     string      @ name of the global variable
 
-local annotation_global_p = Cmt(
-  capture_min_p(GLOBAL)
-* C(identifier_p)         -- capture the name
-* capture_comment_and_eol_p,
----@return integer
----@return AD.Global
-function (s, i, min, name, comment, eol_n)
-  return i, {
-    id      = GLOBAL,
-    min     = min,
-    name    = name,
-    comment = comment,
-    max     = eol_n - 1,
-  }
-  end
-)
+---@type AD.At.Global
+AD.At.Global = make_class(AD.At, {
+  name = "UNKNOWN",
+  capture_description_long_p = at_match_p("global") * (
+    Ct( chunk_begin_p
+      * Cg(identifier_p, "name")
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Global(at)
+        end
+    + error_annotation_p
+  )
+})
 
----@class AD.Code
----@field public id   string  @ id of the annotation, one of the constants above
----@field public min  integer @ first index of characters to hide in pure code
----@field public max  integer @ last index of characters to hide in pure code
+---@class AD.Code: AD.Info
 
-local annotation_code_p = Cmt(
-    white_p^0
-  * ( (
-      1
-    - P("--")
-    - S([['"]])
-    - P("[") * P("=")^0 * P("[")
-    - P("\n")
-  ) )^0
-  * capture_eol_p,
-  ---@return integer
-  ---@return AD.Code
-  function (s, i, min, eol_n)
-    return i, {
-      id      = CODE,
-      min     = min,
-      max     = eol_n - 1,
-    }
-  end
-)
+---@type AD.Code
+AD.Code = make_class(AD.Info)
 
----@class AD.Break
----@field public id   string  @ id of the annotation, one of the constants above
+---@class AD.Break: AD.Info
 
-local annotation_break_p = Cmt(
-    S(" \t\n")^0
-  * P("\n"),
-  ---@return integer
-  ---@return AD.Break
-  function (s, i)
-    return i, {
-      id = BREAK,
-    }
-  end
-)
+---@type AD.Break
+AD.Break = make_class(AD.Info, {
+  capture = Ct(
+    ( white_p^0 * P("\n") )^1
+    * chunk_begin_p
+    * chunk_end_p
+  ) / function (t)
+        return AD.Break(t)
+      end
+})
 
--- Link id's
+-- @function name [@ comment]
+---@class AD.At.Function: AD.At
+---@field public name string  @ name of the function
 
----@class AD.Range              @ a range of indices
----@field public min    integer @ minimum of the range
----@field public after  integer @ just after the maximum of the range
+---@type AD.At.Function
+AD.At.Function = make_class(AD.At, {
+  name = "UNKNOWN",
+  compute = at_match_p("function") * (
+    Ct( chunk_begin_p
+      * Cg(identifier_p, "name")    -- capture the name
+      * capture_comment_p
+      * chunk_end_p
+    ) / function (at)
+          return AD.At.Function(at)
+        end
+    + error_annotation_p
+  )
+})
+
+--[[
+List of main patterns
+
+  short_literal_p
+  long_literal_p
+  AD.LineComment.pattern
+  AD.LongComment.pattern
+  AD.code_p
+  capture_doc_p
+  capture_at_field_p
+  capture_at_see_p
+  capture_at_class_p
+  capture_class_p
+  capture_at_type_p
+  capture_at_param_p
+  capture_at_return_p
+  capture_at_generic_p
+  capture_at_vararg_p
+  capture_at_module_p
+  capture_at_global_p
+ 
+--]]
+
+-- Range
+
+---@class AD.Range                @ a range of indices
+---@field public min      integer @ minimum of the range
+---@field public next_min integer @ just next_min the maximum of the range
 
 ---@class AD.Scope: AD.Range          @ A scope is a range with inner scopes
 ---@field public depth integer        @ the depth of this scope
 ---@field private _scopes AD.Range[]  @ inner scopes
 
-AD.Scope = {}
-AD.Scope.__index = AD.Scope
 
----Create a new scope instance.
----@param depth integer|nil @ defaults to `self.depth` or 0
----@param min   integer|nil @ defaults to `self.min` or 1
----@param after integer|nil @ defaults to `self.after` or 1
----@return AD.Scope
-function AD.Scope:new(depth, min, after)
-  return setmetatable({
-    depth   = depth or self.depth or 0,
-    min     = min   or self.min   or 1,
-    max     = after or self.after or self.min or 1,
-    _scopes = {}
-  }, AD.Scope)
-end
+AD.Scope = make_class({
+  depth = 0,
+  _scopes = {},
+  initialize = function (self, depth, min, max)
+    self.depth  = depth or self.depth or 0
+    self.min    = min   or self.min   or 1
+    self.max    = max   or self.max or self.min - 1
+  end
+})
 
 ---Append an inner scope
 ---@param scope AD.Scope
@@ -909,7 +1214,7 @@ end
 ---@param i integer
 ---@return AD.Scope? @ nil is returned when `i` is out of the scope range
 function AD.Scope:get_scope_at(i)
-  if self.min <= i and i < self.after then
+  if self.min <= i and i <= self.max then
     for s in self:scopes() do
       local result = s:get_scope_at(i)
       if result then
@@ -929,232 +1234,47 @@ end
 
 AD.Parser = {}
 
----Initialize the parser with the given path.
+---Initialize the parser with given string.
+---Prepare and store the string.
+---@param s string
+function AD.Parser:init_with_string(s)
+  -- normalize newline characters
+  self.contents = s
+    :gsub("\r\n", "\n")
+    :gsub("\n\r", "\n")
+    :gsub("\r", "\n")
+end
+
+---Initialize the parser with the file at the given path.
 ---Read the file at the given path,
 ---prepare and store its contents.
 ---@param path string
-function AD.Parser:init(path)
+function AD.Parser:init_with_contents_of_file(path)
   -- read the file contents
   local fh = open(path, "r")
   local s = fh:read("a")
   fh:close()
-  -- normalize newline characters
-  s = s
-    :gsub("\r\n", "\n")
-    :gsub("\n\r", "\n")
-    :gsub("\r", "\n")
-  self.contents = s
+  self:init_with_string(s)
 end
 
----Get the root.
----Lazy intializer.
----@return AD.Link
-function AD.Parser:get_root()
-  if self._root then
-    return self._root
-  end
-  -- In order to properly find string literals,
-  -- duplicate the source and remove quote escape sequences
-  -- To keep the same length, we replace by exactly 2 characters
-  -- because the source is not interpreted.
-  local s = self.contents
-    :gsub([[\\]], "XX")
-  -- unescape escape quotes
-    :gsub([[\']], "XX")
-    :gsub([[\"]], "XX")
-  -- unescape escape quotes
-    :gsub([[\<]], "XX")   -- for table<??,??>
-    :gsub([[\>]], "XX")
-    :gsub([[\(]], "XX")  -- for fun(??)
-    :gsub([[\)]], "XX")
+function AD.Parser:parse()
 end
 
----Return the contents, with string literals and comments replaced by "*" characters.
----Lazy initializer.
----The return string has exactly the same line length (and global length) as the original.
----The only difference is that literal strings and comment have been replaced
----by the character "*".
----it is easier to find blocks.
----@return string
-function AD.Parser:get_pure_code()
-  if self._pure_code then
-    return self._pure_code
-  end
-  -- Remove all the literal content from the CODE
-  -- turn the contents into a list of characters
-  local t = Ct(C(1)^0):match(self.contents)
-  -- Replace any character not in a CODE chunk by an "*"
-  -- Keep the "\n" for display convenience
-  self:foreach(function (link)
-    if link.id ~= CODE then
-      for i = link.min, link.after - 1 do
-        if t[i] ~= "\n" then
-          t[i] = "*"
-        end
-      end
-    end
-  end)
-  self._pure_code = concat(t)
-  return self._pure_code
+-- Export symbols to the _ENV for testing purposes
+if _ENV.during_unit_testing then
+  _ENV.white_p                    = white_p
+  _ENV.black_p                    = black_p
+  _ENV.eol_p                      = eol_p
+  _ENV.module_name_p              = module_name_p
+  _ENV.variable_p                 = variable_p
+  _ENV.identifier_p               = identifier_p
+  _ENV.code_p                     = code_p
+  _ENV.special_begin_p            = special_begin_p
+  _ENV.get_spaced_p               = get_spaced_p
+  _ENV.colon_p                    = colon_p
+  _ENV.comma_p                    = comma_p
+  _ENV.lua_type_p                 = lua_type_p
+  _ENV.named_types_p              = named_types_p
 end
 
----Get the top scope
----Lazy initializer.
----Once all the chunk info are found,
----it is easier to find blocks.
----@return AD.Scope
-function AD.Parser:get_top_scope()
-  if self._top_scope then
-    return self._top_scope
-  end
-  local pure_code = self:get_pure_code()
-  ---@type AD.Scope
-  self._top_scope = AD.Scope:new(0, 1, #pure_code)
-  -- Any string literal and comment is masked out in `pure_code`
-  -- Now find the true top level scope. Scopes are delimited by
-  -- * function ... end
-  -- * do ... end
-  -- * then ... elseif|else|end
-  -- * repeat ... until
-  -- We want to use the "%b()" lua pattern but we need
-  -- delimiters that are not in the source.
-  local left, right
-  for i = 0, 31 do
-    local c = char(i)
-    if not pure_code:find(c, nil, true) then
-      left = c
-      for j = i + 1, 31 do
-        c = char(j)
-        if not pure_code:find(c, nil, true) then
-          right = c
-        end
-      end
-    end
-  end
-  assert(left and right, "Error: the source contains too many control characters")
-  local scope_pattern = "%b".. left .. right
-  local function to_word(s)
-    return "%f[%w_]".. s .."%f[^%w_]"
-  end
-  local s = pure_code
-    :gsub(to_word("function"),        "functio".. left)
-    :gsub(to_word("do"),              "d"..       left)
-    :gsub(to_word("then"),            "the"..     left)
-    :gsub(to_word("elseif"),  right .."lseif")
-    :gsub(to_word("else"),    right .."ls"..      left)
-    :gsub(to_word("end"),     right .."nd")
-    :gsub(to_word("until"),   right .."ntil")
-  -- Then complete each scope starting from the top
-  -- Feed a todo list
-  ---@type AD.Scope[]
-  local todo = {
-    self._top_scope
-  }
-  local done = 0 -- index of the last item done in the todo list
-  while done < #todo do
-    done = done + 1
-    ---@type AD.Scope
-    local scope = todo[done]
-    local init  = scope.min
-    repeat
-      local min, max = s:find(scope_pattern, init)
-      if not min or min >= scope.after then
-        break -- no more inner scope
-      end
-      ---@type AD.Scope
-      local found = AD.Scope:new(
-        scope.depth + 1,
-        min + 1,
-        max
-      )
-      scope:append_scope(found)
-      append(todo, found)
-      init = max + 1
-    until false
-  end
-  --[[
-  local function print_scope(scope)
-    local prefix = ("  "):rep(scope.depth)
-    if not scope:is_empty() then
-      print(prefix .."{ ".. scope.min ..":...")
-      for scp in scope:scopes() do
-        print_scope(scp)
-      end
-      print(prefix .."} ...:".. scope.max)
-    else
-      print(prefix .. scope.min ..":".. scope.max)
-    end
-  end
-  print_scope(self.top_scope)
-  os.exit()
-  --]]
-  return self._top_scope
-end
-
----Complete the chunk infos with the proper scope
----Associate the proper scope to each chunk.
-function AD.Parser:resolve_scopes()
-  ---@type AD.Scope
-  local scope = self:get_top_scope()
-  self:foreach(function (link)
-    link.scope = scope:get_scope_at(link.min)
-  end)
-end
-
----Get the balanced pattern for the given patterns.
----See http://www.inf.puc-rio.br/~roberto/lpeg/#ex
----@param del string @ pair or delimiters
-local function get_balanced_p(del)
-  return P({
-      del:sub(1, 1)
-    * ((1 - S(del)) + V(1))^0
-    * del:sub(2, 2)
-  })
-end
-
-local type_table_p =
-    "table"
-  * white_p^0
-  * get_balanced_p("<>")
-
----Parse inline documentation of a lua source file
----@param path string @ The path of the file to parse
----@return table @ A private structure
-function AD.Parser:parse(path)
-  self:init(path)
-  self:resolve_scopes()
-  self:simplify()
-  self:foreach(function (link)
-    print(
-      link.id:sub(1,4),
-      link.scope.depth,
-      link.scope.min,
-      link.min,
-      link.max,
-      link.scope.max
-    )
-  end)
-  os.exit(421)
-  self:resolve_annotations()
-  self:gather()
-  self:foreach(function (link)
-    print(
-      link.id:sub(1,4),
-      link.annotation and link.annotation.id:sub(1,4),
-      link.scope.depth,
-      link.scope.min,
-      link.min,
-      link.max,
-      link.scope.max
-    )
-  end)
-  os.exit(0)
-  self.item = {}
-  local docs = {}
-  local doc
-end
-
----@class l3b_AD.t
----@field parse fun(p: string): table
-AD.Parser:parse(arg[1])
-
+return AD
