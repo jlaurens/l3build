@@ -1,37 +1,8 @@
 #!/usr/bin/env texlua
 
-local __ = setmetatable({
-  during_unit_testing = true,
-}, {
-  __index = _G
-})
-
-local AD = loadfile(
-  "../l3build-autodoc.lua",
-  "t",
-  __
-)()
-
-local expect = dofile("./l3b-expect.lua")
-
-local lpeg    = require("lpeg")
-
-print("POC")
-
-local p_one = lpeg.Cg(lpeg.P(1), "one")
-local p_two = lpeg.Cg(lpeg.P(1), "two")
-local t = lpeg.Ct(p_one*p_two):match("12")
-print(t.one)
-print(t.two)
-
-os.exit()
-
-
-local P       = lpeg.P
-
 local write   = io.write
 
-function pretty_print(tt, indent, done)
+local function pretty_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
   if type(tt) == "table" then
@@ -68,6 +39,49 @@ function pretty_print(tt, indent, done)
   end
 end
 
+local __ = setmetatable({
+  during_unit_testing = true,
+}, {
+  __index = _G
+})
+
+local AD = loadfile(
+  "../l3build-autodoc.lua",
+  "t",
+  __
+)()
+
+local expect  = dofile("./l3b-expect.lua")
+
+local lpeg    = require("lpeg")
+
+do
+  local p_one = lpeg.Cg(lpeg.P(1), "one")
+  local p_two = lpeg.Cg(lpeg.P(1), "two")
+  local t = lpeg.Ct(p_one*p_two):match("12")
+  expect(t.one).is("1")
+  expect(t.two).is("2")
+end
+
+do
+  -- print("POC min <- max + 1")
+  local p1 =
+      lpeg.Cg(lpeg.Cc(421), "min")
+    * lpeg.Cg(lpeg.Cc(123), "max")
+  local m = lpeg.Ct(p1):match("")
+  expect(m.min).is(421)
+  expect(m.max).is(123)
+  local p2 = p1 * lpeg.Cg(
+    lpeg.Cb("min") / function (min) return min + 1 end,
+    "max"
+  )
+  m = lpeg.Ct(p2):match("")
+  expect(m.min).is(421)
+  expect(m.max).is(422)
+end
+
+local P       = lpeg.P
+
 assert(AD.Info)
 expect(AD.Info.__Class).is(AD.Info)
 
@@ -101,26 +115,6 @@ expect(p:match("    ", 2)).is(2)
 expect(p:match(" \n  ", 2)).is(3)
 expect(p:match("\n   ")).is(2)
 
-p = __.white_and_eol_p
-expect(p).is.NOT(nil)
-
-expect(p:match("")).is(1)
-expect(p:match("\n")).is(2)
-expect(p:match(" ")).is(2)
-expect(p:match(" \n")).is(3)
-expect(p:match("\n ")).is(2)
-expect(p:match(" \n ")).is(3)
-expect(p:match("    ")).is(5)
-expect(p:match("    ", 2)).is(5)
-expect(p:match(" \n  ")).is(3)
-expect(p:match(" \n  ", 2)).is(3)
-expect(p:match("\n   ")).is(2)
-
-p = __.module_name_p
-expect(p).is.NOT(nil)
-
-assert(p:match("abc"))
-
 p = __.variable_p
 expect(p).is.NOT(nil)
 
@@ -137,24 +131,6 @@ expect(p:match("2bc")).is(nil)
 expect(p:match("abc.")).is(4)
 expect(p:match("abc._")).is(6)
 
-p = __.capture_text_p
-expect(p).is.NOT(nil)
-
-expect({ p:match("abc") }).equal({ 1, 4 })
-expect({ p:match("  abc  ") }).equal({ 3, 6 })
-expect({ p:match("  abc  \n c") }).equal({ 3, 6 })
-expect((p*P("\n")):match("  abc  \n c")).is.NOT(nil)
-
-p = __.code_p
-expect(p).is.NOT(nil)
-
-expect(p:match("abc")).is(2)
-expect(p:match("'")).is(nil)
-expect(p:match('"')).is(nil)
-expect(p:match("[[")).is(nil)
-expect(p:match("-")).is(2)
-expect(p:match("--")).is(nil)
-
 p = __.special_begin_p
 expect(p).is.NOT(nil)
 
@@ -166,19 +142,6 @@ expect(p:match("  -")).is(nil)
 expect(p:match("  --")).is(nil)
 expect(p:match("  ---")).is(6)
 expect(p:match("  ---  ")).is(8)
-
-p = __.capture_comment_and_eol_p
-expect(p).is.NOT(nil)
-
---   ----5----0 --- -5----0----5----0----5----0----5----|
-s = "  @ foo  \n  \n"
-t = { p:match("  @ foo  \n  \n") }
-expect(t).equal({ "foo", 8 })
-
-expect(p:match("    foo  \n  \n")).is(nil)
-
-t = { p:match("         \n  \n") }
-expect(t).equal({ nil, 1 })
 
 p = __.colon_p
 expect(p).is.NOT(nil)
@@ -223,63 +186,136 @@ expect(p:match("fun(foo : bar, foo: bar, ...: bar)")).is(35)
 expect(p:match("fun():foo")).is(10)
 expect(p:match("fun():foo, bar")).is(15)
 
-p = __.capture_types_p
+p = __.named_types_p
 expect(p).is.NOT(nil)
 
-expect(p:match("foo")[1]).is("foo")
-expect(p:match("foo|chi")[2]).is("chi")
-expect(p:match("foo|chi|mee")[3]).is("mee")
+p = lpeg.Ct(p)
+expect(p:match("foo").types[1]).is("foo")
+expect(p:match("foo|chi").types[2]).is("chi")
+expect(p:match("foo|chi|mee").types[3]).is("mee")
 
 expect(lpeg.C("X"):match("X")).is("X")
-
-p = __.no_captures_p(lpeg.C("X"))
-expect(p).is.NOT(nil)
-
-expect(p:match("X")).is(2)
 
 ---@type AD.ShortLiteral
 t = AD.ShortLiteral()
 expect(t.__Class).is(AD.ShortLiteral)
-expect(t.min).is(0)
-expect(t.max).is(-1)
-expect(t.after).is(0)
+expect(t.min).is(1)
+expect(t.max).is(0)
+expect(t.content_min).is(1)
+expect(t.content_max).is(0)
 
-p = __.short_literal_p
+local tag_del = {}
+
+p = lpeg.Ct(
+    __.white_p^0
+  * lpeg.Cg(lpeg.S([['"]]), tag_del)
+  * __.named_pos_p("content_min")
+  * __.chunk_begin_p
+  * lpeg.Cg(lpeg.Cmt(
+    lpeg.Cb(tag_del),
+    function (s, i, del)
+      repeat
+        local c = s:sub(i, i)
+        if c == del then
+          return i + 1, i - 1 -- capture also `content_max`
+        elseif c == [[\]] then
+          i = i + 2
+        elseif c then
+          i = i + 1
+        else
+          error("Missing closing delimiter ".. del)
+        end
+      until false
+    end
+  ), "content_max")
+  -- * __.chunk_end_p
+  -- * lpeg.Cg(P(0), tag_del)
+) / function (t)
+  return AD.ShortLiteral(t)
+end
+
+expect(lpeg.Ct(__.chunk_init_p):match("")).equals({
+  min = 1,
+  max = 0,
+})
+
+s = '"234"  \n  '
+p = __.chunk_init_p
+  * __.chunk_begin_p
+  * P(1)
+  * __.chunk_end_p
+
+t = lpeg.Ct(p):match(s)
+
+expect(t).equals({
+  min = 1,
+  max = 1,
+  code_before = {
+    min = 1,
+    max = 0,
+  }
+})
+
+p = AD.ShortLiteral:get_capture_p()
 expect(p).is.NOT(nil)
 
+p = __.chunk_init_p * p
+
+s = '"234"  \n  '
 ---@type AD.ShortLiteral
-t = p:match("'234'  \n  ")
+t = p:match(s)
 expect(t.__Class).is(AD.ShortLiteral)
-expect(t.min).is(2)
-expect(t.max).is(4)
-expect(t.after).is(9)
+expect(t).equals({
+  min = 1,
+  max = 8,
+  content_min = 2,
+  content_max = 4,
+  code_before = {
+    max = 0,
+    min = 1,
+  },
+})
 
-t = p:match('"234"  \n  ')
 expect(t.__Class).is(AD.ShortLiteral)
-expect(t.min).is(2)
-expect(t.max).is(4)
-expect(t.after).is(9)
+expect(t.min).is(1)
+expect(t.max).is(8)
+expect(t.content_min).is(2)
+expect(t.content_max).is(4)
 
-p = __.long_literal_p
+s = "'234'  \n  "
+t = p:match(s)
+expect(t.__Class).is(AD.ShortLiteral)
+expect(t.min).is(1)
+expect(t.max).is(8)
+expect(t.content_min).is(2)
+expect(t.content_max).is(4)
+
+p = AD.LongLiteral:get_capture_p()
 expect(p).is.NOT(nil)
 
-t = p:match('[[345]]  \n  ')
+p = __.chunk_init_p * p
+s = '[[345]]  \n  '
+t = p:match(s)
 expect(t.__Class).is(AD.LongLiteral)
-expect(t.min).is(3)
-expect(t.max).is(5)
+expect(t.min).is(1)
+expect(t.max).is(10)
 expect(t.level).is(0)
-expect(t.after).is(11)
+expect(t.content_min).is(3)
+expect(t.content_max).is(5)
 
 t = p:match('[===[678]===]  \n  ')
 expect(t.__Class).is(AD.LongLiteral)
-expect(t.min).is(6)
-expect(t.max).is(8)
+expect(t.min).is(1)
+expect(t.max).is(16)
 expect(t.level).is(3)
-expect(t.after).is(17)
+expect(t.content_min).is(6)
+expect(t.content_max).is(8)
 
 assert(AD.LineComment)
-p = __.line_comment_p
+p = AD.LineComment:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ---@type AD.LineComment
 t = p:match('-  \n  ')
@@ -289,58 +325,76 @@ expect(t).is(nil)
 t = p:match('---  \n  ', 2)
 expect(t).is(nil)
 
+t = p:match('--  ')
+expect(t.__Class).is(AD.LineComment)
+expect(t.min).is(1)
+expect(t.max).is(4)
+expect(t.content_min).is(5)
+expect(t.content_max).is(4)
+
 t = p:match('--  \n  ')
 expect(t.__Class).is(AD.LineComment)
-expect(t.min).is(5)
-expect(t.max).is(4)
-expect(t.after).is(6)
+expect(t.min).is(1)
+expect(t.max).is(5)
+expect(t.content_min).is(5)
+expect(t.content_max).is(4)
 
 t = p:match('----------')
 expect(t.__Class).is(AD.LineComment)
-expect(t.min).is(11)
+expect(t.min).is(1)
 expect(t.max).is(10)
-expect(t.after).is(11)
+expect(t.content_min).is(11)
+expect(t.content_max).is(10)
 
-t = p:match('-- 456 89f \n  ')
+t = p:match('-- 456 89A \n  ')
 expect(t.__Class).is(AD.LineComment)
-expect(t.min).is(4)
-expect(t.max).is(10)
-expect(t.after).is(13)
+expect(t.min).is(1)
+expect(t.max).is(12)
+expect(t.content_min).is(4)
+expect(t.content_max).is(10)
 
 assert(AD.LongComment)
-p = __.long_comment_p
+p = AD.LongComment:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ---@type AD.LongComment
 t = p:match('--  \n  ')
 expect(t).is(nil)
 
-t = __.long_comment_p:match('--[[56 89f]]')
+t = p:match('--[[56 89A]]')
 expect(t.__Class).is(AD.LongComment)
-expect(t.min).is(5)
-expect(t.max).is(10)
-expect(t.after).is(13)
+expect(t.min).is(1)
+expect(t.max).is(12)
+expect(t.content_min).is(5)
+expect(t.content_max).is(10)
 
-t = p:match('--[[\n6 89f]]')
+t = p:match('--[[\n6 89A]]')
 expect(t.__Class).is(AD.LongComment)
-expect(t.min).is(6)
-expect(t.max).is(10)
-expect(t.after).is(13)
+expect(t.min).is(1)
+expect(t.max).is(12)
+expect(t.content_min).is(6)
+expect(t.content_max).is(10)
 
-t = p:match('--[[\n  8\nf  ]]')
+t = p:match('--[[\n  8\nA  ]]')
 expect(t.__Class).is(AD.LongComment)
-expect(t.min).is(8)
-expect(t.max).is(10)
-expect(t.after).is(15)
+expect(t.min).is(1)
+expect(t.max).is(14)
+expect(t.content_min).is(6)
+expect(t.content_max).is(10)
 
 t = p:match('--[==[78]=] \n ]==] ')
 expect(t.__Class).is(AD.LongComment)
-expect(t.min).is(7)
-expect(t.max).is(11)
-expect(t.after).is(20)
+expect(t.min).is(1)
+expect(t.max).is(19)
+expect(t.content_min).is(7)
+expect(t.content_max).is(13)
 
-p = __.capture_doc_p
+p = AD.LineDoc:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 t = p:match('-- ')
 expect(t).is(nil)
@@ -349,44 +403,49 @@ expect(t).is(nil)
 t = p:match('---- ', 1)
 expect(t).is(nil)
 
+t = p:match('---')
+expect(t.__Class).is(AD.LineDoc)
+expect(t.min).is(1)
+expect(t.max).is(3)
+expect(t.content_min).is(4)
+expect(t.content_max).is(3)
+
 t = p:match('---456789A')
-expect(t.__Class).is(AD.Doc)
-expect(t.min).is(4)
+expect(t.__Class).is(AD.LineDoc)
+expect(t.min).is(1)
 expect(t.max).is(10)
-expect(t.after).is(11)
+expect(t.content_min).is(4)
+expect(t.content_max).is(10)
 
 t = p:match('--- 56 89 ')
-expect(t.__Class).is(AD.Doc)
-expect(t.min).is(5)
-expect(t.max).is(9)
-expect(t.after).is(11)
+expect(t.__Class).is(AD.LineDoc)
+expect(t.min).is(1)
+expect(t.max).is(10)
+expect(t.content_min).is(5)
+expect(t.content_max).is(9)
+
+t = p:match('--- 56 89 \n')
+expect(t.__Class).is(AD.LineDoc)
+expect(t.min).is(1)
+expect(t.max).is(11)
+expect(t.content_min).is(5)
+expect(t.content_max).is(9)
 
 s = [=====[
 ---456789
 ---456789
 ---456789
 ]=====]
-expect(p:match(s,  1).after).is(11)
-expect(p:match(s, 11).after).is(21)
-expect(p:match(s, 21).after).is(31)
+expect(p:match(s,  1).max).is(10)
+expect(p:match(s, 11).max).is(20)
+expect(p:match(s, 21).max).is(30)
 expect((p^2):match(s, 1)).is.NOT(nil)
 expect((p^2):match(s, 11)).is.NOT(nil)
 
-
-
-p = __.capture_description_long_p
+p = AD.Description:get_capture_p()
 expect(p).is.NOT(nil)
 
-s = [=====[
----
---[===[]===]
-]=====]
-expect(p:match(s, 1)).is.NOT(nil)
-expect(p:match(s, 2)).is(nil)
-expect(p:match(s, 5)).is.NOT(nil)
-
-p = __.capture_description_p
-expect(p).is.NOT(nil)
+p = __.chunk_init_p * p
 
 t = p:match("--")
 expect(t).is(nil)
@@ -394,31 +453,31 @@ expect(t).is(nil)
 ---@type AD.Description
 t = p:match("---")
 expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
+expect(t.short.__Class).is(AD.LineDoc)
 expect(#t.long).is(0)
-expect(t.after).is(4)
+expect(t.min).is(1)
+expect(t.max).is(3)
 
 t = p:match("---\n")
-expect(t.after).is(5)
+expect(t.max).is(4)
 
 t = p:match("---\ns")
-expect(t.after).is(5)
+expect(t.max).is(4)
 
 t = p:match("---\n\n")
-expect(t.after).is(5)
+expect(t.max).is(4)
 
 t = p:match("-- \n---")
-expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
-expect(#t.long).is(0)
-expect(t.after).is(8)
+expect(t).is(nil)
 
 t = p:match("---\n---")
+
 expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
+expect(t.short.__Class).is(AD.LineDoc)
 expect(#t.long).is(1)
-expect(t.long[1].__Class).is(AD.Doc)
-expect(t.after).is(8)
+expect(t.long[1].__Class).is(AD.LineDoc)
+expect(t.long[1].max).is(7)
+expect(t.max).is(7)
 
 s = [=====[
 ---
@@ -426,9 +485,9 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
+expect(t.short.__Class).is(AD.LineDoc)
 expect(#t.long).is(0)
-expect(t.after).is(12)
+expect(t.max).is(11)
 
 s = [=====[
 ---
@@ -436,10 +495,11 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
+expect(t.short.__Class).is(AD.LineDoc)
 expect(#t.long).is(1)
-expect(t.long[1].__Class).is(AD.LongComment)
-expect(t.after).is(18)
+expect(t.long[1].__Class).is(AD.LongDoc)
+expect(t.min).is(1)
+expect(t.max).is(17)
 
 s = [=====[
 ---
@@ -450,172 +510,239 @@ s   s
 ]=====]
 t = p:match(s)
 expect(t.__Class).is(AD.Description)
-expect(t.short.__Class).is(AD.Doc)
+expect(t.short.__Class).is(AD.LineDoc)
 expect(#t.long).is(2)
-expect(t.long[1].__Class).is(AD.LongComment)
-expect(t.long[2].__Class).is(AD.Doc)
-expect(t.after).is(25)
+expect(t.long[1].__Class).is(AD.LongDoc)
+expect(t.long[2].__Class).is(AD.LineDoc)
+expect(t.max).is(24)
 
-p = __.capture_description_p
+p = AD.Description:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 expect(p:match("---")).is.NOT(nil)
 expect(p:match("---\n---")).is.NOT(nil)
 expect(p:match("---\n--[===[]===]")).is.NOT(nil)
 
-p = __.capture_comment_and_eol_p
+p = AD.At.Field:get_capture_p()
 expect(p).is.NOT(nil)
 
-p = __.capture_at_field_p
-expect(p).is.NOT(nil)
+p = __.chunk_init_p * p
 
-expect(p:match("--- @field public foo \n bar")).is(nil)
+expect(function () p:match("--- @field public foo") end).error()
 
----@type AD.AtField
-t = p:match("--- @field public foo bar")
+expect(function () p:match("--- @field public foo \n bar") end).error()
 
-expect(t.__Class).is(AD.AtField)
+---@type AD.At.Field
+t = p:match("--- @field public f21 b25")
 
-expect(t.description.__Class).is(AD.Description)
-expect(t.min).is(12)
+expect(lpeg.Ct(__.named_types_p):match("--- @field public f21 b25", 23)).equals({
+  types = { "b25" },
+})
+
+expect(t.__Class).is(AD.At.Field)
+expect(t.min).is(1)
 expect(t.max).is(25)
-expect(t.after).is(26)
-expect(t.name).is("foo")
 expect(t.visibility).is("public")
-expect(t.types[1]).is("bar")
+expect(t.name).is("f21")
+expect(t.types[1]).is("b25")
 
-t = p:match("--- @field private foo bar\n   ")
-expect(t.__Class).is(AD.AtField)
+t = p:match("--- @field private f22 b26\n   ")
+expect(t.__Class).is(AD.At.Field)
 expect(t.visibility).is("private")
-expect(t.types).equal({ "bar" })
-expect(t.min).is(12)
-expect(t.max).is(26)
-expect(t.after).is(28)
+expect(t.name).is("f22")
+expect(t.types).equal({ "b26" })
+expect(t.min).is(1)
+expect(t.max).is(27)
 
 ----5----0   ----5----0----5----0----5----0----5----0----5
-t = p:match("--- @field private foo bar @ commentaire   ")
-expect(t.__Class).is(AD.AtField)
+t = p:match("--- @field private f22 b26 @ commentai40   ")
+expect(t.__Class).is(AD.At.Field)
 expect(t.visibility).is("private")
-expect(t.types).equal({ "bar" })
-expect(t.min).is(12)
-expect(t.max).is(40)
-expect(t.after).is(44)
-expect(t.comment).is("commentaire")
+expect(t.name).is("f22")
+expect(t.types).equal({ "b26" })
+expect(t.min).is(1)
+expect(t.max).is(43)
+expect(t.content_min).is(30)
+expect(t.content_max).is(40)
 
-t = p:match("--- @field private foo bar\n   ")
-expect(t.__Class).is(AD.AtField)
+t = p:match("--- @field private f22 b26\n   ")
+expect(t.__Class).is(AD.At.Field)
 expect(t.visibility).is("private")
-expect(t.types).equal({ "bar" })
-expect(t.min).is(22)
+expect(t.name).is("f22")
+expect(t.types).equal({ "b26" })
+expect(t.min).is(1)
+expect(t.max).is(27)
+
+t = p:match("--- @field private f22 b26\n   ")
+expect(t.__Class).is(AD.At.Field)
+expect(t.visibility).is("private")
+expect(t.name).is("f22")
+expect(t.types).equal({ "b26" })
+expect(t.min).is(1)
+expect(t.max).is(27)
+
+t = p:match("123456789--- @field private f22 b26\n   ", 10)
+expect(t.__Class).is(AD.At.Field)
+expect(t.visibility).is("private")
+expect(t.name).is("f22")
+expect(t.types).equal({ "b26" })
+expect(t.min).is(10)
 expect(t.max).is(36)
-expect(t.after).is(38)
 
-t = p:match("--- @field private foo bar\n   ")
-expect(t.__Class).is(AD.AtField)
-expect(t.visibility).is("private")
-expect(t.types).equal({ "bar" })
-expect(t.min).is(32)
-expect(t.max).is(46)
-expect(t.after).is(48)
-
-p = __.capture_at_see_p
+p = AD.At.See:get_capture_p()
 expect(p).is.NOT(nil)
 
----@type AD.AtSee
-t = p:match("---@see what do you want of me  ")
-expect(t.__Class).is(AD.AtSee)
-expect(t.min).is(9)
-expect(t.max).is(30)
-expect(t.after).is(33)
-expect(t.references).is("what do you want of me")
+p = __.chunk_init_p * p
+
+---@type AD.At.See
+s = "---@see 9hat do you want of 30  "
+t = p:match(s)
+expect(t.__Class).is(AD.At.See)
+expect(t.min).is(1)
+expect(t.max).is(32)
+expect(t.content_min).is(9)
+expect(t.content_max).is(30)
+expect(t:get_content(s)).is("9hat do you want of 30")
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
 
-p = __.capture_at_class_p
+p = AD.At.Class:get_capture_p()
 expect(p).is.NOT(nil)
 
----@type AD.Class
-t = p:match("---@class MY_TYPE")
-expect(t.__Class).is(AD.Class)
-expect(t.min).is(11)
+p = __.chunk_init_p * p
+
+---@type AD.At.Class
+t = p:match("---@class MY_TY17")
+
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
 expect(t.max).is(17)
-expect(t.after).is(18)
 expect(t.parent).is(nil)
-expect(t.comment).is(nil)
+expect(t.content_min).is(1)
+expect(t.content_max).is(0)
 
----@type AD.Class
-t = p:match("---@class MY_TYPE: PARENT_TYPE")
-expect(t.__Class).is(AD.Class)
-expect(t.min).is(11)
+---@type AD.At.Class
+t = p:match("---@class AY_TYPE: PARENT_TY30")
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
 expect(t.max).is(30)
-expect(t.after).is(31)
-expect(t.parent).is("PARENT_TYPE")
-expect(t.comment).is(nil)
+expect(t.parent).is("PARENT_TY30")
+expect(t.content_min).is(1)
+expect(t.content_max).is(0)
 
+local tag_at = {}
 
-p = __.capture_class_p
+p = __.chunk_init_p * lpeg.Cg(
+  lpeg.Cmt(
+      ( AD.Description:get_capture_p()
+      + lpeg.Cc(AD.Description())
+    )
+    -- capture a raw class annotation:
+    -- create an AD.At.Class instance
+    -- capture it with the tag `tag_at`
+    * AD.At.Class:get_capture_p(),
+    function (_, i, desc, at)
+      at.description = desc
+      return i, at
+    end
+  ),
+  tag_at
+)
+* ( AD.At.Field:get_complete_p()
+* lpeg.Cb(tag_at)
+/ function (at_field, at)
+  table.insert(at.fields, at_field)
+end
++   AD.At.See:get_complete_p()
+* lpeg.Cb(tag_at)
+/ function (at_see, at)
+    at.see = at_see
+  end
++ ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
+* lpeg.Cb(tag_at)
+/ function (ignore, at)
+    table.insert(at.ignores, ignore)
+  end
+)^0
+* lpeg.Cp()
+* lpeg.Cb(tag_at)
+/ function (max, at)
+    at.max = max
+    return at -- captured
+  end
+
+p = AD.At.Class:get_complete_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----|
+s = [[
+---@class TYPE: PARENT @        COMMENT]]
+
+---@type AD.At.Class
+t = p:match(s)
+
+---5----0----5----0----5----0----5----0----5----|
 s = [[
 ---@class TYPE: PARENT @        COMMENT
 ---@field protected NAME TYPE @   OTHER]]
 
----@type AD.AtClass
-t = __.capture_class_p:match(s)
-expect(t.__Class).is(AD.AtClass)
-expect(t.min).is(11)
-expect(t.max).is(39)
-expect(t.after).is(41)
+---@type AD.At.Class
+t = p:match(s)
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
+expect(t.max).is(80)
+expect(t.name).is("TYPE")
 expect(t.parent).is("PARENT")
-expect(t.comment).is("COMMENT")
----@type AD.AtField
-t = __.capture_field_p:match(s, 41)
-expect(t.__Class).is(AD.AtField)
-expect(t.min).is(51)
+expect(t:get_content(s)).is("COMMENT")
+
+---@type AD.At.Field
+t = (__.chunk_init_p * AD.At.Field:get_capture_p()):match(s, 41)
+expect(t.__Class).is(AD.At.Field)
+expect(t.min).is(41)
 expect(t.max).is(79)
-expect(t.after).is(80)
 expect(t.visibility).is("protected")
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE" })
-expect(t.comment).is("OTHER")
+expect(t:get_content(s)).is("OTHER")
 
----@type AD.Class
+---@type AD.At.Class
 t = p:match(s)
-expect(t.__Class).is(AD.Class)
-expect(t.min).is(11)
-expect(t.max).is(39)
-expect(t.after).is(80)
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
+expect(t.max).is(80)
 expect(t.parent).is("PARENT")
-expect(t.comment).is("COMMENT")
+expect(t:get_content(s)).is("COMMENT")
 expect(#t.fields).is(1)
 expect(t.see).is(nil)
-expect(t.black_code).is(0)
 f = t.fields[1]
 expect(f.name).is("NAME")
 expect(f.types).equal({ "TYPE" })
-expect(f.comment).is("OTHER")
+expect(f:get_content(s)).is("OTHER")
 
----@type AD.Class
-t = p:match([[---@class MY_TYPE: PARENT_TYPE @ COMMENT
+---@type AD.At.Class
+s = [[---@class MY_TYPE: PARENT_TYPE @ COMMENT
 ---SHORT DOC
----@field public NAME TYPE @ OTHER COMMENT]])
-expect(t.__Class).is(AD.Class)
-expect(t.min).is(11)
-expect(t.max).is(40)
-expect(t.after).is(97)
+---@field public NAME TYPE @ OTHER COMMENT]]
+t = p:match(s)
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
+expect(t.max).is(97)
+expect(t.name).is("MY_TYPE")
 expect(t.parent).is("PARENT_TYPE")
-expect(t.comment).is("COMMENT")
+expect(t:get_content(s)).is("COMMENT")
 expect(#t.fields).is(1)
 expect(t.see).is(nil)
-expect(t.black_code).is(0)
 f = t.fields[1]
 expect(f.name).is("NAME")
 expect(f.types).equal({ "TYPE" })
-expect(f.comment).is("OTHER COMMENT")
+expect(f:get_content(s)).is("OTHER COMMENT")
 expect(f.description).is.NOT(nil)
-expect(f:get_short_description()).is("SHORT DOC")
-expect(f:get_long_description()).is("")
+expect(f:get_short_description(s)).is("SHORT DOC")
+expect(f:get_long_description(s)).is("")
 
 s = [=====[
 ---@class MY_TYPE: PARENT_TYPE @ COMMENT
@@ -624,25 +751,26 @@ s = [=====[
 --[===[SEE LONG DESCRIPTION]===]
 ---@see SEE
    foo bar]=====]
----@type AD.Class
+---@type AD.At.Class
 t = p:match(s)
-expect(t.__Class).is(AD.Class)
-expect(t.min).is(11)
-expect(t.max).is(40)
-expect(t.after).is(165)
+expect(t.__Class).is(AD.At.Class)
+expect(t.min).is(1)
+expect(t.max).is(155)
+expect(t.name).is("MY_TYPE")
 expect(t.parent).is("PARENT_TYPE")
-expect(t.comment).is("COMMENT")
+expect(t:get_content(s)).is("COMMENT")
 expect(#t.fields).is(1)
-expect(t.see:get_short_description()).is("SEE SHORT DESCRIPTION")
-expect(t.see:get_long_description()).is("SEE LONG DESCRIPTION")
-expect(t.black_code).is(158)
+expect(t.see:get_short_description(s)).is("SEE SHORT DESCRIPTION")
+expect(t.see:get_long_description(s)).is("SEE LONG DESCRIPTION")
 f = t.fields[1]
 expect(f.name).is("NAME")
 expect(f.types).equal({ "TYPE" })
-expect(f.comment).is("OTHER COMMENT")
+expect(f:get_content(s)).is("OTHER COMMENT")
 
-p = __.capture_type_p
+p = AD.At.Type:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 s = [=====[
 ---@type MY_TYPE]=====]
@@ -660,15 +788,20 @@ s = [=====[
 ---@type MY_TYPE|OTHER_TYPE @ COMMENT ]=====]
 t = p:match(s)
 expect(t).is.NOT(nil)
-expect(t.comment).is("COMMENT")
+expect(t:get_content(s)).is("COMMENT")
+
+p = AD.At.Type:get_complete_p()
+expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 s = [=====[
 ---SHORT DESCRIPTION
 ---@type MY_TYPE|OTHER_TYPE]=====]
 t = p:match(s)
 expect(t).is.NOT(nil)
-expect(t:get_short_description()).is("SHORT DESCRIPTION")
-expect(t:get_long_description()).is("")
+expect(t:get_short_description(s)).is("SHORT DESCRIPTION")
+expect(t:get_long_description(s)).is("")
 
 s = [=====[
 ---SHORT DESCRIPTION
@@ -676,15 +809,17 @@ s = [=====[
 ---@type MY_TYPE|OTHER_TYPE]=====]
 t = p:match(s)
 expect(t).is.NOT(nil)
-expect(t:get_short_description()).is("SHORT DESCRIPTION")
-expect(t:get_long_description()).is("LONG DESCRIPTION")
+expect(t:get_short_description(s)).is("SHORT DESCRIPTION")
+expect(t:get_long_description(s)).is("LONG DESCRIPTION")
 
-p = __.alias_p
+p = AD.At.Alias:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 s = [=====[
 ---@alias NEW_NAME TYPE ]=====]
----@type AD.AtAlias
+---@type AD.At.Alias
 t = p:match(s)
 expect(t).is.NOT(nil)
 expect(t.name).is("NEW_NAME")
@@ -704,10 +839,9 @@ t = p:match(s)
 expect(t).is.NOT(nil)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE" })
-expect(t.comment).is("SOME   COMMENT")
-expect(t.min).is(15)
+expect(t:get_content(s)).is("SOME   COMMENT")
+expect(t.min).is(1)
 expect(t.max).is(40)
-expect(t.after).is(41)
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -717,13 +851,14 @@ t = p:match(s)
 expect(t).is.NOT(nil)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE" })
-expect(t.comment).is("SOME   COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(40)
-expect(t.after).is(51)
+expect(t:get_content(s)).is("SOME   COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(50)
 
-p = __.capture_param_p
+p = AD.At.Param:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -731,10 +866,9 @@ s = [=====[
 t = p:match(s)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE" })
-expect(t.comment).is(nil)
-expect(t.min).is(11)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
 expect(t.max).is(19)
-expect(t.after).is(20)
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -743,10 +877,9 @@ s = [=====[
 t = p:match(s)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE" })
-expect(t.comment).is(nil)
-expect(t.min).is(11)
-expect(t.max).is(19)
-expect(t.after).is(21)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(20)
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -755,10 +888,9 @@ s = [=====[
 t = p:match(s)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE", "OTHER" })
-expect(t.comment).is(nil)
-expect(t.min).is(11)
-expect(t.max).is(29)
-expect(t.after).is(31)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(30)
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -767,13 +899,14 @@ s = [=====[
 t = p:match(s)
 expect(t.name).is("NAME")
 expect(t.types).equal({ "TYPE", "OTHER" })
-expect(t.comment).is("COMMENT")
-expect(t.min).is(11)
-expect(t.max).is(39)
-expect(t.after).is(41)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(40)
 
-p = __.capture_return_p
+p = AD.At.Return:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -781,13 +914,14 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.types).equal({ "TYPE", "OTHER" })
-expect(t.comment).is("COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(39)
-expect(t.after).is(41)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(40)
 
-p = __.capture_generic_p
+p = AD.At.Generic:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 s = [=====[
 -- @generic T1 [: PARENT_TYPE] [, T2 [: PARENT_TYPE]]
@@ -796,7 +930,7 @@ s = [=====[
 s = [=====[
 ---@generic T1
 ]=====]
----@type AD.AtGeneric
+---@type AD.At.Generic
 t = p:match(s)
 expect(t.type_1).is.equal.to("T1")
 expect(t.parent_1).is(nil)
@@ -855,13 +989,14 @@ expect(t.type_1).is.equal.to("T1")
 expect(t.parent_1).is("PARENT_TYPE")
 expect(t.type_2).is.equal.to("T2")
 expect(t.parent_2).is("PARENT_TYPE")
-expect(t.comment).is("COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(59)
-expect(t.after).is(61)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(60)
 
-p = __.capture_vararg_p
+p = AD.At.Vararg:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 s = [=====[
 -- @vararg TYPE[|OTHER_TYPE] [ @ comment ]
@@ -873,10 +1008,9 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.types).equals({ "TYPE_" })
-expect(t.comment).is(nil)
-expect(t.min).is(15)
-expect(t.max).is(19)
-expect(t.after).is(21)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(20)
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -884,10 +1018,9 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.types).equals({ "TYPE_", "TYPE" })
-expect(t.comment).is(nil)
-expect(t.min).is(15)
-expect(t.max).is(24)
-expect(t.after).is(26)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(25)
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -895,25 +1028,31 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.types).equals({ "TYPE_", "TYPE" })
-expect(t.comment).is("CMT_")
-expect(t.min).is(15)
-expect(t.max).is(29)
-expect(t.after).is(31)
+expect(t:get_content(s)).is("CMT_")
+expect(t.min).is(1)
+expect(t.max).is(30)
 
-p = __.capture_module_p
+p = AD.At.Module.NAME_p
 expect(p).is.NOT(nil)
+
+assert(p:match("abc"))
+
+
+p = AD.At.Module:get_capture_p()
+expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
 ---   @module name_
 ]=====]
----@type AD.AtModule
+---@type AD.At.Module
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is(nil)
-expect(t.min).is(15)
-expect(t.max).is(19)
-expect(t.after).is(21)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(20)
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -921,76 +1060,63 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is("COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(29)
-expect(t.after).is(31)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(30)
 
-p = __.capture_global_p
+p = AD.At.Global:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
 ---  @global  name_
 ]=====]
----@type AD.AtGlobal
+---@type AD.At.Global
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is(nil)
-expect(t.min).is(15)
-expect(t.max).is(19)
-expect(t.after).is(21)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(20)
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
 ---  @global  name_ @ COMMENT
 ]=====]
----@type AD.AtGlobal
+---@type AD.At.Global
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is("COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(29)
-expect(t.after).is(31)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(30)
 
-p = __.capture_code_p
+p = AD.Break:get_capture_p()
 expect(p).is.NOT(nil)
 
-expect(p:match("-- bla bla bla")).is(nil)
-
-----5----0----5----0----5----0----5----0----5----0----5----|
-s = [=====[
-    XXXXX XXXX
-]=====]
----@type AD.Code
-t = p:match(s)
-expect(t.min).is(5)
-expect(t.max).is(14)
-expect(t.after).is(16)
-
-p = __.capture_break_p
-expect(p).is.NOT(nil)
+p = __.chunk_init_p * p
 
 expect(p:match("")).is(nil)
-expect(p:match("\n").after).is(2)
-expect(p:match(" \n ").after).is(3)
-expect(p:match(" \n \n").after).is(5)
+expect(p:match("\n").max).is(1)
+expect(p:match(" \n ").max).is(3)
+expect(p:match(" \n \n").max).is(4)
 
 
-p = __.capture_function_annotation_p
+p = AD.At.Function:get_capture_p()
 expect(p).is.NOT(nil)
+
+p = __.chunk_init_p * p
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
 ---@function  name_
 ]=====]
----@type AD.AtFunction
+---@type AD.At.Function
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is(nil)
-expect(t.min).is(15)
-expect(t.max).is(19)
-expect(t.after).is(21)
+expect(t:get_content(s)).is("")
+expect(t.min).is(1)
+expect(t.max).is(20)
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
 s = [=====[
@@ -998,10 +1124,9 @@ s = [=====[
 ]=====]
 t = p:match(s)
 expect(t.name).equals("name_")
-expect(t.comment).is("COMMENT")
-expect(t.min).is(15)
-expect(t.max).is(29)
-expect(t.after).is(31)
+expect(t:get_content(s)).is("COMMENT")
+expect(t.min).is(1)
+expect(t.max).is(30)
 
 
 
