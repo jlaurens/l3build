@@ -756,7 +756,7 @@ local error_annotation_p = Cmt(
     Cp()
   * one_line_chunk_end_p,
   function (s, to, from)
-    print(debug.traceback())
+    -- print(debug.traceback())
     error("Bad annotation ".. s:sub(from, to))
   end
 )
@@ -1010,8 +1010,8 @@ AD.At.Type = make_class(AD.At, {
 
 -- @alias NEW_TYPE TYPE [@ comment]
 ---@class AD.At.Alias: AD.At
----@field public name     string    @ the name of the alias
----@field public types    string[]  @ the target types
+---@field public name   string    @ the name of the alias
+---@field public types  string[]  @ the target types
 
 ---@type AD.At.Alias
 AD.At.Alias = make_class(AD.At, {
@@ -1253,7 +1253,7 @@ do
             more_ignore_p
           + more_param_p
           + more_vararg_p
-          + more_return_p     
+          + more_return_p
         )^0
         * Cp() -- capture max
         * Cb(tag_at)
