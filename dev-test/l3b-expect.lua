@@ -8,6 +8,12 @@ local Expect = {
   __almost = false,
 }
 
+local function expect(actual)
+  return setmetatable({
+    actual = actual,
+  }, Expect)
+end
+
 function Expect:__index(k)
   if k == "NOT" then
     self.__NOT = not self.__NOT
@@ -80,15 +86,6 @@ function Expect.__call(self, expected, options)
     end
   end
   if self.op == ">" then
-    if  self.__NOT
-    and type(self.actual) == "table"
-    and type(expected) == "table"
-    then
-      for k, v in pairs(self.actual) do
-        LU.assertEquals(expected[k], v)
-      end
-      return
-    end
     if self.__NOT then
       LU.assertFalse(self.actual > expected)
     else
@@ -107,7 +104,13 @@ function Expect.__call(self, expected, options)
     and type(expected) == "table"
     then
       for k, v in pairs(expected) do
-        LU.assertEquals(self.actual[k], v)
+        if  type(v) == "table"
+        and type(self.actual[k]) == "table"
+        then
+          expect(self.actual[k]).contains(v)
+        else
+          LU.assertEquals(self.actual[k], v)
+        end
       end
       return
     end
@@ -123,31 +126,6 @@ function Expect.__call(self, expected, options)
   return self
 end
 
-local function expect(actual)
-  return setmetatable({
-    actual = actual,
-  }, Expect)
-end
-
----Run a unit test
----@param msg string
----@param run_f fun()
-local function test(msg, run_f)
-  local setup_f = function () end
-  local teardown_f = function () end
-  local tests = {}
-  local function setup(f)
-    setup_f = f
-  end
-  local function teardown(f)
-    teardown_f = f
-  end
-  run_f()
-
-
-end
-
 return {
   expect  = expect,
-  test    = test,
 }, LU

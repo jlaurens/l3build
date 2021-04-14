@@ -178,39 +178,31 @@ local variable_p =
 local identifier_p =
   variable_p * ("." * variable_p)^0
 
+---Capture the current position under the given name with the given shifht
+---@param s string
+---@param d number
+---@return lpeg.Pattern
+local function named_pos_p(s, d)
+  return  Cg(d
+      and Cp() / function (i) return i - d end
+      or  Cp(),
+    s)
+end
+
 -- Named captures must exist before use.
 -- Prefix any pattern with `chunk_init_p`
 -- such that named captures are defined at the top level.
 ---@type lpeg.Pattern
 local chunk_init_p =
-    Cg(Cp(),  "min")
-  * Cg(Cp() / function (i) return i - 1 end, "max")
+    named_pos_p("min")
+  * named_pos_p("max", 1)
 
 ---Prepare the match of a new chunk
 ---In order to further insert a code chunk info if necessary
 ---create it and save it as capture named "code_before".
 ---@type lpeg.Pattern
 local chunk_begin_p =
-  Cg(
-      Cb("min") -- captured outside, unchanged locally
-    * Cb("max")
-    / function (min, max)
-        return AD.Code({ -- new code up to max has been registered
-          min = min,
-          max = max,
-        })
-      end,
-    "code_before"
-  )
-  * Cg(
-    Cb("max")
-    / function (c)
-        return c + 1
-      end,
-    "min" -- the new value is available outside
-  )
-  -- no capture
-  -- now we have somehow Cb("min") == Cb("max") + 1
+  Cg( Cb("min"), "min")
 
 ---End of chunk pattern
 --[===[
@@ -222,10 +214,7 @@ then store the position in the capture named "max".
 local chunk_end_p =
     white_p^0
   * P("\n")^-1
-  * Cg(
-    Cp() / function (i) return i - 1 end,
-    "max"
-  )
+  * named_pos_p("max", 1)
   -- no capture
   -- the current position becomes the next chunk min
 
@@ -233,17 +222,6 @@ local chunk_end_p =
 local one_line_chunk_end_p =
   (1 - P("\n"))^0 -- anything but a newline
   * chunk_end_p
-
----Capture the current position under the given name with the given shifht
----@param s string
----@param d number
----@return lpeg.Pattern
-local function named_pos_p(s, d)
-  return  Cg(d
-      and Cp() / function (i) return i - d end
-      or  Cp(),
-    s)
-end
 
 local special_begin_p =
   (white_p^1 + -B("-")) -- 1+ spaces or negative lookbehind: no "-" behind
@@ -265,14 +243,18 @@ local comma_p = get_spaced_p(",")
 
 ---@type lpeg.Pattern
 local capture_comment_p = (
-    get_spaced_p("@")
-  * named_pos_p("content_min")
-  * black_p^0
-  * ( white_p^1 * black_p^1 )^0
-  * named_pos_p("content_max", 1)
-  * white_p^0
-  * -black_p      -- no black character except "@" comment
-)^-1
+      get_spaced_p("@")
+    * named_pos_p("content_min")
+    * black_p^0
+    * ( white_p^1 * black_p^1 )^0
+    * named_pos_p("content_max", 1)
+    * white_p^0
+    * -black_p      -- no black character except "@" comment
+  )
+  + (
+      named_pos_p("content_min")
+    * named_pos_p("content_max", 1)
+  )
 
 ---Sub grammar for lua types
 ---@type lpeg.Pattern
@@ -339,6 +321,7 @@ local function make_class(Super, data)
   data.__Class = data -- more readable than __index
   local function __call(self, d, ...)  -- self is a constructor
     d = d or {}
+    d.ID = self.ID  -- hard code the ID for testing purposes
     setmetatable(d, self)
     if d.initialize then
       d:initialize(...)
@@ -425,8 +408,9 @@ AD.LineComment = make_class(AD.Content, {
   TYPE = "AD.LineComment",
   get_capture_p = function (self)
     return
-        (white_p^1 + -B("-"))             -- 1+ spaces or no "-" before, the back test should never be reached
-      * (P("-")^4
+        chunk_init_p
+      * (white_p^1 + -B("-"))             -- 1+ spaces or no "-" before, the back test should never be reached
+      * ( P("-")^4
         + P("--")
         * -P("-")                         -- >1 dashes, but not 3
         * -(P("[") * P("=")^0 * P("[")) -- no long comment
@@ -452,14 +436,15 @@ AD.LineDoc = make_class(AD.Content, {
   TYPE = "AD.LineDoc",
   get_capture_p = function (self)
     return
-        special_begin_p
+        chunk_init_p
+      * special_begin_p
       * -P("@")       -- negative lookahead: not an annotation
       * Ct(
           chunk_begin_p
         * white_p^0
         * named_pos_p("content_min")
         * black_p^0
-        * (white_p^1 * black_p^1)^0
+        * ( white_p^1 * black_p^1 )^0
         * named_pos_p("content_max", 1)
         * chunk_end_p
       ) / function (t)
@@ -476,7 +461,9 @@ do
   AD.ShortLiteral = make_class(AD.Content, {
     TYPE = "AD.ShortLiteral",
     get_capture_p = function (self)
-      return Ct(
+      return 
+          chunk_init_p
+        * Ct(
           white_p^0
         * Cg(S([['"]]), tag_del)
         * chunk_begin_p
@@ -555,15 +542,17 @@ do
     TYPE = "AD.LongLiteral",
     level = 0,
     get_capture_p = function (self)
-      return Ct(
-          open_p
-        * chunk_begin_p
-        * close_p
-        * chunk_end_p
-      ) / function (t)
-            t[tag_equal] = nil
-            return AD.LongLiteral(t)
-          end
+      return
+          chunk_init_p
+        * Ct(
+            open_p
+          * chunk_begin_p
+          * close_p
+          * chunk_end_p
+        ) / function (t)
+              t[tag_equal] = nil
+              return AD.LongLiteral(t)
+            end
     end,
   })
 end
@@ -618,9 +607,11 @@ do
     TYPE = "AD.LongComment",
     level = 0,
     get_capture_p = function (self)
-      return Ct(
-          prefix
-        * open_p
+      return
+          chunk_init_p
+        * prefix
+        * Ct(
+          open_p
         * chunk_begin_p
         * close_p
         * chunk_end_p
@@ -639,41 +630,44 @@ AD.LongDoc = make_class(AD.Content, {
   TYPE = "AD.LongDoc",
   level = 0,
   get_capture_p = function (self)
-    return Ct(
-      ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
-      * P("--[===[")
-      * eol_p
-      * chunk_begin_p
-      * named_pos_p("content_min")
-      * Cg(
-        Cmt(
-          P(0),
-          function (s, i)
-            local p = white_p^0 * P("-")^0 * P("]===]")
-            for j = i, #s - 1 - 3 do
-              local result = p:match(s, j)
-              if result then
-                return result, j - 1 -- capture `content_max`
+    return
+        chunk_init_p
+      * Ct(
+        ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
+        * P("--[===[")
+        * eol_p
+        * chunk_begin_p
+        * named_pos_p("content_min")
+        * Cg(
+          Cmt(
+            P(0),
+            function (s, i)
+              local p = white_p^0 * P("-")^0 * P("]===]")
+              for j = i, #s - 1 - 3 do
+                local result = p:match(s, j)
+                if result then
+                  return result, j - 1 -- capture `content_max`
+                end
               end
+              error("Missing delimiter `]===]`")
             end
-            error("Missing delimiter `]===]`")
+          ),
+          "content_max"
+        )
+        * chunk_end_p
+      ) / function (t)
+            return AD.LongDoc(t)
           end
-        ),
-        "content_max"
-      )
-      * chunk_end_p
-    ) / function (t)
-          return AD.LongDoc(t)
-        end
   end,
 })
 
 ---@alias AD.AllDoc AD.LongDoc|AD.LineDoc
+---@alias AD.AllComment AD.LongComment|AD.LineComment
 
 ---@class AD.Description: AD.Info
 ---@field public short            AD.LineDoc
 ---@field public long             AD.AllDoc[]
----@field public ignores          AD.AllDoc[]
+---@field public ignores          AD.AllComment[]
 ---@field public get_short_value  fun(self: AD.Description, s: string): string @ redundant declaration
 ---@field public get_long_value   fun(self: AD.Description, s: string): string @ redundant declaration
 
@@ -714,7 +708,7 @@ do
           + ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
           * Cb(tag_desc)
           / function (comment, desc)
-              append(desc.ignores, comment)
+            append(desc.ignores, comment)
               desc.max = comment.max
             end
         )^0
@@ -811,7 +805,9 @@ end
 ---@param self AD.At @ self is a "subclass" of AD.At
 ---@return lpeg.Pattern
 function AD.At:get_capture_p()
-  return at_match_p(self.KEY) * (
+  return
+        chunk_init_p
+      * at_match_p(self.KEY) * (
       Ct(
           chunk_begin_p
         * self:get_core_p() -- specific static pattern
@@ -983,8 +979,8 @@ do
       -- and return the AD.At.Class instance as sole capture
       * Cp()
       * Cb(tag_at)
-      / function (max, at)
-          at.max = max
+      / function (after, at)
+          at.max = after - 1
           return at -- captured
         end
       -- the temporary group is no longer available ?
@@ -1231,21 +1227,21 @@ do
     get_complete_p = function (self)
       -- capture a description or create a void one)
       return
-        -- capture a raw class annotation:
-        -- create an AD.At.Class instance
+        -- capture a complete functions annotation:
+        -- create an AD.At.Function instance
         -- capture it with the tag `tag_at`
         Cg(
-          Cmt (
-            ( AD.Description:get_capture_p() + Cc(AD.Description()) )
-            * (self:get_capture_p()
-              + start_with_param_p  -- when no ---@function is available
-              + start_with_vararg_p
-              + start_with_return_p
-            ),
-            function (desc, at)
-              at.description = desc
-            end
-          ),
+          ( AD.Description:get_capture_p() + Cc(AD.Description()) )
+          * (self:get_capture_p()
+            -- + start_with_param_p  -- when no ---@function is available
+            -- + start_with_vararg_p
+            -- + start_with_return_p
+          )
+          / function (desc, at)
+            at.description = desc
+            return at -- return the capture
+          end
+          ,
           tag_at
         )
         -- now capture all the other attributes
@@ -1255,10 +1251,10 @@ do
           + more_vararg_p
           + more_return_p
         )^0
-        * Cp() -- capture max
+        * Cp() -- capture after
         * Cb(tag_at)
-        / function (max, at)
-            at.max = max
+        / function (after, at)
+            at.max = after - 1
             return at -- return the capture
           end
     end
@@ -1281,7 +1277,8 @@ AD.Break = make_class(AD.Info, {
   TYPE = "AD.Break",
   get_capture_p = function (self)
     return
-      Ct(
+        chunk_init_p
+      * Ct(
         ( white_p^0 * P("\n") )^1
         * chunk_begin_p
         * chunk_end_p
@@ -1341,36 +1338,15 @@ do
   ---@type AD.Source
   AD.Source = make_class(AD.Info, {
     TYPE = "AD.Source",
-    capture =
-        chunk_init_p
-      * Cg(Ct(loop_p^0), "infos")
-      / function (t)
-          return AD.Source(t)
-        end
+    get_capture_p = function (self)
+      return
+          Ct( Cg( Ct(loop_p^0), "infos") )
+        / function (t)
+            return AD.Source(t)
+          end
+      end
   })
 end
-
---[[
-List of main patterns
-
-  short_literal_p
-  long_literal_p
-  AD.LineComment.pattern
-  AD.LongComment.pattern
-  capture_doc_p
-  capture_at_field_p
-  capture_at_see_p
-  capture_at_class_p
-  capture_class_p
-  capture_at_type_p
-  capture_at_param_p
-  capture_at_return_p
-  capture_at_generic_p
-  capture_at_vararg_p
-  capture_at_module_p
-  capture_at_global_p
- 
---]]
 
 -- Range
 

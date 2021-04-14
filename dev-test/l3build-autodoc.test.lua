@@ -2,7 +2,7 @@
 
 local write   = io.write
 
-local function pretty_print(tt, indent, done)
+function _G.pretty_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
   if type(tt) == "table" then
@@ -20,7 +20,7 @@ local function pretty_print(tt, indent, done)
         done[v] = true
         if next(v) then
           write(('["%s"]%s = {\n'):format(tostring(k), filler))
-          pretty_print(v, indent + w + 7, done)
+          _G.pretty_print(v, indent + w + 7, done)
           write((" "):rep( indent + w + 5)) -- indent it
           write("}\n")
         else
@@ -56,43 +56,379 @@ local Xpct, LU  = dofile("./l3b-expect.lua")
 local expect = Xpct.expect
 
 local lpeg    = require("lpeg")
+local P       = lpeg.P
+local Cg      = lpeg.Cg
+local Ct      = lpeg.Ct
+local Cc      = lpeg.Cc
+local Cb      = lpeg.Cb
+local V       = lpeg.V
+local Cp      = lpeg.Cp
+local Cmt     = lpeg.Cmt
 
-do
-  local p_one = lpeg.Cg(lpeg.P(1), "one")
-  local p_two = lpeg.Cg(lpeg.P(1), "two")
-  local t = lpeg.Ct(p_one*p_two):match("12")
-  expect(t.one).is("1")
-  expect(t.two).is("2")
-end
+---@class TestData
+---@field public s string   @ target
+---@field public m AD.Info  @ match result
+---@field public c string   @ comment
 
-do
-  -- print("POC min <- max + 1")
-  local p1 =
-      lpeg.Cg(lpeg.Cc(421), "min")
-    * lpeg.Cg(lpeg.Cc(123), "max")
-  local m = lpeg.Ct(p1):match("")
-  expect(m.min).is(421)
-  expect(m.max).is(123)
-  local p2 = p1 * lpeg.Cg(
-    lpeg.Cb("min") / function (min) return min + 1 end,
-    "max"
-  )
-  m = lpeg.Ct(p2):match("")
-  expect(m.min).is(421)
-  expect(m.max).is(422)
-end
-
+---@type TestData
+local TestData = {
+  s = "UNKNOWN",
+  m = { "UNKNOWN" },
+  c = "NOT AVAILABLE",
+}
+TestData.__index = TestData
+setmetatable(TestData, {
+  __call = function (self, d)
+    d = d or {}
+    return setmetatable(d, self)
+  end,
+})
 
 -- All the tests are object with next `MT` as metatable
-local MT = {}
+local MT = {
+  get_LINE_DOC = function ()
+    return TestData({
+----5----0----5----0----5----0
+      s = [[
+--- LINE DOC WITH 3 SPACES   
+]],
+      m = function (min)
+        min = min or 1
+        return AD.LineDoc({
+          min         = min,
+          content_min = min + 4,
+          content_max = min + 25,
+          max         = min + 29,
+        })
+      end,
+    })
+  end,
+  get_LONG_DOC = function ()
+    return TestData({
+----5----0----5----0----5----0
+      s = [[
+--[===[VEEEEEEEEERY
+LOOOOOOOOOOOOOOOONG
+DOOOOOOOOOOOOOOOOOC
+              ]===]
+]],
+      m = function (min) -- get the FIELD match
+        min = min or 1
+        return AD.LongDoc({
+          min         = min,
+          content_min = min + 7,
+          content_max = min + 59,
+          max         = min + 79,
+        })
+      end,
+    })
+  end,
+  get_FIELD = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+--- @field public NAME TYPE @ COMMENT39
+]],
+      c = "COMMENT39",
+      m = function (min, offset) -- get the FIELD match
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Field({
+          min         = min,
+          content_min = min + offset + 30,
+          content_max = min + offset + 38,
+          max         = min + offset + 39,
+          visibility  = "public",
+          name        = "NAME",
+          types       = { "TYPE" },
+        })
+      end,
+    })
+  end,
+  get_SEE = function()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+--- @see  reference
+]],
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.See({
+          min         = min,
+          content_min = min + offset + 10,
+          content_max = min + offset + 18,
+          max         = min + offset + 19,
+        })
+      end,
+    })
+  end,
+  get_CLASS = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+---@class NAME: PARENT @         COMMENT
+]],
+      c = "COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Class({
+          min         = min,
+          content_min = min + offset + 33,
+          content_max = min + offset + 39,
+          max         = min + offset + 40,
+        })
+      end,
+    })
+  end,
+  get_TYPE = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+---@type  TYPE | OTHER_TYPE @ COM  MENT
+]],
+      c = "COM  MENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Type({
+          min         = min,
+          content_min = min + offset + 30,
+          content_max = min + offset + 38,
+          max         = min + offset + 39,
+        })
+      end,
+    })
+  end,
+  get_MODULE = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+---   @module name_ @ COMMENT
+]],
+      c = "COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Module({
+          min         = min,
+          content_min = min + offset + 22,
+          content_max = min + offset + 28,
+          max         = min + offset + 29,
+        })
+      end,
+    })
+  end,
+  get_ALIAS = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5---|0----5
+      s = [=====[
+---   @alias  NAME TYPE@ SOME   COMMENT         
+]=====],
+      c = "SOME   COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Alias({
+          min         = min,
+          content_min = min + offset + 25,
+          content_max = min + offset + 38,
+          max         = min + offset + 48,
+        })
+      end,
+    })
+  end,
+  get_PARAM = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5---|0----5
+      s = [[
+---   @param NAME TYPE  |  OTHER@ COM    MENT
+]],
+      c = "COM    MENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Param({
+          min         = min,
+          content_min = min + offset + 34,
+          content_max = min + offset + 44,
+          max         = min + offset + 45,
+          name        = "NAME",
+          types       = { "TYPE", "OTHER", },
+        })
+      end,
+    })
+  end,
+  get_GENERIC = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---  @generic  T1 : P1, T2 : P2 @  COM    MENT
+]],
+      c = "COM    MENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Generic({
+          min         = min,
+          content_min = min + offset + 35,
+          content_max = min + offset + 45,
+          max         = min + offset + 46,
+          type_1      = "T1",
+          parent_1    = "P1",
+          type_2      = "T2",
+          parent_2    = "P2",
+        })
+      end,
+    })
+  end,
+  get_VARARG = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---@vararg    TYPE_|TYPE@CMT_
+]],
+      c = "CMT_",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Vararg({
+          min         = min,
+          content_min = min + offset + 25,
+          content_max = min + offset + 28,
+          max         = min + offset + 29,
+          types       = { "TYPE_", "TYPE" },
+        })
+      end,
+    })
+  end,
+  get_RETURN = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---   @return TYPE   |  OTHER @ COMMENT
+]],
+      c = "COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Return({
+          min         = min,
+          content_min = min + offset + 32,
+          content_max = min + offset + 38,
+          max         = min + offset + 39,
+          types       = { "TYPE", "OTHER" },
+        })
+      end,
+    })
+  end,
+  get_FUNCTION = function ()
+    return TestData({
+----5----0----5----0----5----0----5---|0----5----0
+      s = [[
+---  @function  NAME  @ COMMENT        
+]],
+      c = "COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Function({
+          min         = min,
+          content_min = min + offset + 24,
+          content_max = min + offset + 30,
+          max         = min + offset + 39,
+          name        = "NAME",
+        })
+      end,
+    })
+  end,
+  get_GLOBAL = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---  @global  NAME @ COMMENT
+]],
+      c = "COMMENT",
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Global({
+          min         = min,
+          content_min = min + offset + 21,
+          content_max = min + offset + 27,
+          max         = min + offset + 28,
+          name        = "NAME",
+        })
+      end,
+    })
+  end,
+  do_test_TD = function (self, Key)
+    local KEY = Key:upper()
+    local TD = self["get_".. KEY]()
+    local t = self.p:match(TD.s)
+    expect(t).contains(TD.m())
+    if TD.c then
+      expect(t:get_comment(TD.s)).is(TD.c)
+    end
+  end,
+  do_test_complete = function (self, Key)
+    local Class = AD.At[Key]
+    local TYPE = Class.TYPE
+    local KEY = Key:upper()
+    local TD = self["get_".. KEY]()
+    local p = AD.At[Key]:get_capture_p()
+    local s = TD.s
+    local t = p:match(s)
+    expect(t.TYPE).is(TYPE)
+    expect(t).contains(TD.m())
+
+    p = AD.At[Key]:get_complete_p()
+    t = p:match(s)
+    local TD_LINE_DOC = self.get_LINE_DOC()
+    s = TD_LINE_DOC.s .. TD.s
+    t = p:match(s)
+    -- print("t")
+    -- _G.pretty_print(t)
+    expect(t.TYPE).is(TYPE)
+    local LINE_DOC_m = TD_LINE_DOC.m()
+    -- print("LINE_DOC_m")
+    -- _G.pretty_print(LINE_DOC_m)
+    expect(t).contains(TD.m(1 + LINE_DOC_m.max))
+    expect(t.description.short).contains(LINE_DOC_m)
+
+    s = TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD.s
+    t = p:match(s)
+    expect(t.TYPE).is(TYPE)
+    expect(t).contains(TD.m(1 + 2 * LINE_DOC_m.max))
+    expect(t.description.short).contains(LINE_DOC_m)
+    
+    -- _G.pretty_print(t.description.long[1])
+    -- _G.pretty_print(self:get_LINE_DOC_m(LINE_DOC_m.max + 1))
+    
+    expect(t.description.long[1]).contains(TD_LINE_DOC.m(LINE_DOC_m.max + 1))
+    
+    s = TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD.s
+    t = p:match(s)
+    expect(t.TYPE).is(TYPE)
+    expect(t).contains(TD.m(1 + 3 * LINE_DOC_m.max))
+    expect(t.description.short).contains(LINE_DOC_m)
+    expect(t.description.long[2]).contains(TD_LINE_DOC.m(1 + 2 * LINE_DOC_m.max))
+
+    local TD_LONG_DOC = self.get_LONG_DOC()
+    s = TD_LINE_DOC.s .. TD_LONG_DOC.s .. TD.s
+    t = p:match(s)
+    expect(t.TYPE).is(TYPE)
+    local LONG_DOC_m = TD_LONG_DOC.m(LINE_DOC_m.max)
+
+    expect(t).contains(TD.m(1 + 1 + LONG_DOC_m.max))
+    expect(t.description.short).contains(LINE_DOC_m)
+    expect(t.description.long[1]).contains(TD_LONG_DOC.m(LINE_DOC_m.max + 1))
+  end,
+}
 MT.__index = MT
 function MT:new(d)
   return setmetatable(d or {}, self)
-end
-
-_G.test_Info = function ()
-  expect(AD.Info).is.NOT(nil)
-  expect(AD.Info.__Class).is(AD.Info)
 end
 
 function MT:add_strip(k)
@@ -104,6 +440,52 @@ function MT:p_test(target, expected, where)
   self:add_strip(1)
   expect(self.p:match(target, where)).is(expected)
   self:add_strip(-1)
+end
+
+_G.test_POC = MT:new({
+  test_Ct = function ()
+    local p_one = Cg(P(1), "one")
+    local p_two = Cg(P(1), "two")
+    local t = Ct(p_one*p_two):match("12")
+    expect(t.one).is("1")
+    expect(t.two).is("2")
+  end,
+  test_min_max = function(self)
+    -- print("POC min <- max + 1")
+    local p1 =
+        Cg(Cc(421), "min")
+      * Cg(Cc(123), "max")
+    local m = Ct(p1):match("")
+    expect(m.min).is(421)
+    expect(m.max).is(123)
+    local p2 = p1 * Cg(
+      Cb("min") / function (min) return min + 1 end,
+      "max"
+    )
+    m = Ct(p2):match("")
+    expect(m.min).is(421)
+    expect(m.max).is(422)
+  end,
+  test_table = function (self)
+    local p = P({
+      "type",
+      type = V("table") + P("abc"),
+      table =
+        P("table")   -- table<foo,bar>
+      * P( __.get_spaced_p("<")
+        * V("type")
+        * __.comma_p
+        * V("type")
+        * __.get_spaced_p(">")
+      )^-1,
+    })
+    expect((p * Cp()):match("table<abc,abc>")).is(15)
+  end
+})
+
+_G.test_Info = function ()
+  expect(AD.Info).is.NOT(nil)
+  expect(AD.Info.__Class).is(AD.Info)
 end
 
 _G.test_white_p = MT:new({
@@ -153,12 +535,6 @@ _G.test_eol_p = MT:new({
     self:p_test("\n   ", 2)  
   end
 })
-
-
-local P       = lpeg.P
-
-
-local t, p, f, s
 
 _G.test_variable_p = MT:new({
   setup = function (self)
@@ -223,20 +599,6 @@ _G.test_comma_p = MT:new({
   end
 })
 
-p = P({
-  "type",
-  type = lpeg.V("table") + P("abc"),
-  table =
-    P("table")   -- table<foo,bar>
-  * P( __.get_spaced_p("<")
-    * lpeg.V("type")
-    * __.comma_p
-    * lpeg.V("type")
-    * __.get_spaced_p(">")
-  )^-1,
-})
-expect((p * lpeg.Cp()):match("table<abc,abc>")).is(15)
-
 _G.test_lua_type_p = MT:new({
   setup = function (self)
     self.p = __.lua_type_p
@@ -265,7 +627,7 @@ _G.test_lua_type_p = MT:new({
 
 _G.test_named_types_p = MT:new({
   setup = function (self)
-    self.p = lpeg.Ct(__.named_types_p)
+    self.p = Ct(__.named_types_p)
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -282,7 +644,7 @@ _G.test_named_types_p = MT:new({
 
 _G.test_comment_p = MT:new({
   setup = function (self)
-    self.p = lpeg.Ct(__.capture_comment_p)
+    self.p = Ct(__.capture_comment_p)
   end,
   test = function (self)
     local t, s
@@ -300,7 +662,7 @@ _G.test_comment_p = MT:new({
 
 _G.test_comment_p_2 = MT:new({
   setup = function (self)
-    self.p = lpeg.Ct(
+    self.p = Ct(
         __.chunk_init_p
       * __.capture_comment_p
       * __.chunk_end_p
@@ -322,6 +684,7 @@ _G.test_comment_p_2 = MT:new({
   end
 })
 
+-- unused yet
 function MT:ad_test(target, expected, content, index)
   self:add_strip(1)
   local m = self.p:match(target, index)
@@ -333,261 +696,245 @@ end
 _G.test_ShortLiteral = MT:new({
   test_base = function ()
     local t = AD.ShortLiteral()
-    expect(t.__Class).is(AD.ShortLiteral)
-    expect(t.min).is(1)
-    expect(t.max).is(0)
-    expect(t.content_min).is(1)
-    expect(t.content_max).is(0)
+    expect(t).contains(AD.ShortLiteral({
+      min         = 1,
+      content_min = 1,
+      content_max = 0,
+      max         = 0,
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.ShortLiteral:get_capture_p()
+    self.p = AD.ShortLiteral:get_capture_p()
   end,
   test = function (self)
     local s, t
     expect(self.p).is.NOT(nil)
     s = '"234"  \n  '
     ---@type AD.ShortLiteral
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.ShortLiteral)
-    expect(t).equals({
+    t = self.p:match(s)
+    expect(t).contains(AD.ShortLiteral({
       min = 1,
-      max = 8,
       content_min = 2,
       content_max = 4,
-      code_before = {
-        max = 0,
-        min = 1,
-      },
-    })
+      max = 8,
+    }))
 
     s = "'234'  \n  "
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.ShortLiteral)
-    expect(t).contains({
+    t = self.p:match(s)
+    expect(t).contains(AD.ShortLiteral({
       min         = 1,
-      max         = 8,
       content_min = 2,
       content_max = 4,
-    })
+      max         = 8,
+    }))
   end
 })
 
 _G.test_LongLiteral = MT:new({
   test_base = function ()
     local t = AD.LongLiteral()
-    expect(t.__Class).is(AD.LongLiteral)
-    expect(t).contains({
+    expect(t).contains(AD.LongLiteral({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
+      max         = 0,
       level       = 0,
-    })
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.LongLiteral:get_capture_p()
+    self.p = AD.LongLiteral:get_capture_p()
   end,
   test = function (self)
     local s, t
     s = '[[345]]  \n  '
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.LongLiteral)
-    expect(t).contains({
+    t = self.p:match(s)
+    expect(t).contains(AD.LongLiteral({
       min         = 1,
-      max         = 10,
       content_min = 3,
       content_max = 5,
+      max         = 10,
       level       = 0,
-    })
+    }))
 
-    local t = self.p:match('[===[678]===]  \n  ')
-    expect(t.__Class).is(AD.LongLiteral)
-    expect(t).contains({
+    t = self.p:match('[===[678]===]  \n  ')
+    expect(t).contains(AD.LongLiteral({
       min         = 1,
-      max         = 16,
       content_min = 6,
       content_max = 8,
+      max         = 16,
       level       = 3,
-    })
+    }))
   end
 })
 
 _G.test_LineComment = MT:new({
   test_base = function ()
     local t = AD.LineComment()
-    expect(t.__Class).is(AD.LineComment)
-    expect(t).contains({
+    expect(t).contains(AD.LineComment({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.LineComment:get_capture_p()
+    self.p = AD.LineComment:get_capture_p()
   end,
   test = function (self)
-    local s, t
+    local t
     ---@type AD.LineComment
-    local t = self.p:match('-  \n  ')
+    t = self.p:match('-  \n  ')
     expect(t).is(nil)
-    local t = self.p:match('---  \n  ')
+    t = self.p:match('---  \n  ')
     expect(t).is(nil)
-    local t = self.p:match('---  \n  ', 2)
+    t = self.p:match('---  \n  ', 2)
     expect(t).is(nil)
 
-    local t = self.p:match('--  ')
-    expect(t.__Class).is(AD.LineComment)
-    expect(t).contains({
+    t = self.p:match('--  ')
+    expect(t).contains(AD.LineComment({
       min         = 1,
+      content_min = 5,
+      content_max = 4,
       max         = 4,
-      content_min = 5,
-      content_max = 4,
-    })
+    }))
 
-    local t = self.p:match('--  \n  ')
-    expect(t.__Class).is(AD.LineComment)
-    expect(t).contains({
+    t = self.p:match('--  \n  ')
+    expect(t).contains(AD.LineComment({
       min         = 1,
-      max         = 5,
       content_min = 5,
       content_max = 4,
-    })
+      max         = 5,
+    }))
 
-    local t = self.p:match('----------')
-    expect(t.__Class).is(AD.LineComment)
-    expect(t.min).is(1)
-    expect(t.max).is(10)
-    expect(t.content_min).is(11)
-    expect(t.content_max).is(10)
+    t = self.p:match('----------')
+    expect(t).contains(AD.LineComment({
+      min         = 1,
+      content_min = 11,
+      content_max = 10,
+      max         = 10,
+    }))
 
-    local t = self.p:match('-- 456 89A \n  ')
-    expect(t.__Class).is(AD.LineComment)
-    expect(t.min).is(1)
-    expect(t.max).is(12)
-    expect(t.content_min).is(4)
-    expect(t.content_max).is(10)
+    t = self.p:match('-- 456 89A \n  ')
+    expect(t).contains(AD.LineComment({
+      min         = 1,
+      content_min = 4,
+      content_max = 10,
+      max         = 12,
+    }))
   end
 })
 
 _G.test_LongComment = MT:new({
   test_base = function ()
     local t = AD.LongComment()
-    expect(t.__Class).is(AD.LongComment)
-    expect(t).contains({
+    expect(t).contains(AD.LongComment({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
+      max         = 0,
       level       = 0,
-    })
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.LongComment:get_capture_p()
+    self.p = AD.LongComment:get_capture_p()
   end,
   test = function (self)
     local s, t
     ---@type AD.LongComment
-    local t = self.p:match('--  \n  ')
+    t = self.p:match('--  \n  ')
     expect(t).is(nil)
 
-    local t = self.p:match('--[[56 89A]]')
-    expect(t.__Class).is(AD.LongComment)
-    expect(t).contains({
+    t = self.p:match('--[[56 89A]]')
+    expect(t).contains(AD.LongComment({
       min         = 1,
-      max         = 12,
       content_min = 5,
       content_max = 10,
-      level       = 0,
-    })
-
-    local t = self.p:match('--[[\n6 89A]]')
-    expect(t.__Class).is(AD.LongComment)
-    expect(t).contains({
-      min         = 1,
       max         = 12,
+      level       = 0,
+    }))
+
+    t = self.p:match('--[[\n6 89A]]')
+    expect(t).contains(AD.LongComment({
+      min         = 1,
       content_min = 6,
       content_max = 10,
+      max         = 12,
       level       = 0,
-    })
+    }))
 
-    local t = self.p:match('--[[\n  8\nA  ]]')
-    expect(t.__Class).is(AD.LongComment)
-    expect(t).contains({
+    t = self.p:match('--[[\n  8\nA  ]]')
+    expect(t).contains(AD.LongComment({
       min         = 1,
+      content_min = 6,
+      content_max = 10,
       max         = 14,
-      content_min = 6,
-      content_max = 10,
       level       = 0,
-    })
+    }))
 
-    local t = self.p:match('--[==[78]=] \n ]==] ')
-    expect(t.__Class).is(AD.LongComment)
-    expect(t).contains({
+    t = self.p:match('--[==[78]=] \n ]==] ')
+    expect(t).contains(AD.LongComment({
       min         = 1,
-      max         = 19,
       content_min = 7,
       content_max = 13,
+      max         = 19,
       level       = 2,
-    })
+    }))
   end
 })
 
 _G.test_LineDoc = MT:new({
   test_base = function ()
     local t = AD.LineDoc()
-    expect(t.__Class).is(AD.LineDoc)
-    expect(t).contains({
+    expect(t).contains(AD.LineDoc({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.LineDoc:get_capture_p()
+    self.p = AD.LineDoc:get_capture_p()
   end,
   test = function (self)
     local s, t
-    local t = self.p:match('-- ')
+    t = self.p:match('-- ')
     expect(t).is(nil)
-    local t = self.p:match('---- ')
+    t = self.p:match('---- ')
     expect(t).is(nil)
-    local t = self.p:match('---- ', 1)
+    t = self.p:match('---- ', 1)
     expect(t).is(nil)
 
-    local t = self.p:match('---')
-    expect(t.__Class).is(AD.LineDoc)
-    expect(t.min).is(1)
-    expect(t.max).is(3)
-    expect(t.content_min).is(4)
-    expect(t.content_max).is(3)
+    t = self.p:match('---')
+    expect(t).contains(AD.LineDoc({
+      min         = 1,
+      content_min = 4,
+      content_max = 3,
+      max         = 3,
+    }))
 
-    local t = self.p:match('---456789A')
-    expect(t.__Class).is(AD.LineDoc)
-    expect(t.min).is(1)
-    expect(t.max).is(10)
-    expect(t.content_min).is(4)
-    expect(t.content_max).is(10)
+    t = self.p:match('---456789A')
+    expect(t).contains(AD.LineDoc({
+      min         = 1,
+      content_min = 4,
+      content_max = 10,
+      max         = 10,
+    }))
 
-    local t = self.p:match('--- 56 89 ')
-    expect(t.__Class).is(AD.LineDoc)
-    expect(t.min).is(1)
-    expect(t.max).is(10)
-    expect(t.content_min).is(5)
-    expect(t.content_max).is(9)
+    t = self.p:match('--- 56 89 ')
+    expect(t).contains(AD.LineDoc({
+      min         = 1,
+      content_min = 5,
+      content_max = 9,
+      max         = 10,
+    }))
 
-    local t = self.p:match('--- 56 89 \n')
-    expect(t.__Class).is(AD.LineDoc)
-    expect(t.min).is(1)
-    expect(t.max).is(11)
-    expect(t.content_min).is(5)
-    expect(t.content_max).is(9)
+    t = self.p:match('--- 56 89 \n')
+    expect(t).contains(AD.LineDoc({
+      min         = 1,
+      content_min = 5,
+      content_max = 9,
+      max         = 11,
+    }))
 
     s = [=====[
 ---456789
@@ -599,6 +946,70 @@ _G.test_LineDoc = MT:new({
     expect(self.p:match(s, 21).max).is(30)
     expect((self.p^2):match(s, 1)).is.NOT(nil)
     expect((self.p^2):match(s, 11)).is.NOT(nil)
+
+    local TD = self.get_LINE_DOC()
+    t = self.p:match(TD.s)
+    expect(t).contains(TD.m())
+  end
+})
+
+_G.test_LongDoc = MT:new({
+  test_base = function ()
+    local t = AD.LongDoc()
+    expect(t).contains(AD.LongDoc({
+      min         = 1,
+      content_min = 1,
+      content_max = 0,
+      max         = 0,
+    }))
+  end,
+  setup = function (self)
+    self.p = AD.LongDoc:get_capture_p()
+  end,
+  test = function (self)
+    local s, t
+    t = self.p:match('-- ')
+    expect(t).is(nil)
+    t = self.p:match('--- ')
+    expect(t).is(nil)
+    t = self.p:match('--- ', 1)
+    expect(t).is(nil)
+
+    t = self.p:match('--[===[]===]')
+    expect(t).contains(AD.LongDoc({
+      min         = 1,
+      content_min = 8,
+      content_max = 7,
+      max         = 12,
+    }))
+
+    t = self.p:match('--[===[89AB]===]')
+    expect(t).contains(AD.LongDoc({
+      min         = 1,
+      content_min = 8,
+      content_max = 11,
+      max         = 16,
+    }))
+
+    t = self.p:match('--[===[09 B]===]')
+    expect(t).contains(AD.LongDoc({
+      min         = 1,
+      content_min = 8,
+      content_max = 11,
+      max         = 16,
+    }))
+
+    t = self.p:match('--[===[09 B]===]\n')
+    expect(t).contains(AD.LongDoc({
+      min         = 1,
+      content_min = 8,
+      content_max = 11,
+      max         = 17,
+    }))
+
+    local TD = self.get_LONG_DOC()
+    t = self.p:match(TD.s)
+    expect(t).contains(TD.m())
   end
 })
 
@@ -608,198 +1019,276 @@ _G.test_Description = MT:new({
     expect(t.__Class).is(AD.Description)
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.Description:get_capture_p()
+    self.p = AD.Description:get_capture_p()
   end,
   test = function (self)
     local s, t
-    local t = self.p:match("--")
+    t = self.p:match("--")
     expect(t).is(nil)
 
-    expect(self.p:match("---")).is.NOT(nil)
-    expect(self.p:match("---\n---")).is.NOT(nil)
     expect(self.p:match("---\n--[===[]===]")).is.NOT(nil)
 
     ---@type AD.Description
-    local t = self.p:match("---")
-    expect(t.__Class).is(AD.Description)
-    expect(t.short.__Class).is(AD.LineDoc)
-    expect(#t.long).is(0)
-    expect(t.min).is(1)
-    expect(t.max).is(3)
+    t = self.p:match("---")
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 3,
+      long  = {},
+      short = AD.LineDoc({
+        min   = 1,
+        max   = 3,
+      }),
+    }))
 
-    local t = self.p:match("---\n")
-    expect(t.max).is(4)
+    t = self.p:match("---\n")
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 4,
+      long  = {},
+    }))
 
-    local t = self.p:match("---\ns")
-    expect(t.max).is(4)
+    t = self.p:match("---\ns")
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 4,
+      long  = {},
+    }))
 
-    local t = self.p:match("---\n\n")
-    expect(t.max).is(4)
 
-    local t = self.p:match("-- \n---")
+    t = self.p:match("---\n\n")
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 4,
+      long  = {},
+    }))
+
+    t = self.p:match("-- \n---")
     expect(t).is(nil)
 
-    local t = self.p:match("---\n---")
+    s = "---\n---"
+    t = self.p:match(s)
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 7,
+      short = AD.LineDoc({
+        min         = 1,
+        content_min = 4,
+        content_max = 3,
+        max         = 4,
+      }),
+      long  = { AD.LineDoc({
+        min         = 5,
+        content_min = 8,
+        content_max = 7,
+        max         = 7,
+      }) },
+    }))
 
-    expect(t.__Class).is(AD.Description)
-    expect(t.short.__Class).is(AD.LineDoc)
-    expect(#t.long).is(1)
-    expect(t.long[1].__Class).is(AD.LineDoc)
-    expect(t.long[1].max).is(7)
-    expect(t.max).is(7)
-
+----5----0----5----0----5----0----5----0----5
     s = [=====[
 ---
 --[[]]
 ]=====]
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.Description)
-    expect(t.short.__Class).is(AD.LineDoc)
-    expect(#t.long).is(0)
-    expect(t.max).is(11)
+    t = self.p:match(s)
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 11,
+      short = AD.LineDoc({
+        min         = 1,
+        content_min = 4,
+        content_max = 3,
+        max         = 4,
+      }),
+      long  = {},
+    }))
 
-    s = [=====[
+----5----0----5----0----5----0----5----0----5
+s = [=====[
 ---
 --[===[]===]
 ]=====]
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.Description)
-    expect(t.short.__Class).is(AD.LineDoc)
-    expect(#t.long).is(1)
-    expect(t.long[1].__Class).is(AD.LongDoc)
-    expect(t.min).is(1)
-    expect(t.max).is(17)
+    t = self.p:match(s)
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 17,
+      short = AD.LineDoc({
+        min         = 1,
+        content_min = 4,
+        content_max = 3,
+        max         = 4,
+      }),
+      long  = { AD.LongDoc({
+        min         = 5,
+        content_min = 12,
+        content_max = 11,
+        max         = 17,
+      }) }
+    }))
 
-    s = [=====[
+----5----0----5----0----5----0----5----0----5
+s = [=====[
 ---
 --[===[]===]
 --
 ---
 s   s
 ]=====]
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.Description)
-    expect(t.short.__Class).is(AD.LineDoc)
-    expect(#t.long).is(2)
-    expect(t.long[1].__Class).is(AD.LongDoc)
-    expect(t.long[2].__Class).is(AD.LineDoc)
-    expect(t.max).is(24)
+    t = self.p:match(s)
+    expect(t).contains(AD.Description({
+      min   = 1,
+      max   = 24,
+      short = AD.LineDoc({
+        min   = 1,
+        content_min = 4,
+        content_max = 3,
+        max   = 4,
+      }),
+      long  = {
+        AD.LongDoc({
+          min   = 5,
+          content_min = 12,
+          content_max = 11,
+          max   = 17,
+        }),
+        AD.LineDoc({
+          min   = 21,
+          content_min = 24,
+          content_max = 23,
+          max   = 24,
+        })
+      },
+    }))
   end
 })
 
 _G.test_Field = MT:new({
   test_base = function ()
     local t = AD.At.Field()
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    expect(t).contains(AD.At.Field({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }))
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Field:get_capture_p()
+    self.p = AD.At.Field:get_capture_p()
   end,
   test = function (self)
     local s, t
-    expect(function () self.p:match("--- @field public foo") end).error()
+    expect(
+      function ()
+        self.p:match("--- @field public foo")
+      end
+    ).error()
 
-    expect(function () self.p:match("--- @field public foo \n bar") end).error()
+    expect(
+      function ()
+        self.p:match("--- @field public foo \n bar")
+      end
+    ).error()
 
+    --   ----5----0----5----0----5----0
+    s = "--- @field public f21 b25"
     ---@type AD.At.Field
-    t = self.p:match("--- @field public f21 b25")
-
-    expect(lpeg.Ct(__.named_types_p):match("--- @field public f21 b25", 23)).equals({
-      types = { "b25" },
-    })
-
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    t = self.p:match(s)
+    expect(t).contains(AD.At.Field({
       min         = 1,
+      content_min = 26,
+      content_max = 25,
       max         = 25,
       visibility  = "public",
       name        = "f21",
       types       = { "b25" },
-    })
+    }))
 
-    t = self.p:match("--- @field private f22 b26\n   ")
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    --   ----5----0----5----0----5----0----5
+    s = "--- @field private f22 b26\n   "
+    ---@type AD.At.Field
+    t = self.p:match(s)
+    expect(t).contains( AD.At.Field({
       min         = 1,
+      content_min = 27,
+      content_max = 26,
       max         = 27,
       visibility  = "private",
       name        = "f22",
       types       = { "b26" },
-    })
+    }) )
 
-    ----5----0   ----5----0----5----0----5----0----5----0----5
-    local t = self.p:match("--- @field private f22 b26 @ commentai40   ")
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "--- @field private f22 b26 @ commentai40   "
+    t = self.p:match(s)
+    expect(t).contains( AD.At.Field({
       min         = 1,
-      max         = 43,
       content_min = 30,
       content_max = 40,
+      max         = 43,
       visibility  = "private",
       name        = "f22",
       types       = { "b26" },
-    })
+    }) )
 
-    local t = self.p:match("--- @field private f22 b26\n   ")
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "--- @field private f22 b26\n   "
+    t = self.p:match(s)
+    expect(t).contains( AD.At.Field({
       min         = 1,
+      content_min = 27,
+      content_max = 26,
       max         = 27,
-      content_min = 1,
-      content_max = 0,
       visibility  = "private",
       name        = "f22",
       types       = { "b26" },
-    })
+    }) )
 
-    local t = self.p:match("123456789--- @field private f22 b26\n   ", 10)
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "123456789--- @field private f22 b26\n   "
+    t = self.p:match(s, 10)
+    expect(t).contains( AD.At.Field({
       min         = 10,
+      content_min = 36,
+      content_max = 35,
       max         = 36,
-      content_min = 1,
-      content_max = 0,
       visibility  = "private",
       name        = "f22",
       types       = { "b26" },
-    })
+    }) )
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Field")
   end
 })
 
 _G.test_See = MT:new({
   test_base = function ()
     local t = AD.At.See()
-    expect(t.__Class).is(AD.At.See)
-    expect(t).contains({
+    expect(t).contains( AD.At.See({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.See:get_capture_p()
+    self.p = AD.At.See:get_capture_p()
   end,
   test = function (self)
     local s, t
+    --   ----5----0----5----0----5----0----5----0----5
     s = "---@see 9hat do you want of 30  "
     ---@type AD.At.See
-    local t = self.p:match(s)
-    expect(t.__Class).is(AD.At.See)
-    expect(t.min).is(1)
-    expect(t.max).is(32)
-    expect(t.content_min).is(9)
-    expect(t.content_max).is(30)
+    t = self.p:match(s)
+    expect(t).contains( AD.At.See({
+      min         = 1,
+      content_min = 9,
+      content_max = 30,
+      max         = 32,
+    }) )
     expect(t:get_content(s)).is("9hat do you want of 30")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("See")
   end
 })
 
@@ -807,423 +1296,296 @@ _G.test_See = MT:new({
 _G.test_Class = MT:new({
   test_base = function (self)
     local t = AD.At.Class()
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
+    expect(t).contains( AD.At.Class({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Class:get_capture_p()
+    self.p = AD.At.Class:get_capture_p()
   end,
   test = function (self)
     local s, t
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "---@class MY_TY17"
     ---@type AD.At.Class
-    t = self.p:match("---@class MY_TY17")
+    t = self.p:match(s)
 
     expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
+    expect(t).contains( AD.At.Class({
       min         = 1,
+      content_min = 18,
+      content_max = 17,
       max         = 17,
-      content_min = 1,
-      content_max = 0,
-    })
+    }) )
     expect(t.parent).is(nil)
-    
+
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "---@class AY_TYPE: PARENT_TY30"
     ---@type AD.At.Class
-    t = self.p:match("---@class AY_TYPE: PARENT_TY30")
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
+    t = self.p:match(s)
+    expect(t).contains( AD.At.Class({
       min         = 1,
+      content_min = 31,
+      content_max = 30,
       max         = 30,
-      content_min = 1,
-      content_max = 0,
       name        = "AY_TYPE",
       parent      = "PARENT_TY30",
-    })
-----5----0----5----0----5----0----5----0----5----|
-    s = [[
----@class TYPE: PARENT @         COMMENT]]
+    }) )
 
+    local TD = self.get_CLASS()
     ---@type AD.At.Class
-    t = self.p:match(s)
-    expect(t).contains({
-      min         = 1,
-      max         = 40,
-      content_min = 34,
-      content_max = 40,
-      name        = "TYPE",
-      parent      = "PARENT",
-    })
-    expect(t:get_comment(s)).is("COMMENT")
-
-  end
-})
-
--- @class MY_TYPE[:PARENT_TYPE] [@comment]
-_G.test_Class2 = MT:new({
-  setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Class:get_complete_p()
+    t = self.p:match(TD.s)
+    expect(t).contains(TD.m())
+    expect(t:get_comment(TD.s)).is(TD.c)
   end,
-  test_base = function (self)
-----5----0----5----0----5----0----5----0----5----
-    s = [[
----@class TYPE: PARENT @        COMMENT
----@field protected NAME TYPE @   OTHER]]
-    ---@type AD.At.Class
-    t = self.p:match(s)
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
-      min         = 1,
-      max         = 80,
-      content_min = 33,
-      content_max = 39,
-      name        = "TYPE",
-      parent      = "PARENT",
-    })
-    expect(t:get_comment(s)).is("COMMENT")
-    ---@type AD.At.Class
-    t = self.p:match(s)
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
-      min         = 1,
-      max         = 80,
-      content_min = 33,
-      content_max = 39,
-      name        = "TYPE",
-      parent      = "PARENT",
-    })
-    expect(t:get_comment(s)).is("COMMENT")
+  test_complete = function (self)
+    self:do_test_complete("Class")
 
-    expect(#t.fields).is(1)
-    local f = t.fields[1]
-    expect(f.name).is("NAME")
-    expect(f.types).equal({ "TYPE" })
-    expect(f:get_comment(s)).is("OTHER")
+    local p = AD.At.Class:get_complete_p()
+    local TD_CLASS = self:get_CLASS()
+    local TD_FIELD = self:get_FIELD()
+    local s = TD_CLASS.s .. TD_FIELD.s
+    local t = p:match(s)
+    local CLASS_m = TD_CLASS.m()
+    local FIELD_m = TD_FIELD.m(1 + CLASS_m.max)
+    CLASS_m.max = FIELD_m.max
+    CLASS_m.fields = { FIELD_m }
+  end,
 
-    expect(t.see).is(nil)
-
-    ---@type AD.At.Class
-          ----5----0----5----0----5----0----5----0----5----
-    s = [[---@class MY_TYPE: PARENT_TYPE @ COMMENT
----SHORT DOC
----@field public NAME TYPE @ OTHER COMMENT]]
-    t = self.p:match(s)
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
-      min         = 1,
-      max         = 97,
-      content_min = 34,
-      content_max = 40,
-      name        = "MY_TYPE",
-      parent      = "PARENT_TYPE",
-    })
-    expect(t:get_comment(s)).is("COMMENT")
-
-    expect(#t.fields).is(1)
-    local f = t.fields[1]
-    expect(f.name).is("NAME")
-    expect(f.types).equal({ "TYPE" })
-    expect(f:get_comment(s)).is("OTHER COMMENT")
-
-    expect(t.see).is(nil)
-
-    expect(f.description).is.NOT(nil)
-    expect(f:get_short_description(s)).is("SHORT DOC")
-    expect(f:get_long_description(s)).is("")
-
-----5----0----5----0----5----0----5----0----5----
-    s = [=====[
----@class MY_TYPE: PARENT_TYPE @ COMMENT
----@field public NAME TYPE @ OTHER COMMENT
----SEE SHORT DESCRIPTION
---[===[SEE LONG DESCRIPTION]===]
----@see SEE
-  foo bar]=====]
-    ---@type AD.At.Class
-    t = self.p:match(s)
-    expect(t.__Class).is(AD.At.Class)
-    expect(t).contains({
-      min         = 1,
-      max         = 155,
-      content_min = 34,
-      content_max = 40,
-      name        = "MY_TYPE",
-      parent      = "PARENT_TYPE",
-    })
-    expect(t:get_comment(s)).is("COMMENT")
-
-    expect(#t.fields).is(1)
-    local f = t.fields[1]
-    expect(f.name).is("NAME")
-    expect(f.types).equal({ "TYPE" })
-    expect(f:get_content(s)).is("OTHER COMMENT")
-
-    expect(t.see:get_short_description(s)).is("SEE SHORT DESCRIPTION")
-    expect(t.see:get_long_description(s)).is("SEE LONG DESCRIPTION")
-
-    ---@type AD.At.Field
-    t = (__.chunk_init_p * AD.At.Field:get_capture_p()):match(s, 42)
-    expect(t.__Class).is(AD.At.Field)
-    expect(t).contains({
-      min         = 42,
-      max         = 84,
-      content_min = 71,
-      content_max = 83,
-      visibility  = "public",
-      name        = "NAME",
-      types       = { "TYPE" },
-    })
-    expect(t:get_comment(s)).is("OTHER COMMENT")
-  end
 })
 
 _G.test_Type = MT:new({
   test_base = function ()
     local t = AD.At.Type()
-    expect(t.__Class).is(AD.At.Type)
-    expect(t).contains({
+    expect(t).contains( AD.At.Type({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Type:get_capture_p()
+    self.p = AD.At.Type:get_capture_p()
   end,
   test = function (self)
     local s, t
+----5----0----5----0----5----0----5----0
     s = [=====[
 ---@type MY_TYPE]=====]
+    ---@type AD.At.Type
     t = self.p:match(s)
-    expect(t).is.NOT(nil)
-    expect(t.types).equal({ "MY_TYPE" })
+    expect(t).contains( AD.At.Type({
+      min = 1,
+      content_min = 17,
+      content_max = 16,
+      max = 16,
+      types = { "MY_TYPE" },
+    }) )
 
-    s = [=====[
+----5----0----5----0----5----0----5----0
+s = [=====[
 ---@type MY_TYPE|OTHER_TYPE]=====]
+    ---@type AD.At.Type
     t = self.p:match(s)
-    expect(t).is.NOT(nil)
-    expect(t.types).equal({ "MY_TYPE", "OTHER_TYPE" })
+    expect(t).contains( AD.At.Type({
+      min = 1,
+      content_min = 28,
+      content_max = 27,
+      max = 27,
+      types = { "MY_TYPE", "OTHER_TYPE" },
+    }) )
 
+----5----0----5----0----5----0----5----0
     s = [=====[
 ---@type MY_TYPE|OTHER_TYPE @ COMMENT ]=====]
+    ---@type AD.At.Type
     t = self.p:match(s)
-    expect(t).is.NOT(nil)
+    expect(t).contains( AD.At.Type({
+      min = 1,
+      content_min = 31,
+      content_max = 37,
+      max = 38,
+      types = { "MY_TYPE", "OTHER_TYPE" },
+    }) )
     expect(t:get_content(s)).is("COMMENT")
 
-  end
-})
-
-_G.test_Type2 = MT:new({
-  test_base = function ()
-    local t = AD.At.Type()
-    expect(t.__Class).is(AD.At.Type)
-    expect(t).contains({
-      min         = 1,
-      max         = 0,
-      content_min = 1,
-      content_max = 0,
-    })
+    local TD = self.get_TYPE()
+    ---@type AD.At.Type
+    t = self.p:match(TD.s)
+    expect(t).contains(TD.m())
+    expect(t:get_comment(TD.s)).is(TD.c)
   end,
-  setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Type:get_complete_p()
+  test_complete = function (self)
+    self:do_test_complete("Type")
   end,
-  test = function (self)
-    local s, t
-    s = [=====[
----SHORT DESCRIPTION
----@type MY_TYPE|OTHER_TYPE]=====]
-    t = self.p:match(s)
-    expect(t).is.NOT(nil)
-    expect(t:get_short_description(s)).is("SHORT DESCRIPTION")
-    expect(t:get_long_description(s)).is("")
-
-    s = [=====[
----SHORT DESCRIPTION
---[===[LONG DESCRIPTION]===]
----@type MY_TYPE|OTHER_TYPE]=====]
-    t = self.p:match(s)
-    expect(t).is.NOT(nil)
-    expect(t:get_short_description(s)).is("SHORT DESCRIPTION")
-    expect(t:get_long_description(s)).is("LONG DESCRIPTION")
-  end
 })
 
 _G.test_Alias = MT:new({
   test_base = function ()
     local t = AD.At.Alias()
-    expect(t.__Class).is(AD.At.Alias)
-    expect(t).contains({
+    expect(t).contains( AD.At.Alias({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Alias:get_capture_p()
+    self.p = AD.At.Alias:get_capture_p()
   end,
   test = function (self)
     local s, t
-    s = [=====[
+----5----0----5----0----5----0----5----0
+s = [=====[
 ---@alias NEW_NAME TYPE ]=====]
     ---@type AD.At.Alias
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Alias({
       min         = 1,
+      content_min = 24,
+      content_max = 23,
       max         = 24,
-      content_min = 1,
-      content_max = 0,
       name        = "NEW_NAME",
       types       = { "TYPE" },
-    })
+    }) )
 
+----5----0----5----0----5----0----5----0
     s = [=====[
 ---@alias NEW_NAME TYPE | OTHER_TYPE ]=====]
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Alias({
       min         = 1,
+      content_min = 37,
+      content_max = 36,
       max         = 37,
-      content_min = 1,
-      content_max = 0,
       name        = "NEW_NAME",
       types       = { "TYPE", "OTHER_TYPE" },
-    })
+    }) )
 
     ----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@alias     NAME TYPE @ SOME   COMMENT]=====]
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Alias({
       min         = 1,
-      max         = 40,
       content_min = 27,
       content_max = 40,
+      max         = 40,
       name        = "NAME",
       types       = { "TYPE" },
-    })
+    }) )
     expect(t:get_comment(s)).is("SOME   COMMENT")
 
---[[
-  at_match_p(self.KEY) * (
-  Ct(
-      chunk_begin_p
-    * Cg(identifier_p, "name")
-    * white_p^1
-    * named_types_p
-    * capture_comment_p
-    * chunk_end_p
-  )
-  / function (at)
-      return self(at)
-    end
-  + error_annotation_p
-)
-    
-
-
-]]
 ----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@alias     NAME TYPE @ SOME   COMMENT         
     SUITE                                        ]=====]
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Alias({
       min         = 1,
-      max         = 50,
       content_min = 27,
       content_max = 40,
+      max         = 50,
       name        = "NAME",
       types       = { "TYPE" },
-    })
+    }) )
     expect(t:get_comment(s)).is("SOME   COMMENT")
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Alias")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Alias")
+  end,
 })
 
 _G.test_Param = MT:new({
   test_base = function ()
     local t = AD.At.Param()
-    expect(t.__Class).is(AD.At.Param)
-    expect(t).contains({
+    expect(t).contains( AD.At.Param({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Param:get_capture_p()
+    self.p = AD.At.Param:get_capture_p()
   end,
   test = function (self)
     local s, t
-    ----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@param NAME TYPE]=====]
+    ---@type AD.At.Param
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Param({
       min         = 1,
+      content_min = 20,
+      content_max = 19,
       max         = 19,
-      content_min = 1,
-      content_max = 0,
       name        = "NAME",
       types       = { "TYPE" },
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
-    ----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@param NAME TYPE
 ]=====]
+    ---@type AD.At.Param
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Param({
       min         = 1,
+      content_min = 20,
+      content_max = 19,
       max         = 20,
-      content_min = 1,
-      content_max = 0,
       name        = "NAME",
       types       = { "TYPE" },
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
-    ----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@param NAME TYPE  |  OTHER
 ]=====]
+    ---@type AD.At.Param
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Param({
       min         = 1,
+      content_min = 30,
+      content_max = 29,
       max         = 30,
-      content_min = 1,
-      content_max = 0,
       name        = "NAME",
       types       = { "TYPE", "OTHER" },
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
     ----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@param NAME TYPE  |  OTHER@  COMMENT
 ]=====]
+    ---@type AD.At.Param
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Param({
       min         = 1,
-      max         = 40,
       content_min = 33,
       content_max = 39,
+      max         = 40,
       name        = "NAME",
       types       = { "TYPE", "OTHER" },
-    })
+    }) )
     expect(t:get_comment(s)).is("COMMENT")
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Param")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Param")
+  end,
 })
 
 _G.test_Return = MT:new({
@@ -1256,7 +1618,13 @@ _G.test_Return = MT:new({
       types       = { "TYPE", "OTHER" },
     })
     expect(t:get_comment(s)).is("COMMENT")
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Return")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Return")
+  end,
 })
 
 _G.test_Generic = MT:new({
@@ -1341,84 +1709,95 @@ _G.test_Generic = MT:new({
     expect(t:get_content(s)).is("COMMENT")
     expect(t.min).is(1)
     expect(t.max).is(60)
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Generic")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Generic")
+  end,
 })
 
 _G.test_Vararg = MT:new({
   test_base = function ()
     local t = AD.At.Vararg()
-    expect(t.__Class).is(AD.At.Vararg)
-    expect(t).contains({
+    expect(t).contains( AD.At.Vararg({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Vararg:get_capture_p()
+    self.p = AD.At.Vararg:get_capture_p()
   end,
   test = function (self)
     local s, t
-    ----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@vararg    TYPE_
 ]=====]
+    ---@type AD.At.Vararg
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Vararg({
       min         = 1,
+      content_min = 20,
+      content_max = 19,
       max         = 20,
-      content_min = 1,
-      content_max = 0,
       types       = { "TYPE_" },
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@vararg    TYPE_|TYPE
 ]=====]
+    ---@type AD.At.Vararg
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Vararg({
       min         = 1,
+      content_min = 25,
+      content_max = 24,
       max         = 25,
-      content_min = 1,
-      content_max = 0,
       types       = { "TYPE_", "TYPE" },
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@vararg    TYPE_|TYPE@CMT_
 ]=====]
+    ---@ype AD.At.Vararg
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Vararg({
       min         = 1,
-      max         = 30,
       content_min = 26,
       content_max = 29,
+      max         = 30,
       types       = { "TYPE_", "TYPE" },
-    })
+    }) )
     expect(t:get_content(s)).is("CMT_")
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Vararg")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Vararg")
+  end,
 })
 
 _G.test_Module = MT:new({
   test_base = function ()
     local t = AD.At.Module()
-    expect(t.__Class).is(AD.At.Module)
-    expect(t).contains({
+    expect(t).contains( AD.At.Module({
       min         = 1,
-      max         = 0,
       content_min = 1,
       content_max = 0,
-    })
+      max         = 0,
+    }) )
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
-      * AD.At.Module:get_capture_p()
+    self.p = AD.At.Module:get_capture_p()
   end,
   test = function (self)
     local s, t
@@ -1428,13 +1807,13 @@ _G.test_Module = MT:new({
 ]=====]
     ---@type AD.At.Module
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Module({
       min         = 1,
+      content_min = 20,
+      content_max = 19,
       max         = 20,
-      content_min = 1,
-      content_max = 0,
       name        = "name_",
-    })
+    }) )
     expect(t:get_comment(s)).is("")
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
@@ -1442,24 +1821,38 @@ _G.test_Module = MT:new({
 ---   @module name_ @ COMMENT
 ]=====]
     t = self.p:match(s)
-    expect(t).contains({
+    expect(t).contains( AD.At.Module({
       min         = 1,
-      max         = 30,
       content_min = 23,
       content_max = 29,
+      max         = 30,
       name        = "name_",
-    })
+    }) )
     expect(t:get_comment(s)).is("COMMENT")
-  end
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Module")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Module")
+  end,
 })
 
-_G.test_Function = {
+_G.test_Function = MT:new({
+  test_base = function ()
+    local t = AD.At.Function()
+    expect(t).contains( AD.At.Function({
+      min         = 1,
+      content_min = 1,
+      content_max = 0,
+      max         = 0,
+    }) )
+  end,
   setup = function (self)
-    self.p =
-        __.chunk_init_p
-      * AD.At.Function:get_capture_p()
+    self.p = AD.At.Function:get_capture_p()
   end,
   test = function (self)
+    local s, t
 ---5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@function  name_
@@ -1484,13 +1877,24 @@ _G.test_Function = {
     })
     expect(t:get_comment(s)).is("COMMENT")
   end,
-}
+  test_TD = function (self)
+    self:do_test_TD("Function")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Function")
+  end,
+})
 
 _G.test_Break = MT:new({
+  test_base = function ()
+    local t = AD.Break()
+    expect(t).contains( AD.Break({
+      min         = 1,
+      max         = 0,
+    }) )
+  end,
   setup = function (self)
-    self.p =
-        __.chunk_init_p
-      * AD.Break:get_capture_p()
+    self.p = AD.Break:get_capture_p()
   end,
   test = function (self)
     ---@type AD.Break
@@ -1514,13 +1918,22 @@ _G.test_Break = MT:new({
 })
 
 _G.test_Global = MT:new({
+  test_base = function ()
+    local t = AD.At.Global()
+    expect(t).contains( AD.At.Global({
+      min         = 1,
+      content_min = 1,
+      content_max = 0,
+      max         = 0,
+    }) )
+  end,
   setup = function (self)
     self.p =
         __.chunk_init_p
       * AD.At.Global:get_capture_p()
   end,
   test = function (self)
----5----0----5----0----5----0----5----0----5----0----5----
+----5----0----5----0----5----0----5----0----5----0----5----
     local s, t
     s = [=====[
 ---  @global  name_
@@ -1544,6 +1957,22 @@ _G.test_Global = MT:new({
       name = "name_",
     })
     expect(t:get_comment(s)).is("COMMENT")
+  end,
+  test_TD = function (self)
+    self:do_test_TD("Global")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Global")
+  end,
+})
+
+_G.test_Source = MT:new({
+  test_base = function ()
+    local t = AD.Source()
+    expect(t).contains( AD.Source() )
+  end,
+  setup = function (self)
+    self.p = AD.Source:get_capture_p()
   end,
 })
 
