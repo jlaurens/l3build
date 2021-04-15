@@ -1,5 +1,4 @@
 #!/usr/bin/env texlua
-
 local write   = io.write
 
 function _G.pretty_print(tt, indent, done)
@@ -55,8 +54,11 @@ local Xpct, LU  = dofile("./l3b-expect.lua")
 
 local expect = Xpct.expect
 
+local re      = require("re")
+
 local lpeg    = require("lpeg")
 local P       = lpeg.P
+local B       = lpeg.B
 local Cg      = lpeg.Cg
 local Ct      = lpeg.Ct
 local Cc      = lpeg.Cc
@@ -72,9 +74,9 @@ local Cmt     = lpeg.Cmt
 
 ---@type TestData
 local TestData = {
-  s = "UNKNOWN",
-  m = { "UNKNOWN" },
-  c = "NOT AVAILABLE",
+  s = "UNKNOWN STRING",
+  m = { "UNKNOWN MATCH" },
+  -- c = "ERROR: NOT AVAILABLE",
 }
 TestData.__index = TestData
 setmetatable(TestData, {
@@ -84,8 +86,8 @@ setmetatable(TestData, {
   end,
 })
 
--- All the tests are object with next `MT` as metatable
-local MT = {
+-- All the tests are object with next `Test` as metatable
+local Test = {
   get_LINE_DOC = function ()
     return TestData({
 ----5----0----5----0----5----0
@@ -426,23 +428,25 @@ DOOOOOOOOOOOOOOOOOC
     expect(t.description.long[1]).contains(TD_LONG_DOC.m(LINE_DOC_m.max + 1))
   end,
 }
-MT.__index = MT
-function MT:new(d)
-  return setmetatable(d or {}, self)
-end
+Test.__index = Test
+setmetatable(Test, {
+  __call = function (self, d)
+    return setmetatable(d or {}, self)
+  end
+})
 
-function MT:add_strip(k)
+function Test:add_strip(k)
   LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE =
     LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE + k
 end
 
-function MT:p_test(target, expected, where)
+function Test:p_test(target, expected, where)
   self:add_strip(1)
   expect(self.p:match(target, where)).is(expected)
   self:add_strip(-1)
 end
 
-_G.test_POC = MT:new({
+_G.test_POC = Test({
   test_Ct = function ()
     local p_one = Cg(P(1), "one")
     local p_two = Cg(P(1), "two")
@@ -488,7 +492,7 @@ _G.test_Info = function ()
   expect(AD.Info.__Class).is(AD.Info)
 end
 
-_G.test_white_p = MT:new({
+_G.test_white_p = Test({
   setup = function (self)
     self.p = __.white_p
   end,
@@ -507,7 +511,7 @@ _G.test_white_p = MT:new({
   end
 })
 
-_G.test_black_p = MT:new({
+_G.test_black_p = Test({
   setup = function (self)
     self.p = __.black_p
   end,
@@ -521,7 +525,7 @@ _G.test_black_p = MT:new({
   end
 })
 
-_G.test_eol_p = MT:new({
+_G.test_eol_p = Test({
   setup = function (self)
     self.p = __.eol_p
   end,
@@ -536,7 +540,7 @@ _G.test_eol_p = MT:new({
   end
 })
 
-_G.test_variable_p = MT:new({
+_G.test_variable_p = Test({
   setup = function (self)
     self.p = __.variable_p
   end,
@@ -548,7 +552,7 @@ _G.test_variable_p = MT:new({
   end
 })
 
-_G.test_identifier_p = MT:new({
+_G.test_identifier_p = Test({
   setup = function (self)
     self.p = __.identifier_p
   end,
@@ -562,7 +566,7 @@ _G.test_identifier_p = MT:new({
   end
 })
 
-_G.test_special_begin_p = MT:new({
+_G.test_special_begin_p = Test({
   setup = function (self)
     self.p = __.special_begin_p
   end,
@@ -579,7 +583,7 @@ _G.test_special_begin_p = MT:new({
   end
 })
 
-_G.test_colon_p = MT:new({
+_G.test_colon_p = Test({
   setup = function (self)
     self.p = __.colon_p
   end,
@@ -590,7 +594,7 @@ _G.test_colon_p = MT:new({
   end
 })
 
-_G.test_comma_p = MT:new({
+_G.test_comma_p = Test({
   setup = function (self)
     self.p = __.comma_p
   end,
@@ -599,7 +603,7 @@ _G.test_comma_p = MT:new({
   end
 })
 
-_G.test_lua_type_p = MT:new({
+_G.test_lua_type_p = Test({
   setup = function (self)
     self.p = __.lua_type_p
   end,
@@ -625,7 +629,7 @@ _G.test_lua_type_p = MT:new({
   end
 })
 
-_G.test_named_types_p = MT:new({
+_G.test_named_types_p = Test({
   setup = function (self)
     self.p = Ct(__.named_types_p)
   end,
@@ -642,7 +646,7 @@ _G.test_named_types_p = MT:new({
   end,
 })
 
-_G.test_comment_p = MT:new({
+_G.test_comment_p = Test({
   setup = function (self)
     self.p = Ct(__.capture_comment_p)
   end,
@@ -660,7 +664,7 @@ _G.test_comment_p = MT:new({
   end
 })
 
-_G.test_comment_p_2 = MT:new({
+_G.test_comment_p_2 = Test({
   setup = function (self)
     self.p = Ct(
         __.chunk_init_p
@@ -685,7 +689,7 @@ _G.test_comment_p_2 = MT:new({
 })
 
 -- unused yet
-function MT:ad_test(target, expected, content, index)
+function Test:ad_test(target, expected, content, index)
   self:add_strip(1)
   local m = self.p:match(target, index)
   expect(m).contains(expected)
@@ -693,7 +697,7 @@ function MT:ad_test(target, expected, content, index)
   self:add_strip(-1)
 end
 
-_G.test_ShortLiteral = MT:new({
+_G.test_ShortLiteral = Test({
   test_base = function ()
     local t = AD.ShortLiteral()
     expect(t).contains(AD.ShortLiteral({
@@ -730,7 +734,7 @@ _G.test_ShortLiteral = MT:new({
   end
 })
 
-_G.test_LongLiteral = MT:new({
+_G.test_LongLiteral = Test({
   test_base = function ()
     local t = AD.LongLiteral()
     expect(t).contains(AD.LongLiteral({
@@ -767,7 +771,7 @@ _G.test_LongLiteral = MT:new({
   end
 })
 
-_G.test_LineComment = MT:new({
+_G.test_LineComment = Test({
   test_base = function ()
     local t = AD.LineComment()
     expect(t).contains(AD.LineComment({
@@ -824,7 +828,7 @@ _G.test_LineComment = MT:new({
   end
 })
 
-_G.test_LongComment = MT:new({
+_G.test_LongComment = Test({
   test_base = function ()
     local t = AD.LongComment()
     expect(t).contains(AD.LongComment({
@@ -882,7 +886,7 @@ _G.test_LongComment = MT:new({
   end
 })
 
-_G.test_LineDoc = MT:new({
+_G.test_LineDoc = Test({
   test_base = function ()
     local t = AD.LineDoc()
     expect(t).contains(AD.LineDoc({
@@ -953,7 +957,7 @@ _G.test_LineDoc = MT:new({
   end
 })
 
-_G.test_LongDoc = MT:new({
+_G.test_LongDoc = Test({
   test_base = function ()
     local t = AD.LongDoc()
     expect(t).contains(AD.LongDoc({
@@ -1013,7 +1017,7 @@ _G.test_LongDoc = MT:new({
   end
 })
 
-_G.test_Description = MT:new({
+_G.test_Description = Test({
   test_base = function ()
     local t = AD.Description()
     expect(t.__Class).is(AD.Description)
@@ -1161,7 +1165,7 @@ s   s
   end
 })
 
-_G.test_Field = MT:new({
+_G.test_Field = Test({
   test_base = function ()
     local t = AD.At.Field()
     expect(t).contains(AD.At.Field({
@@ -1260,7 +1264,7 @@ _G.test_Field = MT:new({
   end
 })
 
-_G.test_See = MT:new({
+_G.test_See = Test({
   test_base = function ()
     local t = AD.At.See()
     expect(t).contains( AD.At.See({
@@ -1293,7 +1297,7 @@ _G.test_See = MT:new({
 })
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
-_G.test_Class = MT:new({
+_G.test_Class = Test({
   test_base = function (self)
     local t = AD.At.Class()
     expect(t).contains( AD.At.Class({
@@ -1357,7 +1361,7 @@ _G.test_Class = MT:new({
 
 })
 
-_G.test_Type = MT:new({
+_G.test_Type = Test({
   test_base = function ()
     local t = AD.At.Type()
     expect(t).contains( AD.At.Type({
@@ -1386,7 +1390,7 @@ _G.test_Type = MT:new({
     }) )
 
 ----5----0----5----0----5----0----5----0
-s = [=====[
+    s = [=====[
 ---@type MY_TYPE|OTHER_TYPE]=====]
     ---@type AD.At.Type
     t = self.p:match(s)
@@ -1423,7 +1427,7 @@ s = [=====[
   end,
 })
 
-_G.test_Alias = MT:new({
+_G.test_Alias = Test({
   test_base = function ()
     local t = AD.At.Alias()
     expect(t).contains( AD.At.Alias({
@@ -1502,7 +1506,7 @@ s = [=====[
   end,
 })
 
-_G.test_Param = MT:new({
+_G.test_Param = Test({
   test_base = function ()
     local t = AD.At.Param()
     expect(t).contains( AD.At.Param({
@@ -1528,6 +1532,23 @@ _G.test_Param = MT:new({
       content_max = 19,
       max         = 19,
       name        = "NAME",
+      optional    = false,
+      types       = { "TYPE" },
+    }) )
+    expect(t:get_comment(s)).is("")
+
+----5----0----5----0----5----0----5----0----5----|
+    s = [=====[
+---@param NAME ? TYPE]=====]
+    ---@type AD.At.Param
+    t = self.p:match(s)
+    expect(t).contains( AD.At.Param({
+      min         = 1,
+      content_min = 22,
+      content_max = 21,
+      max         = 21,
+      name        = "NAME",
+      optional    = true,
       types       = { "TYPE" },
     }) )
     expect(t:get_comment(s)).is("")
@@ -1544,9 +1565,27 @@ _G.test_Param = MT:new({
       content_max = 19,
       max         = 20,
       name        = "NAME",
+      optional    = false,
       types       = { "TYPE" },
     }) )
     expect(t:get_comment(s)).is("")
+
+----5----0----5----0----5----0----5----0----5----|
+s = [=====[
+---@param NAME ? TYPE
+]=====]
+  ---@type AD.At.Param
+  t = self.p:match(s)
+  expect(t).contains( AD.At.Param({
+    min         = 1,
+    content_min = 22,
+    content_max = 21,
+    max         = 22,
+    name        = "NAME",
+    optional    = true,
+    types       = { "TYPE" },
+  }) )
+  expect(t:get_comment(s)).is("")
 
 ----5----0----5----0----5----0----5----0----5----|
     s = [=====[
@@ -1560,11 +1599,12 @@ _G.test_Param = MT:new({
       content_max = 29,
       max         = 30,
       name        = "NAME",
+      optional    = false,
       types       = { "TYPE", "OTHER" },
     }) )
     expect(t:get_comment(s)).is("")
 
-    ----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----|
     s = [=====[
 ---@param NAME TYPE  |  OTHER@  COMMENT
 ]=====]
@@ -1576,6 +1616,7 @@ _G.test_Param = MT:new({
       content_max = 39,
       max         = 40,
       name        = "NAME",
+      optional    = false,
       types       = { "TYPE", "OTHER" },
     }) )
     expect(t:get_comment(s)).is("COMMENT")
@@ -1588,7 +1629,7 @@ _G.test_Param = MT:new({
   end,
 })
 
-_G.test_Return = MT:new({
+_G.test_Return = Test({
   test_base = function ()
     local t = AD.At.Return()
     expect(t.__Class).is(AD.At.Return)
@@ -1618,7 +1659,21 @@ _G.test_Return = MT:new({
       types       = { "TYPE", "OTHER" },
     })
     expect(t:get_comment(s)).is("COMMENT")
-  end,
+----5----0----5----0----5----0----5----0----5----|
+    s = [=====[
+---   @return TYPE? @ COMMENT
+]=====]
+    t = self.p:match(s)
+    expect(t).contains({
+      min         = 1,
+      max         = 30,
+      content_min = 23,
+      content_max = 29,
+      types       = { "TYPE" },
+      optional    = true,
+    })
+    expect(t:get_comment(s)).is("COMMENT")
+    end,
   test_TD = function (self)
     self:do_test_TD("Return")
   end,
@@ -1627,7 +1682,7 @@ _G.test_Return = MT:new({
   end,
 })
 
-_G.test_Generic = MT:new({
+_G.test_Generic = Test({
   test_base = function ()
     local t = AD.At.Generic()
     expect(t.__Class).is(AD.At.Generic)
@@ -1718,7 +1773,7 @@ _G.test_Generic = MT:new({
   end,
 })
 
-_G.test_Vararg = MT:new({
+_G.test_Vararg = Test({
   test_base = function ()
     local t = AD.At.Vararg()
     expect(t).contains( AD.At.Vararg({
@@ -1786,7 +1841,7 @@ _G.test_Vararg = MT:new({
   end,
 })
 
-_G.test_Module = MT:new({
+_G.test_Module = Test({
   test_base = function ()
     local t = AD.At.Module()
     expect(t).contains( AD.At.Module({
@@ -1838,7 +1893,7 @@ _G.test_Module = MT:new({
   end,
 })
 
-_G.test_Function = MT:new({
+_G.test_Function = Test({
   test_base = function ()
     local t = AD.At.Function()
     expect(t).contains( AD.At.Function({
@@ -1882,10 +1937,43 @@ _G.test_Function = MT:new({
   end,
   test_complete = function (self)
     self:do_test_complete("Function")
+
+    local p = AD.At.Function:get_complete_p()
+
+    local TD = self.get_PARAM()
+    expect(p:match(TD.s)).contains({
+      ID          = AD.At.Function.ID,
+      max         = 46,
+      description = {
+        ID      = AD.Description.ID,
+        long    = {},
+        ignores = {},
+      },
+      params      = {
+        {
+          ID          = AD.At.Param.ID,
+          min         = 1,
+          content_min = 35,
+          content_max = 45,
+          max         = 46,
+          description = {
+            ID      = AD.Description.ID,
+            long    = {},
+            ignores = {},
+          },
+          name        = "NAME",
+          optional    = false,
+          types       = {
+            "TYPE",
+            "OTHER",
+          },
+        }
+      },
+    })
   end,
 })
 
-_G.test_Break = MT:new({
+_G.test_Break = Test({
   test_base = function ()
     local t = AD.Break()
     expect(t).contains( AD.Break({
@@ -1917,7 +2005,7 @@ _G.test_Break = MT:new({
   end,
 })
 
-_G.test_Global = MT:new({
+_G.test_Global = Test({
   test_base = function ()
     local t = AD.At.Global()
     expect(t).contains( AD.At.Global({
@@ -1966,13 +2054,159 @@ _G.test_Global = MT:new({
   end,
 })
 
-_G.test_Source = MT:new({
+Test.STANDARD_ITEMS = {
+  "LINE_DOC",
+  "LONG_DOC",
+  "FIELD",
+  "SEE",
+  "CLASS",
+  "TYPE",
+  "MODULE",
+  "ALIAS",
+  -- "PARAM",
+  -- "GENERIC",
+  -- "VARARG",
+  -- "RETURN",
+  "FUNCTION",
+  "GLOBAL",
+}
+Test.FUNCTION_ITEMS = {
+  PARAM = true,
+  GENERIC = false,
+  VARARG = false,
+  RETURN = true,
+}
+_G.test_loop_p = Test({
+  setup = function (self)
+    self.p = __.loop_p
+  end,
+  no_test_items = function (self)
+    expect(self.p).is.NOT(nil)
+    local p = AD.LineDoc:get_capture_p()
+    local f = self["get_".. "LINE_DOC"]
+    local TD = f(self)
+    print("TD.s", TD.s)
+    _G.pretty_print(p:match(TD.s))
+    expect(p:match(TD.s)).contains(TD.m())
+  end,
+  test_standard_items = function (self)
+    for _, KEY in ipairs(self.STANDARD_ITEMS) do
+      local f = self["get_".. KEY]
+      local TD = f(self)
+      local m = self.p:match(TD.s)
+      expect(m).contains(TD.m())
+      if TD.c and m.get_content then
+        expect(m:get_content(TD.s)).is(TD.c)
+      end
+    end
+  end,
+  test_function_items = function (self)
+    -- to one attributes
+    for KEY, multi in pairs(self.FUNCTION_ITEMS) do
+      local f = self["get_".. KEY]
+      local TD = f(self)
+      local m = self.p:match(TD.s)
+      local key = multi
+        and KEY:lower() .."s"
+        or  KEY:lower()
+      expect(m).contains({
+        ID          = AD.At.Function.ID,
+        max         = TD.m().max,
+        description = AD.Description(),
+        [key]       = multi and { TD.m() } or TD.m(),
+      })
+    end
+  end,
+})
+
+_G.test_Source = Test({
   test_base = function ()
     local t = AD.Source()
     expect(t).contains( AD.Source() )
   end,
   setup = function (self)
     self.p = AD.Source:get_capture_p()
+  end,
+  test_standard_items = function (self)
+    for _, KEY in ipairs(self.STANDARD_ITEMS) do
+      local f = self["get_".. KEY]
+      local TD = f(self)
+      local m = self.p:match(TD.s)
+      expect(m).contains({
+        ID = AD.Source.ID,
+        infos = { TD.m() },
+      })
+    end
+  end,
+  test_function_items = function (self)
+    for KEY, multi in pairs(self.FUNCTION_ITEMS) do
+      local f = self["get_".. KEY]
+      local TD = f(self)
+      local m = self.p:match(TD.s)
+      local key = multi
+        and KEY:lower() .."s"
+        or  KEY:lower()
+      expect(m).contains({
+        ID = AD.Source.ID,
+        infos = { {
+          ID          = AD.At.Function.ID,
+          max         = TD.m().max,
+          description = AD.Description(),
+          [key]       = multi and { TD.m() } or TD.m(),
+        } },
+      })
+    end
+  end,
+  test_two_items = function (self)
+    for _, KEY_1 in ipairs(self.STANDARD_ITEMS) do
+      local f_1 = self["get_".. KEY_1]
+      local TD_1 = f_1(self)
+      for _, KEY_2 in ipairs(self.STANDARD_ITEMS) do
+        local f_2 = self["get_".. KEY_2]
+        local TD_2 = f_2(self)
+        local m = self.p:match(TD_1.s .. TD_2.s)
+        -- do not test when items are combined
+        if #m.infos == 2 then
+          expect(m).contains({
+            ID = AD.Source.ID,
+            infos = {
+              TD_1.m(),
+              TD_2.m(1 + TD_1.m().max)
+            },
+          })
+        end
+      end
+    end
+  end,
+})
+
+_G.test_autodoc = Test({
+  setup = function (self)
+    self.p = AD.Source:get_capture_p()
+  end,
+  test = function (self)
+    local fh =  io.open("../l3build-autodoc.lua")
+    local s = fh:read("a")
+    fh:close()
+    local m = self.p:match(s)
+    expect(#m.infos>0).is(true)
+  end,
+})
+
+_G.test_Parser = Test({
+  setup = function (self)
+    self.parser = AD.Parser("../l3build-autodoc.lua")
+    self.parser:parse()
+  end,
+  test_parse = function (self)
+    expect(#self.parser._infos > 0).is(true)
+  end,
+  test_function_name = function (self)
+    for info in self.parser.infos do
+      if info:is_instance_of(AD.At.Function) then
+        expect(info.name).is.NOT(AD.At.Function.name)
+      end
+    end
   end,
 })
 

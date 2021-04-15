@@ -1,6 +1,6 @@
 --[[
 
-File l3build-devlib.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-autodoc.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -102,7 +102,7 @@ and before an annotation of some pure code chunk.
 Regular comments are ignored.
 --]==]
 
----@module l3build-AD.Parser
+---@module l3build-autodoc
 
 -- Safeguard and shortcuts
 
@@ -175,13 +175,18 @@ local variable_p =
   * ("_" + locale.alnum)^0    -- ascii letter, or "_" or digit
 
   -- for a class, type name
-local identifier_p =
+  local identifier_p =
   variable_p * ("." * variable_p)^0
+
+  -- for a class, type name
+  local function_p =
+  variable_p * (S(".:") * variable_p)^0
 
 ---Capture the current position under the given name with the given shifht
 ---@param s string
 ---@param d number
 ---@return lpeg.Pattern
+-- This is a one line doc for testing purposes
 local function named_pos_p(s, d)
   return  Cg(d
       and Cp() / function (i) return i - d end
@@ -304,9 +309,15 @@ local named_types_p = Cg(Ct(-- collect all the captures in an array
   * (get_spaced_p("|") * C(lua_type_p))^0
 ), "types")
 
+---@type lpeg.Pattern
+local named_optional_p =
+    white_p^0 * Cg(P("?") * Cc(true) , "optional") * white_p^0
+  + Cg(Cc(false), "optional") * white_p^0
+
 ---@class AD.Object @ fake class
----@field public finalize   fun(self: AD.Object)      @ finalize the class object
----@field public initialize fun(self: AD.Object, ...) @ initialize the instance
+---@field public finalize       fun(self: AD.Object)      @ finalize the class object
+---@field public initialize     fun(self: AD.Object, ...) @ initialize the instance
+---@field public is_instance_of fun(self: AD.Object, Class: AD.Object)
 
 ---Class making utility
 ---@generic T: AD.Object
@@ -356,6 +367,8 @@ end
 ---@field public get_core_p     fun(self: AD.Info): lpeg.Pattern
 ---@field public get_capture_p  fun(self: AD.Info): lpeg.Pattern
 ---@field public code_before    AD.Info
+---@field public mask_contents  fun(self: AD.Info, t: string[])
+---@field public is_instance_of fun(self: AD.Info, Class: AD.Info): boolean
 
 AD.Info = make_class({
   TYPE = "AD.Info",
@@ -364,6 +377,9 @@ AD.Info = make_class({
   -- Next fields are defined by subclassers, see finalize
   -- get_core_p     = nil
   -- get_capture_p   = nil,
+  is_instance_of = function (self, Class)
+    return self.ID == Class.ID
+  end
 })
 
 ---The core part of the pattern
@@ -384,6 +400,45 @@ function AD.Info:get_capture_p()
   return self:get_core_p()
 end
 
+---Mask the contents
+---The default implementation does nothing
+---@param t string[]
+function AD.Info:mask_contents(t)
+  return
+end
+
+---Mask the contents
+---Replace some charactes with "*".
+---@param t string[]
+function AD.Info:do_mask_contents(t)
+  local p = -S("-@ \t\n\"\'=[]") -- none of "-", "@"... 
+  for i = self.min, self.max do
+    if p:match(t[i]) then
+      t[i] = "*"
+    end
+  end
+  for _, info in ipairs(self.ignores or {}) do
+    info:mask_contents(t)
+  end
+end
+
+---Get the line number for the given string
+---Should cache intermediate results.
+---Should be defined globally.
+---@param s     string
+---@param i     integer
+---@return lpeg.Pattern
+local function get_line_number(s, i)
+  print(s, i)
+  local result = 1
+  for j = 1, i do
+    if s:sub(j, j) == "\n" then
+      result = result + 1
+    end
+  end
+  return result
+end
+
 ---@class AD.Content: AD.Info
 ---@field public content_min  integer
 ---@field public content_max  integer
@@ -397,7 +452,28 @@ AD.Content = make_class(AD.Info, {
   get_content = function (self, s)
     return s:sub(self.content_min, self.content_max)
   end,
+  ---Mask the contents
+  ---The default implementation does nothing
+  ---@param t string[]
+  mask_contents = function (self, t)
+    self:do_mask_contents(t)
+  end,
 })
+
+---The core pattern
+---This pattern matches the specific part of
+---inline annotations.
+---It will be used by the default implementation
+---of `capture`.
+---The default implementation fires an error.
+---@param self AD.Content
+function AD.Content:get_core_p()
+   return
+      named_pos_p("content_min")
+    * black_p^0
+    * ( white_p^1 * black_p^1 )^0
+    * named_pos_p("content_max", 1)
+end
 
 -- One line inline comments
 
@@ -409,7 +485,7 @@ AD.LineComment = make_class(AD.Content, {
   get_capture_p = function (self)
     return
         chunk_init_p
-      * (white_p^1 + -B("-"))             -- 1+ spaces or no "-" before, the back test should never be reached
+      * ( white_p^1 + -B("-") )             -- 1+ spaces or no "-" before, the back test should never be reached
       * ( P("-")^4
         + P("--")
         * -P("-")                         -- >1 dashes, but not 3
@@ -418,9 +494,7 @@ AD.LineComment = make_class(AD.Content, {
       * white_p^0
       * Ct(
           chunk_begin_p
-        * named_pos_p("content_min")
-        * black_p^0 * (white_p^1 * black_p^1)^0
-        * named_pos_p("content_max", 1)
+        * self:get_core_p()
         * chunk_end_p
       ) / function (t)
           return AD.LineComment(t)
@@ -439,13 +513,10 @@ AD.LineDoc = make_class(AD.Content, {
         chunk_init_p
       * special_begin_p
       * -P("@")       -- negative lookahead: not an annotation
+      * white_p^0
       * Ct(
           chunk_begin_p
-        * white_p^0
-        * named_pos_p("content_min")
-        * black_p^0
-        * ( white_p^1 * black_p^1 )^0
-        * named_pos_p("content_max", 1)
+        * self:get_core_p()
         * chunk_end_p
       ) / function (t)
             return AD.LineDoc(t)
@@ -461,7 +532,7 @@ do
   AD.ShortLiteral = make_class(AD.Content, {
     TYPE = "AD.ShortLiteral",
     get_capture_p = function (self)
-      return 
+      return
           chunk_init_p
         * Ct(
           white_p^0
@@ -472,16 +543,18 @@ do
           Cmt(
             Cb(tag_del),
             function (s, i, del)
+              local j = i
               repeat
-                local c = s:sub(i, i)
+                local c = s:sub(j, j)
                 if c == del then
-                  return i + 1, i - 1 -- capture also `content_max`
+                  return j + 1, j - 1 -- capture also `content_max`
                 elseif c == [[\]] then
-                  i = i + 2
+                  j = j + 2
                 elseif c then
-                  i = i + 1
+                  j = j + 1
                 else
-                  error("Missing closing delimiter ".. del)
+                  error("Missing closing delimiter " .. del
+                    .. " after line ".. get_line_number(s, i))
                 end
               until false
             end
@@ -519,7 +592,8 @@ do
           return j + #equal + 2, j - 1, #equal -- 2 captures for content_max and level
         end
       end
-      error("Missing delimiter `]".. equal .."]`")
+      error("Missing delimiter `]".. equal .."]`"
+        .." after line ".. get_line_number(s, i))
     end
   ), tag_equal)
   * Cg(
@@ -580,7 +654,8 @@ do
           return result, j - 1, #equal -- 2 captured values: content_max and level
         end
       end
-      error("Missing delimiter `]".. equal .."]`")
+      error("Missing delimiter `]".. equal .."]`"
+        .." after line ".. get_line_number(s, i))
     end
   ), tag_equal)
   * Cg(
@@ -649,7 +724,8 @@ AD.LongDoc = make_class(AD.Content, {
                   return result, j - 1 -- capture `content_max`
                 end
               end
-              error("Missing delimiter `]===]`")
+              error("Missing delimiter `]===]`"
+                .." after line ".. get_line_number(s, i))
             end
           ),
           "content_max"
@@ -716,7 +792,13 @@ do
         / function (desc)
             return desc
           end
-    end
+    end,
+    ---Mask the contents
+    ---Forwards to `do_mask_contents`
+    ---@param t string[]
+    mask_contents = function (self, t)
+      self:do_mask_contents(t)
+    end,
   })
 end
 
@@ -740,21 +822,25 @@ end
 
 ---@class AD.At: AD.Content  @ For embedded annotations `---@foo ...`
 ---@field public description            AD.Description
+---@field public is_annotation          boolean                             @ true
 ---@field public KEY                    string                              @ static  KEY, the "foo" in ---@foo
 ---@field public get_complete_p         fun(self: AD.At): lpeg.Pattern      @ complete pattern, see `finalize`.
 ---@field public get_short_description  fun(self: AD.At, s: string): string @ redundant declaration, for editors
 ---@field public get_long_description   fun(self: AD.At, s: string): string @ redundant declaration for editors
 ---@field public get_comment            fun(self: AD.Content, s: string): string @ the substring of the argument corresponding to the comment
 
-local error_annotation_p = Cmt(
-    Cp()
-  * one_line_chunk_end_p,
-  function (s, to, from)
-    -- print(debug.traceback())
-    error("Bad annotation ".. s:sub(from, to))
-  end
-)
-
+local error_annotation_p = function (Key)
+  return Cmt(
+      Cp()
+    * one_line_chunk_end_p,
+    function (s, to, from)
+      -- print(debug.traceback())
+      error("Bad ".. Key .." annotation"
+        .." at line ".. get_line_number(s, from)
+        .. ": ".. s:sub(from, to))
+    end
+  )
+end
 ---Capture the pattern "---@<name>..."
 ---@param name string
 ---@return lpeg.Pattern
@@ -768,8 +854,9 @@ end
 
 ---@type AD.At
 AD.At = make_class(AD.Content, {
-  TYPE = "AD.At",
-  KEY = "UNKNOWN", -- to be overriden
+  TYPE          = "AD.At",
+  KEY           = "UNKNOWN KEY", -- to be overriden
+  is_annotation = true,
   content_min = 1, -- only valid when content_min > min
   content_max = 0,
   -- Next fields are defined by subclassers, see `finalize`
@@ -780,17 +867,6 @@ AD.At = make_class(AD.Content, {
 ---@param self AD.At
 function AD.At:initialize()
   self.description = self.description or AD.Description() -- `AD.Description` is not yet available
-end
-
----The core pattern
----This pattern matches the specific part of
----inline annotations.
----It is used by the default implementation
----of `capture`.
----The default implementation fires an error.
----@param self AD.At
-function AD.At:get_core_p(_self)
-  error("No default pattern is available")
 end
 
 ---Pattern to capture an annotation
@@ -816,7 +892,7 @@ function AD.At:get_capture_p()
       / function (at)
           return self(at)
         end
-      + error_annotation_p
+      + error_annotation_p(self.KEY)
     )
 end
 
@@ -864,6 +940,24 @@ function AD.At:get_comment(s)
   return self:get_content(s)
 end
 
+---@class AD.At.Author: AD.At
+---@field public pseudo string
+
+---@type AD.At.Author
+AD.At.Author = make_class(AD.At, {
+  TYPE        = "AD.At.Author",
+  KEY         = "author",
+  -- @author pseudo (mail eventually)
+  get_core_p = function (_self)
+    return
+        named_pos_p("content_min")
+      * black_p^0
+      * ( white_p^1 * black_p^1 )^0
+      * named_pos_p("content_max", 1)
+  end,
+})
+
+
 ---@class AD.At.Field: AD.At
 ---@field public visibility string | "public" | "protected" | "private"
 ---@field public name       string
@@ -874,7 +968,7 @@ AD.At.Field = make_class(AD.At, {
   TYPE        = "AD.At.Field",
   KEY         = "field",
   visibility  = "public",
-  name        = "UNKNOWN",
+  name        = "UNKNOWN NAME",
   initialize  = function (self)
     self.types = self.types or {}
   end,
@@ -913,6 +1007,7 @@ AD.At.See = make_class(AD.At, {
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
 ---@class AD.At.Class: AD.At
+---@field public ignores      AD.AllComment[]
 ---@field public name         string        @ the name of the receiver
 ---@field public parent       string|nil    @ the parent class if any, for class
 ---@field public fields       AD.At.Field[] @ list of fields
@@ -920,18 +1015,15 @@ AD.At.See = make_class(AD.At, {
 
 do
   local tag_at = {} -- unique tag for a temporary capture
-  local match = Cg(identifier_p, "name")
-  * (colon_p * Cg(identifier_p, "parent"))^-1                 -- or nil
-  * capture_comment_p
-  
 
   ---@type AD.At.Class
   AD.At.Class = make_class(AD.At, {
     TYPE  = "AD.At.Class",
     KEY   = "class",
-    name  = "UNKNOWN",
+    name  = "UNKNOWN CLASS NAME",
     initialize = function (self)
-      self.fields = self.fields or {}
+      self.fields   = self.fields  or {}
+      self.ignores  = self.ignores or {}
     end,
     get_core_p = function (_self)
       return 
@@ -997,7 +1089,7 @@ end
 AD.At.Type = make_class(AD.At, {
   TYPE  = "AD.At.Type",
   KEY   = "type",
-  types = { "UNKNOWN" },
+  types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
     return named_types_p
       * capture_comment_p
@@ -1013,8 +1105,8 @@ AD.At.Type = make_class(AD.At, {
 AD.At.Alias = make_class(AD.At, {
   TYPE  = "AD.At.Alias",
   KEY   = "alias",
-  name  = "UNKNOWN",
-  types = { "UNKNOWN" },
+  name  = "UNKNOWN ALIAS NAME",
+  types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
     return
         Cg(identifier_p, "name")
@@ -1024,7 +1116,7 @@ AD.At.Alias = make_class(AD.At, {
   end,
 })
 
--- @return MY_TYPE[|OTHER_TYPE] [@comment]
+-- @return MY_TYPE[|OTHER_TYPE] [?] [@comment]
 ---@class AD.At.Return: AD.At
 ---@field public types  string[]  @ List of types
 
@@ -1032,10 +1124,11 @@ AD.At.Alias = make_class(AD.At, {
 AD.At.Return = make_class(AD.At, {
   TYPE  = "AD.At.Return",
   KEY   = "return",
-  types = { "UNKNOWN" },
+  types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
     return
         named_types_p
+      * named_optional_p
       * capture_comment_p
   end,
 })
@@ -1051,7 +1144,7 @@ AD.At.Return = make_class(AD.At, {
 AD.At.Generic = make_class(AD.At, {
   TYPE    = "AD.At.Generic",
   KEY     = "generic",
-  type_1  = "UNKNOWN",
+  type_1  = "UNKNOWN TYPE NAME",
   get_core_p = function (self)
     return
         Cg(variable_p, "type_1")          -- capture type_1
@@ -1071,20 +1164,20 @@ AD.At.Generic = make_class(AD.At, {
 -- @param param_name MY_TYPE[|other_type] [@comment]
 ---@class AD.At.Param: AD.At
 ---@field public name     string      @ the name of the alias
+---@field public optional boolean     @ whether this param is optional, defaults to false
 ---@field public types    string[]    @ List of types
 
 ---@type AD.At.Param
 AD.At.Param = make_class(AD.At, {
-  TYPE    = "AD.At.Param",
-  KEY     = "param",
-  name    = "UNKNOWN",
-  types   = { "UNKNOWN" },
+  TYPE      = "AD.At.Param",
+  KEY       = "param",
+  name      = "UNKNOWN PARAM NAME",
+  optional  = false,
+  types     = { "UNKNOWN TYPE NAME" },
   get_core_p = function ()
     return
         Cg(variable_p, "name")
-      * ( white_p^0 * Cg(P("?"), "optional") * white_p^0
-        + white_p^1 * Cg(Cc(""), "optional")
-      )
+      * named_optional_p
       * named_types_p
       * capture_comment_p
   end,
@@ -1098,7 +1191,7 @@ AD.At.Param = make_class(AD.At, {
 AD.At.Vararg = make_class(AD.At, {
   TYPE  = "AD.At.Vararg",
   KEY   = "vararg",
-  types = { "UNKNOWN" },
+  types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
     return
         named_types_p
@@ -1115,8 +1208,8 @@ AD.At.Vararg = make_class(AD.At, {
 AD.At.Module = make_class(AD.At, {
   TYPE    = "AD.At.Module",
   KEY     = "module",
-  name    = "UNKNOWN",
-  NAME_p  = (R("az", "09") + S("_-"))^1,
+  name    = "UNKNOWN MODULE NAME",
+  NAME_p  = R("az", "09") * (R("az", "09") + S("_-."))^0,
   get_core_p = function(self)
     if not self then
       print(debug.traceback())
@@ -1135,7 +1228,7 @@ AD.At.Module = make_class(AD.At, {
 AD.At.Global = make_class(AD.At, {
   TYPE  = "AD.At.Global",
   KEY   = "global",
-  name  = "UNKNOWN",
+  name  = "UNKNOWN GLOBALE NAME",
   get_core_p = function (self)
     return
         Cg(identifier_p, "name")
@@ -1145,11 +1238,14 @@ AD.At.Global = make_class(AD.At, {
 
 -- @function name [@ comment]
 ---@class AD.At.Function: AD.At
+---@field public ignores  AD.AllComment[]
 ---@field public name     string          @ name of the function
 ---@field public params   AD.At.Param[]   @ parameters of the function
 ---@field public vararg   AD.At.Vararg    @ variadic arguments
+---@field public generic  AD.At.Generic   @ generic annotation
 ---@field public returns  AD.At.Return[]  @ parameters of the function
 ---@field public see      AD.At.See       @ reference
+---@field public guess_p  lpeg.Pattern 
 do
   local tag_at = {} -- unique capture tag
   ---@type lpeg.Pattern
@@ -1157,7 +1253,8 @@ do
       AD.At.Param:get_capture_p() -- when no ---@function was given
     / function (at_param)
         return AD.At.Function({
-          params = {
+          min     = at_param.min,
+          params  = {
             at_param
           }
         })
@@ -1167,18 +1264,19 @@ do
       AD.At.Param:get_complete_p()
     * Cb(tag_at)
     / function (at_param, at)
-      append(at.params, at_param)
-      -- returning no capture for this very pattern
-      -- does not affect captures already made outside
-      -- either named or not
-    end
+        append(at.params, at_param)
+        -- returning no capture for this very pattern
+        -- does not affect captures already made outside
+        -- either named or not
+      end
 
   ---@type lpeg.Pattern
   local start_with_vararg_p =
     AD.At.Vararg:get_capture_p()
     / function (at_vararg)
         return AD.At.Function({
-          vararg = at_vararg
+          min     = at_vararg.min,
+          vararg  = at_vararg
         })
       end
   ---@type lpeg.Pattern
@@ -1189,10 +1287,27 @@ do
         at.vararg = at_vararg
       end
   ---@type lpeg.Pattern
+  local start_with_generic_p =
+    AD.At.Generic:get_capture_p() -- when no ---@function was given
+    / function (at_generic)
+        return AD.At.Function({
+          min     = at_generic.min,
+          generic = at_generic,
+        })
+      end
+  ---@type lpeg.Pattern
+  local more_generic_p =
+      AD.At.Generic:get_complete_p()
+    * Cb(tag_at)
+    / function (at_generic, at)
+        at.generic = at_generic
+      end
+  ---@type lpeg.Pattern
   local start_with_return_p =
     AD.At.Return:get_capture_p() -- when no ---@function was given
     / function (at_return)
         return AD.At.Function({
+          min     = at_return.min,
           returns = {
             at_return
           }
@@ -1216,9 +1331,14 @@ do
   AD.At.Function = make_class(AD.At, {
     TYPE  = "AD.At.Function",
     KEY   = "function",
-    name  = "UNKNOWN",
+    name  = "UNKNOWN FUNCTION NAME",
     params = {},
     returns = {},
+    initialize = function (self)
+      self.params   = self.params  or {}
+      self.returns  = self.returns or {}
+      self.ignores  = self.ignores or {}
+    end,
     get_core_p = function (self)
       return
           Cg(identifier_p, "name")  -- capture the name
@@ -1231,11 +1351,12 @@ do
         -- create an AD.At.Function instance
         -- capture it with the tag `tag_at`
         Cg(
-          ( AD.Description:get_capture_p() + Cc(AD.Description()) )
-          * (self:get_capture_p()
-            -- + start_with_param_p  -- when no ---@function is available
-            -- + start_with_vararg_p
-            -- + start_with_return_p
+            ( AD.Description:get_capture_p() + Cc(AD.Description()) )
+          * ( self:get_capture_p()
+            + start_with_param_p  -- when no ---@function is available
+            + start_with_vararg_p
+            + start_with_generic_p
+            + start_with_return_p
           )
           / function (desc, at)
             at.description = desc
@@ -1249,6 +1370,7 @@ do
             more_ignore_p
           + more_param_p
           + more_vararg_p
+          + more_generic_p
           + more_return_p
         )^0
         * Cp() -- capture after
@@ -1257,7 +1379,55 @@ do
             at.max = after - 1
             return at -- return the capture
           end
-    end
+    end,
+    guess_p = P( {
+      - B(black_p)
+      * Ct(
+          V("local function")
+        + V("function ...")
+        + V("local ... = function (")
+        + V("... = function (")
+      )
+      * white_p^0
+      * P("(")
+      + P(1) * V(1), -- advance one character and try to match
+      ["local function"] =
+        P("local")
+        * white_p^1
+        * P("function")
+        * white_p^1
+        * Cg(
+          variable_p,
+          "name"
+        )
+        * Cg( Cc(true), "is_local"),
+      ["function ..."] =
+          P("function")
+        * white_p^1
+        * Cg(
+          function_p,
+          "name"
+        )
+        * Cg( Cc(false), "is_local"),
+        ["local ... = function ("] =
+            P("local")
+          * white_p^1
+          * Cg(
+            variable_p,
+            "name"
+          )
+          * get_spaced_p("=")
+          * P("function")
+          * Cg( Cc(true), "is_local"),
+        ["... = function ("] =
+            Cg(
+            variable_p,
+            "name"
+          )
+          * get_spaced_p("=")
+          * P("function")
+          * Cg( Cc(false), "is_local"),
+    })
   }
 )
 end
@@ -1293,7 +1463,7 @@ AD.Break = make_class(AD.Info, {
 
 do
   local more_utf8_p = R("\x80\xBF")
-  local consume_one_character_p = (
+  local utf8_p      =
       R("\x00\x7F") - P("\n") -- ones ascii char but a newline
     + R("\xC2\xDF") * more_utf8_p
     + P("\xE0")     * R("\xA0\xBF") * more_utf8_p
@@ -1302,12 +1472,13 @@ do
     + P("\xF0")     * R("\x90\xBF") * more_utf8_p * more_utf8_p
     + P("\xF4")     * R("\x80\x8F") * more_utf8_p * more_utf8_p
     + R("\xF1\xF3") * more_utf8_p   * more_utf8_p * more_utf8_p
-    + Cmt((1 - P("\n")),   -- and consume one erroneous UTF8 character
+
+  local consume_one_character_p = (
+      utf8_p
+    + Cmt( 1 - P("\n"),   -- and consume one byte for an erroneous UTF8 character
       function (s, i) print("UTF8 problem ".. s:sub(i-1, i-1)) end
     )
   )
-  * white_p^0
-  * eol_p
 
   -- We capture the current begin of line position with name "bol"
   ---@type lpeg.Pattern
@@ -1326,15 +1497,22 @@ do
     + AD.At.Alias:get_complete_p()
     + AD.LineDoc:get_capture_p()
     + AD.LongDoc:get_capture_p()
-    + AD.At.Field:get_capture_p()     -- OK standalone field are ignored
-    + AD.At.Type:get_capture_p()      -- OK type annotation are unused in documentation
-    + AD.ShortLiteral:get_capture_p() -- OK
-    + AD.LongLiteral:get_capture_p()  -- OK
-    + consume_one_character_p
+    + AD.At.Field:get_capture_p()     -- standalone field are ignored
+    + AD.At.Type:get_capture_p()      -- type annotation are unused in documentation
+    + AD.ShortLiteral:get_capture_p()
+    + AD.LongLiteral:get_capture_p()
+    +   consume_one_character_p
+      * white_p^0
+      * eol_p
   )
-  * AD.Break:get_capture_p()
+  * AD.Break:get_capture_p()^0
   * named_pos_p("max")        -- advance "max" to the current position
 
+  -- Export symbols to the _ENV for testing purposes
+  if _ENV.during_unit_testing then
+    _ENV.consume_one_character_p    = consume_one_character_p
+    _ENV.loop_p                     = loop_p
+  end
   ---@type AD.Source
   AD.Source = make_class(AD.Info, {
     TYPE = "AD.Source",
@@ -1417,6 +1595,24 @@ end
 ---@field private _top_scope AD.Scope @ top scope
 
 AD.Parser = {}
+AD.Parser.__index = function (self, k)
+  if k == "infos" then
+    local i = 0
+    return function ()
+      i = i + 1
+      return self._infos[i]
+    end
+  end
+  return AD.Parser[k]
+end
+
+setmetatable(AD.Parser, {
+  __call = function (self, filename)
+    local result = setmetatable({}, self)
+    result:init_with_contents_of_file(filename)
+    return result
+  end
+})
 
 ---Initialize the parser with given string.
 ---Prepare and store the string.
@@ -1441,7 +1637,59 @@ function AD.Parser:init_with_contents_of_file(path)
   self:init_with_string(s)
 end
 
+function AD.Parser:make_after_codes()
+  for i = 2, #self._infos do
+    local min = self._infos[i-1].max + 1
+    local max = self._infos[i].min - 1
+    if min <= max then
+      self._infos[i-1].after_code = AD.Code({
+        min = min,
+        max = max,
+      })
+    end
+  end
+end
+
+---Make the masked contents
+---The masked contents is obtained replacing black characters
+---in literals and comments with a "*"
+function AD.Parser:make_masked_contents()
+  -- explode the `contents` into a Regular array of bytes
+  local t = Ct( C(P(1))^0 ):match(self.contents)
+  for info in self.infos do
+    info:mask_contents(t)
+  end
+  self.masked_contents = concat(t, "")
+end
+
+function AD.Parser:guess_function_names()
+  local p = AD.At.Function.guess_p
+  for info in self.infos do
+    if info:is_instance_of(AD.At.Function) then
+      if info.name == AD.At.Function.name then
+        local code = info.after_code
+        if not code then
+          error("Cannot guess function name of ".. self.contents:sub(info.min, info.max))
+        end
+        local s = self.contents:sub(code.min, code.max)
+        local t = p:match(s)
+        if not t then
+          error("Cannot guess function name from ".. s)
+        end
+        info.name     = t.name
+        info.is_local = t.is_local
+      end
+    end
+  end
+end
+
 function AD.Parser:parse()
+  local p = AD.Source:get_capture_p()
+  local m = p:match(self.contents)
+  self._infos = m.infos
+  self:make_after_codes()
+  -- self:make_masked_contents()
+  self:guess_function_names()
 end
 
 -- Export symbols to the _ENV for testing purposes
@@ -1452,12 +1700,14 @@ if _ENV.during_unit_testing then
   _ENV.eol_p                      = eol_p
   _ENV.variable_p                 = variable_p
   _ENV.identifier_p               = identifier_p
+  _ENV.function_p                 = function_p
   _ENV.special_begin_p            = special_begin_p
   _ENV.get_spaced_p               = get_spaced_p
   _ENV.colon_p                    = colon_p
   _ENV.comma_p                    = comma_p
   _ENV.lua_type_p                 = lua_type_p
   _ENV.named_types_p              = named_types_p
+  _ENV.named_optional_p           = named_optional_p
   _ENV.named_pos_p                = named_pos_p
   _ENV.at_match_p                 = at_match_p
   _ENV.chunk_begin_p              = chunk_begin_p
