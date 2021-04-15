@@ -1193,9 +1193,10 @@ AD.At.Vararg = make_class(AD.At, {
 
 -- @module name [@ comment]
 ---@class AD.At.Module: AD.At
----@field public name   string  @ name of the module
----@field public author AD.At.Author
----@field public NAME_p string  @ pattern for module names
+---@field public    name   string     @ name of the module
+---@field public    author AD.At.Author
+---@field public    see    AD.At.See  @ reference
+---@field protected NAME_p string     @ pattern for module names
 
 ---@type AD.At.Module
 AD.At.Module = make_class(AD.At, {
@@ -1208,24 +1209,44 @@ AD.At.Module = make_class(AD.At, {
       Cg(self.NAME_p, "name")
       * capture_comment_p
   end,
-  get_complete_p = function (self)
+})
+
+do
+  local tag_at = {}
+  function AD.At.Module:get_complete_p()
     return
-        ( AD.Description:get_capture_p() + Cc(false) )
-      * ( AD.At.Author:get_complete_p() + Cc(false) )
-      * self:get_capture_p()
+      Cg(
+        Cmt( -- necessary because the capture must be evaluated only once
+          ( AD.Description:get_capture_p() + Cc(false) )
+          * self:get_capture_p(),
+          function (_, i, desc, at)
+            if desc then
+              at.description = desc
+            end
+            return i, at -- return the capture
+          end
+        ),
+        tag_at
+      )
+      * ( AD.At.Author:get_complete_p()
+        * Cb(tag_at)
+        / function (at_author, at)
+            at.author = at_author
+          end
+        + AD.At.See:get_complete_p()
+        * Cb(tag_at)
+        / function (at_see, at)
+            at.see = at_see
+          end
+      )^0
+      * Cb(tag_at)
       * Cp() -- capture after
-      / function (desc, author, at, after)
-          if desc then
-            at.description = desc
-          end
-          if author then
-            at.author = author
-          end
+      / function (at, after)
           at.max = after - 1
           return at -- return the capture
         end
-  end,
-})
+  end
+end
 
 -- @global name [@ comment]
 ---@class AD.At.Global: AD.At

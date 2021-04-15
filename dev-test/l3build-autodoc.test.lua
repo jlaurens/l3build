@@ -1949,23 +1949,23 @@ _G.test_Module = Test({
 
 ----5----0----5----0----5----0----5----0----5----0----5----|
   local s = [=====[
----@author my_pseudo
 ---@module my_module
+---@author my_pseudo
 ]=====]
     local p = AD.At.Module:get_complete_p()
     local t = p:match(s)
     expect(t).contains( AD.At.Module({
-      min         = 22,
-      content_min = 42,
-      content_max = 41,
+      min         = 1,
+      content_min = 21,
+      content_max = 20,
       max         = 42,
       name        = "my_module",
     }) )
     expect(t.author).contains( AD.At.Author({
-      min         = 1,
-      content_min = 12,
-      content_max = 20,
-      max         = 21,
+      min         = 22,
+      content_min = 33,
+      content_max = 41,
+      max         = 42,
     }) )
     expect(t:get_comment(s)).is("")
     expect(t.author:get_content(s)).is("my_pseudo")
