@@ -125,6 +125,24 @@ DOOOOOOOOOOOOOOOOOC
       end,
     })
   end,
+  get_AUTHOR = function()
+    return TestData({
+----5----0----5----0----5----0----5----0----5
+      s = [[
+--- @author  pseudo
+]],
+      m = function (min, offset)
+        min = min or 1
+        offset = offset or 0
+        return AD.At.Author({
+          min         = min,
+          content_min = min + offset + 13,
+          content_max = min + offset + 18,
+          max         = min + offset + 19,
+        })
+      end,
+    })
+  end,
   get_FIELD = function ()
     return TestData({
 ----5----0----5----0----5----0----5----0----5
@@ -619,11 +637,10 @@ _G.test_lua_type_p = Test({
     self:p_test("table<k, v>[]", 14)
     self:p_test("fun", 4)
     self:p_test("fun()", 6)
-    self:p_test("fun(... : string[])", 20)
-    self:p_test("fun(... : bar)", 15)
+    self:p_test("fun(...)", 9)
     self:p_test("fun(foo : bar)", 15)
-    self:p_test("fun(foo : bar, ...: bar)", 25)
-    self:p_test("fun(foo : bar, foo: bar, ...: bar)", 35)
+    self:p_test("fun(foo : bar, ...)", 20)
+    self:p_test("fun(foo : bar, foo: bar, ...)", 30)
     self:p_test("fun():foo", 10)
     self:p_test("fun():foo, bar", 15)
   end
@@ -669,7 +686,7 @@ _G.test_comment_p_2 = Test({
     self.p = Ct(
         __.chunk_init_p
       * __.capture_comment_p
-      * __.chunk_end_p
+      * __.chunk_stop_p
   )
   end,
   test = function (self)
@@ -1165,6 +1182,38 @@ s   s
   end
 })
 
+_G.test_Author = Test({
+  test_base = function ()
+    local t = AD.At.Author()
+    expect(t).contains( AD.At.Author({
+      min         = 1,
+      content_min = 1,
+      content_max = 0,
+      max         = 0,
+    }) )
+  end,
+  setup = function (self)
+    self.p = AD.At.Author:get_capture_p()
+  end,
+  test = function (self)
+    local s, t
+    --   ----5----0----5----0----5----0----5----0----5
+    s = "---@author 9hat do you want of 30  "
+    ---@type AD.At.Author
+    t = self.p:match(s)
+    expect(t).contains( AD.At.See({
+      min         = 1,
+      content_min = 12,
+      content_max = 33,
+      max         = 35,
+    }) )
+    expect(t:get_content(s)).is("9hat do you want of 30")
+  end,
+  test_complete = function (self)
+    self:do_test_complete("Author")
+  end
+})
+
 _G.test_Field = Test({
   test_base = function ()
     local t = AD.At.Field()
@@ -1351,12 +1400,18 @@ _G.test_Class = Test({
     local p = AD.At.Class:get_complete_p()
     local TD_CLASS = self:get_CLASS()
     local TD_FIELD = self:get_FIELD()
-    local s = TD_CLASS.s .. TD_FIELD.s
+    local TD_AUTHOR = self:get_AUTHOR()
+    local s = TD_CLASS.s .. TD_FIELD.s .. TD_AUTHOR.s
     local t = p:match(s)
-    local CLASS_m = TD_CLASS.m()
-    local FIELD_m = TD_FIELD.m(1 + CLASS_m.max)
-    CLASS_m.max = FIELD_m.max
-    CLASS_m.fields = { FIELD_m }
+    expect(t).is.NOT(nil)
+    expect(t.fields).contains({
+      TD_FIELD.m(1 + TD_CLASS.m().max)
+    })
+    expect(t.author).contains(
+      TD_AUTHOR.m(
+        1 + TD_FIELD.m(1 + TD_CLASS.m().max).max
+      )
+    )
   end,
 
 })
@@ -1884,13 +1939,37 @@ _G.test_Module = Test({
       name        = "name_",
     }) )
     expect(t:get_comment(s)).is("COMMENT")
+
   end,
   test_TD = function (self)
     self:do_test_TD("Module")
   end,
   test_complete = function (self)
     self:do_test_complete("Module")
-  end,
+
+----5----0----5----0----5----0----5----0----5----0----5----|
+  local s = [=====[
+---@author my_pseudo
+---@module my_module
+]=====]
+    local p = AD.At.Module:get_complete_p()
+    local t = p:match(s)
+    expect(t).contains( AD.At.Module({
+      min         = 22,
+      content_min = 42,
+      content_max = 41,
+      max         = 42,
+      name        = "my_module",
+    }) )
+    expect(t.author).contains( AD.At.Author({
+      min         = 1,
+      content_min = 12,
+      content_max = 20,
+      max         = 21,
+    }) )
+    expect(t:get_comment(s)).is("")
+    expect(t.author:get_content(s)).is("my_pseudo")
+    end,
 })
 
 _G.test_Function = Test({
@@ -1944,11 +2023,6 @@ _G.test_Function = Test({
     expect(p:match(TD.s)).contains({
       ID          = AD.At.Function.ID,
       max         = 46,
-      description = {
-        ID      = AD.Description.ID,
-        long    = {},
-        ignores = {},
-      },
       params      = {
         {
           ID          = AD.At.Param.ID,
@@ -1956,11 +2030,6 @@ _G.test_Function = Test({
           content_min = 35,
           content_max = 45,
           max         = 46,
-          description = {
-            ID      = AD.Description.ID,
-            long    = {},
-            ignores = {},
-          },
           name        = "NAME",
           optional    = false,
           types       = {
@@ -2112,7 +2181,6 @@ _G.test_loop_p = Test({
       expect(m).contains({
         ID          = AD.At.Function.ID,
         max         = TD.m().max,
-        description = AD.Description(),
         [key]       = multi and { TD.m() } or TD.m(),
       })
     end
@@ -2151,7 +2219,6 @@ _G.test_Source = Test({
         infos = { {
           ID          = AD.At.Function.ID,
           max         = TD.m().max,
-          description = AD.Description(),
           [key]       = multi and { TD.m() } or TD.m(),
         } },
       })

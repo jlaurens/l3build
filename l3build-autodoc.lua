@@ -206,7 +206,7 @@ local chunk_init_p =
 ---In order to further insert a code chunk info if necessary
 ---create it and save it as capture named "code_before".
 ---@type lpeg.Pattern
-local chunk_begin_p =
+local chunk_start_p =
   Cg( Cb("min"), "min")
 
 ---End of chunk pattern
@@ -216,7 +216,7 @@ Advance the cursor to the end of line or end of file,
 then store the position in the capture named "max".
 --]===]
 ---@type lpeg.Pattern
-local chunk_end_p =
+local chunk_stop_p =
     white_p^0
   * P("\n")^-1
   * named_pos_p("max", 1)
@@ -224,12 +224,12 @@ local chunk_end_p =
   -- the current position becomes the next chunk min
 
 ---@type lpeg.Pattern
-local one_line_chunk_end_p =
+local one_line_chunk_stop_p =
   (1 - P("\n"))^0 -- anything but a newline
-  * chunk_end_p
+  * chunk_stop_p
 
 local special_begin_p =
-  (white_p^1 + -B("-")) -- 1+ spaces or negative lookbehind: no "-" behind
+  ( white_p^1 + -B("-") ) -- 1+ spaces or negative lookbehind: no "-" behind
   * P("---") * -P("-")
   * white_p^0
 
@@ -246,6 +246,22 @@ local colon_p = get_spaced_p(":")
 ---@type lpeg.Pattern
 local comma_p = get_spaced_p(",")
 
+---Get the line number for the given string
+---Should cache intermediate results.
+---Should be defined globally.
+---@param s     string
+---@param i     integer
+---@return lpeg.Pattern
+local function get_line_number(s, i)
+  local result = 1
+  for j = 1, i do
+    if s:sub(j, j) == "\n" then
+      result = result + 1
+    end
+  end
+  return result
+end
+
 ---@type lpeg.Pattern
 local capture_comment_p = (
       get_spaced_p("@")
@@ -254,11 +270,19 @@ local capture_comment_p = (
     * ( white_p^1 * black_p^1 )^0
     * named_pos_p("content_max", 1)
     * white_p^0
-    * -black_p      -- no black character except "@" comment
+  )
+  + Cmt(
+    black_p,
+    function (s, i)
+      error("Missing @ for a comment at line "
+        .. get_line_number(s, i - 1)
+        ..": ".. s:sub(i - 1, i + 50))
+    end
   )
   + (
       named_pos_p("content_min")
     * named_pos_p("content_max", 1)
+    * white_p^0
   )
 
 ---Sub grammar for lua types
@@ -292,7 +316,7 @@ local lua_type_p = P({
     * get_spaced_p(")")
     * V("fun_return")^-1,
   fun_vararg =
-    P("...") * colon_p * V("type"),
+    P("..."),
   fun_param =
     variable_p * colon_p * V("type"),
   fun_params =
@@ -422,23 +446,6 @@ function AD.Info:do_mask_contents(t)
   end
 end
 
----Get the line number for the given string
----Should cache intermediate results.
----Should be defined globally.
----@param s     string
----@param i     integer
----@return lpeg.Pattern
-local function get_line_number(s, i)
-  print(s, i)
-  local result = 1
-  for j = 1, i do
-    if s:sub(j, j) == "\n" then
-      result = result + 1
-    end
-  end
-  return result
-end
-
 ---@class AD.Content: AD.Info
 ---@field public content_min  integer
 ---@field public content_max  integer
@@ -493,9 +500,9 @@ AD.LineComment = make_class(AD.Content, {
       )
       * white_p^0
       * Ct(
-          chunk_begin_p
+          chunk_start_p
         * self:get_core_p()
-        * chunk_end_p
+        * chunk_stop_p
       ) / function (t)
           return AD.LineComment(t)
         end
@@ -515,9 +522,9 @@ AD.LineDoc = make_class(AD.Content, {
       * -P("@")       -- negative lookahead: not an annotation
       * white_p^0
       * Ct(
-          chunk_begin_p
+          chunk_start_p
         * self:get_core_p()
-        * chunk_end_p
+        * chunk_stop_p
       ) / function (t)
             return AD.LineDoc(t)
           end
@@ -537,7 +544,7 @@ do
         * Ct(
           white_p^0
         * Cg(S([['"]]), tag_del)
-        * chunk_begin_p
+        * chunk_start_p
         * named_pos_p("content_min")
         * Cg(
           Cmt(
@@ -561,7 +568,7 @@ do
           ),
           "content_max"
         )
-        * chunk_end_p
+        * chunk_stop_p
       ) / function (t)
             t[tag_del] = nil
             return AD.ShortLiteral(t)
@@ -593,7 +600,7 @@ do
         end
       end
       error("Missing delimiter `]".. equal .."]`"
-        .." after line ".. get_line_number(s, i))
+        .." after line ".. get_line_number(s, i - 1))
     end
   ), tag_equal)
   * Cg(
@@ -620,9 +627,9 @@ do
           chunk_init_p
         * Ct(
             open_p
-          * chunk_begin_p
+          * chunk_start_p
           * close_p
-          * chunk_end_p
+          * chunk_stop_p
         ) / function (t)
               t[tag_equal] = nil
               return AD.LongLiteral(t)
@@ -655,7 +662,7 @@ do
         end
       end
       error("Missing delimiter `]".. equal .."]`"
-        .." after line ".. get_line_number(s, i))
+        .." after line ".. get_line_number(s, i - 1))
     end
   ), tag_equal)
   * Cg(
@@ -687,9 +694,9 @@ do
         * prefix
         * Ct(
           open_p
-        * chunk_begin_p
+        * chunk_start_p
         * close_p
-        * chunk_end_p
+        * chunk_stop_p
       ) / function (t)
             t[tag_equal] = nil
             return AD.LongComment(t)
@@ -711,7 +718,7 @@ AD.LongDoc = make_class(AD.Content, {
         ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
         * P("--[===[")
         * eol_p
-        * chunk_begin_p
+        * chunk_start_p
         * named_pos_p("content_min")
         * Cg(
           Cmt(
@@ -725,12 +732,12 @@ AD.LongDoc = make_class(AD.Content, {
                 end
               end
               error("Missing delimiter `]===]`"
-                .." after line ".. get_line_number(s, i))
+                .." after line ".. get_line_number(s, i - 1))
             end
           ),
           "content_max"
         )
-        * chunk_end_p
+        * chunk_stop_p
       ) / function (t)
             return AD.LongDoc(t)
           end
@@ -832,7 +839,7 @@ end
 local error_annotation_p = function (Key)
   return Cmt(
       Cp()
-    * one_line_chunk_end_p,
+    * one_line_chunk_stop_p,
     function (s, to, from)
       -- print(debug.traceback())
       error("Bad ".. Key .." annotation"
@@ -863,12 +870,6 @@ AD.At = make_class(AD.Content, {
   -- complete = nil
 })
 
----comment
----@param self AD.At
-function AD.At:initialize()
-  self.description = self.description or AD.Description() -- `AD.Description` is not yet available
-end
-
 ---Pattern to capture an annotation
 ---All annotations start with '---@<KEY>'.
 ---If this string is recognized, an object is created
@@ -885,9 +886,9 @@ function AD.At:get_capture_p()
         chunk_init_p
       * at_match_p(self.KEY) * (
       Ct(
-          chunk_begin_p
+          chunk_start_p
         * self:get_core_p() -- specific static pattern
-        * chunk_end_p
+        * chunk_stop_p
       )
       / function (at)
           return self(at)
@@ -905,14 +906,13 @@ end
 ---@return lpeg.Pattern
 function AD.At:get_complete_p()
   return
-      AD.Description:get_capture_p()^-1
+    ( AD.Description:get_capture_p() + Cc(false) )
     * self:get_capture_p()
-    / function (desc_or_at, at)
-        if at then -- 2 captures
-          at.description = desc_or_at
-          return at
+    / function (desc, at)
+        if desc then
+          at.description = desc
         end
-        return desc_or_at -- only one capture
+        return at
       end
 end
 
@@ -941,22 +941,12 @@ function AD.At:get_comment(s)
 end
 
 ---@class AD.At.Author: AD.At
----@field public pseudo string
 
 ---@type AD.At.Author
 AD.At.Author = make_class(AD.At, {
   TYPE        = "AD.At.Author",
   KEY         = "author",
-  -- @author pseudo (mail eventually)
-  get_core_p = function (_self)
-    return
-        named_pos_p("content_min")
-      * black_p^0
-      * ( white_p^1 * black_p^1 )^0
-      * named_pos_p("content_max", 1)
-  end,
 })
-
 
 ---@class AD.At.Field: AD.At
 ---@field public visibility string | "public" | "protected" | "private"
@@ -996,13 +986,6 @@ AD.At.Field = make_class(AD.At, {
 AD.At.See = make_class(AD.At, {
   TYPE  = "AD.At.See",
   KEY   = "see",
-  get_core_p = function (_self)
-    return
-        named_pos_p("content_min")
-      * black_p^0
-      * ( white_p^1 * black_p^1 )^0
-      * named_pos_p("content_max", 1)
-  end,
 })
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
@@ -1011,6 +994,7 @@ AD.At.See = make_class(AD.At, {
 ---@field public name         string        @ the name of the receiver
 ---@field public parent       string|nil    @ the parent class if any, for class
 ---@field public fields       AD.At.Field[] @ list of fields
+---@field public author       AD.At.Author
 ---@field public see          AD.At.See     @ references
 
 do
@@ -1037,14 +1021,16 @@ do
       return Cg(
         Cmt(
             ( AD.Description:get_capture_p()
-            + Cc(AD.Description())
+            + Cc(false)
           )
           -- capture a raw class annotation:
           -- create an AD.At.Class instance
           -- capture it with the tag `tag_at`
           * self:get_capture_p(),
           function (_, i, desc, at)
-            at.description = desc
+            if desc then
+              at.description = desc
+            end
             return i, at
           end
         ),
@@ -1055,6 +1041,11 @@ do
           / function (at_field, at)
             append(at.fields, at_field)
           end
+        +   AD.At.Author:get_complete_p()
+          * Cb(tag_at)
+          / function (at_author, at)
+              at.author = at_author
+            end
         +   AD.At.See:get_complete_p()
           * Cb(tag_at)
           / function (at_see, at)
@@ -1083,7 +1074,7 @@ end
 
 -- @type MY_TYPE[|OTHER_TYPE] [@comment]
 ---@class AD.At.Type: AD.At
----@field public types        string[]    @ List of types
+---@field public types  string[]  @ List of types
 
 ---@type AD.At.Type
 AD.At.Type = make_class(AD.At, {
@@ -1091,7 +1082,8 @@ AD.At.Type = make_class(AD.At, {
   KEY   = "type",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
-    return named_types_p
+    return
+        named_types_p
       * capture_comment_p
   end,
 })
@@ -1185,7 +1177,7 @@ AD.At.Param = make_class(AD.At, {
 
 -- @vararg TYPE[|OTHER_TYPE] [ @ comment ]
 ---@class AD.At.Vararg: AD.At
----@field public types    string[]    @ the types of the variadic arguments
+---@field public types  string[]  @ the types of the variadic arguments
 
 ---@type AD.At.Vararg
 AD.At.Vararg = make_class(AD.At, {
@@ -1202,6 +1194,7 @@ AD.At.Vararg = make_class(AD.At, {
 -- @module name [@ comment]
 ---@class AD.At.Module: AD.At
 ---@field public name   string  @ name of the module
+---@field public author AD.At.Author
 ---@field public NAME_p string  @ pattern for module names
 
 ---@type AD.At.Module
@@ -1211,12 +1204,26 @@ AD.At.Module = make_class(AD.At, {
   name    = "UNKNOWN MODULE NAME",
   NAME_p  = R("az", "09") * (R("az", "09") + S("_-."))^0,
   get_core_p = function(self)
-    if not self then
-      print(debug.traceback())
-    end
     return
       Cg(self.NAME_p, "name")
       * capture_comment_p
+  end,
+  get_complete_p = function (self)
+    return
+        ( AD.Description:get_capture_p() + Cc(false) )
+      * ( AD.At.Author:get_complete_p() + Cc(false) )
+      * self:get_capture_p()
+      * Cp() -- capture after
+      / function (desc, author, at, after)
+          if desc then
+            at.description = desc
+          end
+          if author then
+            at.author = author
+          end
+          at.max = after - 1
+          return at -- return the capture
+        end
   end,
 })
 
@@ -1244,6 +1251,7 @@ AD.At.Global = make_class(AD.At, {
 ---@field public vararg   AD.At.Vararg    @ variadic arguments
 ---@field public generic  AD.At.Generic   @ generic annotation
 ---@field public returns  AD.At.Return[]  @ parameters of the function
+---@field public author   AD.At.Author
 ---@field public see      AD.At.See       @ reference
 ---@field public guess_p  lpeg.Pattern 
 do
@@ -1327,6 +1335,20 @@ do
     / function (at_ignore, at)
         append(at.ignores, at_ignore)
       end
+  ---@type lpeg.Pattern
+  local author_p =
+      AD.At.Author:get_complete_p()
+    * Cb(tag_at)
+    / function (at_author, at)
+        at.author = at_author
+      end
+  ---@type lpeg.Pattern
+  local see_p =
+      AD.At.See:get_complete_p()
+    * Cb(tag_at)
+    / function (at_see, at)
+        at.see = at_see
+      end
   ---@type AD.At.Function
   AD.At.Function = make_class(AD.At, {
     TYPE  = "AD.At.Function",
@@ -1351,7 +1373,7 @@ do
         -- create an AD.At.Function instance
         -- capture it with the tag `tag_at`
         Cg(
-            ( AD.Description:get_capture_p() + Cc(AD.Description()) )
+            ( AD.Description:get_capture_p() + Cc(false) )
           * ( self:get_capture_p()
             + start_with_param_p  -- when no ---@function is available
             + start_with_vararg_p
@@ -1359,7 +1381,9 @@ do
             + start_with_return_p
           )
           / function (desc, at)
-            at.description = desc
+            if desc then
+              at.description = desc
+            end
             return at -- return the capture
           end
           ,
@@ -1372,6 +1396,8 @@ do
           + more_vararg_p
           + more_generic_p
           + more_return_p
+          + see_p
+          + author_p
         )^0
         * Cp() -- capture after
         * Cb(tag_at)
@@ -1380,6 +1406,7 @@ do
             return at -- return the capture
           end
     end,
+    -- pattern to guess the name of the documented function
     guess_p = P( {
       - B(black_p)
       * Ct(
@@ -1450,8 +1477,8 @@ AD.Break = make_class(AD.Info, {
         chunk_init_p
       * Ct(
         ( white_p^0 * P("\n") )^1
-        * chunk_begin_p
-        * chunk_end_p
+        * chunk_start_p
+        * chunk_stop_p
       ) / function (t)
             return AD.Break(t)
           end
@@ -1492,6 +1519,7 @@ do
     + AD.At.Param:get_complete_p()
     + AD.At.Vararg:get_complete_p()
     + AD.At.Return:get_complete_p()
+    + AD.At.Author:get_complete_p()
     + AD.At.See:get_complete_p()
     + AD.At.Global:get_complete_p()
     + AD.At.Alias:get_complete_p()
@@ -1710,8 +1738,8 @@ if _ENV.during_unit_testing then
   _ENV.named_optional_p           = named_optional_p
   _ENV.named_pos_p                = named_pos_p
   _ENV.at_match_p                 = at_match_p
-  _ENV.chunk_begin_p              = chunk_begin_p
-  _ENV.chunk_end_p                = chunk_end_p
+  _ENV.chunk_start_p              = chunk_start_p
+  _ENV.chunk_stop_p                = chunk_stop_p
   _ENV.chunk_init_p               = chunk_init_p
   _ENV.capture_comment_p          = capture_comment_p
 end
