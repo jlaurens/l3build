@@ -44,8 +44,9 @@ local __ = setmetatable({
   __index = _G
 })
 
+local AUTODOC_PATH = "../l3b/l3b-autodoc.lua"
 local AD = loadfile(
-  "../l3build-autodoc.lua",
+  AUTODOC_PATH,
   "t",
   __
 )()
@@ -2252,7 +2253,7 @@ _G.test_autodoc = Test({
     self.p = AD.Source:get_capture_p()
   end,
   test = function (self)
-    local fh =  io.open("../l3build-autodoc.lua")
+    local fh =  io.open(AUTODOC_PATH)
     local s = fh:read("a")
     fh:close()
     local m = self.p:match(s)
@@ -2260,16 +2261,16 @@ _G.test_autodoc = Test({
   end,
 })
 
-_G.test_Parser = Test({
+_G.test_Module = Test({
   setup = function (self)
-    self.parser = AD.Parser("../l3build-autodoc.lua")
-    self.parser:parse()
+    self.module = AD.Module(AUTODOC_PATH)
+    self.module:parse()
   end,
   test_parse = function (self)
-    expect(#self.parser._infos > 0).is(true)
+    expect(#self.module._infos > 0).is(true)
   end,
   test_function_name = function (self)
-    for info in self.parser.infos do
+    for info in self.module.infos do
       if info:is_instance_of(AD.At.Function) then
         expect(info.name).is.NOT(AD.At.Function.name)
       end

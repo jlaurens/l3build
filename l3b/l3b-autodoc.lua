@@ -1,6 +1,6 @@
 --[[
 
-File l3build-autodoc.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3b-autodoc.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -22,7 +22,7 @@ for those people who are interested.
 
 --]]
 
--- Documentation of module `AD.Parser`
+-- Documentation of module `AD.Module`
 ---Automatic documentation of lua code
 --[==[
 
@@ -67,13 +67,14 @@ Function and methods annotations are
 ```
 Extensions are
 ```
----@module Only one per file
+---@module At most one per file
+---@author
 ---@global For global constants
----@function when the function name cannot be guessed easily by the parser
+---@function When the function name cannot be guessed easily by the parser
 ```
 
 All of these extra annotations are not widely used
-and may not be processed by IDE's.
+and may not be processed by IDE's, at least they are harmless.
 
 # Parsing a source file
 
@@ -1637,14 +1638,14 @@ function AD.Scope:get_scope_at(i)
   return nil
 end
 
----@class AD.Parser                   @ AD.Parser
+---@class AD.Module                   @ AD.Module
 ---@field private path string         @ the path of the source file
 ---@field private contents string     @ the contents to recover documentation from
 ---@field private _pure_code string   @ the contents without comment nor literals
 ---@field private _top_scope AD.Scope @ top scope
 
-AD.Parser = {}
-AD.Parser.__index = function (self, k)
+AD.Module = {}
+AD.Module.__index = function (self, k)
   if k == "infos" then
     local i = 0
     return function ()
@@ -1652,10 +1653,10 @@ AD.Parser.__index = function (self, k)
       return self._infos[i]
     end
   end
-  return AD.Parser[k]
+  return AD.Module[k]
 end
 
-setmetatable(AD.Parser, {
+setmetatable(AD.Module, {
   __call = function (self, filename)
     local result = setmetatable({}, self)
     result:init_with_contents_of_file(filename)
@@ -1666,7 +1667,7 @@ setmetatable(AD.Parser, {
 ---Initialize the parser with given string.
 ---Prepare and store the string.
 ---@param s string
-function AD.Parser:init_with_string(s)
+function AD.Module:init_with_string(s)
   -- normalize newline characters
   self.contents = s
     :gsub("\r\n", "\n")
@@ -1678,7 +1679,7 @@ end
 ---Read the file at the given path,
 ---prepare and store its contents.
 ---@param path string
-function AD.Parser:init_with_contents_of_file(path)
+function AD.Module:init_with_contents_of_file(path)
   -- read the file contents
   local fh = open(path, "r")
   local s = fh:read("a")
@@ -1686,59 +1687,61 @@ function AD.Parser:init_with_contents_of_file(path)
   self:init_with_string(s)
 end
 
-function AD.Parser:make_after_codes()
-  for i = 2, #self._infos do
-    local min = self._infos[i-1].max + 1
-    local max = self._infos[i].min - 1
-    if min <= max then
-      self._infos[i-1].after_code = AD.Code({
-        min = min,
-        max = max,
-      })
-    end
-  end
-end
-
----Make the masked contents
----The masked contents is obtained replacing black characters
----in literals and comments with a "*"
-function AD.Parser:make_masked_contents()
-  -- explode the `contents` into a Regular array of bytes
-  local t = Ct( C(P(1))^0 ):match(self.contents)
-  for info in self.infos do
-    info:mask_contents(t)
-  end
-  self.masked_contents = concat(t, "")
-end
-
-function AD.Parser:guess_function_names()
-  local p = AD.At.Function.guess_p
-  for info in self.infos do
-    if info:is_instance_of(AD.At.Function) then
-      if info.name == AD.At.Function.name then
-        local code = info.after_code
-        if not code then
-          error("Cannot guess function name of ".. self.contents:sub(info.min, info.max))
-        end
-        local s = self.contents:sub(code.min, code.max)
-        local t = p:match(s)
-        if not t then
-          error("Cannot guess function name from ".. s)
-        end
-        info.name     = t.name
-        info.is_local = t.is_local
+do
+  local function make_after_codes(self)
+    for i = 2, #self._infos do
+      local min = self._infos[i - 1].max + 1
+      local max = self._infos[i].min - 1
+      if min <= max then
+        self._infos[i - 1].after_code = AD.Code({
+          min = min,
+          max = max,
+        })
       end
     end
   end
-end
 
-function AD.Parser:parse()
-  local p = AD.Source:get_capture_p()
-  local m = p:match(self.contents)
-  self._infos = m.infos
-  self:make_after_codes()
-  -- self:make_masked_contents()
-  self:guess_function_names()
+  ---Make the masked contents
+  ---The masked contents is obtained replacing black characters
+  ---in literals and comments with a "*"
+  local function make_masked_contents(self)
+    -- explode the `contents` into a regular array of bytes
+    local t = Ct( C(P(1))^0 ):match(self.contents)
+    for info in self.infos do
+      info:mask_contents(t)
+    end
+    self.masked_contents = concat(t, "")
+  end
+
+  local function guess_function_names(self)
+    local p = AD.At.Function.guess_p
+    for info in self.infos do
+      if info:is_instance_of(AD.At.Function) then
+        if info.name == AD.At.Function.name then
+          local code = info.after_code
+          if not code then
+            error("Cannot guess function name of ".. self.contents:sub(info.min, info.max))
+          end
+          local s = self.contents:sub(code.min, code.max)
+          local t = p:match(s)
+          if not t then
+            error("Cannot guess function name from ".. s)
+          end
+          info.name     = t.name
+          info.is_local = t.is_local
+        end
+      end
+    end
+  end
+
+  function AD.Module:parse()
+    local p = AD.Source:get_capture_p()
+    local m = p:match(self.contents)
+    self._infos = m.infos
+    make_after_codes(self)
+    -- self:make_masked_contents()
+    guess_function_names(self)
+  end
 end
 
 -- Export symbols to the _ENV for testing purposes
@@ -1760,7 +1763,7 @@ if _ENV.during_unit_testing then
   _ENV.named_pos_p                = named_pos_p
   _ENV.at_match_p                 = at_match_p
   _ENV.chunk_start_p              = chunk_start_p
-  _ENV.chunk_stop_p                = chunk_stop_p
+  _ENV.chunk_stop_p               = chunk_stop_p
   _ENV.chunk_init_p               = chunk_init_p
   _ENV.capture_comment_p          = capture_comment_p
 end
