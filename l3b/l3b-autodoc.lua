@@ -1680,12 +1680,12 @@ end
 -- High level objects.
 -- Hides implementation details
 
----@class AD.ObjectAt
+---@class AD.AtProxy
 ---@field private _at AD.At @ "@" annotation info
-AD.ObjectAt = make_class({
-  TYPE = "AD.ObjectAt",
-  initialize = function (self, info)
-    self._at = info
+AD.AtProxy = make_class({
+  TYPE = "AD.AtProxy",
+  initialize = function (self, at)
+    self._at = at
   end,
   __computed = function (self, k)
     if k == "name" then
@@ -1694,24 +1694,44 @@ AD.ObjectAt = make_class({
   end,
 })
 
----@class AD.Function: AD.ObjectAt
+---@class AD.Param: AD.AtProxy
+---@field private _at AD.At.Param
+
+---@class AD.Function: AD.AtProxy
 ---@field private _at AD.At.Function
 
-AD.Function = make_class(AD.ObjectAt, {
+AD.Function = make_class(AD.AtProxy, {
   TYPE = "AD.Function",
   __AtClass = AD.At.Function,
+  initialize = function (self, ...)
+    AD.Function.__Super.initialize(self, ...)
+    ---@type table<string, AD.Param>
+    self._params = {}
+  end
 })
 
----@class AD.Class: AD.ObjectAt
+function AD.Function:__computed(k)
+  if k == "param_names" then
+    local i = 0
+    return function ()
+      i = i + 1
+      local param = self._at.params[i]
+      return param and param.name
+    end
+  end
+  return AD.Function.__Super.__computed(self, k)
+end
+
+---@class AD.Class: AD.AtProxy
 ---@field private _at AD.At.Class
-AD.Class = make_class(AD.ObjectAt, {
+AD.Class = make_class(AD.AtProxy, {
   TYPE = "AD.Class",
   __AtClass = AD.At.Class,
 })
 
----@class AD.Global: AD.ObjectAt
+---@class AD.Global: AD.AtProxy
 ---@field private _at AD.At.Global
-AD.Global = make_class(AD.ObjectAt, {
+AD.Global = make_class(AD.AtProxy, {
   TYPE = "AD.Global",
   __AtClass = AD.At.Global,
 })
@@ -1752,7 +1772,7 @@ function AD.Module:_get_instance(name, Class, store)
   if result then
     return result
   end
-  for info in self.infos do
+  for info in self._infos do
     if  info:is_instance_of(Class.__AtClass)
     and info.name == name
     then
@@ -1799,7 +1819,7 @@ function AD.Module:iterator(Class, options)
   return function ()
     repeat
       i = i + 1
-      local result = self._infos[i]
+      local result = self.__infos[i]
       if result then
         if result:is_instance_of(Class) then
           if not options.ignore
@@ -1816,36 +1836,36 @@ end
 
 AD.Module.__computed = function (self, k)
   -- computed properties
-  if k == "infos" then
+  if k == "_infos" then
     local i = 0
     return function ()
       i = i + 1
-      return self._infos[i]
+      return self.__infos[i]
     end
   end
   if k == "name" then
-    for info in self.infos do
+    for info in self._infos do
       if info:is_instance_of(AD.At.Module) then
         self.name = info.name
         return self.name
       end
     end
   end
-  if k == "classes" then
+  if k == "class_names" then
     return self:iterator(AD.At.Class, {
       map = function (info)
         return info.name
       end
     })
   end
-  if k == "functions" then
+  if k == "function_names" then
     return self:iterator(AD.At.Function, {
       map = function (info)
         return info.name
       end
     })
   end
-  if k == "globals" then
+  if k == "global_names" then
     return self:iterator(AD.At.Global, {
       map = function (info)
         return info.name
@@ -1880,11 +1900,11 @@ end
 
 do
   local function make_after_codes(self)
-    for i = 2, #self._infos do
-      local min = self._infos[i - 1].max + 1
-      local max = self._infos[i].min - 1
+    for i = 2, #self.__infos do
+      local min = self.__infos[i - 1].max + 1
+      local max = self.__infos[i].min - 1
       if min <= max then
-        self._infos[i - 1].after_code = AD.Code({
+        self.__infos[i - 1].after_code = AD.Code({
           min = min,
           max = max,
         })
@@ -1906,7 +1926,7 @@ do
   ]]
   local function guess_function_names(self)
     local p = AD.At.Function.guess_p
-    for info in self.infos do
+    for info in self._infos do
       if info:is_instance_of(AD.At.Function) then
         if info.name == AD.At.Function.name then
           local code = info.after_code
@@ -1928,7 +1948,7 @@ do
   function AD.Module:parse()
     local p = AD.Source:get_capture_p()
     local m = p:match(self.contents)
-    self._infos = m.infos
+    self.__infos = m.infos
     make_after_codes(self)
     -- self:make_masked_contents()
     guess_function_names(self)

@@ -2429,13 +2429,13 @@ _G.test_Module = Test({
     })
   end,
   test_base = function (self)
-    expect(self.module._infos).contains({})
+    expect(self.module.__infos).contains({})
     expect(self.module._globals).contains({})
     expect(self.module._functions).contains({})
     expect(self.module._classes).contains({})
   end,
   test_function_name = function (self)
-    for info in self.module.infos do
+    for info in self.module._infos do
       if info:is_instance_of(AD.At.Function) then
         -- all function names have been properly guessed:
         expect(info.name).is.NOT(AD.At.Function.name)
@@ -2447,23 +2447,23 @@ _G.test_Module = Test({
     expect(self.module.file_path).is(AUTODOC_PATH)
     expect(self.module.name).is(AUTODOC_NAME)
   end,
-  test_class = function (self)
+  test_class_names = function (self)
     local module = self.module
-    for name in module.classes do
+    for name in module.class_names do
       local info = module:get_class(name)
       expect(info.name).is(name)
     end
   end,
-  test_functions = function (self)
+  test_function_names = function (self)
     local module = self.module
-    for name in module.functions do
+    for name in module.function_names do
       local info = module:get_function(name)
       expect(info.name).is(name)
     end
   end,
-  test_globals = function (self)
+  test_global_names = function (self)
     local module = self.module
-    for name in module.globals do
+    for name in module.global_names do
       local info = module:get_global(name)
       expect(info.name).is(name)
     end
