@@ -44,7 +44,9 @@ local __ = setmetatable({
   __index = _G
 })
 
-local AUTODOC_PATH = "../l3b/l3b-autodoc.lua"
+local AUTODOC_NAME = "l3b-autodoc"
+local AUTODOC_PATH = "../l3b/".. AUTODOC_NAME ..".lua"
+
 local AD = loadfile(
   AUTODOC_PATH,
   "t",
@@ -464,6 +466,165 @@ function Test:p_test(target, expected, where)
   expect(self.p:match(target, where)).is(expected)
   self:add_strip(-1)
 end
+
+_G.test_make_class = Test({
+  test_computed = function (_self)
+    
+    local Class_1 = __.make_class({
+      TYPE = "Class_1",
+      __computed = function (self, k)
+        if k == "foo_1" then
+          return "bar_1"
+        end
+      end
+    })
+    expect(Class_1.__index(nil, "foo_1")).is("bar_1")
+    expect(Class_1.__computed(nil, "foo_1")).is("bar_1")
+    local instance_1 = Class_1()
+    expect(instance_1.foo_1).is("bar_1")
+
+    local Class_2a = __.make_class(Class_1, {
+      TYPE = "Class_2a",
+      __computed = function (self, k)
+        if k == "foo_2a" then
+          return "bar_2a"
+        end
+      end
+    })
+    expect(Class_2a.__index(nil, "foo_2a")).is("bar_2a")
+    expect(Class_2a.__computed(nil, "foo_2a")).is("bar_2a")
+    local instance_2a = Class_2a()
+    expect(instance_2a.foo_2a).is("bar_2a")
+
+    local Class_2b = __.make_class(Class_1, {
+      TYPE = "Class_2b",
+      __computed = function (self, k)
+        if k == "foo_2b" then
+          return "bar_2b"
+        end
+        return Class_1.__computed(self, k) -- inherits all computed properties
+      end
+    })
+    local instance_2b = Class_2b()
+    expect(instance_2b.foo_2b).is("bar_2b")
+
+    expect(instance_2b.foo_1).is("bar_1")
+
+    local Class_2c = __.make_class(Class_1, {
+      TYPE = "Class_2c",
+    })
+    local instance_2c = Class_2c()
+    expect(instance_2c.foo_1).is("bar_1")
+
+  end,
+
+  test_base = function (self)
+    -- make a class hierarchy
+    local Class_1  = __.make_class()
+    expect(Class_1.__Super).is(nil)
+    local Class_2  = __.make_class(Class_1)
+    expect(Class_2.__Super).is(Class_1)
+    local Class_3  = __.make_class(Class_2)
+    expect(Class_3.__Super).is(Class_2)
+    -- make instances
+    local instance_1 = Class_1()
+    expect(instance_1.__Class).is(Class_1)
+    local instance_2 = Class_2()
+    expect(instance_2.__Class).is(Class_2)
+    local instance_3 = Class_3()
+    expect(instance_3.__Class).is(Class_3)
+
+    expect(Class_1.foo).is(nil)
+    expect(instance_1.foo).is(nil)
+    expect(Class_2.foo).is(nil)
+    expect(instance_2.foo).is(nil)
+    expect(Class_3.foo).is(nil)
+    expect(instance_3.foo).is(nil)
+
+    Class_1.foo = "bar"
+
+    expect(Class_1.foo).is("bar")
+    expect(instance_1.foo).is("bar")
+    expect(Class_2.foo).is("bar")
+    expect(instance_2.foo).is("bar")
+    expect(Class_3.foo).is("bar")
+    expect(instance_3.foo).is("bar")
+
+    Class_1.foo = nil
+
+    expect(Class_1.foo    ).is(nil)
+    expect(instance_1.foo ).is(nil)
+    expect(Class_2.foo    ).is(nil)
+    expect(instance_2.foo ).is(nil)
+    expect(Class_3.foo    ).is(nil)
+    expect(instance_3.foo ).is(nil)
+
+    Class_2.foo = "bar"
+
+    expect(Class_1.foo    ).is(nil)
+    expect(instance_1.foo ).is(nil)
+    expect(Class_2.foo    ).is("bar")
+    expect(instance_2.foo ).is("bar")
+    expect(Class_3.foo    ).is("bar")
+    expect(instance_3.foo ).is("bar")
+
+    Class_2.foo = nil
+
+    expect(Class_1.foo    ).is(nil)
+    expect(instance_1.foo ).is(nil)
+    expect(Class_2.foo    ).is(nil)
+    expect(instance_2.foo ).is(nil)
+    expect(Class_3.foo    ).is(nil)
+    expect(instance_3.foo ).is(nil)
+
+    Class_3.foo = "bar"
+
+    expect(Class_1.foo    ).is(nil)
+    expect(instance_1.foo ).is(nil)
+    expect(Class_2.foo    ).is(nil)
+    expect(instance_2.foo ).is(nil)
+    expect(Class_3.foo    ).is("bar")
+    expect(instance_3.foo ).is("bar")
+
+    Class_3.foo = nil
+
+    expect(Class_1.foo    ).is(nil)
+    expect(instance_1.foo ).is(nil)
+    expect(Class_2.foo    ).is(nil)
+    expect(instance_2.foo ).is(nil)
+    expect(Class_3.foo    ).is(nil)
+    expect(instance_3.foo ).is(nil)
+
+  end,
+
+  test_data = function (_self)
+    local Class  = __.make_class({
+      foo = "bar",
+    })
+    local instance = Class()
+    expect(instance.foo).is("bar")
+  end,
+
+  test_initialize = function (_self)
+    local Class  = __.make_class({
+      initialize = function (self)
+        self.foo = "bar"
+      end
+    })
+    local instance = Class()
+    expect(instance.foo).is("bar")
+  end,
+
+  test_initialize_param = function (_self)
+    local Class  = __.make_class({
+      initialize = function (self, x)
+        self.foo = x
+      end
+    })
+    local instance = Class({}, "bar")
+    expect(instance.foo).is("bar")
+  end,
+})
 
 _G.test_POC = Test({
   test_Ct = function ()
@@ -1183,7 +1344,7 @@ s   s
   end
 })
 
-_G.test_Author = Test({
+_G.test_At_Author = Test({
   test_base = function ()
     local t = AD.At.Author()
     expect(t).contains( AD.At.Author({
@@ -1215,7 +1376,7 @@ _G.test_Author = Test({
   end
 })
 
-_G.test_Field = Test({
+_G.test_At_Field = Test({
   test_base = function ()
     local t = AD.At.Field()
     expect(t).contains(AD.At.Field({
@@ -1314,7 +1475,7 @@ _G.test_Field = Test({
   end
 })
 
-_G.test_See = Test({
+_G.test_At_See = Test({
   test_base = function ()
     local t = AD.At.See()
     expect(t).contains( AD.At.See({
@@ -1347,7 +1508,7 @@ _G.test_See = Test({
 })
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
-_G.test_Class = Test({
+_G.test_At_Class = Test({
   test_base = function (self)
     local t = AD.At.Class()
     expect(t).contains( AD.At.Class({
@@ -1417,7 +1578,7 @@ _G.test_Class = Test({
 
 })
 
-_G.test_Type = Test({
+_G.test_At_Type = Test({
   test_base = function ()
     local t = AD.At.Type()
     expect(t).contains( AD.At.Type({
@@ -1483,7 +1644,7 @@ _G.test_Type = Test({
   end,
 })
 
-_G.test_Alias = Test({
+_G.test_At_Alias = Test({
   test_base = function ()
     local t = AD.At.Alias()
     expect(t).contains( AD.At.Alias({
@@ -1562,7 +1723,7 @@ s = [=====[
   end,
 })
 
-_G.test_Param = Test({
+_G.test_At_Param = Test({
   test_base = function ()
     local t = AD.At.Param()
     expect(t).contains( AD.At.Param({
@@ -1685,7 +1846,7 @@ s = [=====[
   end,
 })
 
-_G.test_Return = Test({
+_G.test_At_Return = Test({
   test_base = function ()
     local t = AD.At.Return()
     expect(t.__Class).is(AD.At.Return)
@@ -1738,7 +1899,7 @@ _G.test_Return = Test({
   end,
 })
 
-_G.test_Generic = Test({
+_G.test_At_Generic = Test({
   test_base = function ()
     local t = AD.At.Generic()
     expect(t.__Class).is(AD.At.Generic)
@@ -1829,7 +1990,7 @@ _G.test_Generic = Test({
   end,
 })
 
-_G.test_Vararg = Test({
+_G.test_At_Vararg = Test({
   test_base = function ()
     local t = AD.At.Vararg()
     expect(t).contains( AD.At.Vararg({
@@ -1897,7 +2058,7 @@ _G.test_Vararg = Test({
   end,
 })
 
-_G.test_Module = Test({
+_G.test_At_Module = Test({
   test_base = function ()
     local t = AD.At.Module()
     expect(t).contains( AD.At.Module({
@@ -1973,7 +2134,7 @@ _G.test_Module = Test({
     end,
 })
 
-_G.test_Function = Test({
+_G.test_At_Function = Test({
   test_base = function ()
     local t = AD.At.Function()
     expect(t).contains( AD.At.Function({
@@ -2043,7 +2204,7 @@ _G.test_Function = Test({
   end,
 })
 
-_G.test_Break = Test({
+_G.test_At_Break = Test({
   test_base = function ()
     local t = AD.Break()
     expect(t).contains( AD.Break({
@@ -2075,7 +2236,7 @@ _G.test_Break = Test({
   end,
 })
 
-_G.test_Global = Test({
+_G.test_At_Global = Test({
   test_base = function ()
     local t = AD.At.Global()
     expect(t).contains( AD.At.Global({
@@ -2233,7 +2394,7 @@ _G.test_Source = Test({
         local f_2 = self["get_".. KEY_2]
         local TD_2 = f_2(self)
         local m = self.p:match(TD_1.s .. TD_2.s)
-        -- do not test when items are combined
+        -- do not test when items are combined into one
         if #m.infos == 2 then
           expect(m).contains({
             ID = AD.Source.ID,
@@ -2263,17 +2424,48 @@ _G.test_autodoc = Test({
 
 _G.test_Module = Test({
   setup = function (self)
-    self.module = AD.Module(AUTODOC_PATH)
-    self.module:parse()
+    self.module = AD.Module({
+      file_path = AUTODOC_PATH
+    })
   end,
-  test_parse = function (self)
-    expect(#self.module._infos > 0).is(true)
+  test_base = function (self)
+    expect(self.module._infos).contains({})
+    expect(self.module._globals).contains({})
+    expect(self.module._functions).contains({})
+    expect(self.module._classes).contains({})
   end,
   test_function_name = function (self)
     for info in self.module.infos do
       if info:is_instance_of(AD.At.Function) then
+        -- all function names have been properly guessed:
         expect(info.name).is.NOT(AD.At.Function.name)
       end
+    end
+  end,
+  test_module_name = function (self)
+    expect(self.module.name).is.NOT(AD.Module.name)
+    expect(self.module.file_path).is(AUTODOC_PATH)
+    expect(self.module.name).is(AUTODOC_NAME)
+  end,
+  test_class = function (self)
+    local module = self.module
+    for name in module.classes do
+      local info = module:get_class(name)
+      expect(info.name).is(name)
+    end
+  end,
+  test_functions = function (self)
+    local module = self.module
+    for name in module.functions do
+      local info = module:get_function(name)
+      expect(info.name).is(name)
+    end
+  end,
+  test_globals = function (self)
+    local module = self.module
+    for name in module.globals do
+      local info = module:get_global(name)
+      expect(info.name).is(name)
     end
   end,
 })

@@ -103,7 +103,7 @@ and before an annotation of some pure code chunk.
 Regular comments are ignored.
 --]==]
 
----@module l3build-autodoc
+---@module l3b-autodoc
 
 -- Safeguard and shortcuts
 
@@ -340,31 +340,47 @@ local named_optional_p =
   + Cg(Cc(false), "optional") * white_p^0
 
 ---@class AD.Object @ fake class
----@field public finalize       fun(self: AD.Object)      @ finalize the class object
----@field public initialize     fun(self: AD.Object, ...) @ initialize the instance
 ---@field public is_instance_of fun(self: AD.Object, Class: AD.Object)
-
+---@field protected finalize    fun(self: AD.Object)      @ finalize the class object
+---@field protected initialize  fun(self: AD.Object, ...) @ initialize the instance
+---@field protected __computed  fun(self: AD.Object, k: string): any
 ---Class making utility
 ---@generic T: AD.Object
----@param Super?  table
----@param data?   T
+---@param Super?  T | table
+---@param data?   T @ Will become the class table
 ---@return T
 local function make_class(Super, data)
+  if not data and Super and not Super.ID then
+    Super, data = nil, Super
+  end
   ---@type AD.Object
   data = data or {}
   data.ID = {}        -- unique id by class
-  data.__index = data
+  data.__index = function (self, k)
+    local computed = rawget(data, "__computed")
+    return computed and computed(self, k) or data[k]
+  end
   data.__Class = data -- more readable than __index
-  local function __call(self, d, ...)  -- self is a constructor
+  -- Define the constructor with a direct call syntax
+  -- @param self  any @ seen as a constructor
+  -- @param d?    any @ base of the construction, will be the instance result
+  -- @vararg any      @ parameters to the initilier function
+  local function __call(self, d, ...)
     d = d or {}
-    d.ID = self.ID  -- hard code the ID for testing purposes
-    setmetatable(d, self)
+    d.ID = self.ID        -- hard code the ID for testing purposes
+    setmetatable(d, self) -- d is an instance of self
     if d.initialize then
       d:initialize(...)
     end
     return d
   end
   if Super then
+    -- computed properties are inherited by default:
+    data.__computed = data.__computed
+      or function (self, k)
+          local computed = Super.__computed
+          return computed and computed(self, k)
+        end
     data.__Super = Super
     setmetatable(data, {
       __index = Super,
@@ -1018,20 +1034,11 @@ do
     end,
     -- class annotation needs a custom complete method
     get_complete_p = function (self)
-      -- capture a description or create a void one)
+      -- capture a description
       return Cg(
-        Cmt(
-            ( AD.Description:get_capture_p()
-            + Cc(false)
-          )
-          -- capture a raw class annotation:
-          -- create an AD.At.Class instance
-          -- capture it with the tag `tag_at`
-          * self:get_capture_p(),
-          function (_, i, desc, at)
-            if desc then
-              at.description = desc
-            end
+        Cmt( -- expand
+          AD.At.Class.__Super.get_complete_p(self),
+          function (_, i, at)
             return i, at
           end
         ),
@@ -1218,27 +1225,23 @@ do
     return
       Cg(
         Cmt( -- necessary because the capture must be evaluated only once
-          ( AD.Description:get_capture_p() + Cc(false) )
-          * self:get_capture_p(),
-          function (_, i, desc, at)
-            if desc then
-              at.description = desc
-            end
+          AD.At.Module.__Super.get_complete_p(self),
+          function (_, i, at)
             return i, at -- return the capture
           end
         ),
         tag_at
       )
       * ( AD.At.Author:get_complete_p()
-        * Cb(tag_at)
-        / function (at_author, at)
-            at.author = at_author
-          end
+          * Cb(tag_at)
+          / function (at_author, at)
+              at.author = at_author
+            end
         + AD.At.See:get_complete_p()
-        * Cb(tag_at)
-        / function (at_see, at)
-            at.see = at_see
-          end
+          * Cb(tag_at)
+          / function (at_see, at)
+              at.see = at_see
+            end
       )^0
       * Cb(tag_at)
       * Cp() -- capture after
@@ -1251,7 +1254,8 @@ end
 
 -- @global name [@ comment]
 ---@class AD.At.Global: AD.At
----@field public name     string      @ name of the global variable
+---@field public name string            @ name of the global variable
+---@field public type nil | AD.At.Type  @ type annotation eventually
 
 ---@type AD.At.Global
 AD.At.Global = make_class(AD.At, {
@@ -1264,6 +1268,39 @@ AD.At.Global = make_class(AD.At, {
       * capture_comment_p
   end,
 })
+do
+  local tag_at = {}
+  function AD.At.Global:get_complete_p()
+    -- capture a description
+    return Cg(
+      Cmt(
+        AD.At.Global.__Super.get_complete_p(self),
+        function (_, i, at)
+          return i, at
+        end
+      ),
+      tag_at
+    )
+    * (   AD.At.Type:get_complete_p()
+        * Cb(tag_at)
+        / function (at_type, at)
+          at.type = at_type
+        end
+    )^0
+    -- No capture was made so far
+    -- capture the current position, record it
+    -- and return the AD.At.Class instance as sole capture
+    * Cp()
+    * Cb(tag_at)
+    / function (after, at)
+        at.max = after - 1
+        return at -- captured
+      end
+    -- the temporary group is no longer available ?
+    -- see https://stackoverflow.com/questions/67019331
+  end
+
+end
 
 -- @function name [@ comment]
 ---@class AD.At.Function: AD.At
@@ -1389,25 +1426,27 @@ do
         * capture_comment_p
     end,
     get_complete_p = function (self)
-      -- capture a description or create a void one)
+      -- capture a description
       return
         -- capture a complete functions annotation:
         -- create an AD.At.Function instance
         -- capture it with the tag `tag_at`
         Cg(
-            ( AD.Description:get_capture_p() + Cc(false) )
-          * ( self:get_capture_p()
-            + start_with_param_p  -- when no ---@function is available
-            + start_with_vararg_p
-            + start_with_generic_p
-            + start_with_return_p
-          )
-          / function (desc, at)
-            if desc then
-              at.description = desc
+          Cmt(
+              ( AD.Description:get_capture_p() + Cc(false) )
+            * ( self:get_capture_p()
+              + start_with_param_p  -- when no ---@function is available
+              + start_with_vararg_p
+              + start_with_generic_p
+              + start_with_return_p
+            ),
+            function (_, i, desc, at)
+              if desc then
+                at.description = desc
+              end
+              return i, at -- return the capture
             end
-            return at -- return the capture
-          end
+          )
           ,
           tag_at
         )
@@ -1638,14 +1677,145 @@ function AD.Scope:get_scope_at(i)
   return nil
 end
 
----@class AD.Module                   @ AD.Module
----@field private path string         @ the path of the source file
----@field private contents string     @ the contents to recover documentation from
----@field private _pure_code string   @ the contents without comment nor literals
----@field private _top_scope AD.Scope @ top scope
+-- High level objects.
+-- Hides implementation details
 
-AD.Module = {}
-AD.Module.__index = function (self, k)
+---@class AD.ObjectAt
+---@field private _at AD.At @ "@" annotation info
+AD.ObjectAt = make_class({
+  TYPE = "AD.ObjectAt",
+  initialize = function (self, info)
+    self._at = info
+  end,
+  __computed = function (self, k)
+    if k == "name" then
+      return self._at[k]
+    end
+  end,
+})
+
+---@class AD.Function: AD.ObjectAt
+---@field private _at AD.At.Function
+
+AD.Function = make_class(AD.ObjectAt, {
+  TYPE = "AD.Function",
+  __AtClass = AD.At.Function,
+})
+
+---@class AD.Class: AD.ObjectAt
+---@field private _at AD.At.Class
+AD.Class = make_class(AD.ObjectAt, {
+  TYPE = "AD.Class",
+  __AtClass = AD.At.Class,
+})
+
+---@class AD.Global: AD.ObjectAt
+---@field private _at AD.At.Global
+AD.Global = make_class(AD.ObjectAt, {
+  TYPE = "AD.Global",
+  __AtClass = AD.At.Global,
+})
+
+---@class AD.Module                   @ AD.Module
+---@field public  path      string         @ the path of the source file
+---@field public  name      string         @ the name of the module as defined in the first module annotation
+---@field public  classes   fun(): string | nil @ class names iterator
+---@field public  functions fun(): string | nil @ function names iterator
+---@field public  globals   fun(): string | nil @ globals name iterator
+---@field private contents  string     @ the contents to recover documentation from
+---@field private _pure_code  string   @ the contents without comment nor literals
+---@field private _top_scope  AD.Scope @ top scope
+
+AD.Module = make_class({
+  TYPE = "AD.Module",
+  name = "UNKOWN MODULE NAME",
+  initialize = function (self)
+    ---@type table<string, AD.Global>
+    self._globals    = {}
+    ---@type table<string, AD.Class>
+    self._classes    = {}
+    ---@type table<string, AD.Function>
+    self._functions  = {}
+    self:init_with_contents_of_file(self.file_path)
+    self:parse()
+  end
+})
+
+---Get the info annotation object for the given name and class.
+---@generic T: AD.Object
+---@param name string
+---@param Class T
+---@param store table<string,T>
+---@return nil | T
+function AD.Module:_get_instance(name, Class, store)
+  local result = store[name]
+  if result then
+    return result
+  end
+  for info in self.infos do
+    if  info:is_instance_of(Class.__AtClass)
+    and info.name == name
+    then
+      result = Class(nil, info)
+      store[name] = result
+      return result
+    end
+  end
+end
+
+---Get the global info for the given name
+---@param name string
+---@return nil | AD.Global
+function AD.Module:get_global(name)
+  return self:_get_instance(name, AD.Global, self._globals)
+end
+
+---Get the class info for the given name
+---@param name string
+---@return nil | AD.Class
+function AD.Module:get_class(name)
+  return self:_get_instance(name, AD.Class, self._classes)
+end
+
+---Get the function info for the given name
+---@param name string
+---@return nil | AD.Function
+function AD.Module:get_function(name)
+  return self:_get_instance(name, AD.Function, self._functions)
+end
+
+---@class AD.Module.iterator_options
+---@field public map    fun(t: AD.Info): any      @ defaults to the identity map
+---@field public ignore fun(t: AD.Info): boolean  @ defaults to always true
+
+---Iterator over infos of the given class
+---@generic T: AD.Info, Out: any
+---@param Class T
+---@param options AD.Module.iterator_options
+---@return fun(): Out | nil
+function AD.Module:iterator(Class, options)
+  options = options or {}
+  local i = 0
+  return function ()
+    repeat
+      i = i + 1
+      local result = self._infos[i]
+      if result then
+        if result:is_instance_of(Class) then
+          if not options.ignore
+          or not options.ignore(result)
+          then
+            return options.map and options.map(result)
+              or result
+          end
+        end
+      end
+    until not result
+  end
+end
+
+AD.Module.__computed = function (self, k)
+  -- computed properties
   if k == "infos" then
     local i = 0
     return function ()
@@ -1653,16 +1823,37 @@ AD.Module.__index = function (self, k)
       return self._infos[i]
     end
   end
+  if k == "name" then
+    for info in self.infos do
+      if info:is_instance_of(AD.At.Module) then
+        self.name = info.name
+        return self.name
+      end
+    end
+  end
+  if k == "classes" then
+    return self:iterator(AD.At.Class, {
+      map = function (info)
+        return info.name
+      end
+    })
+  end
+  if k == "functions" then
+    return self:iterator(AD.At.Function, {
+      map = function (info)
+        return info.name
+      end
+    })
+  end
+  if k == "globals" then
+    return self:iterator(AD.At.Global, {
+      map = function (info)
+        return info.name
+      end,
+    })
+  end
   return AD.Module[k]
 end
-
-setmetatable(AD.Module, {
-  __call = function (self, filename)
-    local result = setmetatable({}, self)
-    result:init_with_contents_of_file(filename)
-    return result
-  end
-})
 
 ---Initialize the parser with given string.
 ---Prepare and store the string.
@@ -1700,7 +1891,7 @@ do
       end
     end
   end
-
+  --[[
   ---Make the masked contents
   ---The masked contents is obtained replacing black characters
   ---in literals and comments with a "*"
@@ -1712,7 +1903,7 @@ do
     end
     self.masked_contents = concat(t, "")
   end
-
+  ]]
   local function guess_function_names(self)
     local p = AD.At.Function.guess_p
     for info in self.infos do
@@ -1742,6 +1933,7 @@ do
     -- self:make_masked_contents()
     guess_function_names(self)
   end
+
 end
 
 -- Export symbols to the _ENV for testing purposes
