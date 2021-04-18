@@ -107,12 +107,10 @@ Regular comments are ignored.
 
 -- Safeguard and shortcuts
 
-local type    = type
 local open    = io.open
 local append  = table.insert
 local concat  = table.concat
-local remove  = table.remove
-local char    = string.char
+local move    = table.move
 
 local lpeg        = require("lpeg")
 local locale      = lpeg.locale()
@@ -184,15 +182,15 @@ local variable_p =
   variable_p * (S(".:") * variable_p)^0
 
 ---Capture the current position under the given name with the given shifht
----@param s string
----@param d number
+---@param str string
+---@param shift number
 ---@return lpeg.Pattern
 -- This is a one line doc for testing purposes
-local function named_pos_p(s, d)
-  return  Cg(d
-      and Cp() / function (i) return i - d end
+local function named_pos_p(str, shift)
+  return  Cg(shift
+      and Cp() / function (i) return i - shift end
       or  Cp(),
-    s)
+    str)
 end
 
 -- Named captures must exist before use.
@@ -250,13 +248,13 @@ local comma_p = get_spaced_p(",")
 ---Get the line number for the given string
 ---Should cache intermediate results.
 ---Should be defined globally.
----@param s     string
----@param i     integer
+---@param str   string
+---@param index integer
 ---@return lpeg.Pattern
-local function get_line_number(s, i)
+local function get_line_number(str, index)
   local result = 1
-  for j = 1, i do
-    if s:sub(j, j) == "\n" then
+  for j = 1, index do
+    if str:sub(j, j) == "\n" then
       result = result + 1
     end
   end
@@ -344,6 +342,7 @@ local named_optional_p =
 ---@field protected finalize    fun(self: AD.Object)      @ finalize the class object
 ---@field protected initialize  fun(self: AD.Object, ...) @ initialize the instance
 ---@field protected __computed  fun(self: AD.Object, k: string): any
+
 ---Class making utility
 ---@generic T: AD.Object
 ---@param Super?  T | table
@@ -365,15 +364,7 @@ local function make_class(Super, data)
   -- @param self  any @ seen as a constructor
   -- @param d?    any @ base of the construction, will be the instance result
   -- @vararg any      @ parameters to the initilier function
-  local function __call(self, d, ...)
-    d = d or {}
-    d.ID = self.ID        -- hard code the ID for testing purposes
-    setmetatable(d, self) -- d is an instance of self
-    if d.initialize then
-      d:initialize(...)
-    end
-    return d
-  end
+  local __call
   if Super then
     -- computed properties are inherited by default:
     data.__computed = data.__computed
@@ -384,11 +375,28 @@ local function make_class(Super, data)
     data.__Super = Super
     setmetatable(data, {
       __index = Super,
-      __call  = __call,
+      __call  = function (self, d, ...)
+        d = Super(d or {}, ...) -- call Super constructor first
+        d.ID = self.ID          -- hard code the ID for testing purposes
+        d.TYPE = self.TYPE      -- hard code the TYPE for testing purposes
+        setmetatable(d, self)   -- d is an instance of self
+        if rawget(d, "initialize") or rawget(self, "initialize") then
+          d:initialize(...)
+        end
+        return d
+      end,
     })
   else
     setmetatable(data, {
-      __call  = __call,
+      __call  = function (self, d, ...)
+        d = d or {}
+        d.ID = self.ID        -- hard code the ID for testing purposes
+        setmetatable(d, self) -- d is an instance of self
+        if d.initialize then
+          d:initialize(...)
+        end
+        return d
+      end,
     })
   end
   if data.finalize then
@@ -458,7 +466,7 @@ function AD.Info:do_mask_contents(t)
       t[i] = "*"
     end
   end
-  for _, info in ipairs(self.ignores or {}) do
+  for _, info in ipairs(self.ignores) do
     info:mask_contents(t)
   end
 end
@@ -777,8 +785,8 @@ do
     TYPE    = "AD.Description",
     short   = AD.LineDoc(),
     initialize = function (self)
-      self.long     = self.long     or {}
-      self.ignores  = self.ignores  or {}
+      self.long     = self.long or {}
+      self.ignores  = self.ignores or {}
     end,
     get_capture_p = function (self)
       return Cg(
@@ -808,7 +816,7 @@ do
           + ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
           * Cb(tag_desc)
           / function (comment, desc)
-            append(desc.ignores, comment)
+              append(desc.ignores, comment)
               desc.max = comment.max
             end
         )^0
@@ -852,6 +860,7 @@ end
 ---@field public get_short_description  fun(self: AD.At, s: string): string @ redundant declaration, for editors
 ---@field public get_long_description   fun(self: AD.At, s: string): string @ redundant declaration for editors
 ---@field public get_comment            fun(self: AD.Content, s: string): string @ the substring of the argument corresponding to the comment
+---@field public ignores  AD.AllComment[]
 
 local error_annotation_p = function (Key)
   return Cmt(
@@ -885,6 +894,9 @@ AD.At = make_class(AD.Content, {
   content_max = 0,
   -- Next fields are defined by subclassers, see `finalize`
   -- complete = nil
+  initialize = function (self)
+    self.ignores = self.ignores or {}
+  end,
 })
 
 ---Pattern to capture an annotation
@@ -914,6 +926,11 @@ function AD.At:get_capture_p()
     )
 end
 
+local capture_ignores_p = Ct(
+  ( AD.LineComment:get_capture_p()
+  + AD.LongComment:get_capture_p()
+  )^0
+)
 ---Pattern for a complete annotation
 ---A complete annotation is a normal annotation
 ---combined with the description that precedes it.
@@ -925,9 +942,11 @@ function AD.At:get_complete_p()
   return
     ( AD.Description:get_capture_p() + Cc(false) )
     * self:get_capture_p()
-    / function (desc, at)
+    * capture_ignores_p
+    / function (desc, at, ignores)
         if desc then
           at.description = desc
+          move(ignores, 1, #ignores, #at.ignores + 1, at.ignores)
         end
         return at
       end
@@ -1007,7 +1026,6 @@ AD.At.See = make_class(AD.At, {
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
 ---@class AD.At.Class: AD.At
----@field public ignores      AD.AllComment[]
 ---@field public name         string        @ the name of the receiver
 ---@field public parent       string|nil    @ the parent class if any, for class
 ---@field public fields       AD.At.Field[] @ list of fields
@@ -1024,7 +1042,6 @@ do
     name  = "UNKNOWN CLASS NAME",
     initialize = function (self)
       self.fields   = self.fields  or {}
-      self.ignores  = self.ignores or {}
     end,
     get_core_p = function (_self)
       return 
@@ -1059,11 +1076,6 @@ do
           / function (at_see, at)
               at.see = at_see
             end
-        + ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
-          * Cb(tag_at)
-          / function (ignore, at)
-              append(at.ignores, ignore)
-            end
       )^0
       -- No capture was made so far
       -- capture the current position, record it
@@ -1074,7 +1086,8 @@ do
           at.max = after - 1
           return at -- captured
         end
-      -- the temporary group is no longer available ?
+      -- the `tag_at` named temporary capture is no longer available
+      -- because it was created locally
       -- see https://stackoverflow.com/questions/67019331
     end,
 })
@@ -1083,6 +1096,7 @@ end
 -- @type MY_TYPE[|OTHER_TYPE] [@comment]
 ---@class AD.At.Type: AD.At
 ---@field public types  string[]  @ List of types
+---@field public _name  string    @ Name of the variable guessed from the following code
 
 ---@type AD.At.Type
 AD.At.Type = make_class(AD.At, {
@@ -1304,7 +1318,6 @@ end
 
 -- @function name [@ comment]
 ---@class AD.At.Function: AD.At
----@field public ignores  AD.AllComment[]
 ---@field public name     string          @ name of the function
 ---@field public params   AD.At.Param[]   @ parameters of the function
 ---@field public vararg   AD.At.Vararg    @ variadic arguments
@@ -1312,7 +1325,7 @@ end
 ---@field public returns  AD.At.Return[]  @ parameters of the function
 ---@field public author   AD.At.Author
 ---@field public see      AD.At.See       @ reference
----@field public guess_p  lpeg.Pattern 
+---@field public guess_p  lpeg.Pattern
 do
   local tag_at = {} -- unique capture tag
   ---@type lpeg.Pattern
@@ -1413,12 +1426,9 @@ do
     TYPE  = "AD.At.Function",
     KEY   = "function",
     name  = "UNKNOWN FUNCTION NAME",
-    params = {},
-    returns = {},
     initialize = function (self)
       self.params   = self.params  or {}
       self.returns  = self.returns or {}
-      self.ignores  = self.ignores or {}
     end,
     get_core_p = function (self)
       return
@@ -1478,7 +1488,7 @@ do
       )
       * white_p^0
       * P("(")
-      + P(1) * V(1), -- advance one character and try to match
+      + ( P(1) - P("\n") ) * V(1), -- advance one character one the same line and try to match
       ["local function"] =
         P("local")
         * white_p^1
@@ -1508,8 +1518,8 @@ do
           * P("function")
           * Cg( Cc(true), "is_local"),
         ["... = function ("] =
-            Cg(
-            variable_p,
+          Cg(
+            function_p,
             "name"
           )
           * get_spaced_p("=")
@@ -1536,12 +1546,12 @@ AD.Break = make_class(AD.Info, {
   get_capture_p = function (self)
     return
         chunk_init_p
-      * Ct(
+      * Ct(                     -- 1) a table of named captures
         ( white_p^0 * P("\n") )^1
         * chunk_start_p
         * chunk_stop_p
       ) / function (t)
-            return AD.Break(t)
+            return AD.Break(t)  -- 2) an instance with that table
           end
   end
 })
@@ -1633,7 +1643,7 @@ AD.Scope = make_class({
   initialize = function (self, depth, min, max)
     self.depth  = depth or self.depth or 0
     self.min    = min   or self.min   or 1
-    self.max    = max   or self.max or self.min - 1
+    self.max    = max   or self.max   or self.min - 1
   end
 })
 
@@ -1681,36 +1691,109 @@ end
 -- Hides implementation details
 
 ---@class AD.AtProxy
+---@field public name     string
+---@field public source   string
+---@field public comment  string
+---@field public short_description  string
+---@field public long_description   string
 ---@field private _at AD.At @ "@" annotation info
+---@field private _module AD.Module
+
 AD.AtProxy = make_class({
   TYPE = "AD.AtProxy",
-  initialize = function (self, at)
+  initialize = function (self, module, at)
+    self._module = module
     self._at = at
   end,
   __computed = function (self, k)
+    if k == "source" then
+      return self._module.contents
+    end
     if k == "name" then
       return self._at[k]
+    end
+    if k == "comment" then
+      local result = self._at:get_content(self.source)
+      return #result > 0 and result or nil
+    end
+    if k == "short_description" then
+      local desc = self._at.description
+      if desc then
+        return self._at:get_short_description(self.source)
+      end
+    end
+    if k == "long_description" then
+      local desc = self._at.description
+      if desc then
+        return self._at:get_long_description(self.source)
+      end
+    end
+    if k == "types" then
+      return self._at.types
     end
   end,
 })
 
 ---@class AD.Param: AD.AtProxy
----@field private _at AD.At.Param
+---@field public  types string[]
+---@field private _at   AD.At.Param
+
+AD.Param = make_class(AD.AtProxy, {
+  TYPE = "AD.Param",
+  __AtClass = AD.At.Param,
+  __computed = function (self, k)
+    return AD.Param.__Super.__computed(self, k)
+  end
+})
+
+---@class AD.Vararg: AD.AtProxy
+---@field public  types string[]
+---@field private _at   AD.At.Vararg
+
+AD.Vararg = make_class(AD.AtProxy, {
+  TYPE = "AD.Vararg",
+  __AtClass = AD.At.Vararg,
+  __computed = function (self, k)
+    return AD.Param.__Super.__computed(self, k)
+  end
+})
+
+---@class AD.Return: AD.AtProxy
+---@field public  types string[]
+---@field private _at   AD.At.Return
+
+AD.Return = make_class(AD.AtProxy, {
+  TYPE = "AD.Return",
+  __AtClass = AD.At.Return,
+  __computed = function (self, k)
+    return AD.Param.__Super.__computed(self, k)
+  end
+})
 
 ---@class AD.Function: AD.AtProxy
+---@field public  param_names  fun(): string | nil
+---@field public  get_param    fun(name: string): AD.Param | nil
+---@field public  vararg       AD.Vararg
+---@field public  return_indices  fun(): integer | nil
+---@field public  get_return   fun(i: integer): AD.Return | nil
 ---@field private _at AD.At.Function
+---@field private _params table<string, AD.Param>
 
 AD.Function = make_class(AD.AtProxy, {
   TYPE = "AD.Function",
   __AtClass = AD.At.Function,
   initialize = function (self, ...)
-    AD.Function.__Super.initialize(self, ...)
     ---@type table<string, AD.Param>
     self._params = {}
-  end
+    ---@type table<string, AD.Return>
+    self._returns = {}
+  end,
 })
 
 function AD.Function:__computed(k)
+  ---Parameter names iterator
+  ---@function AD.Function.param_names
+  ---@return fun(): string
   if k == "param_names" then
     local i = 0
     return function ()
@@ -1719,32 +1802,201 @@ function AD.Function:__computed(k)
       return param and param.name
     end
   end
+  if k == "vararg" then
+    local result = AD.Vararg({}, self._module, self._at.vararg)
+    self.vararg = result
+    return result
+  end
+  ---Return indices iterator
+  ---@function AD.Function.return_indices
+  ---@return fun(): string
+  if k == "return_indices" then
+    local i = 0
+    return function ()
+      i = i + 1
+      return i <= #self._at.returns and i
+    end
+  end
   return AD.Function.__Super.__computed(self, k)
 end
 
+---Get the paramater with the given name
+---@param name string @ one of the srings listed by the receiver's `param_names` enumerator.
+---@return AD.Param | nil @ `nil` when no parameter exists with the given name.
+function AD.Function:get_param(name)
+  local params = self._params
+  local result = params[name]
+  if result then
+    return result
+  end
+  for _, param in ipairs(self._at.params) do
+    if param.name == name then
+      result = AD.Param({}, self._module, param)
+      params[name] = result
+      return result
+    end
+  end
+end
+
+---Get the return with the given index
+---@param i integer @ one of the indices returned by the receiver's `return_indices` enumerator
+---@return AD.Return | nil @ `nil` when the indice is out of the authorized range.
+function AD.Function:get_return(i)
+  local returns = self._returns
+  local result = returns[i]
+  if result then
+    return result
+  end
+  local at = self._at.returns[i]
+  if at then
+    result = AD.Return({}, self._module, self._at.returns[i])
+    self._returns[i] = result
+  end
+  return result
+end
+
+---@class AD.Field: AD.AtProxy
+---@field public visibility string
+
+AD.Field = make_class(AD.AtProxy, {
+  TYPE = "AD.Field",
+  __AtClass = AD.At.Field,
+  __computed = function (self, k)
+    if k == "visibility" then
+      return self._at[k]
+    end
+    return AD.Field.__Super.__computed(self, k)
+  end
+})
+
+---@class AD.Author: AD.AtProxy
+AD.Author = make_class(AD.AtProxy, {
+  TYPE = "AD.Author",
+  __AtClass = AD.At.Author,
+  -- next is not very clean but it works and is simple
+  __computed = function (self, k)
+    if k == "comment" then
+      return nil
+    end
+    if k == "value" then
+      return AD.Author.__Super.__computed(self, "comment")
+    end
+    return AD.Author.__Super.__computed(self, k)
+  end,
+})
+
+---@class AD.See: AD.AtProxy
+AD.See = make_class(AD.AtProxy, {
+  TYPE = "AD.See",
+  __AtClass = AD.At.See,
+  -- next is not very clean but it works and is simple
+  __computed = function (self, k)
+    if k == "comment" then
+      return nil
+    end
+    if k == "value" then
+      return AD.Author.__Super.__computed(self, "comment")
+    end
+    return AD.Author.__Super.__computed(self, k)
+  end,
+})
+
 ---@class AD.Class: AD.AtProxy
+---@field public author AD.Author
+---@field public see AD.See
 ---@field private _at AD.At.Class
 AD.Class = make_class(AD.AtProxy, {
   TYPE = "AD.Class",
   __AtClass = AD.At.Class,
+  initialize = function (self, ...)
+    ---@type table<string, AD.Field>
+    self._fields = {}
+  end,
+  __computed = function (self, k)
+    if k == "author" then
+      local at_k = self._at[k]
+      if at_k then
+        local result = AD.Author({}, self._module, at_k)
+        self[k] = result
+        return result
+      end
+    end
+    if k == "see" then
+      local at_k = self._at[k]
+      if at_k then
+        local result = AD.See({}, self._module, at_k)
+        self[k] = result
+        return result
+      end
+    end
+    return AD.Class.__Super.__computed(self, k)
+  end,
+})
+
+---Get the paramater with the given name
+---@param name string   @ one of the srings listed by the receiver's `field_names` enumerator.
+---@return AD.Field | nil @ `nil` when no field exists with the given name.
+function AD.Class:get_field(name)
+  local fields = self._fields
+  local result = fields[name]
+  if result then
+    return result
+  end
+  for _, field in ipairs(self._at.fields) do
+    if field.name == name then
+      result = AD.Field({}, self._module, field)
+      fields[name] = result
+      return result
+    end
+  end
+end
+
+---@class AD.Type: AD.AtProxy
+---@field public types string[]
+AD.Type = make_class(AD.AtProxy, {
+  TYPE = "AD.Type",
+  __AtClass = AD.At.Type,
+  __computed = function (self, k)
+    if k == "types" then
+      return self._at[k]
+    end
+    return AD.Type.__Super.__computed(self, k)
+  end,
 })
 
 ---@class AD.Global: AD.AtProxy
+---@field public type AD.Type
 ---@field private _at AD.At.Global
 AD.Global = make_class(AD.AtProxy, {
   TYPE = "AD.Global",
   __AtClass = AD.At.Global,
+  __computed = function (self, k)
+    if k == "type" then
+      local at_k = self._at[k]
+      if at_k then
+        local result = AD.Type({}, self._module, at_k)
+        self[k] = result
+        return result
+      end
+    end
+    return AD.Global.__Super.__computed(self, k)
+  end,
 })
 
 ---@class AD.Module                   @ AD.Module
 ---@field public  path      string         @ the path of the source file
 ---@field public  name      string         @ the name of the module as defined in the first module annotation
----@field public  classes   fun(): string | nil @ class names iterator
----@field public  functions fun(): string | nil @ function names iterator
----@field public  globals   fun(): string | nil @ globals name iterator
+---@field public  classe_names   fun(): string | nil @ class names iterator
+---@field public  function_names fun(): string | nil @ function names iterator
+---@field public  global_names   fun(): string | nil @ globals name iterator
 ---@field private contents  string     @ the contents to recover documentation from
 ---@field private _pure_code  string   @ the contents without comment nor literals
 ---@field private _top_scope  AD.Scope @ top scope
+---@field private _get_instance fun(name: string, Class: AD.AtProxy, store: table<string,AD.AtProxy>): AD.AtProxy
+---@field private _infos fun(): AD.Info | nil @ info iterator
+---@field private _globals table<string, AD.Global>     @ cache for globals
+---@field private _classes table<string, AD.Class>      @ cache for classes
+---@field private _functions table<string, AD.Function> @ cache for functions
 
 AD.Module = make_class({
   TYPE = "AD.Module",
@@ -1756,7 +2008,11 @@ AD.Module = make_class({
     self._classes    = {}
     ---@type table<string, AD.Function>
     self._functions  = {}
-    self:init_with_contents_of_file(self.file_path)
+    if self.contents then
+      self:init_with_string(self.contents)
+    elseif self.file_path then
+      self:init_with_contents_of_file(self.file_path)
+    end
     self:parse()
   end
 })
@@ -1776,7 +2032,7 @@ function AD.Module:_get_instance(name, Class, store)
     if  info:is_instance_of(Class.__AtClass)
     and info.name == name
     then
-      result = Class(nil, info)
+      result = Class(nil, self, info)
       store[name] = result
       return result
     end
@@ -1787,7 +2043,19 @@ end
 ---@param name string
 ---@return nil | AD.Global
 function AD.Module:get_global(name)
-  return self:_get_instance(name, AD.Global, self._globals)
+  local result = self._globals[name]
+  if result then
+    return result
+  end
+  for info in self._infos do
+    if  info:is_instance_of(AD.At.Global)
+    and info.name == name
+    then
+      result = AD.Global(nil, self, info)
+      self._globals[name] = result
+      return result
+    end
+  end
 end
 
 ---Get the class info for the given name
@@ -1810,7 +2078,11 @@ end
 
 ---Iterator over infos of the given class
 ---@generic T: AD.Info, Out: any
----@param Class T
+---Meaningless short documentation for testin purposes
+--[===[
+Meaningless long documentation for testing purposes
+--]===]
+---@param Class T @ Meaningless comment for testin purposes
 ---@param options AD.Module.iterator_options
 ---@return fun(): Out | nil
 function AD.Module:iterator(Class, options)
@@ -1866,11 +2138,33 @@ AD.Module.__computed = function (self, k)
     })
   end
   if k == "global_names" then
-    return self:iterator(AD.At.Global, {
+    local g_iterator = self:iterator(AD.At.Global, {
       map = function (info)
         return info.name
       end,
     })
+    local p = white_p^0 * P("_G.") * C(identifier_p)
+    local t_iterator = self:iterator(AD.At.Type, {
+      map = function (at)
+        return at._name
+      end,
+      ignore = function (at)
+        local code = at.after_code
+        if code then
+          local s = self.contents:sub(code.min, code.max)
+          local name = p:match(s)
+          if name then
+            at._global = true
+            at._name = name
+            return false
+          end
+        end
+        return true
+      end,
+    })
+    return function ()
+      return g_iterator() or t_iterator()
+    end
   end
   return AD.Module[k]
 end
@@ -1910,6 +2204,16 @@ do
         })
       end
     end
+    -- what comes after the last info:
+    local last = self.__infos[#self.__infos]
+    if last.max < #self.contents then
+      last.after_code = AD.Code({
+        min = last.max + 1,
+        max = #self.contents,
+      })
+    end
+    local max = last.min - 1
+
   end
   --[[
   ---Make the masked contents

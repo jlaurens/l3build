@@ -78,7 +78,7 @@ function Expect.__call(self, expected, options)
       LU.assertError(self.actual)
     end
   end
-  if self.op == "is" then
+  if self.op == "is" or not self.op then
     if self.__NOT then
       LU.assertNotIs(self.actual, expected)
     else

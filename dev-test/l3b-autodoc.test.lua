@@ -205,6 +205,164 @@ DOOOOOOOOOOOOOOOOOC
       end,
     })
   end,
+  get_CLASS_COMPLETE = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---CLASS:   SHORT DESCRIPTION
+---CLASS:   LONG  DESCRIPTION
+---@class NAME: PARENT @ CLASS: COMMENT
+---FIELD_1: SHORT DESCRIPTION
+---FIELD_1: LONG  DESCRIPTION
+---@field protected FIELD_1 TYPE_1 @ FIELD_1: CMT
+---FIELD_2: SHORT DESCRIPTION
+---FIELD_2: LONG  DESCRIPTION
+---@field protected FIELD_2 TYPE_2 @ FIELD_2: CMT
+---AUTHOR:  SHORT DESCRIPTION
+---AUTHOR:  LONG  DESCRIPTION
+---@author  PSEUDO IDENTIFIER
+---SEE:     SHORT DESCRIPTION
+---SEE:     LONG  DESCRIPTION
+---@see    VARIOUS REFERENCES
+]],
+    m = function (min, offset)
+      return AD.At.Class({
+        description = AD.Description({
+          min     = 1,
+          max     = 60,
+          short   = AD.LineDoc({
+            min         = 1,
+            content_min = 4,
+            content_max = 29,
+            max         = 30,
+          }),
+          long    = {
+            AD.LineDoc({
+              min         = 31,
+              content_min = 34,
+              content_max = 59,
+              max         = 60,
+            }),
+          },
+          ignores = {},
+        }),
+        min         = 61,
+        content_min = 86,
+        content_max = 99,
+        max         = 500,
+        name        = "NAME",
+        fields      = {
+          AD.At.Field({
+            description = AD.Description({
+              min     = 101,
+              max     = 160,
+              short   = AD.LineDoc({
+                min         = 101,
+                content_min = 104,
+                content_max = 129,
+                max         = 130,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 131,
+                  content_min = 134,
+                  content_max = 159,
+                  max         = 160,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 161,
+            content_min = 198,
+            content_max = 209,
+            max         = 210,
+            name        = "FIELD_1",
+            visibility  = "protected",
+            types       = { "TYPE_1" },
+          }),
+          AD.At.Field({
+            description = AD.Description({
+              min     = 211,
+              max     = 270,
+              short   = AD.LineDoc({
+                min         = 211,
+                content_min = 214,
+                content_max = 239,
+                max         = 240,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 241,
+                  content_min = 244,
+                  content_max = 269,
+                  max         = 270,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 271,
+            content_min = 308,
+            content_max = 319,
+            max         = 320,
+            name        = "FIELD_2",
+            visibility  = "protected",
+            types       = { "TYPE_2" },
+          }),
+        },
+        author      = AD.At.Author({
+          description = AD.Description({
+            min     = 321,
+            max     = 380,
+            short   = AD.LineDoc({
+              min         = 321,
+              content_min = 324,
+              content_max = 349,
+              max         = 350,
+            }),
+            long    = {
+              AD.LineDoc({
+                min         = 351,
+                content_min = 354,
+                content_max = 379,
+                max         = 380,
+              }),
+            },
+            ignores = {},
+          }),
+          min         = 381,
+          content_min = 393,
+          content_max = 409,
+          max         = 410,
+        }),
+        see         = AD.At.See({
+          description = AD.Description({
+            min     = 411,
+            max     = 470,
+            short   = AD.LineDoc({
+              min         = 411,
+              content_min = 414,
+              content_max = 439,
+              max         = 440,
+            }),
+            long    = {
+              AD.LineDoc({
+                min         = 441,
+                content_min = 444,
+                content_max = 469,
+                max         = 470,
+              }),
+            },
+            ignores = {},
+          }),
+          min         = 471,
+          content_min = 482,
+          content_max = 499,
+          max         = 500,
+        }),
+      })
+    end,
+  })
+  end,
   get_TYPE = function ()
     return TestData({
 ----5----0----5----0----5----0----5----0----5
@@ -366,6 +524,199 @@ DOOOOOOOOOOOOOOOOOC
       end,
     })
   end,
+  get_FUNCTION_COMPLETE = function ()
+    return TestData({
+----5----0----5----0----5----0----5----0----5----0----5
+      s = [[
+---FUNCTION: SHORT DESCRIPT2N
+---FUNCTION: LONG DESCRIPTION
+---@function NAME @ FUNCTION:   COMMENT
+---PARAM_1: SHORT DESCRIPTION
+---PARAM_1: LONG  DESCRIPTION
+---@param PARAM_1 string @ PARAM_1: CMT
+---PARAM_2: SHORT DESCRIPTION
+---PARAM_2: LONG  DESCRIPTION
+---@param PARAM_2 string @ PARAM_2: CMT
+---VARARG:  SHORT DESCRIPTION
+---VARARG:  LONG  DESCRIPTION
+---@vararg string @ VARARG:     COMMENT
+---RETURN_1: SHORT DESCRIPT2N
+---RETURN_1: LONG DESCRIPTION
+---@return string  @ RETURN_1:  COMMENT
+---RETURN_2: SHORT DESCRIPT2N
+---RETURN_2: LONG DESCRIPTION
+---@return boolean @ RETURN_2:  COMMENT
+]],
+    m = function (min, offset)
+      return AD.At.Function({
+        description = AD.Description({
+          min     = 1,
+          max     = 60,
+          short   = AD.LineDoc({
+            min         = 1,
+            content_min = 4,
+            content_max = 29,
+            max         = 30,
+          }),
+          long    = {
+            AD.LineDoc({
+              min         = 31,
+              content_min = 34,
+              content_max = 59,
+              max         = 60,
+            }),
+          },
+          ignores = {},
+        }),
+        min         = 61,
+        content_min = 81,
+        content_max = 99,
+        max         = 600,
+        name        = "NAME",
+        params      = {
+          AD.At.Param({
+            description = AD.Description({
+              min     = 101,
+              max     = 160,
+              short   = AD.LineDoc({
+                min         = 101,
+                content_min = 104,
+                content_max = 129,
+                max         = 130,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 131,
+                  content_min = 134,
+                  content_max = 159,
+                  max         = 160,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 161,
+            content_min = 188,
+            content_max = 199,
+            max         = 200,
+            name        = "PARAM_1",
+            optional    = false,
+            types       = { "string" },
+          }),
+          AD.At.Param({
+            description = AD.Description({
+              min     = 201,
+              max     = 260,
+              short   = AD.LineDoc({
+                min         = 201,
+                content_min = 204,
+                content_max = 229,
+                max         = 230,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 231,
+                  content_min = 234,
+                  content_max = 259,
+                  max         = 260,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 261,
+            content_min = 288,
+            content_max = 299,
+            max         = 300,
+            name        = "PARAM_2",
+            optional    = false,
+            types       = { "string" },
+          }),
+        },
+        vararg      = AD.At.Vararg({
+          description = AD.Description({
+            min     = 301,
+            max     = 360,
+            short   = AD.LineDoc({
+              min         = 301,
+              content_min = 304,
+              content_max = 329,
+              max         = 330,
+            }),
+            long    = {
+              AD.LineDoc({
+                min         = 331,
+                content_min = 334,
+                content_max = 359,
+                max         = 360,
+              }),
+            },
+            ignores = {},
+          }),
+          min         = 361,
+          content_min = 381,
+          content_max = 399,
+          max         = 400,
+          types       = { "string" },
+        }),
+        returns     = {
+          AD.At.Return({
+            description = AD.Description({
+              min     = 401,
+              max     = 460,
+              short   = AD.LineDoc({
+                min         = 401,
+                content_min = 404,
+                content_max = 429,
+                max         = 430,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 431,
+                  content_min = 434,
+                  content_max = 459,
+                  max         = 460,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 461,
+            content_min = 482,
+            content_max = 499,
+            max         = 500,
+            types       = { "string" },
+            optional    = false,
+          }),
+          AD.At.Return({
+            description = AD.Description({
+              min     = 501,
+              max     = 560,
+              short   = AD.LineDoc({
+                min         = 501,
+                content_min = 504,
+                content_max = 529,
+                max         = 530,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 531,
+                  content_min = 534,
+                  content_max = 559,
+                  max         = 560,
+                }),
+              },
+              ignores = {},
+            }),
+            min         = 561,
+            content_min = 582,
+            content_max = 599,
+            max         = 600,
+            types       = { "boolean" },
+            optional    = false,
+          }),
+        },
+      })
+    end,
+  })
+  end,
   get_GLOBAL = function ()
     return TestData({
 ----5----0----5----0----5----0----5----0----5----0----5
@@ -382,6 +733,104 @@ DOOOOOOOOOOOOOOOOOC
           content_max = min + offset + 27,
           max         = min + offset + 28,
           name        = "NAME",
+        })
+      end,
+    })
+  end,
+  get_GLOBAL_COMPLETE = function ()
+    return TestData({
+----5----0----5----0----5---30
+      s = [[
+---GLOBAL:  SHORT DESCRIPTION
+---GLOBAL:  LONG  DESCRIPTION
+---@global NAME @ GLOBAL: CMT
+---TYPE:    SHORT DESCRIPTION
+-- TYPE:    IGNORED DESCR5N 1
+---TYPE:    LONG  DESCRIPTION
+-- TYPE:    IGNORED DESCR5N 2
+---@type TYPE @ TYPE: COMMENT
+-- TYPE:    IGNORED COMMENT 1
+-- TYPE:    IGNORED COMMENT 2
+]],
+      m = function (min, offset)
+        return AD.At.Global({
+          description = AD.Description({
+            min     = 1,
+            max     = 60,
+            short   = AD.LineDoc({
+              min         = 1,
+              content_min = 4,
+              content_max = 29,
+              max         = 30,
+            }),
+            long    = {
+              AD.LineDoc({
+                min         = 31,
+                content_min = 34,
+                content_max = 59,
+                max         = 60,
+              }),
+            },
+            ignores = {},
+          }),
+          min         = 61,
+          content_min = 79,
+          content_max = 89,
+          max         = 300,
+          name        = "NAME",
+          type        = AD.At.Type({
+            description = AD.Description({
+              min     = 91,
+              max     = 210,
+              short   = AD.LineDoc({
+                min         = 91,
+                content_min = 94,
+                content_max = 119,
+                max         = 120,
+              }),
+              long    = {
+                AD.LineDoc({
+                  min         = 151,
+                  content_min = 154,
+                  content_max = 179,
+                  max         = 180,
+                }),
+              },
+              ignores = {
+                AD.LineComment({
+                  min         = 121,
+                  content_min = 124,
+                  content_max = 149,
+                  max         = 150,
+                }),
+                AD.LineComment({
+                  min         = 181,
+                  content_min = 184,
+                  content_max = 209,
+                  max         = 210,
+                })
+              },
+            }),
+            min         = 211,
+            content_min = 227,
+            content_max = 239,
+            max         = 240,
+            types       = { "TYPE" },
+            ignores = {
+              AD.LineComment({
+                min         = 241,
+                content_min = 244,
+                content_max = 269,
+                max         = 270,
+              }),
+              AD.LineComment({
+                min         = 271,
+                content_min = 274,
+                content_max = 299,
+                max         = 300,
+              })
+            },
+          })
         })
       end,
     })
@@ -1363,7 +1812,7 @@ _G.test_At_Author = Test({
     s = "---@author 9hat do you want of 30  "
     ---@type AD.At.Author
     t = self.p:match(s)
-    expect(t).contains( AD.At.See({
+    expect(t).contains( AD.At.Author({
       min         = 1,
       content_min = 12,
       content_max = 33,
@@ -1574,6 +2023,9 @@ _G.test_At_Class = Test({
         1 + TD_FIELD.m(1 + TD_CLASS.m().max).max
       )
     )
+
+    local TD = self.get_CLASS_COMPLETE()
+    expect(p:match(TD.s)).contains(TD.m())
   end,
 
 })
@@ -2201,7 +2653,24 @@ _G.test_At_Function = Test({
         }
       },
     })
+
+    TD = self.get_FUNCTION_COMPLETE()
+    expect(p:match(TD.s)).contains(TD.m())
   end,
+  test_guess_p = function (self)
+    local p = AD.At.Function.guess_p
+    expect(p:match("local function foo()").name)
+      .is("foo")
+    expect(p:match("function foo()").name)
+      .is("foo")
+    expect(p:match("local foo = function ()").name)
+      .is("foo")
+    expect(p:match("foo = function ()").name)
+      .is("foo")
+    -- p accepts even syntax errors
+    expect(p:match("xlocal foo = function ()").name)
+      .is("foo")
+  end
 })
 
 _G.test_At_Break = Test({
@@ -2247,9 +2716,7 @@ _G.test_At_Global = Test({
     }) )
   end,
   setup = function (self)
-    self.p =
-        __.chunk_init_p
-      * AD.At.Global:get_capture_p()
+    self.p = AD.At.Global:get_capture_p()
   end,
   test = function (self)
 ----5----0----5----0----5----0----5----0----5----0----5----
@@ -2282,6 +2749,10 @@ _G.test_At_Global = Test({
   end,
   test_complete = function (self)
     self:do_test_complete("Global")
+
+    local p = AD.At.Global:get_complete_p()
+    local TD = self:get_GLOBAL_COMPLETE()
+    expect(p:match(TD.s)).contains(TD.m())
   end,
 })
 
@@ -2310,15 +2781,6 @@ Test.FUNCTION_ITEMS = {
 _G.test_loop_p = Test({
   setup = function (self)
     self.p = __.loop_p
-  end,
-  no_test_items = function (self)
-    expect(self.p).is.NOT(nil)
-    local p = AD.LineDoc:get_capture_p()
-    local f = self["get_".. "LINE_DOC"]
-    local TD = f(self)
-    print("TD.s", TD.s)
-    _G.pretty_print(p:match(TD.s))
-    expect(p:match(TD.s)).contains(TD.m())
   end,
   test_standard_items = function (self)
     for _, KEY in ipairs(self.STANDARD_ITEMS) do
@@ -2422,10 +2884,10 @@ _G.test_autodoc = Test({
   end,
 })
 
-_G.test_Module = Test({
+_G.test_autodoc_Module = Test({
   setup = function (self)
     self.module = AD.Module({
-      file_path = AUTODOC_PATH
+      file_path = AUTODOC_PATH,
     })
   end,
   test_base = function (self)
@@ -2461,6 +2923,18 @@ _G.test_Module = Test({
       expect(info.name).is(name)
     end
   end,
+  test_function_param_names = function (self)
+    print()
+    local module = self.module
+    for function_name in module.function_names do
+      ---@type AD.Function
+      local info = module:get_function(function_name)
+      for param_name in info.param_names do
+        local param = info:get_param(param_name)
+        expect(param.name).is(param_name)
+      end
+    end
+  end,
   test_global_names = function (self)
     local module = self.module
     for name in module.global_names do
@@ -2470,4 +2944,193 @@ _G.test_Module = Test({
   end,
 })
 
+_G.test_Module = Test({
+  prepare = function (self, str)
+    self.module = AD.Module({
+      file_path = AUTODOC_PATH,
+      foo = "bar",
+      contents = str
+    })
+  end,
+  test_global_names = function (self)
+    local s = [[
+---@global NAME_1
+---@global NAME_2
+---@type string
+whatever
+---@type boolean
+_G.NAME_3 = false
+]]
+    self:prepare(s)
+    local iterator = self.module.global_names
+    expect(iterator()).is("NAME_1")
+    expect(iterator()).is("NAME_2")
+    expect(iterator()).is("NAME_3")
+    expect(iterator()).is(nil)
+  end,
+  test_class_names = function (self)
+    local s = [[
+---@class NAME_1
+---@class NAME_2
+---@type string
+whatever
+---@class NAME_3
+]]
+    self:prepare(s)
+    local iterator = self.module.class_names
+    expect(iterator()).is("NAME_1")
+    expect(iterator()).is("NAME_2")
+    expect(iterator()).is("NAME_3")
+    expect(iterator()).is(nil)
+  end,
+  test_function_names = function (self)
+----5----0----5----0
+    local s = [[
+---@function NAME_1
+---@function NAME_2
+whatever          X
+---@param foo   int
+local function NAME_3()
+---@return int
+function PKG.NAME_4()
+---@param foo   int
+local NAME_5 = function ()
+---@return int
+PKG.NAME_6 = function ()
+]]
+    self:prepare(s)
+    local iterator = self.module.function_names
+    expect(iterator()).is("NAME_1")
+    expect(iterator()).is("NAME_2")
+    expect(iterator()).is("NAME_3")
+    expect(iterator()).is("PKG.NAME_4")
+    expect(iterator()).is("NAME_5")
+    expect(iterator()).is("PKG.NAME_6")
+    expect(iterator()).is(nil)
+  end,
+  test_Global = function (self)
+    local TD = self.get_GLOBAL_COMPLETE()
+    local s = TD.s
+    self:prepare(s)
+    local g_info = self.module:get_global("NAME")
+    expect(g_info).is.NOT(nil)
+    expect(g_info.__Class).is(AD.Global)
+    local type = g_info.type
+    expect(type).is.NOT(nil)
+    expect(type.comment)
+      .is("TYPE: COMMENT")
+    expect(type.short_description)
+      .is("TYPE:    SHORT DESCRIPTION")
+    expect(type.long_description )
+      .is("TYPE:    LONG  DESCRIPTION")
+    expect(type.types)
+      .contains({ "TYPE" })
+  end,
+  test_Class = function (self)
+    local TD = self.get_CLASS_COMPLETE()
+    local s = TD.s
+    self:prepare(s)
+    local c_info = self.module:get_class("NAME")
+    expect(c_info).is.NOT(nil)
+    expect(c_info.__Class).is(AD.Class)
+    expect(c_info._fields).contains({})
+    local field_1 = c_info:get_field("FIELD_1")
+    expect(field_1).is.NOT(nil)
+    expect(field_1.comment)
+      .is("FIELD_1: CMT")
+    expect(field_1.short_description)
+      .is("FIELD_1: SHORT DESCRIPTION")
+    expect(field_1.long_description )
+      .is("FIELD_1: LONG  DESCRIPTION")
+    expect(field_1.types)
+      .contains({ "TYPE_1" })
+    expect(field_1.visibility)
+      .is("protected")
+    local field_2 = c_info:get_field("FIELD_2")
+    expect(field_2).is.NOT(nil)
+    expect(field_2.comment)
+      .is("FIELD_2: CMT")
+    expect(field_2.short_description)
+      .is("FIELD_2: SHORT DESCRIPTION")
+    expect(field_2.long_description )
+      .is("FIELD_2: LONG  DESCRIPTION")
+    expect(field_2.types)
+      .contains({ "TYPE_2" })
+    expect(field_2.visibility)
+      .is("protected")
+      local author = c_info.author
+      expect(author).is.NOT(nil)
+      expect(author.value)
+        .is("PSEUDO IDENTIFIER")
+      expect(author.short_description)
+        .is("AUTHOR:  SHORT DESCRIPTION")
+      expect(author.long_description )
+        .is("AUTHOR:  LONG  DESCRIPTION")
+      local see = c_info.see
+      expect(see).is.NOT(nil)
+      expect(see.value)
+        .is("VARIOUS REFERENCES")
+      expect(see.short_description)
+        .is("SEE:     SHORT DESCRIPTION")
+      expect(see.long_description )
+        .is("SEE:     LONG  DESCRIPTION")
+  end,
+  test_Function = function (self)
+    local TD = self.get_FUNCTION_COMPLETE()
+    local s = TD.s
+    self:prepare(s)
+    local f_info = self.module:get_function("NAME")
+    expect(f_info).is.NOT(nil)
+    expect(f_info.__Class).is(AD.Function)
+    expect(f_info._params).contains({})
+    local param_1 = f_info:get_param("PARAM_1")
+    expect(param_1).is.NOT(nil)
+    expect(param_1.comment)
+      .is("PARAM_1: CMT")
+    expect(param_1.short_description)
+      .is("PARAM_1: SHORT DESCRIPTION")
+    expect(param_1.long_description )
+      .is("PARAM_1: LONG  DESCRIPTION")
+    expect(param_1.types)
+      .contains({ "string" })
+    local param_2 = f_info:get_param("PARAM_2")
+    expect(param_2).is.NOT(nil)
+    expect(param_2.comment)
+      .is("PARAM_2: CMT")
+    expect(param_2.short_description)
+      .is("PARAM_2: SHORT DESCRIPTION")
+    expect(param_2.long_description )
+      .is("PARAM_2: LONG  DESCRIPTION")
+    expect(param_2.types).contains({ "string" })
+    local vararg = f_info.vararg
+    expect(vararg).NOT(nil)
+    expect(vararg.comment)
+      .is("VARARG:     COMMENT")
+    expect(vararg.short_description)
+      .is("VARARG:  SHORT DESCRIPTION")
+    expect(vararg.long_description )
+      .is("VARARG:  LONG  DESCRIPTION")
+    expect(vararg.types).contains({ "string" })
+    local return_1 = f_info:get_return(1)
+    expect(return_1).is.NOT(nil)
+    expect(return_1.comment)
+      .is("RETURN_1:  COMMENT")
+    expect(return_1.short_description)
+      .is("RETURN_1: SHORT DESCRIPT2N")
+    expect(return_1.long_description )
+      .is("RETURN_1: LONG DESCRIPTION")
+    expect(return_1.types)
+    .contains({ "string" })
+    local return_2 = f_info:get_return(2)
+    expect(return_2).is.NOT(nil)
+    expect(return_2.comment)
+      .is("RETURN_2:  COMMENT")
+    expect(return_2.short_description)
+      .is("RETURN_2: SHORT DESCRIPT2N")
+    expect(return_2.long_description )
+      .is("RETURN_2: LONG DESCRIPTION")
+    expect(return_2.types)
+      .contains({ "boolean" })
+  end,
+})
 os.exit( LU.LuaUnit.run() )
