@@ -57,7 +57,7 @@ local Xpct, LU  = dofile("./l3b-expect.lua")
 
 local expect = Xpct.expect
 
-local re      = require("re")
+local append  = table.insert
 
 local lpeg    = require("lpeg")
 local P       = lpeg.P
@@ -2891,13 +2891,13 @@ _G.test_autodoc_Module = Test({
     })
   end,
   test_base = function (self)
-    expect(self.module.__infos).contains({})
-    expect(self.module._globals).contains({})
-    expect(self.module._functions).contains({})
-    expect(self.module._classes).contains({})
+    expect(self.module.__info_t).contains({})
+    expect(self.module.__globals).contains({})
+    expect(self.module.__functions).contains({})
+    expect(self.module.__classes).contains({})
   end,
   test_function_name = function (self)
-    for info in self.module._infos do
+    for info in self.module.__infos do
       if info:is_instance_of(AD.At.Function) then
         -- all function names have been properly guessed:
         expect(info.name).is.NOT(AD.At.Function.name)
@@ -3133,4 +3133,59 @@ PKG.NAME_6 = function ()
       .contains({ "boolean" })
   end,
 })
+
+_G.test_Module_2 = Test({
+  prepare = function (self, str)
+    self.module = AD.Module({
+      file_path = AUTODOC_PATH,
+      foo = "bar",
+      contents = str
+    })
+  end,
+  test_method = function (self)
+    local s = [[
+---@class CLASS.NAME_1
+---@field public METHOD fun()
+---@class CLASS.NAME_2
+---@field public METHOD fun()
+---@function CLASS.NAME_1.METHOD_1
+---@function CLASS.NAME_1.METHOD_2
+---@function CLASS.NAME_1.SUB.METHOD_1
+---@function CLASS.NAME_1.SUB.METHOD_2
+---@function CLASS.NAME_2.METHOD_1
+---@function CLASS.NAME_2.METHOD_2
+---@function CLASS.NAME_2.SUB.METHOD_1
+---@function CLASS.NAME_2.SUB.METHOD_2
+]]
+    self:prepare(s)
+    -- keys are class names, values are method names
+    ---@type table<string,string[]>
+    local t = {}
+    for c_name in self.module.class_names do
+      t[c_name] = {}
+    end
+    for c_name in self.module.class_names do
+      local p =
+          P(c_name)
+        * P(".")
+        * lpeg.C(__.variable_p)
+        * -__.black_p
+      for f_name in self.module.function_names do
+        local name = p:match(f_name)
+        if name then
+          append(t[c_name], name)
+        end
+      end
+    end
+    for class_name, method_names in pairs(t) do
+      local c_info = self.module:get_class(class_name)
+      for _, name in ipairs(method_names) do
+        if not c_info:get_field(name) then
+          print("METHOD", class_name, name)
+        end
+      end
+    end
+  end,
+})
+
 os.exit( LU.LuaUnit.run() )

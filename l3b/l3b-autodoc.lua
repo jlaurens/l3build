@@ -1707,7 +1707,7 @@ AD.AtProxy = make_class({
   end,
   __computed = function (self, k)
     if k == "source" then
-      return self._module.contents
+      return self._module.__contents
     end
     if k == "name" then
       return self._at[k]
@@ -1901,16 +1901,23 @@ AD.See = make_class(AD.AtProxy, {
   end,
 })
 
+---@class AD.Method: AD.Function
+AD.Method = make_class(AD.Function, {
+  TYPE = "AD.Method",
+})
+
 ---@class AD.Class: AD.AtProxy
----@field public author AD.Author
----@field public see AD.See
----@field private _at AD.At.Class
+---@field public    author  AD.Author
+---@field public    see     AD.See
+---@field protected _at     AD.At.Class
 AD.Class = make_class(AD.AtProxy, {
   TYPE = "AD.Class",
   __AtClass = AD.At.Class,
   initialize = function (self, ...)
     ---@type table<string, AD.Field>
-    self._fields = {}
+    self.__fields = {}
+    ---@type table<string, AD.Method>
+    self.__methods = {}
   end,
   __computed = function (self, k)
     if k == "author" then
@@ -1937,7 +1944,7 @@ AD.Class = make_class(AD.AtProxy, {
 ---@param name string   @ one of the srings listed by the receiver's `field_names` enumerator.
 ---@return AD.Field | nil @ `nil` when no field exists with the given name.
 function AD.Class:get_field(name)
-  local fields = self._fields
+  local fields = self.__fields
   local result = fields[name]
   if result then
     return result
@@ -1946,6 +1953,24 @@ function AD.Class:get_field(name)
     if field.name == name then
       result = AD.Field({}, self._module, field)
       fields[name] = result
+      return result
+    end
+  end
+end
+
+---Get the paramater with the given name
+---@param name string   @ one of the srings listed by the receiver's `field_names` enumerator.
+---@return AD.Field | nil @ `nil` when no field exists with the given name.
+function AD.Class:get_method(name)
+  local methods = self.__methods
+  local result = methods[name]
+  if result then
+    return result
+  end
+  for _, field in ipairs(self._at.fields) do
+    if field.name == name then
+      result = AD.Field({}, self._module, field)
+      methods[name] = result
       return result
     end
   end
@@ -1983,35 +2008,36 @@ AD.Global = make_class(AD.AtProxy, {
   end,
 })
 
----@class AD.Module                   @ AD.Module
----@field public  path      string         @ the path of the source file
----@field public  name      string         @ the name of the module as defined in the first module annotation
----@field public  classe_names   fun(): string | nil @ class names iterator
----@field public  function_names fun(): string | nil @ function names iterator
----@field public  global_names   fun(): string | nil @ globals name iterator
----@field private contents  string     @ the contents to recover documentation from
----@field private _pure_code  string   @ the contents without comment nor literals
----@field private _top_scope  AD.Scope @ top scope
----@field private _get_instance fun(name: string, Class: AD.AtProxy, store: table<string,AD.AtProxy>): AD.AtProxy
----@field private _infos fun(): AD.Info | nil @ info iterator
----@field private _globals table<string, AD.Global>     @ cache for globals
----@field private _classes table<string, AD.Class>      @ cache for classes
----@field private _functions table<string, AD.Function> @ cache for functions
+---@class AD.Module
+---@field public  path            string      @ the path of the source file
+---@field public  name            string      @ the name of the module as defined in the first module annotation
+---@field public  classe_names    fun(): string | nil @ class names iterator
+---@field public  function_names  fun(): string | nil @ function names iterator
+---@field public  global_names    fun(): string | nil @ globals name iterator
+---@field private __contents      string              @ the contents to recover documentation from
+---@field private __get_instance  fun(name: string, Class: AD.AtProxy, store: table<string,AD.AtProxy>): AD.AtProxy
+---@field private __infos         fun(): AD.Info | nil      @ info iterator
+---@field private __globals       table<string, AD.Global>  @ cache for globals
+---@field private __classes       table<string, AD.Class>   @ cache for classes
+---@field private __functions     table<string, AD.Function>@ cache for functions
 
 AD.Module = make_class({
   TYPE = "AD.Module",
   name = "UNKOWN MODULE NAME",
   initialize = function (self)
     ---@type table<string, AD.Global>
-    self._globals    = {}
+    self.__globals    = {}
     ---@type table<string, AD.Class>
-    self._classes    = {}
+    self.__classes    = {}
     ---@type table<string, AD.Function>
-    self._functions  = {}
+    self.__functions  = {}
     if self.contents then
       self:init_with_string(self.contents)
+      self.contents = nil
     elseif self.file_path then
       self:init_with_contents_of_file(self.file_path)
+    else
+      error("One of `contents` or `file_path` must be provided")
     end
     self:parse()
   end
@@ -2023,12 +2049,12 @@ AD.Module = make_class({
 ---@param Class T
 ---@param store table<string,T>
 ---@return nil | T
-function AD.Module:_get_instance(name, Class, store)
+function AD.Module:__get_instance(name, Class, store)
   local result = store[name]
   if result then
     return result
   end
-  for info in self._infos do
+  for info in self.__infos do
     if  info:is_instance_of(Class.__AtClass)
     and info.name == name
     then
@@ -2043,16 +2069,16 @@ end
 ---@param name string
 ---@return nil | AD.Global
 function AD.Module:get_global(name)
-  local result = self._globals[name]
+  local result = self.__globals[name]
   if result then
     return result
   end
-  for info in self._infos do
+  for info in self.__infos do
     if  info:is_instance_of(AD.At.Global)
     and info.name == name
     then
       result = AD.Global(nil, self, info)
-      self._globals[name] = result
+      self.__globals[name] = result
       return result
     end
   end
@@ -2062,14 +2088,14 @@ end
 ---@param name string
 ---@return nil | AD.Class
 function AD.Module:get_class(name)
-  return self:_get_instance(name, AD.Class, self._classes)
+  return self:__get_instance(name, AD.Class, self.__classes)
 end
 
 ---Get the function info for the given name
 ---@param name string
 ---@return nil | AD.Function
 function AD.Module:get_function(name)
-  return self:_get_instance(name, AD.Function, self._functions)
+  return self:__get_instance(name, AD.Function, self.__functions)
 end
 
 ---@class AD.Module.iterator_options
@@ -2078,11 +2104,7 @@ end
 
 ---Iterator over infos of the given class
 ---@generic T: AD.Info, Out: any
----Meaningless short documentation for testin purposes
---[===[
-Meaningless long documentation for testing purposes
---]===]
----@param Class T @ Meaningless comment for testin purposes
+---@param Class T
 ---@param options AD.Module.iterator_options
 ---@return fun(): Out | nil
 function AD.Module:iterator(Class, options)
@@ -2091,7 +2113,7 @@ function AD.Module:iterator(Class, options)
   return function ()
     repeat
       i = i + 1
-      local result = self.__infos[i]
+      local result = self.__info_t[i]
       if result then
         if result:is_instance_of(Class) then
           if not options.ignore
@@ -2108,15 +2130,15 @@ end
 
 AD.Module.__computed = function (self, k)
   -- computed properties
-  if k == "_infos" then
+  if k == "__infos" then
     local i = 0
     return function ()
       i = i + 1
-      return self.__infos[i]
+      return self.__info_t[i]
     end
   end
   if k == "name" then
-    for info in self._infos do
+    for info in self.__infos do
       if info:is_instance_of(AD.At.Module) then
         self.name = info.name
         return self.name
@@ -2151,7 +2173,7 @@ AD.Module.__computed = function (self, k)
       ignore = function (at)
         local code = at.after_code
         if code then
-          local s = self.contents:sub(code.min, code.max)
+          local s = self.__contents:sub(code.min, code.max)
           local name = p:match(s)
           if name then
             at._global = true
@@ -2174,7 +2196,7 @@ end
 ---@param s string
 function AD.Module:init_with_string(s)
   -- normalize newline characters
-  self.contents = s
+  self.__contents = s
     :gsub("\r\n", "\n")
     :gsub("\n\r", "\n")
     :gsub("\r", "\n")
@@ -2194,22 +2216,22 @@ end
 
 do
   local function make_after_codes(self)
-    for i = 2, #self.__infos do
-      local min = self.__infos[i - 1].max + 1
-      local max = self.__infos[i].min - 1
+    for i = 2, #self.__info_t do
+      local min = self.__info_t[i - 1].max + 1
+      local max = self.__info_t[i].min - 1
       if min <= max then
-        self.__infos[i - 1].after_code = AD.Code({
+        self.__info_t[i - 1].after_code = AD.Code({
           min = min,
           max = max,
         })
       end
     end
     -- what comes after the last info:
-    local last = self.__infos[#self.__infos]
-    if last.max < #self.contents then
+    local last = self.__info_t[#self.__info_t]
+    if last.max < #self.__contents then
       last.after_code = AD.Code({
         min = last.max + 1,
-        max = #self.contents,
+        max = #self.__contents,
       })
     end
     local max = last.min - 1
@@ -2220,8 +2242,8 @@ do
   ---The masked contents is obtained replacing black characters
   ---in literals and comments with a "*"
   local function make_masked_contents(self)
-    -- explode the `contents` into a regular array of bytes
-    local t = Ct( C(P(1))^0 ):match(self.contents)
+    -- explode the receiver's `__contents` into a regular array of bytes
+    local t = Ct( C(P(1))^0 ):match(self.__contents)
     for info in self.infos do
       info:mask_contents(t)
     end
@@ -2230,14 +2252,14 @@ do
   ]]
   local function guess_function_names(self)
     local p = AD.At.Function.guess_p
-    for info in self._infos do
+    for info in self.__infos do
       if info:is_instance_of(AD.At.Function) then
         if info.name == AD.At.Function.name then
           local code = info.after_code
           if not code then
-            error("Cannot guess function name of ".. self.contents:sub(info.min, info.max))
+            error("Cannot guess function name of ".. self.__contents:sub(info.min, info.max))
           end
-          local s = self.contents:sub(code.min, code.max)
+          local s = self.__contents:sub(code.min, code.max)
           local t = p:match(s)
           if not t then
             error("Cannot guess function name from ".. s)
@@ -2251,8 +2273,8 @@ do
 
   function AD.Module:parse()
     local p = AD.Source:get_capture_p()
-    local m = p:match(self.contents)
-    self.__infos = m.infos
+    local m = p:match(self.__contents)
+    self.__info_t = m.infos
     make_after_codes(self)
     -- self:make_masked_contents()
     guess_function_names(self)
