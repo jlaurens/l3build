@@ -112,20 +112,21 @@ local append  = table.insert
 local concat  = table.concat
 local move    = table.move
 
-local lpeg        = require("lpeg")
-local locale      = lpeg.locale()
-local P           = lpeg.P
-local R           = lpeg.R
-local S           = lpeg.S
-local C           = lpeg.C
-local V           = lpeg.V
-local B           = lpeg.B
-local Cb          = lpeg.Cb
-local Cc          = lpeg.Cc
-local Cg          = lpeg.Cg
-local Cmt         = lpeg.Cmt
-local Cp          = lpeg.Cp
-local Ct          = lpeg.Ct
+local re      = require("re")
+local lpeg    = require("lpeg")
+local locale  = lpeg.locale()
+local P       = lpeg.P
+local R       = lpeg.R
+local S       = lpeg.S
+local C       = lpeg.C
+local V       = lpeg.V
+local B       = lpeg.B
+local Cb      = lpeg.Cb
+local Cc      = lpeg.Cc
+local Cg      = lpeg.Cg
+local Cmt     = lpeg.Cmt
+local Cp      = lpeg.Cp
+local Ct      = lpeg.Ct
 
 -- Namespace
 
@@ -166,19 +167,19 @@ local black_p = P(1) - S(" \t\n") -- non space, non LF
 
 ---@type lpeg.Pattern
 local eol_p   = (
-    P("\n")   -- consume an eol
-)^-1          -- 0 or 1 end of line
+  P("\n") -- consume an eol
+)^-1      -- 0 or 1 end of line
 
 local variable_p =
     ("_" + locale.alpha)      -- ascii letter, or "_"
   * ("_" + locale.alnum)^0    -- ascii letter, or "_" or digit
 
-  -- for a class, type name
-  local identifier_p =
+-- for a class, type name
+local identifier_p =
   variable_p * ("." * variable_p)^0
 
-  -- for a class, type name
-  local function_p =
+-- for a class, type name
+local function_p =
   variable_p * (S(".:") * variable_p)^0
 
 ---Capture the current position under the given name with the given shifht
@@ -224,7 +225,7 @@ local chunk_stop_p =
 
 ---@type lpeg.Pattern
 local one_line_chunk_stop_p =
-  (1 - P("\n"))^0 -- anything but a newline
+  ( 1 - P("\n") )^0 -- anything but a newline
   * chunk_stop_p
 
 local special_begin_p =
@@ -1041,7 +1042,7 @@ do
     KEY   = "class",
     name  = "UNKNOWN CLASS NAME",
     initialize = function (self)
-      self.fields   = self.fields  or {}
+      self.fields = self.fields  or {}
     end,
     get_core_p = function (_self)
       return 
@@ -1095,14 +1096,17 @@ end
 
 -- @type MY_TYPE[|OTHER_TYPE] [@comment]
 ---@class AD.At.Type: AD.At
----@field public types  string[]  @ List of types
----@field public _name  string    @ Name of the variable guessed from the following code
+---@field public types  string[]      @ List of types
+---@field public is_global boolean    @ When global, name of the variable guessed from the following code
+---@field public name   nil | string  @ When global, name of the variable guessed from the following code
+
 
 ---@type AD.At.Type
 AD.At.Type = make_class(AD.At, {
   TYPE  = "AD.At.Type",
   KEY   = "type",
   types = { "UNKNOWN TYPE NAME" },
+  is_global = false,
   get_core_p = function (self)
     return
         named_types_p
@@ -1325,7 +1329,7 @@ end
 ---@field public returns  AD.At.Return[]  @ parameters of the function
 ---@field public author   AD.At.Author
 ---@field public see      AD.At.See       @ reference
----@field public guess_p  lpeg.Pattern
+---@field public GUESS_p  lpeg.Pattern
 do
   local tag_at = {} -- unique capture tag
   ---@type lpeg.Pattern
@@ -1478,7 +1482,7 @@ do
           end
     end,
     -- pattern to guess the name of the documented function
-    guess_p = P( {
+    GUESS_p = P( {
       - B(black_p)
       * Ct(
           V("local function")
@@ -1691,13 +1695,13 @@ end
 -- Hides implementation details
 
 ---@class AD.AtProxy
----@field public name     string
----@field public source   string
----@field public comment  string
----@field public short_description  string
----@field public long_description   string
----@field private _at AD.At @ "@" annotation info
----@field private _module AD.Module
+---@field public    name     string
+---@field public    source   string
+---@field public    comment  string
+---@field public    short_description  string
+---@field public    long_description   string
+---@field private   _at AD.At @ "@" annotation info
+---@field protected _module AD.Module
 
 AD.AtProxy = make_class({
   TYPE = "AD.AtProxy",
@@ -1771,7 +1775,7 @@ AD.Return = make_class(AD.AtProxy, {
 })
 
 ---@class AD.Function: AD.AtProxy
----@field public  param_names  fun(): string | nil
+---@field public  all_param_names  fun(): string | nil
 ---@field public  get_param    fun(name: string): AD.Param | nil
 ---@field public  vararg       AD.Vararg
 ---@field public  return_indices  fun(): integer | nil
@@ -1792,9 +1796,9 @@ AD.Function = make_class(AD.AtProxy, {
 
 function AD.Function:__computed(k)
   ---Parameter names iterator
-  ---@function AD.Function.param_names
+  ---@function AD.Function.all_param_names
   ---@return fun(): string
-  if k == "param_names" then
+  if k == "all_param_names" then
     local i = 0
     return function ()
       i = i + 1
@@ -1821,7 +1825,7 @@ function AD.Function:__computed(k)
 end
 
 ---Get the paramater with the given name
----@param name string @ one of the srings listed by the receiver's `param_names` enumerator.
+---@param name string @ one of the srings listed by the receiver's `all_param_names` enumerator.
 ---@return AD.Param | nil @ `nil` when no parameter exists with the given name.
 function AD.Function:get_param(name)
   local params = self._params
@@ -1902,14 +1906,36 @@ AD.See = make_class(AD.AtProxy, {
 })
 
 ---@class AD.Method: AD.Function
+---@field public base_name  string
+---@field public class      AD.Class
+
 AD.Method = make_class(AD.Function, {
   TYPE = "AD.Method",
+  __computed = function (self, k)
+    if k == "base_name" then
+      local result = re.match(self.name, "([^.]+[.])^+0{[^.]+}")
+      self[k] = result
+      return result
+    end
+    if k == "class" then
+      local class_name =
+        re.match(self.name, "{([^.]+[.])^+0}[^.]+")
+        :sub(1, -2)
+      local result = self._module:get_class(class_name)
+      self[k] = result
+      return result
+    end
+    return AD.Method.__Super.__computed(self, k)
+  end
 })
 
 ---@class AD.Class: AD.AtProxy
----@field public    author  AD.Author
----@field public    see     AD.See
----@field protected _at     AD.At.Class
+---@field public    author    AD.Author
+---@field public    see       AD.See
+---@field protected _at       AD.At.Class
+---@field private   __fields  AD.At.Field[]
+---@field private   __methods AD.Method[]
+
 AD.Class = make_class(AD.AtProxy, {
   TYPE = "AD.Class",
   __AtClass = AD.At.Class,
@@ -1920,6 +1946,34 @@ AD.Class = make_class(AD.AtProxy, {
     self.__methods = {}
   end,
   __computed = function (self, k)
+    if k == "all_field_names" then
+      local i = 0
+      return function ()
+        i = i + 1
+        local f = self._at.fields[i]
+        if f then
+          return f.name
+        end
+      end
+    end
+    if k == "all_method_names" then
+      local p = P(self.name)
+        * P(".")
+        * C(variable_p)
+        * -black_p
+      local iterator = self._module.all_function_names
+      return function ()
+        repeat
+          local function_name = iterator()
+          if function_name then
+            local result = p:match(function_name)
+            if result then
+              return result
+            end
+          end
+        until not function_name
+      end
+    end
     if k == "author" then
       local at_k = self._at[k]
       if at_k then
@@ -1941,7 +1995,7 @@ AD.Class = make_class(AD.AtProxy, {
 })
 
 ---Get the paramater with the given name
----@param name string   @ one of the srings listed by the receiver's `field_names` enumerator.
+---@param name string   @ one of the srings listed by the receiver's `all_field_names` enumerator.
 ---@return AD.Field | nil @ `nil` when no field exists with the given name.
 function AD.Class:get_field(name)
   local fields = self.__fields
@@ -1959,7 +2013,7 @@ function AD.Class:get_field(name)
 end
 
 ---Get the paramater with the given name
----@param name string   @ one of the srings listed by the receiver's `field_names` enumerator.
+---@param name string   @ one of the srings listed by the receiver's `all_field_names` enumerator.
 ---@return AD.Field | nil @ `nil` when no field exists with the given name.
 function AD.Class:get_method(name)
   local methods = self.__methods
@@ -1967,20 +2021,23 @@ function AD.Class:get_method(name)
   if result then
     return result
   end
-  for _, field in ipairs(self._at.fields) do
-    if field.name == name then
-      result = AD.Field({}, self._module, field)
-      methods[name] = result
-      return result
-    end
+  local at = self._module:get_function(self.name ..".".. name)
+  if at then
+    result = AD.Method({}, self._module, at)
+    methods[name] = result
+    return result
   end
 end
 
 ---@class AD.Type: AD.AtProxy
----@field public types string[]
+---@field public types      string[]
+---@field public is_global  boolean
+---@field public GLOBAL_p   lpeg.Pattern
+
 AD.Type = make_class(AD.AtProxy, {
   TYPE = "AD.Type",
   __AtClass = AD.At.Type,
+  GLOBAL_p = white_p^0 * P("_G.") * C(identifier_p),
   __computed = function (self, k)
     if k == "types" then
       return self._at[k]
@@ -1992,6 +2049,7 @@ AD.Type = make_class(AD.AtProxy, {
 ---@class AD.Global: AD.AtProxy
 ---@field public type AD.Type
 ---@field private _at AD.At.Global
+
 AD.Global = make_class(AD.AtProxy, {
   TYPE = "AD.Global",
   __AtClass = AD.At.Global,
@@ -2012,11 +2070,11 @@ AD.Global = make_class(AD.AtProxy, {
 ---@field public  path            string      @ the path of the source file
 ---@field public  name            string      @ the name of the module as defined in the first module annotation
 ---@field public  classe_names    fun(): string | nil @ class names iterator
----@field public  function_names  fun(): string | nil @ function names iterator
----@field public  global_names    fun(): string | nil @ globals name iterator
+---@field public  all_function_names  fun(): string | nil @ function names iterator
+---@field public  all_global_names    fun(): string | nil @ globals name iterator
 ---@field private __contents      string              @ the contents to recover documentation from
 ---@field private __get_instance  fun(name: string, Class: AD.AtProxy, store: table<string,AD.AtProxy>): AD.AtProxy
----@field private __infos         fun(): AD.Info | nil      @ info iterator
+---@field private __all_infos         fun(): AD.Info | nil      @ info iterator
 ---@field private __globals       table<string, AD.Global>  @ cache for globals
 ---@field private __classes       table<string, AD.Class>   @ cache for classes
 ---@field private __functions     table<string, AD.Function>@ cache for functions
@@ -2054,7 +2112,7 @@ function AD.Module:__get_instance(name, Class, store)
   if result then
     return result
   end
-  for info in self.__infos do
+  for info in self.__all_infos do
     if  info:is_instance_of(Class.__AtClass)
     and info.name == name
     then
@@ -2073,7 +2131,7 @@ function AD.Module:get_global(name)
   if result then
     return result
   end
-  for info in self.__infos do
+  for info in self.__all_infos do
     if  info:is_instance_of(AD.At.Global)
     and info.name == name
     then
@@ -2113,7 +2171,7 @@ function AD.Module:iterator(Class, options)
   return function ()
     repeat
       i = i + 1
-      local result = self.__info_t[i]
+      local result = self.__infos[i]
       if result then
         if result:is_instance_of(Class) then
           if not options.ignore
@@ -2130,42 +2188,45 @@ end
 
 AD.Module.__computed = function (self, k)
   -- computed properties
-  if k == "__infos" then
+  if k == "__all_infos" then
     local i = 0
     return function ()
       i = i + 1
-      return self.__info_t[i]
+      return self.__infos[i]
     end
   end
   if k == "name" then
-    for info in self.__infos do
+    for info in self.__all_infos do
       if info:is_instance_of(AD.At.Module) then
         self.name = info.name
         return self.name
       end
     end
   end
-  if k == "class_names" then
+  if k == "all_class_names" then
     return self:iterator(AD.At.Class, {
       map = function (info)
         return info.name
       end
     })
   end
-  if k == "function_names" then
+  if k == "all_function_names" then
     return self:iterator(AD.At.Function, {
       map = function (info)
         return info.name
       end
     })
   end
-  if k == "global_names" then
+  if k == "all_global_names" then
+    -- we create 2 iterators:
+    -- 1) for ---@global
+    -- 2) for ---@type + _G.foo = ...
     local g_iterator = self:iterator(AD.At.Global, {
       map = function (info)
         return info.name
       end,
     })
-    local p = white_p^0 * P("_G.") * C(identifier_p)
+    local p = AD.Type.GLOBAL_p
     local t_iterator = self:iterator(AD.At.Type, {
       map = function (at)
         return at._name
@@ -2184,6 +2245,7 @@ AD.Module.__computed = function (self, k)
         return true
       end,
     })
+    -- we merge the two iterators above:
     return function ()
       return g_iterator() or t_iterator()
     end
@@ -2216,26 +2278,24 @@ end
 
 do
   local function make_after_codes(self)
-    for i = 2, #self.__info_t do
-      local min = self.__info_t[i - 1].max + 1
-      local max = self.__info_t[i].min - 1
+    for i = 2, #self.__infos do
+      local min = self.__infos[i - 1].max + 1
+      local max = self.__infos[i].min - 1
       if min <= max then
-        self.__info_t[i - 1].after_code = AD.Code({
+        self.__infos[i - 1].after_code = AD.Code({
           min = min,
           max = max,
         })
       end
     end
     -- what comes after the last info:
-    local last = self.__info_t[#self.__info_t]
+    local last = self.__infos[#self.__infos]
     if last.max < #self.__contents then
       last.after_code = AD.Code({
         min = last.max + 1,
         max = #self.__contents,
       })
     end
-    local max = last.min - 1
-
   end
   --[[
   ---Make the masked contents
@@ -2244,15 +2304,15 @@ do
   local function make_masked_contents(self)
     -- explode the receiver's `__contents` into a regular array of bytes
     local t = Ct( C(P(1))^0 ):match(self.__contents)
-    for info in self.infos do
+    for info in self.__all_infos do
       info:mask_contents(t)
     end
     self.masked_contents = concat(t, "")
   end
   ]]
-  local function guess_function_names(self)
-    local p = AD.At.Function.guess_p
-    for info in self.__infos do
+  local function guess_all_function_names(self)
+    local p = AD.At.Function.GUESS_p
+    for info in self.__all_infos do
       if info:is_instance_of(AD.At.Function) then
         if info.name == AD.At.Function.name then
           local code = info.after_code
@@ -2271,13 +2331,31 @@ do
     end
   end
 
+  local function make_global_types(self)
+    local p = AD.Type.GLOBAL_p
+    for at in self:iterator(AD.At.Type) do
+      local code = at.after_code
+      if code then
+        local s = self.__contents:sub(code.min, code.max)
+        local name = p:match(s)
+        if name then
+          at.is_global = true
+          at.name = name
+          return false
+        end
+      end
+      return true
+    end
+  end
+
   function AD.Module:parse()
     local p = AD.Source:get_capture_p()
     local m = p:match(self.__contents)
-    self.__info_t = m.infos
+    self.__infos = m.infos
     make_after_codes(self)
+    make_global_types(self)
     -- self:make_masked_contents()
-    guess_function_names(self)
+    guess_all_function_names(self)
   end
 
 end

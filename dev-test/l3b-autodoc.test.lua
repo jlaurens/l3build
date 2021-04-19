@@ -2009,6 +2009,7 @@ _G.test_At_Class = Test({
     self:do_test_complete("Class")
 
     local p = AD.At.Class:get_complete_p()
+
     local TD_CLASS = self:get_CLASS()
     local TD_FIELD = self:get_FIELD()
     local TD_AUTHOR = self:get_AUTHOR()
@@ -2657,8 +2658,8 @@ _G.test_At_Function = Test({
     TD = self.get_FUNCTION_COMPLETE()
     expect(p:match(TD.s)).contains(TD.m())
   end,
-  test_guess_p = function (self)
-    local p = AD.At.Function.guess_p
+  test_GUESS_p = function (self)
+    local p = AD.At.Function.GUESS_p
     expect(p:match("local function foo()").name)
       .is("foo")
     expect(p:match("function foo()").name)
@@ -2891,13 +2892,13 @@ _G.test_autodoc_Module = Test({
     })
   end,
   test_base = function (self)
-    expect(self.module.__info_t).contains({})
+    expect(self.module.__infos).contains({})
     expect(self.module.__globals).contains({})
     expect(self.module.__functions).contains({})
     expect(self.module.__classes).contains({})
   end,
   test_function_name = function (self)
-    for info in self.module.__infos do
+    for info in self.module.__all_infos do
       if info:is_instance_of(AD.At.Function) then
         -- all function names have been properly guessed:
         expect(info.name).is.NOT(AD.At.Function.name)
@@ -2911,14 +2912,14 @@ _G.test_autodoc_Module = Test({
   end,
   test_class_names = function (self)
     local module = self.module
-    for name in module.class_names do
+    for name in module.all_class_names do
       local info = module:get_class(name)
       expect(info.name).is(name)
     end
   end,
-  test_function_names = function (self)
+  test_all_function_names = function (self)
     local module = self.module
-    for name in module.function_names do
+    for name in module.all_function_names do
       local info = module:get_function(name)
       expect(info.name).is(name)
     end
@@ -2926,10 +2927,10 @@ _G.test_autodoc_Module = Test({
   test_function_param_names = function (self)
     print()
     local module = self.module
-    for function_name in module.function_names do
+    for function_name in module.all_function_names do
       ---@type AD.Function
       local info = module:get_function(function_name)
-      for param_name in info.param_names do
+      for param_name in info.all_param_names do
         local param = info:get_param(param_name)
         expect(param.name).is(param_name)
       end
@@ -2937,7 +2938,7 @@ _G.test_autodoc_Module = Test({
   end,
   test_global_names = function (self)
     local module = self.module
-    for name in module.global_names do
+    for name in module.all_global_names do
       local info = module:get_global(name)
       expect(info.name).is(name)
     end
@@ -2962,7 +2963,7 @@ whatever
 _G.NAME_3 = false
 ]]
     self:prepare(s)
-    local iterator = self.module.global_names
+    local iterator = self.module.all_global_names
     expect(iterator()).is("NAME_1")
     expect(iterator()).is("NAME_2")
     expect(iterator()).is("NAME_3")
@@ -2977,13 +2978,13 @@ whatever
 ---@class NAME_3
 ]]
     self:prepare(s)
-    local iterator = self.module.class_names
+    local iterator = self.module.all_class_names
     expect(iterator()).is("NAME_1")
     expect(iterator()).is("NAME_2")
     expect(iterator()).is("NAME_3")
     expect(iterator()).is(nil)
   end,
-  test_function_names = function (self)
+  test_all_function_names = function (self)
 ----5----0----5----0
     local s = [[
 ---@function NAME_1
@@ -2999,7 +3000,7 @@ local NAME_5 = function ()
 PKG.NAME_6 = function ()
 ]]
     self:prepare(s)
-    local iterator = self.module.function_names
+    local iterator = self.module.all_function_names
     expect(iterator()).is("NAME_1")
     expect(iterator()).is("NAME_2")
     expect(iterator()).is("NAME_3")
@@ -3033,47 +3034,62 @@ PKG.NAME_6 = function ()
     local c_info = self.module:get_class("NAME")
     expect(c_info).is.NOT(nil)
     expect(c_info.__Class).is(AD.Class)
-    expect(c_info._fields).contains({})
+    expect(c_info.__fields).contains({})
     local field_1 = c_info:get_field("FIELD_1")
     expect(field_1).is.NOT(nil)
-    expect(field_1.comment)
-      .is("FIELD_1: CMT")
-    expect(field_1.short_description)
-      .is("FIELD_1: SHORT DESCRIPTION")
-    expect(field_1.long_description )
-      .is("FIELD_1: LONG  DESCRIPTION")
-    expect(field_1.types)
-      .contains({ "TYPE_1" })
-    expect(field_1.visibility)
-      .is("protected")
-    local field_2 = c_info:get_field("FIELD_2")
-    expect(field_2).is.NOT(nil)
-    expect(field_2.comment)
-      .is("FIELD_2: CMT")
-    expect(field_2.short_description)
-      .is("FIELD_2: SHORT DESCRIPTION")
-    expect(field_2.long_description )
-      .is("FIELD_2: LONG  DESCRIPTION")
-    expect(field_2.types)
-      .contains({ "TYPE_2" })
-    expect(field_2.visibility)
-      .is("protected")
-      local author = c_info.author
-      expect(author).is.NOT(nil)
-      expect(author.value)
-        .is("PSEUDO IDENTIFIER")
-      expect(author.short_description)
-        .is("AUTHOR:  SHORT DESCRIPTION")
-      expect(author.long_description )
-        .is("AUTHOR:  LONG  DESCRIPTION")
-      local see = c_info.see
-      expect(see).is.NOT(nil)
-      expect(see.value)
-        .is("VARIOUS REFERENCES")
-      expect(see.short_description)
-        .is("SEE:     SHORT DESCRIPTION")
-      expect(see.long_description )
-        .is("SEE:     LONG  DESCRIPTION")
+    -- expect(field_1.comment)
+    --   .is("FIELD_1: CMT")
+    -- expect(field_1.short_description)
+    --   .is("FIELD_1: SHORT DESCRIPTION")
+    -- expect(field_1.long_description )
+    --   .is("FIELD_1: LONG  DESCRIPTION")
+    -- expect(field_1.types)
+    --   .contains({ "TYPE_1" })
+    -- expect(field_1.visibility)
+    --   .is("protected")
+    -- local field_2 = c_info:get_field("FIELD_2")
+    -- expect(field_2).is.NOT(nil)
+    -- expect(field_2.comment)
+    --   .is("FIELD_2: CMT")
+    -- expect(field_2.short_description)
+    --   .is("FIELD_2: SHORT DESCRIPTION")
+    -- expect(field_2.long_description )
+    --   .is("FIELD_2: LONG  DESCRIPTION")
+    -- expect(field_2.types)
+    --   .contains({ "TYPE_2" })
+    -- expect(field_2.visibility)
+    --   .is("protected")
+    --   local author = c_info.author
+    --   expect(author).is.NOT(nil)
+    --   expect(author.value)
+    --     .is("PSEUDO IDENTIFIER")
+    --   expect(author.short_description)
+    --     .is("AUTHOR:  SHORT DESCRIPTION")
+    --   expect(author.long_description )
+    --     .is("AUTHOR:  LONG  DESCRIPTION")
+    --   local see = c_info.see
+    --   expect(see).is.NOT(nil)
+    --   expect(see.value)
+    --     .is("VARIOUS REFERENCES")
+    --   expect(see.short_description)
+    --     .is("SEE:     SHORT DESCRIPTION")
+    --   expect(see.long_description )
+    --     .is("SEE:     LONG  DESCRIPTION")
+  end,
+  test_Class_field_names = function (self)
+    local s = [[
+---@class CLASS.NAME
+---@field public FIELD_1 TYPE_1
+---@field public FIELD_2 TYPE_2
+]]
+    self:prepare(s)
+
+    local c_info = self.module:get_class("CLASS.NAME")
+    expect(c_info).NOT(nil)
+    local iterator = c_info.all_field_names
+    expect(iterator()).is("FIELD_1")
+    expect(iterator()).is("FIELD_2")
+    expect(iterator()).is(nil)
   end,
   test_Function = function (self)
     local TD = self.get_FUNCTION_COMPLETE()
@@ -3158,33 +3174,26 @@ _G.test_Module_2 = Test({
 ---@function CLASS.NAME_2.SUB.METHOD_2
 ]]
     self:prepare(s)
-    -- keys are class names, values are method names
-    ---@type table<string,string[]>
-    local t = {}
-    for c_name in self.module.class_names do
-      t[c_name] = {}
-    end
-    for c_name in self.module.class_names do
-      local p =
-          P(c_name)
-        * P(".")
-        * lpeg.C(__.variable_p)
-        * -__.black_p
-      for f_name in self.module.function_names do
-        local name = p:match(f_name)
-        if name then
-          append(t[c_name], name)
-        end
-      end
-    end
-    for class_name, method_names in pairs(t) do
-      local c_info = self.module:get_class(class_name)
-      for _, name in ipairs(method_names) do
-        if not c_info:get_field(name) then
-          print("METHOD", class_name, name)
-        end
-      end
-    end
+    local c_info = self.module:get_class("CLASS.NAME_1")
+    local iterator = c_info.all_method_names
+    expect(iterator()).is("METHOD_1")
+    expect(iterator()).is("METHOD_2")
+    expect(iterator()).is(nil)
+    local m_info = c_info:get_method("METHOD_1")
+    expect(m_info).Class.is(AD.Method)
+    expect(m_info.name).is("CLASS.NAME_1.METHOD_1")
+    expect(m_info.base_name).is("METHOD_1")
+    expect(m_info.class).is(c_info)
+    c_info = self.module:get_class("CLASS.NAME_2")
+    iterator = c_info.all_method_names
+    expect(iterator()).is("METHOD_1")
+    expect(iterator()).is("METHOD_2")
+    expect(iterator()).is(nil)
+    m_info = c_info:get_method("METHOD_2")
+    expect(m_info).Class.is(AD.Method)
+    expect(m_info.name).is("CLASS.NAME_2.METHOD_2")
+    expect(m_info.base_name).is("METHOD_2")
+    expect(m_info.class).is(c_info)
   end,
 })
 

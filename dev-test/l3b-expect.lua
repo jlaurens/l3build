@@ -35,6 +35,28 @@ function Expect:__index(k)
     self.op = "is"
     return self
   end
+  if k == "type" then
+    local modifier = self.modifier
+    self.modifier = modifier
+      and function (before)
+        return type(modifier(before))
+      end
+      or function (before)
+        return type(before)
+      end
+    return self
+  end
+  if k == "Class" then
+    local modifier = self.modifier
+    self.modifier = modifier
+      and function (before)
+        return modifier(before).__Class
+      end
+      or function (before)
+        return before.__Class
+      end
+    return self
+  end
   if k == "greater" then
     self.op = ">"
     return self
@@ -58,6 +80,9 @@ end
 
 function Expect.__call(self, expected, options)
   options = options or {}
+  if self.modifier then
+    self.actual = self.modifier(self.actual)
+  end
   if self.op == "==" then
     if self.__NOT then
       if self.__almost then
@@ -114,6 +139,7 @@ function Expect.__call(self, expected, options)
       end
       return
     end
+    expect(self.actual).NOT(nil)
     ;(options.case_insensitive
       and LU.assert_str_icontains
       or  LU.assert_str_contains
