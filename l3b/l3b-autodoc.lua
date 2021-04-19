@@ -2047,17 +2047,33 @@ AD.Type = make_class(AD.AtProxy, {
 })
 
 ---@class AD.Global: AD.AtProxy
----@field public type AD.Type
----@field private _at AD.At.Global
+---@field public    types string[]
+---@field protected _type AD.Type
+---@field private _at AD.At.Global | AD.At.Type
 
 AD.Global = make_class(AD.AtProxy, {
   TYPE = "AD.Global",
   __AtClass = AD.At.Global,
   __computed = function (self, k)
-    if k == "type" then
-      local at_k = self._at[k]
-      if at_k then
-        local result = AD.Type({}, self._module, at_k)
+    if k == "_type" then
+      local result
+      if self._at:is_instance_of(AD.At.Type) then
+        result = AD.Type({}, self._module, self._at)
+        self[k] = result
+        return result
+      else
+        local at_type = self._at.type
+        if at_type then
+          result = AD.Type({}, self._module, at_type)
+          self[k] = result
+          return result
+        end
+      end
+    end
+    if k == "types" then
+      local at_type = self._type
+      if at_type then
+        local result = at_type.types
         self[k] = result
         return result
       end
@@ -2131,13 +2147,15 @@ function AD.Module:get_global(name)
   if result then
     return result
   end
-  for info in self.__all_infos do
-    if  info:is_instance_of(AD.At.Global)
-    and info.name == name
+  for at in self.__all_infos do
+    if  at:is_instance_of(AD.At.Global)
+    or  at:is_instance_of(AD.At.Type) and at.is_global
     then
-      result = AD.Global(nil, self, info)
-      self.__globals[name] = result
-      return result
+      if at.name == name then
+        result = AD.Global(nil, self, at)
+        self.__globals[name] = result
+        return result
+      end
     end
   end
 end
@@ -2222,27 +2240,16 @@ AD.Module.__computed = function (self, k)
     -- 1) for ---@global
     -- 2) for ---@type + _G.foo = ...
     local g_iterator = self:iterator(AD.At.Global, {
-      map = function (info)
-        return info.name
+      map = function (at)
+        return at.name
       end,
     })
-    local p = AD.Type.GLOBAL_p
     local t_iterator = self:iterator(AD.At.Type, {
       map = function (at)
-        return at._name
+        return at.name
       end,
       ignore = function (at)
-        local code = at.after_code
-        if code then
-          local s = self.__contents:sub(code.min, code.max)
-          local name = p:match(s)
-          if name then
-            at._global = true
-            at._name = name
-            return false
-          end
-        end
-        return true
+        return not at.is_global
       end,
     })
     -- we merge the two iterators above:

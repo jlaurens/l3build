@@ -2968,6 +2968,10 @@ _G.NAME_3 = false
     expect(iterator()).is("NAME_2")
     expect(iterator()).is("NAME_3")
     expect(iterator()).is(nil)
+    for global_name in self.module.all_global_names do
+      local g_info = self.module:get_global(global_name)
+      expect(g_info.name).is(global_name)
+    end
   end,
   test_class_names = function (self)
     local s = [[
@@ -3016,7 +3020,8 @@ PKG.NAME_6 = function ()
     local g_info = self.module:get_global("NAME")
     expect(g_info).is.NOT(nil)
     expect(g_info.__Class).is(AD.Global)
-    local type = g_info.type
+    expect(g_info.name).is("NAME")
+    local type = g_info._type
     expect(type).is.NOT(nil)
     expect(type.comment)
       .is("TYPE: COMMENT")
@@ -3025,6 +3030,8 @@ PKG.NAME_6 = function ()
     expect(type.long_description )
       .is("TYPE:    LONG  DESCRIPTION")
     expect(type.types)
+      .contains({ "TYPE" })
+    expect(g_info.types)
       .contains({ "TYPE" })
   end,
   test_Class = function (self)
