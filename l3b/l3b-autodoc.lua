@@ -1597,11 +1597,11 @@ do
     + AD.At.Author:get_complete_p()
     + AD.At.See:get_complete_p()
     + AD.At.Global:get_complete_p()
+    + AD.At.Type:get_complete_p()     -- type annotations can correspond to global variables
     + AD.At.Alias:get_complete_p()
     + AD.LineDoc:get_capture_p()
     + AD.LongDoc:get_capture_p()
     + AD.At.Field:get_capture_p()     -- standalone field are ignored
-    + AD.At.Type:get_capture_p()      -- type annotation are unused in documentation
     + AD.ShortLiteral:get_capture_p()
     + AD.LongLiteral:get_capture_p()
     +   consume_one_character_p
@@ -2076,6 +2076,21 @@ AD.Global = make_class(AD.AtProxy, {
         local result = at_type.types
         self[k] = result
         return result
+      end
+    end
+    if k == "short_description"
+    or k == "long_description"
+    or k == "comment"
+    then
+      if self._at:is_instance_of(AD.At.Type) then
+        local at_type = self._at
+        if at_type then
+          local result = at_type[k]
+          if result then
+            self[k] = result
+            return result
+          end
+        end
       end
     end
     return AD.Global.__Super.__computed(self, k)

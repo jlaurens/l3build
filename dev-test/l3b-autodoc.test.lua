@@ -3019,20 +3019,47 @@ PKG.NAME_6 = function ()
     self:prepare(s)
     local g_info = self.module:get_global("NAME")
     expect(g_info).is.NOT(nil)
-    expect(g_info.__Class).is(AD.Global)
+    expect(g_info).Class(AD.Global)
     expect(g_info.name).is("NAME")
+    expect(g_info.short_description)
+      .is("GLOBAL:  SHORT DESCRIPTION")
+    expect(g_info.long_description)
+      .is("GLOBAL:  LONG  DESCRIPTION")
+    expect(g_info.comment)
+      .is("GLOBAL: CMT")
     local type = g_info._type
     expect(type).is.NOT(nil)
     expect(type.comment)
       .is("TYPE: COMMENT")
     expect(type.short_description)
       .is("TYPE:    SHORT DESCRIPTION")
-    expect(type.long_description )
+    expect(type.long_description)
       .is("TYPE:    LONG  DESCRIPTION")
     expect(type.types)
       .contains({ "TYPE" })
     expect(g_info.types)
       .contains({ "TYPE" })
+----5----0----5----0----5---30
+    s = [[
+---TYPE:    SHORT DESCRIPTION
+-- TYPE:    IGNORED DESCR5N 1
+---TYPE:    LONG  DESCRIPTION
+-- TYPE:    IGNORED DESCR5N 2
+---@type TYPE @ TYPE: COMMENT
+_G.foo = bar
+]]
+    self:prepare(s)
+    expect(self.module.all_global_names()).is("foo")
+    g_info = self.module:get_global("foo")
+    expect(g_info).NOT(nil)
+    expect(g_info).Class(AD.Global)
+    expect(g_info.name).is("foo")
+    expect(g_info.short_description)
+      .is("TYPE:    SHORT DESCRIPTION")
+    expect(g_info.long_description)
+      .is("TYPE:    LONG  DESCRIPTION")
+    expect(g_info.comment)
+      .is("TYPE: COMMENT")
   end,
   test_Class = function (self)
     local TD = self.get_CLASS_COMPLETE()
@@ -3161,7 +3188,6 @@ _G.test_Module_2 = Test({
   prepare = function (self, str)
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
-      foo = "bar",
       contents = str
     })
   end,
