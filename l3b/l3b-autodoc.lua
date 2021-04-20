@@ -1675,62 +1675,6 @@ AD.AtProxy = Object:make_subclass({
     if k == "types" then
       return self._at[k] and concat(self._at[k], "|")
     end
-    if k == "as_latex_environment" then
-      local content = self.as_latex
-      return content and #content > 1 and
-        ([[\begin{<?>}
-]]):gsub("<%?>", self.LATEX_ENVIRONMENT)
-        .. content
-        .. ([[\end{<?>}
-]]):gsub("<%?>", self.LATEX_ENVIRONMENT) or ""
-    end
-    if k == "as_latex" then
-      return
-          self.latex_name
-        .. self.latex_value
-        .. self.latex_types
-        .. self.latex_comment
-        .. self.latex_short_description
-        .. self.latex_long_description
-    end
-    if k == "latex_name" then
-      local replacement = self.name
-      return replacement and ([[
-\Name{<?>}
-]]):gsub("<%?>", replacement) or ""
-      end
-    if k == "latex_types" then
-    local replacement = self.types
-    return replacement and ([[
-\Types{<?>}
-]]):gsub("<%?>", replacement) or ""
-    end
-    if k == "latex_comment" then
-      local replacement = self.comment
-      return replacement and ([[
-\Comment{<?>}
-]]):gsub("<%?>", replacement) or ""
-    end
-    if k == "latex_short_description" then
-      local replacement = self.short_description
-      return replacement and ([[
-\ShortDescription{<?>}
-]]):gsub("<%?>", replacement) or ""
-    end
-    if k == "latex_long_description" then
-      local replacement = self.long_description
-      return replacement and ([[
-\begin{LongDescription}
-<?>
-\end{LongDescription}
-]]):gsub("<%?>", replacement) or ""
-      end
-      if k == "latex_value" then
-        local replacement = self.value
-        return replacement and ([[
-\Value{<?>}
-]]):gsub("<%?>", replacement) or ""
-      end
   end,
 })
 
@@ -1888,48 +1832,6 @@ function AD.Function:__computed_index(k)
       local i = iterator()
       return i and self:get_return(i)
     end
-  end
-  if k == "as_latex" then
-    return self.latex_name
-    .. self.latex_comment
-    .. self.latex_short_description
-    .. self.latex_long_description
-    .. self.latex_params
-    .. self.vararg.as_latex_environment
-    .. self.see.as_latex_environment
-    .. self.author.as_latex_environment
-  end
-  if k == "latex_params" then
-    local t = {}
-    for param_name in self.all_param_names do
-      local p_info = self:get_param(param_name)
-      local as_latex = p_info.as_latex_environment
-      if as_latex and #as_latex>0 then
-        append(t, as_latex)
-      end
-    end
-    if #t > 0 then
-      return [[
-\begin{params}
-]]
-        .. concat(t, "")
-        .. [[
-\end{params}
-]]
-    end
-    return ""
-  end
-  if k == "latex_vararg" then
-    return k
-  end
-  if k == "latex_see" then
-    local replacement = self.see
-    return replacement and ([[
-\See{<?>}
-    ]]):gsub("<?>", replacement) or ""
-  end
-  if k == "latex_author" then
-    return k
   end
   return AD.Function.__Super.__computed_index(self, k)
 end
@@ -2116,35 +2018,6 @@ AD.Class = AD.AtProxy:make_subclass({
         return result
       end
     end
-    if k == "as_latex" then
-      return self.latex_name
-      .. self.latex_comment
-      .. self.latex_short_description
-      .. self.latex_long_description
-      .. self.latex_fields
-      .. self.see.as_latex_environment
-      .. self.author.as_latex_environment
-    end
-    if k == "latex_fields" then
-      local t = {}
-      for field_name in self.all_field_names do
-        local f_info = self:get_field(field_name)
-        local as_latex = f_info.as_latex_environment
-        if as_latex and #as_latex>0 then
-          append(t, as_latex)
-        end
-      end
-      if #t > 0 then
-        return [[
-\begin{fields}
-]]
-        .. concat(t, "")
-        .. [[
-\end{fields}
-]]
-      end
-      return ""
-    end
     return AD.Class.__Super.__computed_index(self, k)
   end,
 })
@@ -2294,27 +2167,6 @@ AD.Module = Object:make_subclass({
     end
     self:parse()
   end,
-  __computed_index = function (self, k)
-    if k == "as_latex_environment" then
-      local content = self.as_latex
-      return content and #content > 1 and
-        ([[\begin{<?>}
-]]):gsub("<%?>", self.LATEX_ENVIRONMENT)
-        .. content
-        .. ([[\end{<?>}
-]]):gsub("<%?>", self.LATEX_ENVIRONMENT) or ""
-    end
-    if k == "as_latex" then
-      return
-          self.latex_name
-        .. self.latex_comment
-        .. self.latex_short_description
-        .. self.latex_long_description
-        .. self.latex_globals
-        .. self.latex_functions
-        .. self.latex_classes
-    end
-  end
 })
 
 ---Global names iterator
@@ -2329,14 +2181,25 @@ end
 ---@function AD.Module.all_global_names
 ---@return AD.Global | nil
 function AD.Module.__computed_table:all_global_names()
-  local iterator = self.__all_infos
+  -- we create 2 iterators:
+  -- 1) for ---@global
+  -- 2) for ---@type + _G.foo = ...
+  local g_iterator = self:iterator(AD.At.Global, {
+    map = function (at)
+      return at.name
+    end,
+  })
+  local t_iterator = self:iterator(AD.At.Type, {
+    map = function (at)
+      return at.name
+    end,
+    ignore = function (at)
+      return not at.is_global
+    end,
+  })
+  -- we merge the two iterators above:
   return function ()
-    repeat
-      local at = iterator()
-      if at:is_instance_of(AD.At.Global) then
-        return at.name
-      end
-    until not at
+    return g_iterator() or t_iterator()
   end
 end
 
@@ -2572,37 +2435,6 @@ AD.Module.__computed_index = function (self, k)
       end
     })
   end
-  if k == "all_funs" then
-    local iterator = self.all_fun_names
-    return function()
-      local name = iterator()
-      if name then
-        return self:get_fun(name)
-      end
-    end
-  end
-  if k == "all_global_names" then
-    -- we create 2 iterators:
-    -- 1) for ---@global
-    -- 2) for ---@type + _G.foo = ...
-    local g_iterator = self:iterator(AD.At.Global, {
-      map = function (at)
-        return at.name
-      end,
-    })
-    local t_iterator = self:iterator(AD.At.Type, {
-      map = function (at)
-        return at.name
-      end,
-      ignore = function (at)
-        return not at.is_global
-      end,
-    })
-    -- we merge the two iterators above:
-    return function ()
-      return g_iterator() or t_iterator()
-    end
-  end
   if k == "all_globals" then
     local iterator = self.all_global_names
     return function()
@@ -2739,6 +2571,16 @@ do
     make_is_method(self) -- after guess...
   end
 end
+
+loadfile(
+  require("l3build").work_dir .."l3b/".. "l3b-autodoc+latex.lua",
+  "t",
+  setmetatable({
+    AD = AD,
+  }, {
+    __index = _G
+  })
+)()
 
 -- Export symbols to the _ENV for testing purposes
 if _ENV.during_unit_testing then

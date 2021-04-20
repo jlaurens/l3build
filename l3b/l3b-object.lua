@@ -23,8 +23,10 @@ for those people who are interested.
 --]]
 
 ---@class Object @ Root class
----@field private __computed_table  table<string,fun(self: Object): any>
 ---@field private __TYPE string
+---@field private __Class Object
+---@field private __Super Object | nil
+---@field private __computed_table  table<string,fun(self: Object): any>
 
 Object = {}
 
