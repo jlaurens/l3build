@@ -1,67 +1,12 @@
 #!/usr/bin/env texlua
-local write   = io.write
-
-function _G.pretty_print(tt, indent, done)
-  done = done or {}
-  indent = indent or 0
-  if type(tt) == "table" then
-    local w = 0
-    for k, _ in pairs(tt) do
-      local l = #tostring(k)
-      if l > w then
-        w = l
-      end
-    end
-    for k, v in pairs(tt) do
-      local filler = (" "):rep(w - #tostring(k))
-      write((" "):rep(indent)) -- indent it
-      if type(v) == "table" and not done[v] then
-        done[v] = true
-        if next(v) then
-          write(('["%s"]%s = {\n'):format(tostring(k), filler))
-          _G.pretty_print(v, indent + w + 7, done)
-          write((" "):rep( indent + w + 5)) -- indent it
-          write("}\n")
-        else
-          write(('["%s"]%s = {}\n'):format(tostring(k), filler))
-        end
-      elseif type(v) == "string" then
-        write(('["%s"]%s = "%s"\n'):format(
-            tostring(k), filler, tostring(v)))
-      else
-        write(('["%s"]%s = %s\n'):format(
-            tostring(k), filler, tostring(v)))
-      end
-    end
-  else
-    write(tostring(tt) .."\n")
-  end
-end
-
-local __ = setmetatable({
-  during_unit_testing = true,
-}, {
-  __index = _G
-})
-
-local AUTODOC_NAME = "l3b-autodoc"
-local AUTODOC_PATH = "../l3b/".. AUTODOC_NAME ..".lua"
-
-local AD = loadfile(
-  AUTODOC_PATH,
-  "t",
-  __
-)()
-
-local Xpct, LU  = dofile("./l3b-expect.lua")
-
-local expect = Xpct.expect
 
 local append  = table.insert
 
 local lpeg    = require("lpeg")
 local P       = lpeg.P
 local B       = lpeg.B
+local C       = lpeg.C
+local S       = lpeg.S
 local Cg      = lpeg.Cg
 local Ct      = lpeg.Ct
 local Cc      = lpeg.Cc
@@ -70,12 +15,34 @@ local V       = lpeg.V
 local Cp      = lpeg.Cp
 local Cmt     = lpeg.Cmt
 
----@class TestData
+local LU      = require("l3b-test/luaunit")
+local expect  = require("l3b-test/expect").expect
+
+local l3build = require("l3build")
+
+local AUTODOC_NAME = "l3b-autodoc"
+local AUTODOC_PATH = l3build.work_dir .."l3b/".. AUTODOC_NAME ..".lua"
+
+-- Next is an _ENV that will allow a module to export
+-- more symbols than usually done in order to finegrain testing
+local __ = setmetatable({
+  during_unit_testing = true,
+}, {
+  __index = _G
+})
+
+local AD = loadfile(
+  AUTODOC_PATH,
+  "t",
+  __
+)()
+
+---@class AD.TestData
 ---@field public s string   @ target
 ---@field public m AD.Info  @ match result
 ---@field public c string   @ comment
 
----@type TestData
+---@type AD.TestData
 local TestData = {
   s = "UNKNOWN STRING",
   m = { "UNKNOWN MATCH" },
@@ -403,7 +370,7 @@ DOOOOOOOOOOOOOOOOOC
   end,
   get_ALIAS = function ()
     return TestData({
-----5----0----5----0----5----0----5----0----5---|0----5
+----5----0----5----0----5----0----5----0----5---0----5
       s = [=====[
 ---   @alias  NAME TYPE@ SOME   COMMENT         
 ]=====],
@@ -422,7 +389,7 @@ DOOOOOOOOOOOOOOOOOC
   end,
   get_PARAM = function ()
     return TestData({
-----5----0----5----0----5----0----5----0----5---|0----5
+----5----0----5----0----5----0----5----0----5---0----5
       s = [[
 ---   @param NAME TYPE  |  OTHER@ COM    MENT
 ]],
@@ -506,7 +473,7 @@ DOOOOOOOOOOOOOOOOOC
   end,
   get_FUNCTION = function ()
     return TestData({
-----5----0----5----0----5----0----5---|0----5----0
+----5----0----5----0----5----0----5---0----5----0
       s = [[
 ---  @function  NAME  @ COMMENT        
 ]],
@@ -915,165 +882,6 @@ function Test:p_test(target, expected, where)
   expect(self.p:match(target, where)).is(expected)
   self:add_strip(-1)
 end
-
-_G.test_make_class = Test({
-  test_computed = function (_self)
-    
-    local Class_1 = __.make_class({
-      TYPE = "Class_1",
-      __computed = function (self, k)
-        if k == "foo_1" then
-          return "bar_1"
-        end
-      end
-    })
-    expect(Class_1.__index(nil, "foo_1")).is("bar_1")
-    expect(Class_1.__computed(nil, "foo_1")).is("bar_1")
-    local instance_1 = Class_1()
-    expect(instance_1.foo_1).is("bar_1")
-
-    local Class_2a = __.make_class(Class_1, {
-      TYPE = "Class_2a",
-      __computed = function (self, k)
-        if k == "foo_2a" then
-          return "bar_2a"
-        end
-      end
-    })
-    expect(Class_2a.__index(nil, "foo_2a")).is("bar_2a")
-    expect(Class_2a.__computed(nil, "foo_2a")).is("bar_2a")
-    local instance_2a = Class_2a()
-    expect(instance_2a.foo_2a).is("bar_2a")
-
-    local Class_2b = __.make_class(Class_1, {
-      TYPE = "Class_2b",
-      __computed = function (self, k)
-        if k == "foo_2b" then
-          return "bar_2b"
-        end
-        return Class_1.__computed(self, k) -- inherits all computed properties
-      end
-    })
-    local instance_2b = Class_2b()
-    expect(instance_2b.foo_2b).is("bar_2b")
-
-    expect(instance_2b.foo_1).is("bar_1")
-
-    local Class_2c = __.make_class(Class_1, {
-      TYPE = "Class_2c",
-    })
-    local instance_2c = Class_2c()
-    expect(instance_2c.foo_1).is("bar_1")
-
-  end,
-
-  test_base = function (self)
-    -- make a class hierarchy
-    local Class_1  = __.make_class()
-    expect(Class_1.__Super).is(nil)
-    local Class_2  = __.make_class(Class_1)
-    expect(Class_2.__Super).is(Class_1)
-    local Class_3  = __.make_class(Class_2)
-    expect(Class_3.__Super).is(Class_2)
-    -- make instances
-    local instance_1 = Class_1()
-    expect(instance_1.__Class).is(Class_1)
-    local instance_2 = Class_2()
-    expect(instance_2.__Class).is(Class_2)
-    local instance_3 = Class_3()
-    expect(instance_3.__Class).is(Class_3)
-
-    expect(Class_1.foo).is(nil)
-    expect(instance_1.foo).is(nil)
-    expect(Class_2.foo).is(nil)
-    expect(instance_2.foo).is(nil)
-    expect(Class_3.foo).is(nil)
-    expect(instance_3.foo).is(nil)
-
-    Class_1.foo = "bar"
-
-    expect(Class_1.foo).is("bar")
-    expect(instance_1.foo).is("bar")
-    expect(Class_2.foo).is("bar")
-    expect(instance_2.foo).is("bar")
-    expect(Class_3.foo).is("bar")
-    expect(instance_3.foo).is("bar")
-
-    Class_1.foo = nil
-
-    expect(Class_1.foo    ).is(nil)
-    expect(instance_1.foo ).is(nil)
-    expect(Class_2.foo    ).is(nil)
-    expect(instance_2.foo ).is(nil)
-    expect(Class_3.foo    ).is(nil)
-    expect(instance_3.foo ).is(nil)
-
-    Class_2.foo = "bar"
-
-    expect(Class_1.foo    ).is(nil)
-    expect(instance_1.foo ).is(nil)
-    expect(Class_2.foo    ).is("bar")
-    expect(instance_2.foo ).is("bar")
-    expect(Class_3.foo    ).is("bar")
-    expect(instance_3.foo ).is("bar")
-
-    Class_2.foo = nil
-
-    expect(Class_1.foo    ).is(nil)
-    expect(instance_1.foo ).is(nil)
-    expect(Class_2.foo    ).is(nil)
-    expect(instance_2.foo ).is(nil)
-    expect(Class_3.foo    ).is(nil)
-    expect(instance_3.foo ).is(nil)
-
-    Class_3.foo = "bar"
-
-    expect(Class_1.foo    ).is(nil)
-    expect(instance_1.foo ).is(nil)
-    expect(Class_2.foo    ).is(nil)
-    expect(instance_2.foo ).is(nil)
-    expect(Class_3.foo    ).is("bar")
-    expect(instance_3.foo ).is("bar")
-
-    Class_3.foo = nil
-
-    expect(Class_1.foo    ).is(nil)
-    expect(instance_1.foo ).is(nil)
-    expect(Class_2.foo    ).is(nil)
-    expect(instance_2.foo ).is(nil)
-    expect(Class_3.foo    ).is(nil)
-    expect(instance_3.foo ).is(nil)
-
-  end,
-
-  test_data = function (_self)
-    local Class  = __.make_class({
-      foo = "bar",
-    })
-    local instance = Class()
-    expect(instance.foo).is("bar")
-  end,
-
-  test_initialize = function (_self)
-    local Class  = __.make_class({
-      initialize = function (self)
-        self.foo = "bar"
-      end
-    })
-    local instance = Class()
-    expect(instance.foo).is("bar")
-  end,
-
-  test_initialize_param = function (_self)
-    local Class  = __.make_class({
-      initialize = function (self, x)
-        self.foo = x
-      end
-    })
-    local instance = Class({}, "bar")
-    expect(instance.foo).is("bar")
-  end,
-})
 
 _G.test_POC = Test({
   test_Ct = function ()
@@ -2139,7 +1947,7 @@ s = [=====[
       types       = { "TYPE", "OTHER_TYPE" },
     }) )
 
-    ----5----0----5----0----5----0----5----0----5----|
+    ----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@alias     NAME TYPE @ SOME   COMMENT]=====]
     t = self.p:match(s)
@@ -2153,7 +1961,7 @@ s = [=====[
     }) )
     expect(t:get_comment(s)).is("SOME   COMMENT")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@alias     NAME TYPE @ SOME   COMMENT         
     SUITE                                        ]=====]
@@ -2191,7 +1999,7 @@ _G.test_At_Param = Test({
   end,
   test = function (self)
     local s, t
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@param NAME TYPE]=====]
     ---@type AD.At.Param
@@ -2207,7 +2015,7 @@ _G.test_At_Param = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@param NAME ? TYPE]=====]
     ---@type AD.At.Param
@@ -2223,7 +2031,7 @@ _G.test_At_Param = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@param NAME TYPE
 ]=====]
@@ -2240,7 +2048,7 @@ _G.test_At_Param = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
 s = [=====[
 ---@param NAME ? TYPE
 ]=====]
@@ -2257,7 +2065,7 @@ s = [=====[
   }) )
   expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@param NAME TYPE  |  OTHER
 ]=====]
@@ -2274,7 +2082,7 @@ s = [=====[
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@param NAME TYPE  |  OTHER@  COMMENT
 ]=====]
@@ -2316,7 +2124,7 @@ _G.test_At_Return = Test({
   end,
   test = function (self)
     local s, t
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---   @return TYPE   |  OTHER @ COMMENT
 ]=====]
@@ -2329,7 +2137,7 @@ _G.test_At_Return = Test({
       types       = { "TYPE", "OTHER" },
     })
     expect(t:get_comment(s)).is("COMMENT")
-----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---   @return TYPE? @ COMMENT
 ]=====]
@@ -2422,7 +2230,7 @@ _G.test_At_Generic = Test({
     expect(t.type_2).is.equal.to("T2")
     expect(t.parent_2).is("PARENT_TYPE")
 
-    ----5----0----5----0----5----0----5----0----5----0----5----|
+    ----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@generic   T1 : PARENT_TYPE, T2 : PARENT_TYPE @  COMMENT
 ]=====]
@@ -2458,7 +2266,7 @@ _G.test_At_Vararg = Test({
   end,
   test = function (self)
     local s, t
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@vararg    TYPE_
 ]=====]
@@ -2473,7 +2281,7 @@ _G.test_At_Vararg = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@vararg    TYPE_|TYPE
 ]=====]
@@ -2488,7 +2296,7 @@ _G.test_At_Vararg = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---@vararg    TYPE_|TYPE@CMT_
 ]=====]
@@ -2526,7 +2334,7 @@ _G.test_At_Module = Test({
   end,
   test = function (self)
     local s, t
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---   @module name_
 ]=====]
@@ -2541,7 +2349,7 @@ _G.test_At_Module = Test({
     }) )
     expect(t:get_comment(s)).is("")
 
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---   @module name_ @ COMMENT
 ]=====]
@@ -2562,7 +2370,7 @@ _G.test_At_Module = Test({
   test_complete = function (self)
     self:do_test_complete("Module")
 
-----5----0----5----0----5----0----5----0----5----0----5----|
+----5----0----5----0----5----0----5----0----5----0----5----
   local s = [=====[
 ---@module my_module
 ---@author my_pseudo
@@ -2733,7 +2541,7 @@ _G.test_At_Global = Test({
       name = "name_",
     })
 
----5----0----5----0----5----0----5----0----5----0----5----|
+---5----0----5----0----5----0----5----0----5----0----5----
     s = [=====[
 ---  @global  name_ @ COMMENT
 ]=====]
@@ -2744,6 +2552,20 @@ _G.test_At_Global = Test({
       name = "name_",
     })
     expect(t:get_comment(s)).is("COMMENT")
+----5----0----5----0----5----0----5----0----5----0----5----
+    s = [=====[
+---   @global NAME TYPE @ CMT
+]=====]
+    t = self.p:match(s)
+    expect(t).contains({
+      min = 1,
+      content_min = 27,
+      content_max = 29,
+      max = 30,
+      name = "NAME",
+      types = { "TYPE" }
+    })
+    expect(t:get_comment(s)).is("CMT")
   end,
   test_TD = function (self)
     self:do_test_TD("Global")
@@ -2917,19 +2739,18 @@ _G.test_autodoc_Module = Test({
       expect(info.name).is(name)
     end
   end,
-  test_all_function_names = function (self)
+  test_all_fun_names = function (self)
     local module = self.module
-    for name in module.all_function_names do
-      local info = module:get_function(name)
+    for name in module.all_fun_names do
+      local info = module:get_fun(name)
       expect(info.name).is(name)
     end
   end,
   test_function_param_names = function (self)
-    print()
     local module = self.module
-    for function_name in module.all_function_names do
+    for function_name in module.all_fun_names do
       ---@type AD.Function
-      local info = module:get_function(function_name)
+      local info = module:get_fun(function_name)
       for param_name in info.all_param_names do
         local param = info:get_param(param_name)
         expect(param.name).is(param_name)
@@ -2988,7 +2809,7 @@ whatever
     expect(iterator()).is("NAME_3")
     expect(iterator()).is(nil)
   end,
-  test_all_function_names = function (self)
+  test_all_fun_names = function (self)
 ----5----0----5----0
     local s = [[
 ---@function NAME_1
@@ -3004,7 +2825,7 @@ local NAME_5 = function ()
 PKG.NAME_6 = function ()
 ]]
     self:prepare(s)
-    local iterator = self.module.all_function_names
+    local iterator = self.module.all_fun_names
     expect(iterator()).is("NAME_1")
     expect(iterator()).is("NAME_2")
     expect(iterator()).is("NAME_3")
@@ -3036,9 +2857,9 @@ PKG.NAME_6 = function ()
     expect(type.long_description)
       .is("TYPE:    LONG  DESCRIPTION")
     expect(type.types)
-      .contains({ "TYPE" })
+      .is("TYPE")
     expect(g_info.types)
-      .contains({ "TYPE" })
+      .is("TYPE")
 ----5----0----5----0----5---30
     s = [[
 ---TYPE:    SHORT DESCRIPTION
@@ -3071,44 +2892,44 @@ _G.foo = bar
     expect(c_info.__fields).contains({})
     local field_1 = c_info:get_field("FIELD_1")
     expect(field_1).is.NOT(nil)
-    -- expect(field_1.comment)
-    --   .is("FIELD_1: CMT")
-    -- expect(field_1.short_description)
-    --   .is("FIELD_1: SHORT DESCRIPTION")
-    -- expect(field_1.long_description )
-    --   .is("FIELD_1: LONG  DESCRIPTION")
-    -- expect(field_1.types)
-    --   .contains({ "TYPE_1" })
-    -- expect(field_1.visibility)
-    --   .is("protected")
-    -- local field_2 = c_info:get_field("FIELD_2")
-    -- expect(field_2).is.NOT(nil)
-    -- expect(field_2.comment)
-    --   .is("FIELD_2: CMT")
-    -- expect(field_2.short_description)
-    --   .is("FIELD_2: SHORT DESCRIPTION")
-    -- expect(field_2.long_description )
-    --   .is("FIELD_2: LONG  DESCRIPTION")
-    -- expect(field_2.types)
-    --   .contains({ "TYPE_2" })
-    -- expect(field_2.visibility)
-    --   .is("protected")
-    --   local author = c_info.author
-    --   expect(author).is.NOT(nil)
-    --   expect(author.value)
-    --     .is("PSEUDO IDENTIFIER")
-    --   expect(author.short_description)
-    --     .is("AUTHOR:  SHORT DESCRIPTION")
-    --   expect(author.long_description )
-    --     .is("AUTHOR:  LONG  DESCRIPTION")
-    --   local see = c_info.see
-    --   expect(see).is.NOT(nil)
-    --   expect(see.value)
-    --     .is("VARIOUS REFERENCES")
-    --   expect(see.short_description)
-    --     .is("SEE:     SHORT DESCRIPTION")
-    --   expect(see.long_description )
-    --     .is("SEE:     LONG  DESCRIPTION")
+    expect(field_1.comment)
+      .is("FIELD_1: CMT")
+    expect(field_1.short_description)
+      .is("FIELD_1: SHORT DESCRIPTION")
+    expect(field_1.long_description )
+      .is("FIELD_1: LONG  DESCRIPTION")
+    expect(field_1.types)
+      .is("TYPE_1")
+    expect(field_1.visibility)
+      .is("protected")
+    local field_2 = c_info:get_field("FIELD_2")
+    expect(field_2).is.NOT(nil)
+    expect(field_2.comment)
+      .is("FIELD_2: CMT")
+    expect(field_2.short_description)
+      .is("FIELD_2: SHORT DESCRIPTION")
+    expect(field_2.long_description )
+      .is("FIELD_2: LONG  DESCRIPTION")
+    expect(field_2.types)
+      .is("TYPE_2")
+    expect(field_2.visibility)
+      .is("protected")
+      local author = c_info.author
+      expect(author).is.NOT(nil)
+      expect(author.value)
+        .is("PSEUDO IDENTIFIER")
+      expect(author.short_description)
+        .is("AUTHOR:  SHORT DESCRIPTION")
+      expect(author.long_description )
+        .is("AUTHOR:  LONG  DESCRIPTION")
+      local see = c_info.see
+      expect(see).is.NOT(nil)
+      expect(see.value)
+        .is("VARIOUS REFERENCES")
+      expect(see.short_description)
+        .is("SEE:     SHORT DESCRIPTION")
+      expect(see.long_description )
+        .is("SEE:     LONG  DESCRIPTION")
   end,
   test_Class_field_names = function (self)
     local s = [[
@@ -3129,10 +2950,10 @@ _G.foo = bar
     local TD = self.get_FUNCTION_COMPLETE()
     local s = TD.s
     self:prepare(s)
-    local f_info = self.module:get_function("NAME")
+    local f_info = self.module:get_fun("NAME")
     expect(f_info).is.NOT(nil)
     expect(f_info.__Class).is(AD.Function)
-    expect(f_info._params).contains({})
+    expect(f_info.__params).contains({})
     local param_1 = f_info:get_param("PARAM_1")
     expect(param_1).is.NOT(nil)
     expect(param_1.comment)
@@ -3142,7 +2963,7 @@ _G.foo = bar
     expect(param_1.long_description )
       .is("PARAM_1: LONG  DESCRIPTION")
     expect(param_1.types)
-      .contains({ "string" })
+      .is("string")
     local param_2 = f_info:get_param("PARAM_2")
     expect(param_2).is.NOT(nil)
     expect(param_2.comment)
@@ -3151,7 +2972,8 @@ _G.foo = bar
       .is("PARAM_2: SHORT DESCRIPTION")
     expect(param_2.long_description )
       .is("PARAM_2: LONG  DESCRIPTION")
-    expect(param_2.types).contains({ "string" })
+    expect(param_2.types)
+      .is("string")
     local vararg = f_info.vararg
     expect(vararg).NOT(nil)
     expect(vararg.comment)
@@ -3160,7 +2982,8 @@ _G.foo = bar
       .is("VARARG:  SHORT DESCRIPTION")
     expect(vararg.long_description )
       .is("VARARG:  LONG  DESCRIPTION")
-    expect(vararg.types).contains({ "string" })
+    expect(vararg.types)
+      .is("string")
     local return_1 = f_info:get_return(1)
     expect(return_1).is.NOT(nil)
     expect(return_1.comment)
@@ -3170,7 +2993,7 @@ _G.foo = bar
     expect(return_1.long_description )
       .is("RETURN_1: LONG DESCRIPTION")
     expect(return_1.types)
-    .contains({ "string" })
+      .is("string")
     local return_2 = f_info:get_return(2)
     expect(return_2).is.NOT(nil)
     expect(return_2.comment)
@@ -3180,7 +3003,7 @@ _G.foo = bar
     expect(return_2.long_description )
       .is("RETURN_2: LONG DESCRIPTION")
     expect(return_2.types)
-      .contains({ "boolean" })
+      .is( "boolean" )
   end,
 })
 
@@ -3189,6 +3012,22 @@ _G.test_Module_2 = Test({
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
       contents = str
+    })
+  end,
+  test_CLASS_BASE_p = function (self)
+    local p = AD.Method.CLASS_BASE_p
+    expect(p:match("a")).is(nil)
+    expect(p:match("a.b")).contains({
+      class = "a",
+      base  = "b",
+    })
+    expect(p:match("a.b.c")).contains({
+      class = "a.b",
+      base  = "c",
+    })
+    expect(p:match("a.b:c")).contains({
+      class = "a.b",
+      base  = "c",
     })
   end,
   test_method = function (self)
@@ -3216,6 +3055,7 @@ _G.test_Module_2 = Test({
     expect(m_info).Class.is(AD.Method)
     expect(m_info.name).is("CLASS.NAME_1.METHOD_1")
     expect(m_info.base_name).is("METHOD_1")
+    expect(m_info.class_name).is("CLASS.NAME_1")
     expect(m_info.class).is(c_info)
     c_info = self.module:get_class("CLASS.NAME_2")
     iterator = c_info.all_method_names
@@ -3230,4 +3070,161 @@ _G.test_Module_2 = Test({
   end,
 })
 
-os.exit( LU.LuaUnit.run() )
+_G.test_latex = Test({
+  prepare = function (self, str)
+    self.module = AD.Module({
+      file_path = AUTODOC_PATH,
+      contents = str
+    })
+  end,
+  test_Global = function (self)
+    local s = [[
+---GLOBAL: SHORT DESCRIPTION
+---GLOBAL: LONG  DESCRIPTION
+---@global GLOBAL @ GLOBAL: COMMENT
+---TYPE: SHORT DESCRIPTION
+---TYPE: LONG  DESCRIPTION
+---@type TYPE @ TYPE: COMMENT
+]]
+    local expected = [[
+\begin{global}
+\Name{GLOBAL}
+\Types{TYPE}
+\Comment{GLOBAL: COMMENT}
+\ShortDescription{GLOBAL: SHORT DESCRIPTION}
+\begin{LongDescription}
+GLOBAL: LONG  DESCRIPTION
+\end{LongDescription}
+\end{global}
+]]
+
+    self:prepare(s)
+    local g_info = self.module:get_global("GLOBAL")
+    local as_latex_environment = g_info.as_latex_environment
+    expect(as_latex_environment).NOT(nil)
+    expect(as_latex_environment).is(expected)
+
+    s = [[
+---FUNCTION: SHORT DESCRIPTION
+---FUNCTION: LONG  DESCRIPTION
+---@function FUNCTION
+---PARAM: SHORT DESCRIPTION
+---PARAM: LONG  DESCRIPTION
+---@param PARAM PARAM_TYPE @ PARAM: COMMENT
+---VARARG: SHORT DESCRIPTION
+---VARARG: LONG  DESCRIPTION
+---@vararg VARARG_TYPE @ VARARG: COMMENT
+---RETURN: SHORT DESCRIPTION
+---RETURN: LONG  DESCRIPTION
+---@return RETURN_TYPE @ RETURN: COMMENT
+---SEE: SHORT DESCRIPTION
+---SEE: LONG  DESCRIPTION
+---@see SEE
+---AUTHOR: SHORT DESCRIPTION
+---AUTHOR: LONG  DESCRIPTION
+---@author AUTHOR
+]]
+    expected = [[
+\begin{function}
+\Name{FUNCTION}
+\ShortDescription{FUNCTION: SHORT DESCRIPTION}
+\begin{LongDescription}
+FUNCTION: LONG  DESCRIPTION
+\end{LongDescription}
+\begin{params}
+\begin{param}
+\Name{PARAM}
+\Types{PARAM_TYPE}
+\Comment{PARAM: COMMENT}
+\ShortDescription{PARAM: SHORT DESCRIPTION}
+\begin{LongDescription}
+PARAM: LONG  DESCRIPTION
+\end{LongDescription}
+\end{param}
+\end{params}
+\begin{vararg}
+\Types{VARARG_TYPE}
+\Comment{VARARG: COMMENT}
+\ShortDescription{VARARG: SHORT DESCRIPTION}
+\begin{LongDescription}
+VARARG: LONG  DESCRIPTION
+\end{LongDescription}
+\end{vararg}
+\begin{see}
+\Value{SEE}
+\ShortDescription{SEE: SHORT DESCRIPTION}
+\begin{LongDescription}
+SEE: LONG  DESCRIPTION
+\end{LongDescription}
+\end{see}
+\begin{author}
+\Value{AUTHOR}
+\ShortDescription{AUTHOR: SHORT DESCRIPTION}
+\begin{LongDescription}
+AUTHOR: LONG  DESCRIPTION
+\end{LongDescription}
+\end{author}
+\end{function}
+]]
+    self:prepare(s)
+    local f_info = self.module:get_fun("FUNCTION")
+    as_latex_environment = f_info.as_latex_environment
+    expect(as_latex_environment).NOT(nil)
+    expect(as_latex_environment).is(expected)
+
+    s = [[
+---CLASS: SHORT DESCRIPTION
+---CLASS: LONG  DESCRIPTION
+---@class CLASS @ CLASS CMT
+---FIELD: SHORT DESCRIPTION
+---FIELD: LONG  DESCRIPTION
+---@field public FIELD TYPE @ FIELD CMT
+---SEE: SHORT DESCRIPTION
+---SEE: LONG  DESCRIPTION
+---@see SEE
+---AUTHOR: SHORT DESCRIPTION
+---AUTHOR: LONG  DESCRIPTION
+---@author AUTHOR
+]]
+    expected = [[
+\begin{class}
+\Name{CLASS}
+\Comment{CLASS CMT}
+\ShortDescription{CLASS: SHORT DESCRIPTION}
+\begin{LongDescription}
+CLASS: LONG  DESCRIPTION
+\end{LongDescription}
+\begin{fields}
+\begin{field}
+\Name{FIELD}
+\Types{TYPE}
+\Comment{FIELD CMT}
+\ShortDescription{FIELD: SHORT DESCRIPTION}
+\begin{LongDescription}
+FIELD: LONG  DESCRIPTION
+\end{LongDescription}
+\end{field}
+\end{fields}
+\begin{see}
+\Value{SEE}
+\ShortDescription{SEE: SHORT DESCRIPTION}
+\begin{LongDescription}
+SEE: LONG  DESCRIPTION
+\end{LongDescription}
+\end{see}
+\begin{author}
+\Value{AUTHOR}
+\ShortDescription{AUTHOR: SHORT DESCRIPTION}
+\begin{LongDescription}
+AUTHOR: LONG  DESCRIPTION
+\end{LongDescription}
+\end{author}
+\end{class}
+]]
+    self:prepare(s)
+    local c_info = self.module:get_class("CLASS")
+    as_latex_environment = c_info.as_latex_environment
+    expect(as_latex_environment).NOT(nil)
+    expect(as_latex_environment).is(expected)
+  end
+})

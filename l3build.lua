@@ -260,7 +260,12 @@ do
     local name = pkg_name:match("^l3b%-.*")
     if name then -- an l3b library package
       package.loaded[pkg_name] = true
-      local path = launch_dir .."l3b/".. name
+      local path
+      if pkg_name:match("/") then
+        path = launch_dir .. name
+      else
+        path = launch_dir .."l3b/".. name
+      end
       if debug_require then
         print("path ".. path)
       end
@@ -287,6 +292,14 @@ do
 end
 
 --[==[ end of booting process ]==]
+
+--[==[ Special actions ]==]
+
+if arg[1] == "test" then
+  return require("l3build-test").run()
+end
+
+--[==[ Branching ]==]
 
 ---@type utlib_t
 -- local utlib = require("l3b-utillib")

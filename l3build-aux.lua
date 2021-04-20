@@ -159,7 +159,7 @@ local function load_unique_config(options, configs)
   if config_1 == "build" then
     return
   end
-  config_1 = config_1:gsub( ".lua$", "") .. ".lua"
+  config_1 = config_1:gsub( "%.lua$", "") .. ".lua"
   local config_path = l3build.work_dir .. config_1
   if not file_exists(config_path) then
     config_path = l3build.work_dir .. "config-".. config_1

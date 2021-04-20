@@ -1,6 +1,7 @@
 #!/usr/bin/env texlua
 
-local LU = dofile("./luaunit.lua")
+local LU = require("luaunit")
+
 LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE = 1
 
 local Expect = {
@@ -153,5 +154,5 @@ function Expect.__call(self, expected, options)
 end
 
 return {
-  expect  = expect,
-}, LU
+  expect = expect
+}
