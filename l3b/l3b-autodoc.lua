@@ -156,23 +156,11 @@ We keep track of the parser position in named captures.
 
 --]]
 
----Get the line number for the given string
----Should cache intermediate results.
----Should be defined globally.
----@param str   string
----@param index integer
----@return integer
-local function get_line_number(str, index)
-  local result = 1
-  for j = 1, index do
-    if str:sub(j, j) == "\n" then
-      result = result + 1
-    end
-  end
-  return result
-end
+---@type corelib_t
+local corelib = require("l3b-corelib")
 
-local PTRN = require("l3b-autodoc_pattern")
+---@type lpeg_autodoc_t
+local lpad = require("l3b-lpeg-autodoc")
 
 ---Records info about code chunks.
 ---The source is splitted into contiguous code chunks.
@@ -182,8 +170,8 @@ local PTRN = require("l3b-autodoc_pattern")
 ---@field public id             string
 ---@field public min            integer
 ---@field public max            integer
----@field public get_core_p     fun(self: AD.Info): lpeg.Pattern
----@field public get_capture_p  fun(self: AD.Info): lpeg.Pattern
+---@field public get_core_p     fun(self: AD.Info): lpeg_t
+---@field public get_capture_p  fun(self: AD.Info): lpeg_t
 ---@field public code_before    AD.Info
 ---@field public mask_contents  fun(self: AD.Info, t: string[])
 ---@field public is_instance_of fun(self: AD.Info, Class: AD.Info): boolean
@@ -200,7 +188,7 @@ AD.Info = Object:make_subclass("AD.Info", {
 ---Default implementation raises a error.
 ---Must be overriden by subclassers.
 ---@param self AD.Info
----@return lpeg.Pattern
+---@return lpeg_t
 function AD.Info:get_core_p()
   error("Missing AD.Info:get_core_p implementation for ".. self.TYPE)
 end
@@ -209,7 +197,7 @@ end
 ---The default implementation just forwards to the receiver's
 ---`get_core_p`
 ---@param self AD.Info
----@return lpeg.Pattern
+---@return lpeg_t
 function AD.Info:get_capture_p()
   return self:get_core_p()
 end
@@ -264,7 +252,7 @@ AD.Content = AD.Info:make_subclass("AD.Content", {
 ---The default implementation fires an error.
 ---@param self AD.Content
 function AD.Content:get_core_p()
-   return PTRN.content
+   return lpad.content
 end
 
 -- One line inline comments
@@ -275,7 +263,7 @@ end
 AD.LineComment = AD.Content:make_subclass("AD.LineComment", {
   get_capture_p = function (self)
     return
-        PTRN.line_comment
+        lpad.line_comment
       / function (t)
           return AD.LineComment(t)
         end
@@ -289,7 +277,7 @@ AD.LineComment = AD.Content:make_subclass("AD.LineComment", {
 AD.LineDoc = AD.Content:make_subclass("AD.LineDoc", {
   get_capture_p = function (self)
     return
-        PTRN.line_doc
+        lpad.line_doc
       / function (t)
           return AD.LineDoc(t)
         end
@@ -302,7 +290,7 @@ AD.LineDoc = AD.Content:make_subclass("AD.LineDoc", {
 AD.ShortLiteral = AD.Content:make_subclass("AD.ShortLiteral", {
   get_capture_p = function (self)
     return
-        PTRN.short_literal
+        lpad.short_literal
       / function (t)
           return AD.ShortLiteral(t)
         end
@@ -317,7 +305,7 @@ AD.LongLiteral = AD.Content:make_subclass("AD.LongLiteral", {
   level = 0,
   get_capture_p = function (self)
     return
-        PTRN.long_literal
+        lpad.long_literal
       / function (t)
           return AD.LongLiteral(t)
         end
@@ -332,7 +320,7 @@ AD.LongComment = AD.Content:make_subclass("AD.LongComment", {
   level = 0,
   get_capture_p = function (self)
     return
-        PTRN.long_comment
+        lpad.long_comment
       / function (t)
           return AD.LongComment(t)
         end
@@ -346,7 +334,7 @@ AD.LongDoc = AD.Content:make_subclass("AD.LongDoc", {
   level = 0,
   get_capture_p = function (self)
     return
-          PTRN.long_doc
+          lpad.long_doc
         / function (t)
             return AD.LongDoc(t)
           end
@@ -439,7 +427,7 @@ end
 ---@field public description            AD.Description
 ---@field public is_annotation          boolean                             @ true
 ---@field public KEY                    string                              @ static  KEY, the "foo" in ---@foo
----@field public get_complete_p         fun(self: AD.At): lpeg.Pattern      @ complete pattern, see `finalize`.
+---@field public get_complete_p         fun(self: AD.At): lpeg_t      @ complete pattern, see `finalize`.
 ---@field public get_short_description  fun(self: AD.At, s: string): string @ redundant declaration, for editors
 ---@field public get_long_description   fun(self: AD.At, s: string): string @ redundant declaration for editors
 ---@field public get_comment            fun(self: AD.Content, s: string): string @ the substring of the argument corresponding to the comment
@@ -456,6 +444,18 @@ AD.At = AD.Content:make_subclass("AD.At", {
   __initialize = function (self)
     self.ignores = self.ignores or {}
   end,
+  get_capture_p = function (self)
+    return lpad.get_annotation(self.key, lpad["core_".. self.key])
+  end,
+  __computed_index = function (self, k)
+    if k == "key" then
+      ---@type string
+      local result = self.__TYPE:l3b_base_extension().extension
+      self[k] = result:lower()
+      return result
+    end
+    return AD.At.__Super.__computed_index(self, k)
+  end,
 })
 
 ---Pattern to capture an annotation
@@ -468,10 +468,10 @@ AD.At = AD.Content:make_subclass("AD.At", {
 ---On success, this pattern returns one capture exactly
 ---which is an instance of itself.
 ---@param self AD.At @ self is a "subclass" of AD.At
----@return lpeg.Pattern
+---@return lpeg_t
 function AD.At:get_capture_p()
   return
-      PTRN.get_annotation(self.KEY, self:get_core_p())
+      lpad.get_annotation(self.KEY, self:get_core_p())
     / function (at)
         return self(at)
       end
@@ -488,7 +488,7 @@ local capture_ignores_p = Ct(
 ---The default pattern tries to match one `AD.Description`
 ---if any, and then it tries to match an annotation.
 ---@param self AD.At
----@return lpeg.Pattern
+---@return lpeg_t
 function AD.At:get_complete_p()
   return
     ( AD.Description:get_capture_p() + Cc(false) )
@@ -548,8 +548,8 @@ AD.At.Field = AD.At:make_subclass("AD.At.Field", {
     self.types = self.types or {}
   end,
   -- @field [public|protected|private] field_name FIELD_TYPE[|OTHER_TYPE] [@comment]
-  get_core_p = function (self)
-    return PTRN.core_field
+  get_capture_p = function (self)
+    return lpad.field
   end,
 })
 
@@ -579,8 +579,8 @@ do
     __initialize = function (self)
       self.fields = self.fields  or {}
     end,
-    get_core_p = function (_self)
-      return PTRN.core_class
+    get_capture_p = function (_self)
+      return lpad.class
     end,
     -- class annotation needs a custom complete method
     get_complete_p = function (self)
@@ -635,12 +635,8 @@ end
 
 ---@type AD.At.Type
 AD.At.Type = AD.At:make_subclass("AD.At.Type", {
-  KEY   = "type",
   types = { "UNKNOWN TYPE NAME" },
   is_global = false,
-  get_core_p = function (self)
-    return PTRN.core_type
-  end,
 })
 
 -- @alias NEW_TYPE TYPE [@ comment]
@@ -650,12 +646,8 @@ AD.At.Type = AD.At:make_subclass("AD.At.Type", {
 
 ---@type AD.At.Alias
 AD.At.Alias = AD.At:make_subclass("AD.At.Alias", {
-  KEY   = "alias",
   name  = "UNKNOWN ALIAS NAME",
   types = { "UNKNOWN TYPE NAME" },
-  get_core_p = function (self)
-    return PTRN.core_alias
-  end,
 })
 
 -- @return MY_TYPE[|OTHER_TYPE] [?] [@comment]
@@ -664,11 +656,7 @@ AD.At.Alias = AD.At:make_subclass("AD.At.Alias", {
 
 ---@type AD.At.Return
 AD.At.Return = AD.At:make_subclass("AD.At.Return", {
-  KEY   = "return",
   types = { "UNKNOWN TYPE NAME" },
-  get_core_p = function (self)
-    return PTRN.core_return
-  end,
 })
 
 -- @generic T1 [: PARENT_TYPE] [, T2 [: PARENT_TYPE]] [ @ comment ]
@@ -683,7 +671,7 @@ AD.At.Generic = AD.At:make_subclass("AD.At.Generic", {
   KEY     = "generic",
   type_1  = "UNKNOWN TYPE NAME",
   get_core_p = function (self)
-    return PTRN.core_generic
+    return lpad.core_generic
   end,
 })
 
@@ -700,7 +688,7 @@ AD.At.Param = AD.At:make_subclass("AD.At.Param", {
   optional  = false,
   types     = { "UNKNOWN TYPE NAME" },
   get_core_p = function ()
-    return PTRN.core_param
+    return lpad.core_param
   end,
 })
 
@@ -713,7 +701,7 @@ AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
   KEY   = "vararg",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
-    return PTRN.core_vararg
+    return lpad.core_vararg
   end,
 })
 
@@ -728,7 +716,7 @@ AD.At.Module = AD.At:make_subclass("AD.At.Module", {
   KEY     = "module",
   name    = "UNKNOWN MODULE NAME",
   get_core_p = function(self)
-    return PTRN.core_module
+    return lpad.core_module
   end,
 })
 
@@ -775,7 +763,7 @@ AD.At.Global = AD.At:make_subclass("AD.At.Global", {
   KEY   = "global",
   name  = "UNKNOWN GLOBALE NAME",
   get_core_p = function (self)
-    return PTRN.core_global
+    return lpad.core_global
   end,
 })
 
@@ -822,10 +810,10 @@ end
 ---@field public returns  AD.At.Return[]  @ parameters of the function
 ---@field public author   AD.At.Author
 ---@field public see      AD.At.See       @ reference
----@field public GUESS_p  lpeg.Pattern
+---@field public GUESS_p  lpeg_t
 do
   local tag_at = {} -- unique capture tag
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local start_with_param_p =
       AD.At.Param:get_capture_p() -- when no ---@function was given
     / function (at_param)
@@ -836,7 +824,7 @@ do
           }
         })
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local more_param_p =
       AD.At.Param:get_complete_p()
     * Cb(tag_at)
@@ -847,7 +835,7 @@ do
         -- either named or not
       end
 
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local start_with_vararg_p =
     AD.At.Vararg:get_capture_p()
     / function (at_vararg)
@@ -856,14 +844,14 @@ do
           vararg  = at_vararg
         })
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local more_vararg_p =
       AD.At.Vararg:get_complete_p()
     * Cb(tag_at)
     / function (at_vararg, at)
         at.vararg = at_vararg
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local start_with_generic_p =
     AD.At.Generic:get_capture_p() -- when no ---@function was given
     / function (at_generic)
@@ -872,14 +860,14 @@ do
           generic = at_generic,
         })
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local more_generic_p =
       AD.At.Generic:get_complete_p()
     * Cb(tag_at)
     / function (at_generic, at)
         at.generic = at_generic
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local start_with_return_p =
     AD.At.Return:get_capture_p() -- when no ---@function was given
     / function (at_return)
@@ -890,28 +878,28 @@ do
           }
         })
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local more_return_p =
       AD.At.Return:get_complete_p()
     * Cb(tag_at)
     / function (at_return, at)
         append(at.returns, at_return)
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local more_ignore_p =
     ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
     * Cb(tag_at)
     / function (at_ignore, at)
         append(at.ignores, at_ignore)
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local author_p =
       AD.At.Author:get_complete_p()
     * Cb(tag_at)
     / function (at_author, at)
         at.author = at_author
       end
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local see_p =
       AD.At.See:get_complete_p()
     * Cb(tag_at)
@@ -928,8 +916,8 @@ do
     end,
     get_core_p = function (self)
       return
-          Cg(PTRN.identifier, "name")  -- capture the name
-        * PTRN.capture_comment
+          Cg(lpad.identifier, "name")  -- capture the name
+        * lpad.capture_comment
     end,
     get_complete_p = function (self)
       -- capture a description
@@ -974,7 +962,7 @@ do
           end
     end,
     -- pattern to guess the name of the documented function
-    GUESS_p = PTRN.guess_function_name,
+    GUESS_p = lpad.guess_function_name,
   }
 )
 end
@@ -991,7 +979,7 @@ AD.Code = AD.Info:make_subclass("AD.Code")
 AD.Break = AD.Info:make_subclass("AD.Break", {
   get_capture_p = function (self)
     return
-        PTRN.paragraph_break
+        lpad.paragraph_break
       / function (t)
           return AD.Break(t)  -- 2) an instance with that table
         end
@@ -1003,7 +991,7 @@ AD.Break = AD.Info:make_subclass("AD.Break", {
 
 do
   -- We capture the current begin of line position with name "bol"
-  ---@type lpeg.Pattern
+  ---@type lpeg_t
   local loop_p =
     ( AD.LineComment:get_capture_p()
     + AD.LongComment:get_capture_p()
@@ -1024,12 +1012,12 @@ do
     + AD.At.Field:get_capture_p()     -- standalone field are ignored
     + AD.ShortLiteral:get_capture_p()
     + AD.LongLiteral:get_capture_p()
-    +   PTRN.consume_1_character
-      * PTRN.white^0
-      * PTRN.eol
+    +   lpad.consume_1_character
+      * lpad.white^0
+      * lpad.eol
   )
   * AD.Break:get_capture_p()^0
-  * PTRN.named_pos("max")        -- advance "max" to the current position
+  * lpad.named_pos("max")        -- advance "max" to the current position
 
   -- Export symbols to the _ENV for testing purposes
   if _ENV.during_unit_testing then
@@ -1360,14 +1348,14 @@ AD.Field = AD.AtProxy:make_subclass("AD.Field", {
 AD.Method = AD.Function:make_subclass("AD.Method", {
   __computed_index = function (self, k)
     if k == "base_name" then
-      local m = PTRN.class_base:match(self.name)
+      local m = lpad.class_base:match(self.name)
       if m then
         self[k] = m.base
         return m.base
       end
     end
     if k == "class_name" then
-      local m = PTRN.class_base:match(self.name)
+      local m = lpad.class_base:match(self.name)
       if m then
         self[k] = m.class
         return m.class
@@ -1426,8 +1414,8 @@ AD.Class = AD.AtProxy:make_subclass("AD.Class", {
     if k == "all_method_names" then
       local p = P(self.name)
         * P(".")
-        * C(PTRN.variable)
-        * -PTRN.black
+        * C(lpad.variable)
+        * -lpad.black
       local iterator = self._module.all_fun_names
       return function ()
         repeat
@@ -1506,11 +1494,11 @@ end
 ---@class AD.Type: AD.AtProxy
 ---@field public types      string[]
 ---@field public is_global  boolean
----@field public GLOBAL_p   lpeg.Pattern
+---@field public GLOBAL_p   lpeg_t
 
 AD.Type = AD.AtProxy:make_subclass("AD.Type", {
   __AtClass = AD.At.Type,
-  GLOBAL_p = PTRN.white^0 * P("_G.") * C(PTRN.identifier),
+  GLOBAL_p = lpad.white^0 * P("_G.") * C(lpad.identifier),
   __computed_index = function (self, k)
     if k == "types" then
       local at_k = self._at[k]
@@ -1968,7 +1956,7 @@ do
 
   ---@param self AD.Module
   local function make_is_method(self)
-    local p = PTRN.class_base
+    local p = lpad.class_base
     for f_name in self.all_fun_names do
       if type(f_name) ~= "string" then
         print("WTH")
@@ -2015,7 +2003,7 @@ end
 
 -- feed AD with more latex related stuff
 loadfile(
-  require("l3build").work_dir .."l3b/".. "l3b-autodoc+latex.lua",
+  require("l3build").work_dir .."l3b/".. "l3b-autodoc(latex).lua",
   "t",
   setmetatable({
     AD = AD,

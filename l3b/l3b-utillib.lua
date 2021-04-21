@@ -481,35 +481,50 @@ local function print_diff_time(format, diff)
   end
 end
 
+---Get the line number for the given string
+---Should cache intermediate results.
+---@param str   string
+---@param index integer
+---@return integer
+local function get_line_number(str, index)
+  local result = 1
+  for j = 1, index do
+    if str:sub(j, j) == "\n" then
+      result = result + 1
+    end
+  end
+  return result
+end
+
 ---@alias flags_t table<string,boolean>
 
 ---@type flags_t
 local flags = {}
 
 ---@class utlib_t
----@field public Vars                utlib_vars_t
----@field public flags               flags_t
----@field public to_quoted_string    fun(table: table, separator: string|nil): string
----@field public indices             fun(table: table, reverse: boolean): fun(): integer
----@field public compare_ascending   compare_f
----@field public compare_descending  compare_f
----@field public entries             fun(table: table, kv: sorted_kv_t): iterator_f
----@field public items               fun(...): iterator_f
----@field public unique_items        fun(...): iterator_f
----@field public keys                fun(table: table, compare: compare_f): iterator_f
----@field public sorted_pairs        fun(table: table, kv: sorted_kv_t): fun(): any, any
----@field public values              fun(table: table, kv: sorted_kv_t): iterator_f
----@field public first_of            fun(...): any
----@field public second_of           fun(...): any
----@field public trim                fun(in: string): string
----@field public extend_with         fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
----@field public readonly            fun(t: table, quiet: boolean): table
----@field public is_readonly         fun(t: table): boolean
----@field public shallow_copy        fun(original: any): any
----@field public deep_copy           fun(original: any): any
----@field public bridge              fun(kv: bridge_kv_t): table
----@field public to_ymd_hms          fun(diff: integer): string
----@field public print_diff_time     fun(format: string, diff: integer)
+---@field public Vars               utlib_vars_t
+---@field public flags              flags_t
+---@field public to_quoted_string   fun(table: table, separator: string|nil): string
+---@field public indices            fun(table: table, reverse: boolean): fun(): integer
+---@field public compare_ascending  compare_f
+---@field public compare_descending compare_f
+---@field public entries            fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public items              fun(...): iterator_f
+---@field public unique_items       fun(...): iterator_f
+---@field public keys               fun(table: table, compare: compare_f): iterator_f
+---@field public sorted_pairs       fun(table: table, kv: sorted_kv_t): fun(): any, any
+---@field public values             fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public first_of           fun(...): any
+---@field public second_of          fun(...): any
+---@field public trim               fun(in: string): string
+---@field public extend_with        fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
+---@field public readonly           fun(t: table, quiet: boolean): table
+---@field public is_readonly        fun(t: table): boolean
+---@field public shallow_copy       fun(original: any): any
+---@field public deep_copy          fun(original: any): any
+---@field public bridge             fun(kv: bridge_kv_t): table
+---@field public to_ymd_hms         fun(diff: integer): string
+---@field public print_diff_time    fun(format: string, diff: integer)
 
 return {
   Vars                = Vars,

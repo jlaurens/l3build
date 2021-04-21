@@ -61,12 +61,24 @@ function _G.pretty_print(tt, indent, done)
   end
 end
 
+local LU = require("l3b-test/luaunit")
+function _G.LU_wrap_test(f)
+  return function (...)
+    LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE =
+      LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE + 1
+    local result = f(...)
+    LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE =
+      LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE - 1
+    return result
+  end
+end
+package.loaded["luaunit"] = LU
+
 local run = function ()
-  local LU = require("l3b-test/luaunit")
-  package.loaded["luaunit"] = LU
-  arg = { table.unpack(arg, 2) }
-  _G.arg[1] = dofile(arg[1]:gsub( "%.lua$", "") .. ".lua")
-  os.exit( LU.LuaUnit.run(table.unpack(arg, 2)) )
+  dofile(
+    arg[2]:gsub( "%.lua$", "") .. ".lua"
+  )
+  os.exit( LU["LuaUnit"].run(table.unpack(arg, 3)) )
   return
 end
 

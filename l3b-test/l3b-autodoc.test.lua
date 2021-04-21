@@ -33,12 +33,12 @@ local AD = loadfile(
   __
 )()
 
-local PTRN_XTD = setmetatable({}, { __index = _G })
+local PEG_XTD = setmetatable({}, { __index = _G })
 
-local PTRN = loadfile(
-  l3build.work_dir .."l3b/l3b-autodoc_pattern.lua",
+local PEG = loadfile(
+  l3build.work_dir .."l3b/l3b-peg-autodoc.lua",
   "t",
-  PTRN_XTD
+  PEG_XTD
 )()
 
 ---@class AD.TestData
@@ -917,11 +917,11 @@ _G.test_POC = Test({
       type = V("table") + P("abc"),
       table =
         P("table")   -- table<foo,bar>
-      * P( PTRN.get_spaced("<")
+      * P( PEG.get_spaced("<")
         * V("type")
-        * PTRN.comma
+        * PEG.comma
         * V("type")
-        * PTRN.get_spaced(">")
+        * PEG.get_spaced(">")
       )^-1,
     })
     expect((p * Cp()):match("table<abc,abc>")).is(15)
@@ -935,7 +935,7 @@ end
 
 _G.test_white_p = Test({
   setup = function (self)
-    self.p = PTRN.white
+    self.p = PEG.white
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -954,7 +954,7 @@ _G.test_white_p = Test({
 
 _G.test_black_p = Test({
   setup = function (self)
-    self.p = PTRN.black
+    self.p = PEG.black
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -968,7 +968,7 @@ _G.test_black_p = Test({
 
 _G.test_eol_p = Test({
   setup = function (self)
-    self.p = PTRN.eol
+    self.p = PEG.eol
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -983,7 +983,7 @@ _G.test_eol_p = Test({
 
 _G.test_variable_p = Test({
   setup = function (self)
-    self.p = PTRN.variable
+    self.p = PEG.variable
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -994,7 +994,7 @@ _G.test_variable_p = Test({
 })
 _G.test_identifier_p = Test({
   setup = function (self)
-    self.p = PTRN.identifier
+    self.p = PEG.identifier
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1008,7 +1008,7 @@ _G.test_identifier_p = Test({
 
 _G.test_special_begin_p = Test({
   setup = function (self)
-    self.p = PTRN.special_begin
+    self.p = PEG.special_begin
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1025,7 +1025,7 @@ _G.test_special_begin_p = Test({
 
 _G.test_colon_p = Test({
   setup = function (self)
-    self.p = PTRN.colon
+    self.p = PEG.colon
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1036,7 +1036,7 @@ _G.test_colon_p = Test({
 
 _G.test_comma_p = Test({
   setup = function (self)
-    self.p = PTRN.comma
+    self.p = PEG.comma
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1045,7 +1045,7 @@ _G.test_comma_p = Test({
 
 _G.test_lua_type_p = Test({
   setup = function (self)
-    self.p = PTRN.lua_type
+    self.p = PEG.lua_type
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1070,7 +1070,7 @@ _G.test_lua_type_p = Test({
 
 _G.test_named_types_p = Test({
   setup = function (self)
-    self.p = Ct(PTRN.named_types)
+    self.p = Ct(PEG.named_types)
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1087,7 +1087,7 @@ _G.test_named_types_p = Test({
 
 _G.test_comment_p = Test({
   setup = function (self)
-    self.p = Ct(PTRN.capture_comment)
+    self.p = Ct(PEG.capture_comment)
   end,
   test = function (self)
     local t, s
@@ -1106,9 +1106,9 @@ _G.test_comment_p = Test({
 _G.test_comment_p_2 = Test({
   setup = function (self)
     self.p = Ct(
-        PTRN.chunk_init
-      * PTRN.capture_comment
-      * PTRN.chunk_stop
+        PEG.chunk_init
+      * PEG.capture_comment
+      * PEG.chunk_stop
   )
   end,
   test = function (self)
@@ -2122,7 +2122,7 @@ _G.test_At_Return = Test({
     })
   end,
   setup = function (self)
-    self.p = PTRN.chunk_init
+    self.p = PEG.chunk_init
       * AD.At.Return:get_capture_p()
   end,
   test = function (self)
@@ -2175,7 +2175,7 @@ _G.test_At_Generic = Test({
     })
   end,
   setup = function (self)
-    self.p = PTRN.chunk_init
+    self.p = PEG.chunk_init
       * AD.At.Generic:get_capture_p()
   end,
   test = function (self)
@@ -2470,7 +2470,7 @@ _G.test_At_Function = Test({
     expect(p:match(TD.s)).contains(TD.m())
   end,
   test_guess_function_name = function (self)
-    local p = PTRN.guess_function_name
+    local p = PEG.guess_function_name
     expect(p:match("local function foo()").name)
       .is("foo")
     expect(p:match("function foo()").name)
@@ -3018,7 +3018,7 @@ _G.test_Module_2 = Test({
     })
   end,
   test_class_base = function (self)
-    local p = PTRN.class_base
+    local p = PEG.class_base
     expect(p:match("a")).is(nil)
     expect(p:match("a.b")).contains({
       class = "a",

@@ -23,6 +23,7 @@ for those people who are interested.
 --]]
 
 ---@class Object @ Root class
+---@field public  make_subclass     fun(type: string, t: table): Object
 ---@field private __computed_table  table<string,fun(self: Object): any>
 
 Object = {}
