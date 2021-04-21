@@ -29,6 +29,22 @@ local AD = _ENV.AD
 
 assert(AD)
 
+AD.AtProxy.LATEX_ENVIRONMENT = "unknown"
+for _, Key in ipairs({
+  "Param",
+  "Vararg",
+  "Return",
+  "See",
+  "Author",
+  "Function",
+  "Field",
+  "Class",
+  "Global",
+  "Module"
+}) do
+  AD[Key].LATEX_ENVIRONMENT = Key
+end
+
 function AD.AtProxy.__computed_table:as_latex_environment()
  local content = self.as_latex
  return content and #content > 1 and
@@ -99,6 +115,7 @@ function AD.Function.__computed_table:as_latex()
       .. self.latex_long_description
       .. self.latex_params
       .. self.vararg.as_latex_environment
+      .. self.latex_returns
       .. self.see.as_latex_environment
       .. self.author.as_latex_environment
 end
@@ -113,17 +130,37 @@ function AD.Function.__computed_table:latex_params()
   end
   if #t > 0 then
     return [[
-\begin{params}
+\begin{Params}
 ]]
       .. concat(t, "")
       .. [[
-\end{params}
+\end{Params}
 ]]
   end
   return ""
 end
 function AD.Function.__computed_table:latex_vararg()
   return "vararg"
+end
+function AD.Function.__computed_table:latex_returns()
+  local t = {}
+  for i in self.all_return_indices do
+    local r_info = self:get_return(i)
+    local as_latex = r_info.as_latex_environment
+    if as_latex and #as_latex>0 then
+      append(t, as_latex)
+    end
+  end
+  if #t > 0 then
+    return [[
+\begin{Returns}
+]]
+      .. concat(t, "")
+      .. [[
+\end{Returns}
+]]
+  end
+  return ""
 end
 function AD.Function.__computed_table:latex_see()
   local replacement = self.see
@@ -159,11 +196,11 @@ function AD.Class.__computed_table:latex_fields()
   end
   if #t > 0 then
     return [[
-\begin{fields}
+\begin{Fields}
 ]]
     .. concat(t, "")
     .. [[
-\end{fields}
+\end{Fields}
 ]]
   end
   return ""

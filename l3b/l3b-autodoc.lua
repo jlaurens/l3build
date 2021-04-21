@@ -113,7 +113,6 @@ local concat  = table.concat
 local move    = table.move
 
 local lpeg    = require("lpeg")
-local locale  = lpeg.locale()
 local P       = lpeg.P
 local R       = lpeg.R
 local S       = lpeg.S
@@ -127,11 +126,13 @@ local Cmt     = lpeg.Cmt
 local Cp      = lpeg.Cp
 local Ct      = lpeg.Ct
 
--- Namespace
+local Object = require("l3b-object")
+
+local get_object_Super = get_object_Super
+
+-- Module namespace
 
 local AD = {}
-
-local Object = require("l3b-object")
 
 -- Implementation
 
@@ -153,106 +154,14 @@ everything else is a code chunk.
 
 We keep track of the parser position in named captures.
 
-`Cb("chunk_min")` is the first index of the current chunk
-whereas `Cb("chunk_max")` is after the last one.
-
 --]]
-
----@class lpeg.Pattern @ convenient type
-
----@type lpeg.Pattern
-local white_p = S(" \t")          -- exclude "\n", no unicode space neither.
-
----@type lpeg.Pattern
-local black_p = P(1) - S(" \t\n") -- non space, non LF
-
----@type lpeg.Pattern
-local eol_p   = (
-  P("\n") -- consume an eol
-)^-1      -- 0 or 1 end of line
-
-local variable_p =
-    ("_" + locale.alpha)      -- ascii letter, or "_"
-  * ("_" + locale.alnum)^0    -- ascii letter, or "_" or digit
-
--- for a class, type name
-local identifier_p =
-  variable_p * ("." * variable_p)^0
-
--- for a class, type name
-local function_p =
-  variable_p * (S(".:") * variable_p)^0
-
----Capture the current position under the given name with the given shifht
----@param str string
----@param shift number
----@return lpeg.Pattern
--- This is a one line doc for testing purposes
-local function named_pos_p(str, shift)
-  return  Cg(shift
-      and Cp() / function (i) return i - shift end
-      or  Cp(),
-    str)
-end
-
--- Named captures must exist before use.
--- Prefix any pattern with `chunk_init_p`
--- such that named captures are defined at the top level.
----@type lpeg.Pattern
-local chunk_init_p =
-    named_pos_p("min")
-  * named_pos_p("max", 1)
-
----Prepare the match of a new chunk
----In order to further insert a code chunk info if necessary
----create it and save it as capture named "code_before".
----@type lpeg.Pattern
-local chunk_start_p =
-  Cg( Cb("min"), "min")
-
----End of chunk pattern
---[===[
-This pattern is used at the end of the current logical chunk.
-Advance the cursor to the end of line or end of file,
-then store the position in the capture named "max".
---]===]
----@type lpeg.Pattern
-local chunk_stop_p =
-    white_p^0
-  * P("\n")^-1
-  * named_pos_p("max", 1)
-  -- no capture
-  -- the current position becomes the next chunk min
-
----@type lpeg.Pattern
-local one_line_chunk_stop_p =
-  ( 1 - P("\n") )^0 -- anything but a newline
-  * chunk_stop_p
-
-local special_begin_p =
-  ( white_p^1 + -B("-") ) -- 1+ spaces or negative lookbehind: no "-" behind
-  * P("---") * -P("-")
-  * white_p^0
-
----Pattern with horizontal spaces before and after
----@param del string|number|table|lpeg.Pattern
----@return lpeg.Pattern
-local function get_spaced_p(del)
-  return white_p^0 * del * white_p^0
-end
-
----@type lpeg.Pattern
-local colon_p = get_spaced_p(":")
-
----@type lpeg.Pattern
-local comma_p = get_spaced_p(",")
 
 ---Get the line number for the given string
 ---Should cache intermediate results.
 ---Should be defined globally.
 ---@param str   string
 ---@param index integer
----@return lpeg.Pattern
+---@return integer
 local function get_line_number(str, index)
   local result = 1
   for j = 1, index do
@@ -263,82 +172,7 @@ local function get_line_number(str, index)
   return result
 end
 
----@type lpeg.Pattern
-local capture_comment_p = (
-      get_spaced_p("@")
-    * named_pos_p("content_min")
-    * black_p^0
-    * ( white_p^1 * black_p^1 )^0
-    * named_pos_p("content_max", 1)
-    * white_p^0
-  )
-  + Cmt(
-    black_p,
-    function (s, i)
-      error("Missing @ for a comment at line "
-        .. get_line_number(s, i - 1)
-        ..": ".. s:sub(i - 1, i + 50))
-    end
-  )
-  + (
-      named_pos_p("content_min")
-    * named_pos_p("content_max", 1)
-    * white_p^0
-  )
-
----Sub grammar for lua types
----@type lpeg.Pattern
-local lua_type_p = P({
-  "type",
-  type =
-    (V("table")
-    + V("fun")
-    + identifier_p
-    )
-    * (get_spaced_p("[") -- for an array: `string[]`
-      * get_spaced_p("]")
-    )^0,
-  table =
-    P("table")   -- table<foo,bar>
-    * (get_spaced_p("<")
-      * V("type")
-      * comma_p
-      * V("type")
-      * get_spaced_p(">")
-    )^-1,
-  fun =
-      P("fun")
-    * get_spaced_p("(")
-    * (
-        V("fun_params") * comma_p * V("fun_vararg")
-      + V("fun_params")
-      + V("fun_vararg")^-1
-    )
-    * get_spaced_p(")")
-    * V("fun_return")^-1,
-  fun_vararg =
-    P("..."),
-  fun_param =
-    variable_p * colon_p * V("type"),
-  fun_params =
-    V("fun_param") * (comma_p * V("fun_param"))^0,
-  fun_return =
-      colon_p
-    * V("type")
-    * (comma_p * V("type"))^0,
-})
-
----@type lpeg.Pattern
-local named_types_p = Cg( Ct(-- collect all the captures in an array
-    C(lua_type_p)
-  * ( get_spaced_p("|") * C(lua_type_p) )^0
-), "types")
-
-
----@type lpeg.Pattern
-local named_optional_p =
-    white_p^0 * Cg(P("?") * Cc(true) , "optional") * white_p^0
-  + Cg(Cc(false), "optional") * white_p^0
+local PTRN = require("l3b-autodoc_pattern")
 
 ---Records info about code chunks.
 ---The source is splitted into contiguous code chunks.
@@ -354,8 +188,7 @@ local named_optional_p =
 ---@field public mask_contents  fun(self: AD.Info, t: string[])
 ---@field public is_instance_of fun(self: AD.Info, Class: AD.Info): boolean
 
-AD.Info = Object:make_subclass({
-  __TYPE = "AD.Info",
+AD.Info = Object:make_subclass("AD.Info", {
   min       =  1, -- the first index
   max       =  0, -- min > max => void range
   -- Next fields are defined by subclassers, see finalize
@@ -409,8 +242,7 @@ end
 ---@field public get_content  fun(self: AD.Content, s: string): string @ the substring of the argument corresponding to the content
 
 ---@type AD.Content
-AD.Content = AD.Info:make_subclass({
-  __TYPE = "AD.Content",
+AD.Content = AD.Info:make_subclass("AD.Content", {
   content_min = 1, -- only valid when content_min > min
   content_max = 0,
   get_content = function (self, s)
@@ -432,11 +264,7 @@ AD.Content = AD.Info:make_subclass({
 ---The default implementation fires an error.
 ---@param self AD.Content
 function AD.Content:get_core_p()
-   return
-      named_pos_p("content_min")
-    * black_p^0
-    * ( white_p^1 * black_p^1 )^0
-    * named_pos_p("content_max", 1)
+   return PTRN.content
 end
 
 -- One line inline comments
@@ -444,23 +272,11 @@ end
 ---@class AD.LineComment: AD.Content
 
 ---@type AD.LineComment
-AD.LineComment = AD.Content:make_subclass({
-  __TYPE = "AD.LineComment",
+AD.LineComment = AD.Content:make_subclass("AD.LineComment", {
   get_capture_p = function (self)
     return
-        chunk_init_p
-      * ( white_p^1 + -B("-") )             -- 1+ spaces or no "-" before, the back test should never be reached
-      * ( P("-")^4
-        + P("--")
-        * -P("-")                         -- >1 dashes, but not 3
-        * -(P("[") * P("=")^0 * P("[")) -- no long comment
-      )
-      * white_p^0
-      * Ct(
-          chunk_start_p
-        * self:get_core_p()
-        * chunk_stop_p
-      ) / function (t)
+        PTRN.line_comment
+      / function (t)
           return AD.LineComment(t)
         end
     end,
@@ -470,232 +286,68 @@ AD.LineComment = AD.Content:make_subclass({
 ---@class AD.LineDoc: AD.Content
 
 ---@type AD.LineDoc
-AD.LineDoc = AD.Content:make_subclass({
-  __TYPE = "AD.LineDoc",
+AD.LineDoc = AD.Content:make_subclass("AD.LineDoc", {
   get_capture_p = function (self)
     return
-        chunk_init_p
-      * special_begin_p
-      * -P("@")       -- negative lookahead: not an annotation
-      * white_p^0
-      * Ct(
-          chunk_start_p
-        * self:get_core_p()
-        * chunk_stop_p
-      ) / function (t)
-            return AD.LineDoc(t)
-          end
+        PTRN.line_doc
+      / function (t)
+          return AD.LineDoc(t)
+        end
     end,
 })
 
 ---@class AD.ShortLiteral: AD.Content
 
-do
-  local tag_del = {}
-  ---@type AD.ShortLiteral
-  AD.ShortLiteral = AD.Content:make_subclass({
-    __TYPE = "AD.ShortLiteral",
-    get_capture_p = function (self)
-      return
-          chunk_init_p
-        * Ct(
-          white_p^0
-        * Cg(S([['"]]), tag_del)
-        * chunk_start_p
-        * named_pos_p("content_min")
-        * Cg(
-          Cmt(
-            Cb(tag_del),
-            function (s, i, del)
-              local j = i
-              repeat
-                local c = s:sub(j, j)
-                if c == del then
-                  return j + 1, j - 1 -- capture also `content_max`
-                elseif c == [[\]] then
-                  j = j + 2
-                elseif c then
-                  j = j + 1
-                else
-                  error("Missing closing delimiter " .. del
-                    .. " after line ".. get_line_number(s, i))
-                end
-              until false
-            end
-          ),
-          "content_max"
-        )
-        * chunk_stop_p
-      ) / function (t)
-            t[tag_del] = nil
-            return AD.ShortLiteral(t)
-          end
-    end
-  })
-end
+---@type AD.ShortLiteral
+AD.ShortLiteral = AD.Content:make_subclass("AD.ShortLiteral", {
+  get_capture_p = function (self)
+    return
+        PTRN.short_literal
+      / function (t)
+          return AD.ShortLiteral(t)
+        end
+  end
+})
 
 ---@class AD.LongLiteral: AD.Content
 ---@field public level integer
 
-do
-  local tag_equal = {}
-  -- next patterns are used for both long literals and long comments
-  local open_p =
-      "["
-    * Cg(P("=")^0, tag_equal) -- tagged capture of the equals
-    * "["
-    * eol_p                   -- optional EOL
-    * named_pos_p("content_min")
-
-  local close_p = Cg(Cmt(   -- scan the string by hand
-    Cb(tag_equal),
-    function (s, i, equal)
-      local p = P("]") * equal * P("]")
-      for j = i, #s - 1 - #equal do
-        if p:match(s, j) then
-          return j + #equal + 2, j - 1, #equal -- 2 captures for content_max and level
+---@type AD.LongLiteral
+AD.LongLiteral = AD.Content:make_subclass("AD.LongLiteral", {
+  level = 0,
+  get_capture_p = function (self)
+    return
+        PTRN.long_literal
+      / function (t)
+          return AD.LongLiteral(t)
         end
-      end
-      error("Missing delimiter `]".. equal .."]`"
-        .." after line ".. get_line_number(s, i - 1))
-    end
-  ), tag_equal)
-  * Cg(
-      Cb(tag_equal)
-    / function (content_max, _)
-        return content_max -- only the first captured value
-      end,
-    "content_max"
-  )
-  * Cg(
-      Cb(tag_equal)
-    / function (_, level)
-        return level -- only the second captured value
-      end,
-    "level"
-  )
-
-  ---@type AD.LongLiteral
-  AD.LongLiteral = AD.Content:make_subclass({
-    __TYPE = "AD.LongLiteral",
-    level = 0,
-    get_capture_p = function (self)
-      return
-          chunk_init_p
-        * Ct(
-            open_p
-          * chunk_start_p
-          * close_p
-          * chunk_stop_p
-        ) / function (t)
-              t[tag_equal] = nil
-              return AD.LongLiteral(t)
-            end
-    end,
-  })
-end
+  end,
+})
 
 ---@class AD.LongComment: AD.Content
 ---@field public level integer @ level 3 is for long doc
 
-do
-  -- next patterns are used for both long literals and long comments
-  local tag_equal = {}
-  local open_p =
-      "["
-    * Cg(P("=")^-2 + P("=")^4, tag_equal) -- tagged capture of the equals
-    * "["
-    * eol_p                               -- optional EOL
-    * named_pos_p("content_min")
-
-  local close_p = Cg(Cmt(                 -- scan the string by hand
-    Cb(tag_equal),
-    function (s, i, equal)
-      local p = white_p^0 * P("-")^0 * P("]") * equal * P("]")
-      for j = i, #s - 1 - #equal do
-        local result = p:match(s, j)
-        if result then
-          return result, j - 1, #equal -- 2 captured values: content_max and level
-        end
-      end
-      error("Missing delimiter `]".. equal .."]`"
-        .." after line ".. get_line_number(s, i - 1))
-    end
-  ), tag_equal)
-  * Cg(
-      Cb(tag_equal)
-    / function (content_max, _)
-        return content_max -- only the first captured value
-      end,
-    "content_max"
-  )
-  * Cg(
-      Cb(tag_equal)
-    / function (_, level)
-        return level -- only the second captured value
-      end,
-    "level"
-  )
-
-  ---@type lpeg.Pattern @ what makes the difference with a long literal
-  local prefix =
-  (white_p^1 + -B("-")) -- 1+ spaces or no "-" before
-  * P("--")
 ---@type AD.LongComment
-  AD.LongComment = AD.Content:make_subclass({
-    __TYPE = "AD.LongComment",
-    level = 0,
-    get_capture_p = function (self)
-      return
-          chunk_init_p
-        * prefix
-        * Ct(
-          open_p
-        * chunk_start_p
-        * close_p
-        * chunk_stop_p
-      ) / function (t)
-            t[tag_equal] = nil
-            return AD.LongComment(t)
-          end
-    end,
-  })
-end
+AD.LongComment = AD.Content:make_subclass("AD.LongComment", {
+  level = 0,
+  get_capture_p = function (self)
+    return
+        PTRN.long_comment
+      / function (t)
+          return AD.LongComment(t)
+        end
+  end,
+})
 
 ---@class AD.LongDoc: AD.Content
 
 ---@type AD.LongDoc
-AD.LongDoc = AD.Content:make_subclass({
-  __TYPE = "AD.LongDoc",
+AD.LongDoc = AD.Content:make_subclass("AD.LongDoc", {
   level = 0,
   get_capture_p = function (self)
     return
-        chunk_init_p
-      * Ct(
-        ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
-        * P("--[===[")
-        * eol_p
-        * chunk_start_p
-        * named_pos_p("content_min")
-        * Cg(
-          Cmt(
-            P(0),
-            function (s, i)
-              local p = white_p^0 * P("-")^0 * P("]===]")
-              for j = i, #s - 1 - 3 do
-                local result = p:match(s, j)
-                if result then
-                  return result, j - 1 -- capture `content_max`
-                end
-              end
-              error("Missing delimiter `]===]`"
-                .." after line ".. get_line_number(s, i - 1))
-            end
-          ),
-          "content_max"
-        )
-        * chunk_stop_p
-      ) / function (t)
+          PTRN.long_doc
+        / function (t)
             return AD.LongDoc(t)
           end
   end,
@@ -713,9 +365,8 @@ AD.LongDoc = AD.Content:make_subclass({
 
 do
   local tag_desc = {} -- unique tag
-  AD.Description = AD.Info:make_subclass({
-    TYPE    = "AD.Description",
-    short   = AD.LineDoc(),
+  AD.Description = AD.Info:make_subclass("AD.Description", {
+    short = AD.LineDoc(),
     __initialize = function (self)
       self.long     = self.long or {}
       self.ignores  = self.ignores or {}
@@ -794,32 +445,8 @@ end
 ---@field public get_comment            fun(self: AD.Content, s: string): string @ the substring of the argument corresponding to the comment
 ---@field public ignores  AD.AllComment[]
 
-local error_annotation_p = function (Key)
-  return Cmt(
-      Cp()
-    * one_line_chunk_stop_p,
-    function (s, to, from)
-      -- print(debug.traceback())
-      error("Bad ".. Key .." annotation"
-        .." at line ".. get_line_number(s, from)
-        .. ": ".. s:sub(from, to))
-    end
-  )
-end
----Capture the pattern "---@<name>..."
----@param name string
----@return lpeg.Pattern
-local function at_match_p(name)
-  return
-      special_begin_p
-    * P("@".. name)
-    * -black_p
-    * white_p^0
-end
-
 ---@type AD.At
-AD.At = AD.Content:make_subclass({
-  TYPE          = "AD.At",
+AD.At = AD.Content:make_subclass("AD.At", {
   KEY           = "UNKNOWN KEY", -- to be overriden
   is_annotation = true,
   content_min = 1, -- only valid when content_min > min
@@ -844,18 +471,10 @@ AD.At = AD.Content:make_subclass({
 ---@return lpeg.Pattern
 function AD.At:get_capture_p()
   return
-        chunk_init_p
-      * at_match_p(self.KEY) * (
-      Ct(
-          chunk_start_p
-        * self:get_core_p() -- specific static pattern
-        * chunk_stop_p
-      )
-      / function (at)
-          return self(at)
-        end
-      + error_annotation_p(self.KEY)
-    )
+      PTRN.get_annotation(self.KEY, self:get_core_p())
+    / function (at)
+        return self(at)
+      end
 end
 
 local capture_ignores_p = Ct(
@@ -911,8 +530,7 @@ end
 ---@class AD.At.Author: AD.At
 
 ---@type AD.At.Author
-AD.At.Author = AD.At:make_subclass({
-  TYPE        = "AD.At.Author",
+AD.At.Author = AD.At:make_subclass("AD.At.Author", {
   KEY         = "author",
 })
 
@@ -922,8 +540,7 @@ AD.At.Author = AD.At:make_subclass({
 ---@field public types      string[]
 
 ---@type AD.At.Field
-AD.At.Field = AD.At:make_subclass({
-  TYPE        = "AD.At.Field",
+AD.At.Field = AD.At:make_subclass("AD.At.Field", {
   KEY         = "field",
   visibility  = "public",
   name        = "UNKNOWN NAME",
@@ -932,27 +549,15 @@ AD.At.Field = AD.At:make_subclass({
   end,
   -- @field [public|protected|private] field_name FIELD_TYPE[|OTHER_TYPE] [@comment]
   get_core_p = function (self)
-    return Cg(
-        P("public") + "protected" + "private",
-        "visibility"
-      )
-      * white_p^1
-      * Cg(
-        variable_p,
-        "name"
-      )
-      * white_p^1
-      * named_types_p
-      * capture_comment_p
-    end,
+    return PTRN.core_field
+  end,
 })
 
 -- @see references
 ---@class AD.At.See: AD.At
 
 ---@type AD.At.See
-AD.At.See = AD.At:make_subclass({
-  TYPE  = "AD.At.See",
+AD.At.See = AD.At:make_subclass("AD.At.See", {
   KEY   = "see",
 })
 
@@ -968,18 +573,14 @@ do
   local tag_at = {} -- unique tag for a temporary capture
 
   ---@type AD.At.Class
-  AD.At.Class = AD.At:make_subclass({
-    TYPE  = "AD.At.Class",
+  AD.At.Class = AD.At:make_subclass("AD.At.Class", {
     KEY   = "class",
     name  = "UNKNOWN CLASS NAME",
     __initialize = function (self)
       self.fields = self.fields  or {}
     end,
     get_core_p = function (_self)
-      return 
-          Cg(identifier_p, "name")
-        * (colon_p * Cg(identifier_p, "parent"))^-1                 -- or nil
-        * capture_comment_p
+      return PTRN.core_class
     end,
     -- class annotation needs a custom complete method
     get_complete_p = function (self)
@@ -1033,15 +634,12 @@ end
 
 
 ---@type AD.At.Type
-AD.At.Type = AD.At:make_subclass({
-  TYPE  = "AD.At.Type",
+AD.At.Type = AD.At:make_subclass("AD.At.Type", {
   KEY   = "type",
   types = { "UNKNOWN TYPE NAME" },
   is_global = false,
   get_core_p = function (self)
-    return
-        named_types_p
-      * capture_comment_p
+    return PTRN.core_type
   end,
 })
 
@@ -1051,17 +649,12 @@ AD.At.Type = AD.At:make_subclass({
 ---@field public types  string[]  @ the target types
 
 ---@type AD.At.Alias
-AD.At.Alias = AD.At:make_subclass({
-  TYPE  = "AD.At.Alias",
+AD.At.Alias = AD.At:make_subclass("AD.At.Alias", {
   KEY   = "alias",
   name  = "UNKNOWN ALIAS NAME",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
-    return
-        Cg(identifier_p, "name")
-      * white_p^1
-      * named_types_p
-      * capture_comment_p
+    return PTRN.core_alias
   end,
 })
 
@@ -1070,15 +663,11 @@ AD.At.Alias = AD.At:make_subclass({
 ---@field public types  string[]  @ List of types
 
 ---@type AD.At.Return
-AD.At.Return = AD.At:make_subclass({
-  TYPE  = "AD.At.Return",
+AD.At.Return = AD.At:make_subclass("AD.At.Return", {
   KEY   = "return",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
-    return
-        named_types_p
-      * named_optional_p
-      * capture_comment_p
+    return PTRN.core_return
   end,
 })
 
@@ -1090,23 +679,11 @@ AD.At.Return = AD.At:make_subclass({
 ---@field public parent_2 string|nil  @ Second type of generic annotations
 
 ---@type AD.At.Generic
-AD.At.Generic = AD.At:make_subclass({
-  TYPE    = "AD.At.Generic",
+AD.At.Generic = AD.At:make_subclass("AD.At.Generic", {
   KEY     = "generic",
   type_1  = "UNKNOWN TYPE NAME",
   get_core_p = function (self)
-    return
-        Cg(variable_p, "type_1")          -- capture type_1
-      * (colon_p
-        * Cg(identifier_p, "parent_1")    -- and capture parent_1
-      )^-1
-      * (comma_p * (
-          Cg(variable_p, "type_2")        -- capture type_2
-        * (colon_p
-          * Cg(identifier_p, "parent_2")  -- and capture parent_2
-        )^-1
-      ))^-1
-      * capture_comment_p
+    return PTRN.core_generic
   end,
 })
 
@@ -1117,18 +694,13 @@ AD.At.Generic = AD.At:make_subclass({
 ---@field public types    string[]    @ List of types
 
 ---@type AD.At.Param
-AD.At.Param = AD.At:make_subclass({
-  TYPE      = "AD.At.Param",
+AD.At.Param = AD.At:make_subclass("AD.At.Param", {
   KEY       = "param",
   name      = "UNKNOWN PARAM NAME",
   optional  = false,
   types     = { "UNKNOWN TYPE NAME" },
   get_core_p = function ()
-    return
-        Cg(variable_p, "name")
-      * named_optional_p
-      * named_types_p
-      * capture_comment_p
+    return PTRN.core_param
   end,
 })
 
@@ -1137,14 +709,11 @@ AD.At.Param = AD.At:make_subclass({
 ---@field public types  string[]  @ the types of the variadic arguments
 
 ---@type AD.At.Vararg
-AD.At.Vararg = AD.At:make_subclass({
-  TYPE  = "AD.At.Vararg",
+AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
   KEY   = "vararg",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
-    return
-        named_types_p
-      * capture_comment_p
+    return PTRN.core_vararg
   end,
 })
 
@@ -1153,18 +722,13 @@ AD.At.Vararg = AD.At:make_subclass({
 ---@field public    name   string     @ name of the module
 ---@field public    author AD.At.Author
 ---@field public    see    AD.At.See  @ reference
----@field protected NAME_p string     @ pattern for module names
 
 ---@type AD.At.Module
-AD.At.Module = AD.At:make_subclass({
-  TYPE    = "AD.At.Module",
+AD.At.Module = AD.At:make_subclass("AD.At.Module", {
   KEY     = "module",
   name    = "UNKNOWN MODULE NAME",
-  NAME_p  = R("az", "09") * (R("az", "09") + S("_-."))^0,
   get_core_p = function(self)
-    return
-      Cg(self.NAME_p, "name")
-      * capture_comment_p
+    return PTRN.core_module
   end,
 })
 
@@ -1207,23 +771,14 @@ end
 ---@field public type nil | AD.At.Type  @ type annotation eventually
 
 ---@type AD.At.Global
-AD.At.Global = AD.At:make_subclass({
-  TYPE  = "AD.At.Global",
+AD.At.Global = AD.At:make_subclass("AD.At.Global", {
   KEY   = "global",
   name  = "UNKNOWN GLOBALE NAME",
   get_core_p = function (self)
-    return
-        Cg(identifier_p, "name")
-      * white_p^0
-      * Cg(
-        Ct(-- collect all the captures in an array
-          ( C(lua_type_p)
-            * ( get_spaced_p("|") * C(lua_type_p) )^0
-          ) + P(0)
-        ), "types")
-      * capture_comment_p
+    return PTRN.core_global
   end,
 })
+
 do
   local tag_at = {}
   function AD.At.Global:get_complete_p()
@@ -1364,8 +919,7 @@ do
         at.see = at_see
       end
   ---@type AD.At.Function
-  AD.At.Function = AD.At:make_subclass({
-    TYPE  = "AD.At.Function",
+  AD.At.Function = AD.At:make_subclass("AD.At.Function", {
     KEY   = "function",
     name  = "UNKNOWN FUNCTION NAME",
     __initialize = function (self)
@@ -1374,8 +928,8 @@ do
     end,
     get_core_p = function (self)
       return
-          Cg(identifier_p, "name")  -- capture the name
-        * capture_comment_p
+          Cg(PTRN.identifier, "name")  -- capture the name
+        * PTRN.capture_comment
     end,
     get_complete_p = function (self)
       -- capture a description
@@ -1420,54 +974,7 @@ do
           end
     end,
     -- pattern to guess the name of the documented function
-    GUESS_p = P( {
-      - B(black_p)
-      * Ct(
-          V("local function")
-        + V("function ...")
-        + V("local ... = function (")
-        + V("... = function (")
-      )
-      * white_p^0
-      * P("(")
-      + ( P(1) - P("\n") ) * V(1), -- advance one character one the same line and try to match
-      ["local function"] =
-        P("local")
-        * white_p^1
-        * P("function")
-        * white_p^1
-        * Cg(
-          variable_p,
-          "name"
-        )
-        * Cg( Cc(true), "is_local"),
-      ["function ..."] =
-          P("function")
-        * white_p^1
-        * Cg(
-          function_p,
-          "name"
-        )
-        * Cg( Cc(false), "is_local"),
-        ["local ... = function ("] =
-            P("local")
-          * white_p^1
-          * Cg(
-            variable_p,
-            "name"
-          )
-          * get_spaced_p("=")
-          * P("function")
-          * Cg( Cc(true), "is_local"),
-        ["... = function ("] =
-          Cg(
-            function_p,
-            "name"
-          )
-          * get_spaced_p("=")
-          * P("function")
-          * Cg( Cc(false), "is_local"),
-    })
+    GUESS_p = PTRN.guess_function_name,
   }
 )
 end
@@ -1476,25 +983,18 @@ end
 ---@class AD.Code: AD.Info
 
 ---@type AD.Code
-AD.Code = AD.Info:make_subclass({
-  __TYPE = "AD.Code",
-})
+AD.Code = AD.Info:make_subclass("AD.Code")
 
 ---@class AD.Break: AD.Info
 
 ---@type AD.Break
-AD.Break = AD.Info:make_subclass({
-  __TYPE = "AD.Break",
+AD.Break = AD.Info:make_subclass("AD.Break", {
   get_capture_p = function (self)
     return
-        chunk_init_p
-      * Ct(                     -- 1) a table of named captures
-        ( white_p^0 * P("\n") )^1
-        * chunk_start_p
-        * chunk_stop_p
-      ) / function (t)
-            return AD.Break(t)  -- 2) an instance with that table
-          end
+        PTRN.paragraph_break
+      / function (t)
+          return AD.Break(t)  -- 2) an instance with that table
+        end
   end
 })
 
@@ -1502,24 +1002,6 @@ AD.Break = AD.Info:make_subclass({
 ---@field public infos AD.Info[]
 
 do
-  local more_utf8_p = R("\x80\xBF")
-  local utf8_p      =
-      R("\x00\x7F") - P("\n") -- ones ascii char but a newline
-    + R("\xC2\xDF") * more_utf8_p
-    + P("\xE0")     * R("\xA0\xBF") * more_utf8_p
-    + P("\xED")     * R("\x80\x9F") * more_utf8_p
-    + R("\xE1\xEF") * more_utf8_p   * more_utf8_p
-    + P("\xF0")     * R("\x90\xBF") * more_utf8_p * more_utf8_p
-    + P("\xF4")     * R("\x80\x8F") * more_utf8_p * more_utf8_p
-    + R("\xF1\xF3") * more_utf8_p   * more_utf8_p * more_utf8_p
-
-  local consume_one_character_p = (
-      utf8_p
-    + Cmt( 1 - P("\n"),   -- and consume one byte for an erroneous UTF8 character
-      function (s, i) print("UTF8 problem ".. s:sub(i-1, i-1)) end
-    )
-  )
-
   -- We capture the current begin of line position with name "bol"
   ---@type lpeg.Pattern
   local loop_p =
@@ -1542,21 +1024,19 @@ do
     + AD.At.Field:get_capture_p()     -- standalone field are ignored
     + AD.ShortLiteral:get_capture_p()
     + AD.LongLiteral:get_capture_p()
-    +   consume_one_character_p
-      * white_p^0
-      * eol_p
+    +   PTRN.consume_1_character
+      * PTRN.white^0
+      * PTRN.eol
   )
   * AD.Break:get_capture_p()^0
-  * named_pos_p("max")        -- advance "max" to the current position
+  * PTRN.named_pos("max")        -- advance "max" to the current position
 
   -- Export symbols to the _ENV for testing purposes
   if _ENV.during_unit_testing then
-    _ENV.consume_one_character_p    = consume_one_character_p
-    _ENV.loop_p                     = loop_p
+    _ENV.loop_p = loop_p
   end
   ---@type AD.Source
-  AD.Source = AD.Info:make_subclass({
-    __TYPE = "AD.Source",
+  AD.Source = AD.Info:make_subclass("AD.Source", {
     get_capture_p = function (self)
       return
           Ct( Cg( Ct(loop_p^0), "infos") )
@@ -1577,8 +1057,7 @@ end
 ---@field public depth integer        @ the depth of this scope
 ---@field private _scopes AD.Range[]  @ inner scopes
 
-AD.Scope = Object:make_subclass({
-  __TYPE = "AD.Scope",
+AD.Scope = Object:make_subclass("AD.Scope", {
   depth = 0,
   _scopes = {},
   __initialize = function (self, depth, min, max)
@@ -1631,7 +1110,7 @@ end
 -- High level objects.
 -- Hides implementation details
 
----@class AD.AtProxy
+---@class AD.AtProxy: Object
 ---@field public    name     string
 ---@field public    source   string
 ---@field public    comment  string
@@ -1642,9 +1121,7 @@ end
 ---@field private   _at AD.At @ "@" annotation info
 ---@field protected _module AD.Module
 
-AD.AtProxy = Object:make_subclass({
-  __TYPE = "AD.AtProxy",
-  LATEX_ENVIRONMENT = "unknown",
+AD.AtProxy = Object:make_subclass("AD.AtProxy", {
   __initialize = function (self, module, at)
     self._module = module
     self._at = at
@@ -1682,9 +1159,7 @@ AD.AtProxy = Object:make_subclass({
 ---@field public  types string[]
 ---@field private _at   AD.At.Param
 
-AD.Param = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Param",
-  LATEX_ENVIRONMENT = "param",
+AD.Param = AD.AtProxy:make_subclass("AD.Param", {
   __AtClass = AD.At.Param,
 })
 
@@ -1692,9 +1167,7 @@ AD.Param = AD.AtProxy:make_subclass({
 ---@field public  types string[]
 ---@field private _at   AD.At.Vararg
 
-AD.Vararg = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Vararg",
-  LATEX_ENVIRONMENT = "vararg",
+AD.Vararg = AD.AtProxy:make_subclass("AD.Vararg", {
   __AtClass = AD.At.Vararg,
   __computed_index = function (self, k)
     if k == "types" then
@@ -1708,9 +1181,7 @@ AD.Vararg = AD.AtProxy:make_subclass({
 ---@field public  types string[]
 ---@field private _at   AD.At.Return
 
-AD.Return = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Return",
-  LATEX_ENVIRONMENT = "return",
+AD.Return = AD.AtProxy:make_subclass("AD.Return", {
   __AtClass = AD.At.Return,
   __computed_index = function (self, k)
     if k == "types" then
@@ -1722,9 +1193,7 @@ AD.Return = AD.AtProxy:make_subclass({
 
 ---@class AD.See: AD.AtProxy
 
-AD.See = AD.AtProxy:make_subclass({
-  __TYPE = "AD.See",
-  LATEX_ENVIRONMENT = "see",
+AD.See = AD.AtProxy:make_subclass("AD.See", {
   __AtClass = AD.At.See,
   -- next is not very clean but it works and is simple
   __computed_index = function (self, k)
@@ -1739,9 +1208,7 @@ AD.See = AD.AtProxy:make_subclass({
 })
 
 ---@class AD.Author: AD.AtProxy
-AD.Author = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Author",
-  LATEX_ENVIRONMENT = "author",
+AD.Author = AD.AtProxy:make_subclass("AD.Author", {
   __AtClass = AD.At.Author,
   -- next is not very clean but it works and is simple
   __computed_index = function (self, k)
@@ -1756,20 +1223,12 @@ AD.Author = AD.AtProxy:make_subclass({
 })
 
 ---@class AD.Function: AD.AtProxy
----@field public  all_param_names fun(): string | nil
----@field public  get_param       fun(name: string): AD.Param | nil
----@field public  all_params      fun(): AD.Param | nil
 ---@field public  vararg          AD.Vararg
----@field public  all_return_indices  fun(): integer | nil
----@field public  get_return      fun(i: integer): AD.Return | nil
----@field public  all_returns     fun(): AD.Return | nil
 ---@field private _at AD.At.Function
 ---@field private __params table<string, AD.Param>
 ---@field private __returns table<string, AD.Return>
 
-AD.Function = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Function",
-  LATEX_ENVIRONMENT = "function",
+AD.Function = AD.AtProxy:make_subclass("AD.Function", {
   __AtClass = AD.At.Function,
   __initialize = function (self, ...)
     ---@type AD.Param[]
@@ -1777,66 +1236,39 @@ AD.Function = AD.AtProxy:make_subclass({
     ---@type AD.Return[]
     self.__returns = {}
   end,
+  __computed_index = function (self, k)
+    if k == "vararg" then
+      local result = AD.Vararg({}, self._module, self._at.vararg)
+      self.vararg = result
+      return result
+    end
+    if k == "see" then
+      local result = AD.See({}, self._module, self._at.see)
+      self.vararg = result
+      return result
+    end
+    if k == "author" then
+      local result = AD.Author({}, self._module, self._at.author)
+      self.vararg = result
+      return result
+    end
+    return AD.Function.__Super.__computed_index(self, k)
+  end,
 })
 
-function AD.Function:__computed_index(k)
-  if k == "all_param_names" then
-    local i = 0
-    return function ()
-      i = i + 1
-      local param = self._at.params[i]
-      return param and param.name
-    end
+---Iterator of the parameter info names
+---@function AD.Function.all_param_names
+---@return fun(): string | nil
+function AD.Function.__computed_table:all_param_names()
+  local i = 0
+  return function ()
+    i = i + 1
+    local param = self._at.params[i]
+    return param and param.name
   end
-  ---Parameter iterator
-  ---@function AD.Function.all_params
-  ---@return fun(): string
-  if k == "all_params" then
-    local iterator = self.all_param_names
-    return function ()
-      local name = iterator()
-      return name and self:get_param(name)
-    end
-  end
-  if k == "vararg" then
-    local result = AD.Vararg({}, self._module, self._at.vararg)
-    self.vararg = result
-    return result
-  end
-  if k == "see" then
-    local result = AD.See({}, self._module, self._at.see)
-    self.vararg = result
-    return result
-  end
-  if k == "author" then
-    local result = AD.Author({}, self._module, self._at.author)
-    self.vararg = result
-    return result
-  end
-  ---Return indices iterator
-  ---@function AD.Function.all_return_indices
-  ---@return fun(): string
-  if k == "all_return_indices" then
-    local i = 0
-    return function ()
-      i = i + 1
-      return i <= #self._at.returns and i
-    end
-  end
-  ---Parameter iterator
-  ---@function AD.Function.all_params
-  ---@return fun(): string
-  if k == "all_returns" then
-    local iterator = self.all_return_indices
-    return function ()
-      local i = iterator()
-      return i and self:get_return(i)
-    end
-  end
-  return AD.Function.__Super.__computed_index(self, k)
 end
 
----Get the paramater with the given name
+---Get the paramater info with the given name
 ---@param name string @ one of the srings listed by the receiver's `all_param_names` enumerator.
 ---@return AD.Param | nil @ `nil` when no parameter exists with the given name.
 function AD.Function:get_param(name)
@@ -1851,6 +1283,28 @@ function AD.Function:get_param(name)
       params[name] = result
       return result
     end
+  end
+end
+
+---Parameter info iterator
+---@function AD.Function.all_params
+---@return fun(): string | nil
+function AD.Function.__computed_table:all_params()
+  local iterator = self.all_param_names
+  return function ()
+    local name = iterator()
+    return name and self:get_param(name)
+  end
+end
+
+---Return info indices iterator
+---@function AD.Function.all_return_indices
+---@return fun(): integer | nil
+function AD.Function.__computed_table:all_return_indices()
+  local i = 0
+  return function ()
+    i = i + 1
+    return i <= #self._at.returns and i or nil
   end
 end
 
@@ -1871,13 +1325,21 @@ function AD.Function:get_return(i)
   return result
 end
 
+---Return info iterator
+---@function AD.Function.all_params
+---@return fun(): AD.Return | nil
+function AD.Function.__computed_table:all_returns()
+  local iterator = self.all_return_indices
+  return function ()
+    local i = iterator()
+    return i and self:get_return(i)
+  end
+end
+
 ---@class AD.Field: AD.AtProxy
 ---@field public visibility string
----@field protected as_latex string
 
-AD.Field = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Field",
-  LATEX_ENVIRONMENT = "field",
+AD.Field = AD.AtProxy:make_subclass("AD.Field", {
   __AtClass = AD.At.Field,
   __computed_index = function (self, k)
     if k == "visibility" then
@@ -1891,14 +1353,13 @@ AD.Field = AD.AtProxy:make_subclass({
 ---@field public base_name  string
 ---@field public class      AD.Class
 
-AD.Method = AD.Function:make_subclass({
-  __TYPE = "AD.Method",
+AD.Method = AD.Function:make_subclass("AD.Method", {
   CLASS_BASE_p = Ct(
     Cg(
       C (
-        ( variable_p * P(".") )^0
-        * variable_p * P(":")
-      + ( variable_p * P(".") )^1
+        ( PTRN.variable * P(".") )^0
+        * PTRN.variable * P(":")
+      + ( PTRN.variable * P(".") )^1
       )
       / function (c)
         return c:sub(1, -2)
@@ -1906,7 +1367,7 @@ AD.Method = AD.Function:make_subclass({
       "class"
     )
     * Cg(
-      variable_p,
+      PTRN.variable,
       "base"
     ) )
     * P(-1),
@@ -1949,9 +1410,7 @@ AD.Method = AD.Function:make_subclass({
 ---@field public    get_method    fun(name: string): nil | AD.Method
 ---@field private   __methods AD.Method[]
 
-AD.Class = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Class",
-  LATEX_ENVIRONMENT = "class",
+AD.Class = AD.AtProxy:make_subclass("AD.Class", {
   __AtClass = AD.At.Class,
   __initialize = function (self, ...)
     ---@type AD.Field[]
@@ -1980,8 +1439,8 @@ AD.Class = AD.AtProxy:make_subclass({
     if k == "all_method_names" then
       local p = P(self.name)
         * P(".")
-        * C(variable_p)
-        * -black_p
+        * C(PTRN.variable)
+        * -PTRN.black
       local iterator = self._module.all_fun_names
       return function ()
         repeat
@@ -2062,10 +1521,9 @@ end
 ---@field public is_global  boolean
 ---@field public GLOBAL_p   lpeg.Pattern
 
-AD.Type = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Type",
+AD.Type = AD.AtProxy:make_subclass("AD.Type", {
   __AtClass = AD.At.Type,
-  GLOBAL_p = white_p^0 * P("_G.") * C(identifier_p),
+  GLOBAL_p = PTRN.white^0 * P("_G.") * C(PTRN.identifier),
   __computed_index = function (self, k)
     if k == "types" then
       local at_k = self._at[k]
@@ -2080,9 +1538,7 @@ AD.Type = AD.AtProxy:make_subclass({
 ---@field protected _type AD.Type
 ---@field private _at AD.At.Global | AD.At.Type
 
-AD.Global = AD.AtProxy:make_subclass({
-  __TYPE = "AD.Global",
-  LATEX_ENVIRONMENT = "global",
+AD.Global = AD.AtProxy:make_subclass("AD.Global", {
   __AtClass = AD.At.Global,
   __computed_index = function (self, k)
     if k == "_type" then
@@ -2127,7 +1583,7 @@ AD.Global = AD.AtProxy:make_subclass({
   end,
 })
 
----@class AD.Module
+---@class AD.Module: Object
 ---@field public  path            string      @ the path of the source file
 ---@field public  name            string      @ the name of the module as defined in the first module annotation
 ---@field public  all_funs       fun(): AD.Function | nil  @ function names iterator
@@ -2146,9 +1602,7 @@ AD.Global = AD.AtProxy:make_subclass({
 ---@field private __classes       AD.Class[]    @ cache for classes
 ---@field private __functions     AD.Function[] @ cache for functions
 
-AD.Module = Object:make_subclass({
-  __TYPE = "AD.Module",
-  LATEX_ENVIRONMENT = "module",
+AD.Module = Object:make_subclass("AD.Module", {
   name = "UNKOWN MODULE NAME",
   __initialize = function (self)
     ---@type table<string, AD.Global>
@@ -2572,6 +2026,7 @@ do
   end
 end
 
+-- feed AD with more latex related stuff
 loadfile(
   require("l3build").work_dir .."l3b/".. "l3b-autodoc+latex.lua",
   "t",
@@ -2581,28 +2036,5 @@ loadfile(
     __index = _G
   })
 )()
-
--- Export symbols to the _ENV for testing purposes
-if _ENV.during_unit_testing then
-  _ENV.white_p                    = white_p
-  _ENV.black_p                    = black_p
-  _ENV.eol_p                      = eol_p
-  _ENV.variable_p                 = variable_p
-  _ENV.identifier_p               = identifier_p
-  _ENV.function_p                 = function_p
-  _ENV.special_begin_p            = special_begin_p
-  _ENV.get_spaced_p               = get_spaced_p
-  _ENV.colon_p                    = colon_p
-  _ENV.comma_p                    = comma_p
-  _ENV.lua_type_p                 = lua_type_p
-  _ENV.named_types_p              = named_types_p
-  _ENV.named_optional_p           = named_optional_p
-  _ENV.named_pos_p                = named_pos_p
-  _ENV.at_match_p                 = at_match_p
-  _ENV.chunk_start_p              = chunk_start_p
-  _ENV.chunk_stop_p               = chunk_stop_p
-  _ENV.chunk_init_p               = chunk_init_p
-  _ENV.capture_comment_p          = capture_comment_p
-end
 
 return AD

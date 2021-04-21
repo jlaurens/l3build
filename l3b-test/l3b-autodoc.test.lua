@@ -1,19 +1,13 @@
 #!/usr/bin/env texlua
 
-local append  = table.insert
-
 local lpeg    = require("lpeg")
 local P       = lpeg.P
-local B       = lpeg.B
-local C       = lpeg.C
-local S       = lpeg.S
 local Cg      = lpeg.Cg
 local Ct      = lpeg.Ct
 local Cc      = lpeg.Cc
 local Cb      = lpeg.Cb
 local V       = lpeg.V
 local Cp      = lpeg.Cp
-local Cmt     = lpeg.Cmt
 
 local LU      = require("l3b-test/luaunit")
 local expect  = require("l3b-test/expect").expect
@@ -22,6 +16,8 @@ local l3build = require("l3build")
 
 local AUTODOC_NAME = "l3b-autodoc"
 local AUTODOC_PATH = l3build.work_dir .."l3b/".. AUTODOC_NAME ..".lua"
+
+local pretty_print = _G.pretty_print
 
 -- Next is an _ENV that will allow a module to export
 -- more symbols than usually done in order to finegrain testing
@@ -35,6 +31,14 @@ local AD = loadfile(
   AUTODOC_PATH,
   "t",
   __
+)()
+
+local PTRN_XTD = setmetatable({}, { __index = _G })
+
+local PTRN = loadfile(
+  l3build.work_dir .."l3b/l3b-autodoc_pattern.lua",
+  "t",
+  PTRN_XTD
 )()
 
 ---@class AD.TestData
@@ -828,11 +832,11 @@ DOOOOOOOOOOOOOOOOOC
     s = TD_LINE_DOC.s .. TD.s
     t = p:match(s)
     -- print("t")
-    -- _G.pretty_print(t)
+    -- pretty_print(t)
     expect(t.TYPE).is(TYPE)
     local LINE_DOC_m = TD_LINE_DOC.m()
     -- print("LINE_DOC_m")
-    -- _G.pretty_print(LINE_DOC_m)
+    -- pretty_print(LINE_DOC_m)
     expect(t).contains(TD.m(1 + LINE_DOC_m.max))
     expect(t.description.short).contains(LINE_DOC_m)
 
@@ -842,8 +846,8 @@ DOOOOOOOOOOOOOOOOOC
     expect(t).contains(TD.m(1 + 2 * LINE_DOC_m.max))
     expect(t.description.short).contains(LINE_DOC_m)
     
-    -- _G.pretty_print(t.description.long[1])
-    -- _G.pretty_print(self:get_LINE_DOC_m(LINE_DOC_m.max + 1))
+    -- pretty_print(t.description.long[1])
+    -- pretty_print(self:get_LINE_DOC_m(LINE_DOC_m.max + 1))
     
     expect(t.description.long[1]).contains(TD_LINE_DOC.m(LINE_DOC_m.max + 1))
     
@@ -913,11 +917,11 @@ _G.test_POC = Test({
       type = V("table") + P("abc"),
       table =
         P("table")   -- table<foo,bar>
-      * P( __.get_spaced_p("<")
+      * P( PTRN.get_spaced("<")
         * V("type")
-        * __.comma_p
+        * PTRN.comma
         * V("type")
-        * __.get_spaced_p(">")
+        * PTRN.get_spaced(">")
       )^-1,
     })
     expect((p * Cp()):match("table<abc,abc>")).is(15)
@@ -931,7 +935,7 @@ end
 
 _G.test_white_p = Test({
   setup = function (self)
-    self.p = __.white_p
+    self.p = PTRN.white
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -950,7 +954,7 @@ _G.test_white_p = Test({
 
 _G.test_black_p = Test({
   setup = function (self)
-    self.p = __.black_p
+    self.p = PTRN.black
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -964,7 +968,7 @@ _G.test_black_p = Test({
 
 _G.test_eol_p = Test({
   setup = function (self)
-    self.p = __.eol_p
+    self.p = PTRN.eol
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -979,7 +983,7 @@ _G.test_eol_p = Test({
 
 _G.test_variable_p = Test({
   setup = function (self)
-    self.p = __.variable_p
+    self.p = PTRN.variable
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -988,10 +992,9 @@ _G.test_variable_p = Test({
     self:p_test("2bc", nil)
   end
 })
-
 _G.test_identifier_p = Test({
   setup = function (self)
-    self.p = __.identifier_p
+    self.p = PTRN.identifier
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1005,7 +1008,7 @@ _G.test_identifier_p = Test({
 
 _G.test_special_begin_p = Test({
   setup = function (self)
-    self.p = __.special_begin_p
+    self.p = PTRN.special_begin
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1022,7 +1025,7 @@ _G.test_special_begin_p = Test({
 
 _G.test_colon_p = Test({
   setup = function (self)
-    self.p = __.colon_p
+    self.p = PTRN.colon
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1033,7 +1036,7 @@ _G.test_colon_p = Test({
 
 _G.test_comma_p = Test({
   setup = function (self)
-    self.p = __.comma_p
+    self.p = PTRN.comma
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1042,7 +1045,7 @@ _G.test_comma_p = Test({
 
 _G.test_lua_type_p = Test({
   setup = function (self)
-    self.p = __.lua_type_p
+    self.p = PTRN.lua_type
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1067,7 +1070,7 @@ _G.test_lua_type_p = Test({
 
 _G.test_named_types_p = Test({
   setup = function (self)
-    self.p = Ct(__.named_types_p)
+    self.p = Ct(PTRN.named_types)
   end,
   test = function (self)
     expect(self.p).is.NOT(nil)
@@ -1084,7 +1087,7 @@ _G.test_named_types_p = Test({
 
 _G.test_comment_p = Test({
   setup = function (self)
-    self.p = Ct(__.capture_comment_p)
+    self.p = Ct(PTRN.capture_comment)
   end,
   test = function (self)
     local t, s
@@ -1103,9 +1106,9 @@ _G.test_comment_p = Test({
 _G.test_comment_p_2 = Test({
   setup = function (self)
     self.p = Ct(
-        __.chunk_init_p
-      * __.capture_comment_p
-      * __.chunk_stop_p
+        PTRN.chunk_init
+      * PTRN.capture_comment
+      * PTRN.chunk_stop
   )
   end,
   test = function (self)
@@ -1195,8 +1198,8 @@ _G.test_LongLiteral = Test({
       max         = 10,
       level       = 0,
     }))
-
-    t = self.p:match('[===[678]===]  \n  ')
+    s = '[===[678]===]  \n  '
+    t = self.p:match(s)
     expect(t).contains(AD.LongLiteral({
       min         = 1,
       content_min = 6,
@@ -2119,7 +2122,7 @@ _G.test_At_Return = Test({
     })
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
+    self.p = PTRN.chunk_init
       * AD.At.Return:get_capture_p()
   end,
   test = function (self)
@@ -2172,7 +2175,7 @@ _G.test_At_Generic = Test({
     })
   end,
   setup = function (self)
-    self.p = __.chunk_init_p
+    self.p = PTRN.chunk_init
       * AD.At.Generic:get_capture_p()
   end,
   test = function (self)
@@ -2466,8 +2469,8 @@ _G.test_At_Function = Test({
     TD = self.get_FUNCTION_COMPLETE()
     expect(p:match(TD.s)).contains(TD.m())
   end,
-  test_GUESS_p = function (self)
-    local p = AD.At.Function.GUESS_p
+  test_guess_function_name = function (self)
+    local p = PTRN.guess_function_name
     expect(p:match("local function foo()").name)
       .is("foo")
     expect(p:match("function foo()").name)
@@ -3087,7 +3090,7 @@ _G.test_latex = Test({
 ---@type TYPE @ TYPE: COMMENT
 ]]
     local expected = [[
-\begin{global}
+\begin{Global}
 \Name{GLOBAL}
 \Types{TYPE}
 \Comment{GLOBAL: COMMENT}
@@ -3095,7 +3098,7 @@ _G.test_latex = Test({
 \begin{LongDescription}
 GLOBAL: LONG  DESCRIPTION
 \end{LongDescription}
-\end{global}
+\end{Global}
 ]]
 
     self:prepare(s)
@@ -3125,14 +3128,14 @@ GLOBAL: LONG  DESCRIPTION
 ---@author AUTHOR
 ]]
     expected = [[
-\begin{function}
+\begin{Function}
 \Name{FUNCTION}
 \ShortDescription{FUNCTION: SHORT DESCRIPTION}
 \begin{LongDescription}
 FUNCTION: LONG  DESCRIPTION
 \end{LongDescription}
-\begin{params}
-\begin{param}
+\begin{Params}
+\begin{Param}
 \Name{PARAM}
 \Types{PARAM_TYPE}
 \Comment{PARAM: COMMENT}
@@ -3140,31 +3143,41 @@ FUNCTION: LONG  DESCRIPTION
 \begin{LongDescription}
 PARAM: LONG  DESCRIPTION
 \end{LongDescription}
-\end{param}
-\end{params}
-\begin{vararg}
+\end{Param}
+\end{Params}
+\begin{Vararg}
 \Types{VARARG_TYPE}
 \Comment{VARARG: COMMENT}
 \ShortDescription{VARARG: SHORT DESCRIPTION}
 \begin{LongDescription}
 VARARG: LONG  DESCRIPTION
 \end{LongDescription}
-\end{vararg}
-\begin{see}
+\end{Vararg}
+\begin{Returns}
+\begin{Return}
+\Types{RETURN_TYPE}
+\Comment{RETURN: COMMENT}
+\ShortDescription{RETURN: SHORT DESCRIPTION}
+\begin{LongDescription}
+RETURN: LONG  DESCRIPTION
+\end{LongDescription}
+\end{Return}
+\end{Returns}
+\begin{See}
 \Value{SEE}
 \ShortDescription{SEE: SHORT DESCRIPTION}
 \begin{LongDescription}
 SEE: LONG  DESCRIPTION
 \end{LongDescription}
-\end{see}
-\begin{author}
+\end{See}
+\begin{Author}
 \Value{AUTHOR}
 \ShortDescription{AUTHOR: SHORT DESCRIPTION}
 \begin{LongDescription}
 AUTHOR: LONG  DESCRIPTION
 \end{LongDescription}
-\end{author}
-\end{function}
+\end{Author}
+\end{Function}
 ]]
     self:prepare(s)
     local f_info = self.module:get_fun("FUNCTION")
@@ -3187,15 +3200,15 @@ AUTHOR: LONG  DESCRIPTION
 ---@author AUTHOR
 ]]
     expected = [[
-\begin{class}
+\begin{Class}
 \Name{CLASS}
 \Comment{CLASS CMT}
 \ShortDescription{CLASS: SHORT DESCRIPTION}
 \begin{LongDescription}
 CLASS: LONG  DESCRIPTION
 \end{LongDescription}
-\begin{fields}
-\begin{field}
+\begin{Fields}
+\begin{Field}
 \Name{FIELD}
 \Types{TYPE}
 \Comment{FIELD CMT}
@@ -3203,23 +3216,23 @@ CLASS: LONG  DESCRIPTION
 \begin{LongDescription}
 FIELD: LONG  DESCRIPTION
 \end{LongDescription}
-\end{field}
-\end{fields}
-\begin{see}
+\end{Field}
+\end{Fields}
+\begin{See}
 \Value{SEE}
 \ShortDescription{SEE: SHORT DESCRIPTION}
 \begin{LongDescription}
 SEE: LONG  DESCRIPTION
 \end{LongDescription}
-\end{see}
-\begin{author}
+\end{See}
+\begin{Author}
 \Value{AUTHOR}
 \ShortDescription{AUTHOR: SHORT DESCRIPTION}
 \begin{LongDescription}
 AUTHOR: LONG  DESCRIPTION
 \end{LongDescription}
-\end{author}
-\end{class}
+\end{Author}
+\end{Class}
 ]]
     self:prepare(s)
     local c_info = self.module:get_class("CLASS")

@@ -23,9 +23,6 @@ for those people who are interested.
 --]]
 
 ---@class Object @ Root class
----@field private __TYPE string
----@field private __Class Object
----@field private __Super Object | nil
 ---@field private __computed_table  table<string,fun(self: Object): any>
 
 Object = {}
@@ -43,7 +40,7 @@ end
 Object.__computed_table = {}
 Object.__index = Object
 Object.__Class = Object
-Object.__TYPE = "Object"
+Object.__TYPE  = "Object"
 
 function Object:Constructor(d, ...)
   return d or {}
@@ -79,14 +76,16 @@ Bar = Foo:make_subclass({...})
 --]===]
 ---@generic T: Object
 ---@param Super Object
+---@param TYPE string @ unique identifier, used with `type`
 ---@param class? T @ Will become the newly created class table
 ---@return T
-function Object.make_subclass(Super, class)
+function Object.make_subclass(Super, TYPE, class)
   assert(Super ~= nil)
   assert(Super ~= class)
   ---@type Object
   class = class or {}
   assert(not class.__Class)
+  class.__TYPE = TYPE
   class.__Super = Super -- class hierarchy
   setmetatable(class, Super)
   class.__Class = class -- more readable than __index
@@ -122,7 +121,7 @@ function Object.make_subclass(Super, class)
   function class:Constructor(d, ...)
     d = Super(d, ...) -- call Super constructor first
     setmetatable(d, class)   -- d is an instance of self
-    d.__TYPE = class.__TYPE
+    d.__TYPE = class[TYPE]
     -- initialize without inheritance, it was made in the Super contructor
     local initialize = rawget(class, "__initialize")
     if initialize then
