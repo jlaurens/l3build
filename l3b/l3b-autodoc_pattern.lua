@@ -631,6 +631,24 @@ local consume_1_character =
     function (s, i) print("UTF8 problem ".. s:sub(i-1, i-1)) end
   )
 
+local class_base = Ct(
+    Cg(
+      C (
+        ( variable * P(".") )^0
+        * variable * P(":")
+      + ( variable * P(".") )^1
+      )
+      / function (c)
+        return c:sub(1, -2)
+      end,
+      "class"
+    )
+    * Cg(
+      variable,
+      "base"
+    )
+  )
+  * P(-1)
 ---@class AD.PTRN
 ---@field public line_comment     lpeg.Pattern
 ---@field public line_doc         lpeg.Pattern
@@ -652,6 +670,7 @@ local consume_1_character =
 ---@field public guess_function_name  lpeg.Pattern
 ---@field public paragraph_break  lpeg.Pattern
 ---@field public consume_1_character  lpeg.Pattern
+---@field public class_base       lpeg.Pattern
 --
 ---@field public white        lpeg.Pattern
 ---@field public black        lpeg.Pattern
@@ -698,6 +717,7 @@ local PTRN = {
   guess_function_name = guess_function_name,
   paragraph_break = paragraph_break,
   consume_1_character = consume_1_character,
+  class_base      = class_base,
 
   white           = white,
   black           = black,

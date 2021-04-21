@@ -1224,9 +1224,13 @@ AD.Author = AD.AtProxy:make_subclass("AD.Author", {
 
 ---@class AD.Function: AD.AtProxy
 ---@field public  vararg          AD.Vararg
+---@field public all_param_names  fun(): string|nil
+---@field public all_params       fun(): AD.Param|nil
+---@field public all_return_indices fun(): integer|nil
+---@field public all_returns       fun(): AD.Return|nil
 ---@field private _at AD.At.Function
----@field private __params table<string, AD.Param>
----@field private __returns table<string, AD.Return>
+---@field private __params AD.Param[]
+---@field private __returns AD.Return[]
 
 AD.Function = AD.AtProxy:make_subclass("AD.Function", {
   __AtClass = AD.At.Function,
@@ -1354,33 +1358,16 @@ AD.Field = AD.AtProxy:make_subclass("AD.Field", {
 ---@field public class      AD.Class
 
 AD.Method = AD.Function:make_subclass("AD.Method", {
-  CLASS_BASE_p = Ct(
-    Cg(
-      C (
-        ( PTRN.variable * P(".") )^0
-        * PTRN.variable * P(":")
-      + ( PTRN.variable * P(".") )^1
-      )
-      / function (c)
-        return c:sub(1, -2)
-      end,
-      "class"
-    )
-    * Cg(
-      PTRN.variable,
-      "base"
-    ) )
-    * P(-1),
   __computed_index = function (self, k)
     if k == "base_name" then
-      local m = self.CLASS_BASE_p:match(self.name)
+      local m = PTRN.class_base:match(self.name)
       if m then
         self[k] = m.base
         return m.base
       end
     end
     if k == "class_name" then
-      local m = self.CLASS_BASE_p:match(self.name)
+      local m = PTRN.class_base:match(self.name)
       if m then
         self[k] = m.class
         return m.class
@@ -1981,7 +1968,7 @@ do
 
   ---@param self AD.Module
   local function make_is_method(self)
-    local p = AD.Method.CLASS_BASE_p
+    local p = PTRN.class_base
     for f_name in self.all_fun_names do
       if type(f_name) ~= "string" then
         print("WTH")

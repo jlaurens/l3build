@@ -3017,8 +3017,8 @@ _G.test_Module_2 = Test({
       contents = str
     })
   end,
-  test_CLASS_BASE_p = function (self)
-    local p = AD.Method.CLASS_BASE_p
+  test_class_base = function (self)
+    local p = PTRN.class_base
     expect(p:match("a")).is(nil)
     expect(p:match("a.b")).contains({
       class = "a",
