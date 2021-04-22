@@ -125,6 +125,25 @@ local function get_line_number(str, index)
   return result
 end
 
+local class_base_p = Ct(
+    Cg(
+      C (
+        ( variable_p * P(".") )^0
+        * variable_p * P(":")
+        + ( variable_p * P(".") )^1
+      )
+      / function (c)
+        return c:sub(1, -2)
+      end,
+      "class"
+    )
+    * Cg(
+      variable_p,
+      "base"
+    )
+  )
+  * P(-1)
+
 local dot_p = P(".")
 local no_dot_p = P(1) - dot_p
 local base_extension_p = Ct(
@@ -154,6 +173,7 @@ end
 ---@field public variable_p             lpeg_t
 ---@field public identifier_p           lpeg_t
 ---@field public function_name_p        lpeg_t
+---@field public class_base_p           lpeg_t
 
 return {
   white_p               = white_p,
@@ -169,4 +189,5 @@ return {
   identifier_p          = identifier_p,
   function_name_p       = function_name_p,
   get_line_number       = get_line_number,
+  class_base_p          = class_base_p,
 }

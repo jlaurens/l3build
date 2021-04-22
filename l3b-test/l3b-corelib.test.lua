@@ -119,6 +119,7 @@ _G.test_lpeg = {
     expect(p:match("  :")).is(4)
     expect(p:match(":  ")).is(4)
     expect(p:match("  :  ")).is(6)
+    expect(p:match("  :  abc")).is(6)
   end,
   test_spaced_comma_p = function(self)
     local p = corelib.spaced_comma_p
@@ -155,4 +156,3 @@ _G.test_lpeg = {
     expect(p:match("a:c:def foo")).is(4)
   end,
 }
-

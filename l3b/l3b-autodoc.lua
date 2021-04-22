@@ -128,8 +128,6 @@ local Ct      = lpeg.Ct
 
 local Object = require("l3b-object")
 
-local get_object_Super = get_object_Super
-
 -- Module namespace
 
 local AD = {}
@@ -157,7 +155,10 @@ We keep track of the parser position in named captures.
 --]]
 
 ---@type corelib_t
-local corelib = require("l3b-corelib")
+local corelib       = require("l3b-corelib")
+local identifier_p  = corelib.identifier_p
+local white_p       = corelib.white_p
+local eol_p         = corelib.eol_p
 
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")
@@ -241,6 +242,15 @@ AD.Content = AD.Info:make_subclass("AD.Content", {
   ---@param t string[]
   mask_contents = function (self, t)
     self:do_mask_contents(t)
+  end,
+  __computed_index = function (self, k)
+    if k == "key" then
+      ---@type string
+      local result = self.__TYPE:l3b_base_extension().extension:lower()
+      self[k] = result
+      return result
+    end
+    return AD.Content.__Super.__computed_index(self, k)
   end,
 })
 
@@ -426,7 +436,7 @@ end
 ---@class AD.At: AD.Content  @ For embedded annotations `---@foo ...`
 ---@field public description            AD.Description
 ---@field public is_annotation          boolean                             @ true
----@field public KEY                    string                              @ static  KEY, the "foo" in ---@foo
+---@field public key                    string                              @ the "foo" in ---@foo
 ---@field public get_complete_p         fun(self: AD.At): lpeg_t      @ complete pattern, see `finalize`.
 ---@field public get_short_description  fun(self: AD.At, s: string): string @ redundant declaration, for editors
 ---@field public get_long_description   fun(self: AD.At, s: string): string @ redundant declaration for editors
@@ -435,7 +445,6 @@ end
 
 ---@type AD.At
 AD.At = AD.Content:make_subclass("AD.At", {
-  KEY           = "UNKNOWN KEY", -- to be overriden
   is_annotation = true,
   content_min = 1, -- only valid when content_min > min
   content_max = 0,
@@ -444,25 +453,13 @@ AD.At = AD.Content:make_subclass("AD.At", {
   __initialize = function (self)
     self.ignores = self.ignores or {}
   end,
-  get_capture_p = function (self)
-    return lpad.get_annotation(self.key, lpad["core_".. self.key])
-  end,
-  __computed_index = function (self, k)
-    if k == "key" then
-      ---@type string
-      local result = self.__TYPE:l3b_base_extension().extension
-      self[k] = result:lower()
-      return result
-    end
-    return AD.At.__Super.__computed_index(self, k)
-  end,
 })
 
 ---Pattern to capture an annotation
----All annotations start with '---@<KEY>'.
+---All annotations start with '---@<key>'.
 ---If this string is recognized, an object is created
 ---otherwise an error is thrown.
----This static method is eventually overriden by subclassers.
+---This static method is even
 ---The default implementation wraps the receiver's match
 ---pattern between management code.
 ---On success, this pattern returns one capture exactly
@@ -470,8 +467,12 @@ AD.At = AD.Content:make_subclass("AD.At", {
 ---@param self AD.At @ self is a "subclass" of AD.At
 ---@return lpeg_t
 function AD.At:get_capture_p()
+  print("DEBUG AD.At:get_capture_p", self.__TYPE, self.key)
+  if self:is_instance_of(AD.At.Class) then
+    print("DEBUG CLASS", self.key, "core_".. self.key, lpad["core_".. self.key], lpad.get_annotation(self.key, lpad["core_".. self.key]))
+  end
   return
-      lpad.get_annotation(self.KEY, self:get_core_p())
+      lpad.get_annotation(self.key, lpad["core_".. self.key])
     / function (at)
         return self(at)
       end
@@ -490,6 +491,10 @@ local capture_ignores_p = Ct(
 ---@param self AD.At
 ---@return lpeg_t
 function AD.At:get_complete_p()
+  local p = self:get_capture_p()
+  if not p then
+    print("ERROR", self.__Class.__TYPE)
+  end
   return
     ( AD.Description:get_capture_p() + Cc(false) )
     * self:get_capture_p()
@@ -530,9 +535,7 @@ end
 ---@class AD.At.Author: AD.At
 
 ---@type AD.At.Author
-AD.At.Author = AD.At:make_subclass("AD.At.Author", {
-  KEY         = "author",
-})
+AD.At.Author = AD.At:make_subclass("AD.At.Author")
 
 ---@class AD.At.Field: AD.At
 ---@field public visibility string | "public" | "protected" | "private"
@@ -541,15 +544,10 @@ AD.At.Author = AD.At:make_subclass("AD.At.Author", {
 
 ---@type AD.At.Field
 AD.At.Field = AD.At:make_subclass("AD.At.Field", {
-  KEY         = "field",
   visibility  = "public",
   name        = "UNKNOWN NAME",
   __initialize  = function (self)
     self.types = self.types or {}
-  end,
-  -- @field [public|protected|private] field_name FIELD_TYPE[|OTHER_TYPE] [@comment]
-  get_capture_p = function (self)
-    return lpad.field
   end,
 })
 
@@ -557,9 +555,7 @@ AD.At.Field = AD.At:make_subclass("AD.At.Field", {
 ---@class AD.At.See: AD.At
 
 ---@type AD.At.See
-AD.At.See = AD.At:make_subclass("AD.At.See", {
-  KEY   = "see",
-})
+AD.At.See = AD.At:make_subclass("AD.At.See")
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
 ---@class AD.At.Class: AD.At
@@ -574,13 +570,9 @@ do
 
   ---@type AD.At.Class
   AD.At.Class = AD.At:make_subclass("AD.At.Class", {
-    KEY   = "class",
     name  = "UNKNOWN CLASS NAME",
     __initialize = function (self)
       self.fields = self.fields  or {}
-    end,
-    get_capture_p = function (_self)
-      return lpad.class
     end,
     -- class annotation needs a custom complete method
     get_complete_p = function (self)
@@ -668,7 +660,6 @@ AD.At.Return = AD.At:make_subclass("AD.At.Return", {
 
 ---@type AD.At.Generic
 AD.At.Generic = AD.At:make_subclass("AD.At.Generic", {
-  KEY     = "generic",
   type_1  = "UNKNOWN TYPE NAME",
   get_core_p = function (self)
     return lpad.core_generic
@@ -683,7 +674,6 @@ AD.At.Generic = AD.At:make_subclass("AD.At.Generic", {
 
 ---@type AD.At.Param
 AD.At.Param = AD.At:make_subclass("AD.At.Param", {
-  KEY       = "param",
   name      = "UNKNOWN PARAM NAME",
   optional  = false,
   types     = { "UNKNOWN TYPE NAME" },
@@ -698,7 +688,6 @@ AD.At.Param = AD.At:make_subclass("AD.At.Param", {
 
 ---@type AD.At.Vararg
 AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
-  KEY   = "vararg",
   types = { "UNKNOWN TYPE NAME" },
   get_core_p = function (self)
     return lpad.core_vararg
@@ -713,7 +702,6 @@ AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
 
 ---@type AD.At.Module
 AD.At.Module = AD.At:make_subclass("AD.At.Module", {
-  KEY     = "module",
   name    = "UNKNOWN MODULE NAME",
   get_core_p = function(self)
     return lpad.core_module
@@ -760,7 +748,6 @@ end
 
 ---@type AD.At.Global
 AD.At.Global = AD.At:make_subclass("AD.At.Global", {
-  KEY   = "global",
   name  = "UNKNOWN GLOBALE NAME",
   get_core_p = function (self)
     return lpad.core_global
@@ -810,7 +797,6 @@ end
 ---@field public returns  AD.At.Return[]  @ parameters of the function
 ---@field public author   AD.At.Author
 ---@field public see      AD.At.See       @ reference
----@field public GUESS_p  lpeg_t
 do
   local tag_at = {} -- unique capture tag
   ---@type lpeg_t
@@ -908,16 +894,10 @@ do
       end
   ---@type AD.At.Function
   AD.At.Function = AD.At:make_subclass("AD.At.Function", {
-    KEY   = "function",
     name  = "UNKNOWN FUNCTION NAME",
     __initialize = function (self)
       self.params   = self.params  or {}
       self.returns  = self.returns or {}
-    end,
-    get_core_p = function (self)
-      return
-          Cg(lpad.identifier, "name")  -- capture the name
-        * lpad.capture_comment
     end,
     get_complete_p = function (self)
       -- capture a description
@@ -961,8 +941,6 @@ do
             return at -- return the capture
           end
     end,
-    -- pattern to guess the name of the documented function
-    GUESS_p = lpad.guess_function_name,
   }
 )
 end
@@ -1013,8 +991,8 @@ do
     + AD.ShortLiteral:get_capture_p()
     + AD.LongLiteral:get_capture_p()
     +   lpad.consume_1_character
-      * lpad.white^0
-      * lpad.eol
+      * white_p^0
+      * eol_p
   )
   * AD.Break:get_capture_p()^0
   * lpad.named_pos("max")        -- advance "max" to the current position
@@ -1211,11 +1189,13 @@ AD.Author = AD.AtProxy:make_subclass("AD.Author", {
 })
 
 ---@class AD.Function: AD.AtProxy
----@field public  vararg          AD.Vararg
+---@field public vararg           AD.Vararg
 ---@field public all_param_names  fun(): string|nil
 ---@field public all_params       fun(): AD.Param|nil
+---@field public get_param        fun(name: string): AD.Param
 ---@field public all_return_indices fun(): integer|nil
 ---@field public all_returns       fun(): AD.Return|nil
+---@field public get_return        fun(i: integer): AD.Return
 ---@field private _at AD.At.Function
 ---@field private __params AD.Param[]
 ---@field private __returns AD.Return[]
@@ -1498,7 +1478,7 @@ end
 
 AD.Type = AD.AtProxy:make_subclass("AD.Type", {
   __AtClass = AD.At.Type,
-  GLOBAL_p = lpad.white^0 * P("_G.") * C(lpad.identifier),
+  GLOBAL_p = white_p^0 * P("_G.") * C(identifier_p),
   __computed_index = function (self, k)
     if k == "types" then
       local at_k = self._at[k]
@@ -1936,7 +1916,7 @@ do
   ]]
   ---@param self AD.Module
   local function guess_function_names(self)
-    local p = AD.At.Function.GUESS_p
+    local p = lpad.guess_function_name
     for info in self:iterator(AD.At.Function) do
       if info.name == AD.At.Function.name then
         local code = info.after_code

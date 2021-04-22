@@ -6,7 +6,7 @@ function _G.test_Object()
   expect(Object).NOT(nil)
   expect(Object.__Super).is(nil)
   expect(Object.__Class).is(Object)
-  expect(Object.__index).is(Object)
+  expect(Object.__index()).is(nil)
   expect(Object()).NOT(nil)
   expect(Object()).NOT(nil)
 end
@@ -237,3 +237,77 @@ _G.test_make_another_subclass = {
     expect(instance.foo).is("bar")
   end,
 }
+
+_G.test_computed_table = function ()
+  local A = Object:make_subclass("A")
+  local a = A()
+  expect(a.foo).is(nil)
+  local AA = A:make_subclass("AA")
+  local aa = AA()
+  expect(A.foo).is(nil)
+  expect(a.foo).is(nil)
+  A.__computed_table.foo = function (self)
+    return "bar"
+  end
+  expect(a.foo).is("bar")
+  expect(aa.foo).is("bar")
+  AA.__computed_table.foo = function (self)
+    return "baz"
+  end
+  expect(a.foo).is("bar")
+  expect(aa.foo).is("baz")
+end
+
+_G.test_computed_index = function ()
+  local A = Object:make_subclass("A")
+  local a = A()
+  expect(a.foo).is(nil)
+  local AA = A:make_subclass("AA")
+  local aa = AA()
+  expect(A.foo).is(nil)
+  expect(a.foo).is(nil)
+  A.__computed_index = function (self, k)
+    if k == "foo" then
+      return "bar"
+    end
+  end
+  expect(a.foo).is("bar")
+  expect(aa.foo).is("bar")
+  AA.__computed_index = function (self, k)
+    if k == "foo" then
+      return "baz"
+    end
+  end
+  expect(a.foo).is("bar")
+  expect(aa.foo).is("baz")
+  local AB = A:make_subclass("AB")
+  local ab = AB()
+  expect(ab.foo).is("bar")
+  AB.__computed_index = function (self, k)
+    if k == "bar" then
+      return 421
+    end
+    if k == "foo" then
+      return Object.NIL
+    end
+  end
+  expect(ab.bar).is(421)
+  expect(ab.foo).is(nil)
+end
+
+_G.test_key = function ()
+  local A = Object:make_subclass("A", {
+    __computed_index = function (self, k)
+      if k == "key" then
+        return self.__TYPE
+      end
+    end
+  })
+  local a = A()
+  expect(a.key).is("A")
+  local a_1 = setmetatable({}, A)
+  expect(a_1.key).is("A")
+  expect(A.key).is(nil)
+  local AA = A:make_subclass("AA")
+  expect(AA.key).is("AA")
+end

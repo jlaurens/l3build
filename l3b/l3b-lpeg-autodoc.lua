@@ -43,21 +43,18 @@ local Cmt     = lpeg.Cmt
 local Cp      = lpeg.Cp
 local Ct      = lpeg.Ct
 
----@type lpeglib_t
-local lpeglib       = require("l3b-lpeglib")
-local white         = lpeglib.white
-local black         = lpeglib.black
-local eol           = lpeglib.eol
-local get_spaced    = lpeglib.get_spaced
-local spaced_comma  = lpeglib.spaced_comma
-local spaced_colon  = lpeglib.spaced_comma
-local consume_1_character = lpeglib.consume_1_character
-local variable      = lpeglib.variable
-local identifier    = lpeglib.identifier
-local function_name = lpeglib.function_name
-
 ---@type corelib_t
 local corelib         = require("l3b-corelib")
+local white_p         = corelib.white_p
+local black_p         = corelib.black_p
+local eol_p           = corelib.eol_p
+local get_spaced_p    = corelib.get_spaced_p
+local spaced_comma_p  = corelib.spaced_comma_p
+local spaced_colon_p  = corelib.spaced_colon_p
+local consume_1_character_p = corelib.consume_1_character_p
+local variable_p      = corelib.variable_p
+local identifier_p    = corelib.identifier_p
+local function_name_p = corelib.function_name_p
 local get_line_number = corelib.get_line_number
 
 -- Implementation
@@ -105,8 +102,7 @@ local chunk_init =
   * named_pos("max", 1)
 
 ---Prepare the match of a new chunk
----In order to further insert a code chunk info if necessary
----create it and save it as capture named "code_before".
+---Make a local copy of the capture named "min".
 ---@type lpeg_t
 local chunk_start =
   Cg( Cb("min"), "min")
@@ -119,7 +115,7 @@ then store the position in the capture named "max".
 --]===]
 ---@type lpeg_t
 local chunk_stop =
-    white^0
+    white_p^0
   * P("\n")^-1
   * named_pos("max", 1)
   -- no capture
@@ -132,20 +128,20 @@ local one_line_chunk_stop =
 
 ---@type lpeg_t
 local special_begin =
-  ( white^1 + -B("-") ) -- 1+ spaces or negative lookbehind: no "-" behind
+  ( white_p^1 + -B("-") ) -- 1+ spaces or negative lookbehind: no "-" behind
   * P("---") * -P("-")
-  * white^0
+  * white_p^0
 
 ---@type lpeg_t
 local capture_comment = (
-      get_spaced("@")
+      get_spaced_p("@")
     * named_pos("content_min")
-    * black^0 * ( white^1 * black^1 )^0
+    * black_p^0 * ( white_p^1 * black_p^1 )^0
     * named_pos("content_max", 1)
-    * white^0
+    * white_p^0
   )
   + Cmt(
-    black,
+    black_p,
     function (s, i)
       error("Missing @ for a comment at line "
         .. get_line_number(s, i - 1)
@@ -155,7 +151,7 @@ local capture_comment = (
   + (
       named_pos("content_min")
     * named_pos("content_max", 1)
-    * white^0
+    * white_p^0
   )
 
 ---Sub grammar for lua types
@@ -165,52 +161,52 @@ local lua_type = P({
   type =
     ( V("table")
     + V("fun")
-    + identifier
+    + identifier_p
     )
-    * (get_spaced("[") -- for an array: `string[]`
-      * get_spaced("]")
+    * (get_spaced_p("[") -- for an array: `string[]`
+      * get_spaced_p("]")
     )^0,
   table =
     P("table")   -- table<foo,bar>
-    * (get_spaced("<")
+    * (get_spaced_p("<")
       * V("type")
-      * spaced_comma
+      * spaced_comma_p
       * V("type")
-      * get_spaced(">")
+      * get_spaced_p(">")
     )^-1,
   fun =
       P("fun")
-    * get_spaced("(")
+    * get_spaced_p("(")
     * (
-        V("fun_params") * spaced_comma * V("fun_vararg")
+        V("fun_params") * spaced_comma_p * V("fun_vararg")
       + V("fun_params")
       + V("fun_vararg")^-1
     )
-    * get_spaced(")")
+    * get_spaced_p(")")
     * V("fun_return")^-1,
   fun_vararg =
     P("..."),
   fun_param =
-    variable * spaced_colon * V("type"),
+    variable_p * spaced_colon_p * V("type"),
   fun_params =
-    V("fun_param") * (spaced_comma * V("fun_param"))^0,
+    V("fun_param") * (spaced_comma_p * V("fun_param"))^0,
   fun_return =
-      spaced_colon
+      spaced_colon_p
     * V("type")
-    * (spaced_comma * V("type"))^0,
+    * (spaced_comma_p * V("type"))^0,
 })
 
 ---@type lpeg_t
 local named_types = Cg( Ct(-- collect all the captures in an array
     C(lua_type)
-  * ( get_spaced("|") * C(lua_type) )^0
+  * ( get_spaced_p("|") * C(lua_type) )^0
 ), "types")
 
 
 ---@type lpeg_t
 local named_optional =
-    white^0 * Cg(P("?") * Cc(true) , "optional") * white^0
-  + Cg(Cc(false), "optional") * white^0
+    white_p^0 * Cg(P("?") * Cc(true) , "optional") * white_p^0
+  + Cg(Cc(false), "optional") * white_p^0
 
 ---Capture the pattern "---@<name>..."
 ---@param name string
@@ -219,8 +215,8 @@ local function at_match(name)
   return
       special_begin
     * P("@".. name)
-    * -black
-    * white^0
+    * -black_p
+    * white_p^0
 end
 
 ---comment
@@ -242,16 +238,16 @@ end
 local long_doc =
   chunk_init
   * Ct(
-    ( white^1 + -B("-") ) -- 1+ spaces or no "-" before
+    ( white_p^1 + -B("-") ) -- 1+ spaces or no "-" before
     * P("--[===[")
-    * eol
+    * eol_p
     * chunk_start
     * named_pos("content_min")
     * Cg(
       Cmt(
         P(0),
         function (s, i)
-          local p = white^0 * P("-")^0 * P("]===]")
+          local p = white_p^0 * P("-")^0 * P("]===]")
           for j = i, #s - 1 - 3 do
             local result = p:match(s, j)
             if result then
@@ -269,8 +265,8 @@ local long_doc =
 
 local content =
     named_pos("content_min")
-  * black^0
-  * ( white^1 * black^1 )^0
+  * black_p^0
+  * ( white_p^1 * black_p^1 )^0
   * named_pos("content_max", 1)
 
 --=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
@@ -279,13 +275,13 @@ local content =
 ---@type lpeg_t
 local line_comment =
     chunk_init
-  * ( white^1 + -B("-") )             -- 1+ spaces or no "-" before, the back test should never be reached
+  * ( white_p^1 + -B("-") )             -- 1+ spaces or no "-" before, the back test should never be reached
   * ( P("-")^4
     + P("--")
     * -P("-")                         -- >1 dashes, but not 3
     * -(P("[") * P("=")^0 * P("[")) -- no long comment
   )
-  * white^0
+  * white_p^0
   * Ct(
       chunk_start
     * content
@@ -298,7 +294,7 @@ local line_doc =
     chunk_init
   * special_begin
   * -P("@")       -- negative lookahead: not an annotation
-  * white^0
+  * white_p^0
   * Ct(
       chunk_start
     * content
@@ -308,7 +304,7 @@ local line_doc =
 local short_literal =
     chunk_init
     * Ct(
-      white^0
+      white_p^0
     * Cg(S([['"]]), TAG)
     * chunk_start
     * named_pos("content_min")
@@ -348,13 +344,13 @@ do
       P("[")
     * Cg( C(P("=")^0 ), TAG ) -- tagged capture of the equals
     * P("[")
-    * eol                               -- optional EOL
+    * eol_p                               -- optional EOL
     * named_pos("content_min")
 
   local close_p = Cg( Cmt(                 -- scan the string by hand
     Cb(TAG),
     function (s, i, equal)
-      local p = white^0 * P("-")^0 * P("]") * equal * P("]")
+      local p = white_p^0 * P("-")^0 * P("]") * equal * P("]")
       for j = i, #s - 1 - #equal do
         local result = p:match(s, j)
         if result then
@@ -401,13 +397,13 @@ do
       "["
     * Cg(P("=")^-2 + P("=")^4, TAG) -- tagged capture of the equals
     * "["
-    * eol                               -- optional EOL
+    * eol_p                               -- optional EOL
     * named_pos("content_min")
 
   local close_p = Cg(Cmt(                 -- scan the string by hand
     Cb(TAG),
     function (s, i, equal)
-      local p = white^0 * P("-")^0 * P("]") * equal * P("]")
+      local p = white_p^0 * P("-")^0 * P("]") * equal * P("]")
       for j = i, #s - 1 - #equal do
         local result = p:match(s, j)
         if result then
@@ -435,7 +431,7 @@ do
 
   ---@type lpeg_t @ what makes the difference with a long literal
   local prefix =
-  (white^1 + -B("-")) -- 1+ spaces or no "-" before
+  (white_p^1 + -B("-")) -- 1+ spaces or no "-" before
   * P("--")
   long_comment =
       chunk_init
@@ -457,6 +453,10 @@ end
 ---@param core lpeg_t
 ---@return lpeg_t
 local function get_annotation(key, core)
+  if not core then
+    print("\n**** DEBUG key", key)
+    print(debug.traceback())
+  end
   return
       chunk_init
     * at_match(key) * (
@@ -473,25 +473,25 @@ local core_field = Cg(
     P("public") + "protected" + "private",
     "visibility"
   )
-  * white^1
+  * white_p^1
   * Cg(
-    variable,
+    variable_p,
     "name"
   )
-  * white^1
+  * white_p^1
   * named_types
   * capture_comment
 
 local core_class =
-    Cg(identifier, "name")
-  * ( spaced_colon * Cg(identifier, "parent") )^-1                 -- or nil
+    Cg(identifier_p, "name")
+  * ( spaced_colon_p * Cg(identifier_p, "parent") )^-1                 -- or nil
   * capture_comment
 
 local core_type = named_types * capture_comment
 
 local core_alias =
-    Cg(identifier, "name")
-  * white^1
+    Cg(identifier_p, "name")
+  * white_p^1
   * named_types
   * capture_comment
 
@@ -501,20 +501,20 @@ local core_return =
   * capture_comment
 
 local core_generic =
-    Cg(variable, "type_1")          -- capture type_1
-  * (spaced_colon
-    * Cg(identifier, "parent_1")    -- and capture parent_1
+    Cg(variable_p, "type_1")          -- capture type_1
+  * (spaced_colon_p
+    * Cg(identifier_p, "parent_1")    -- and capture parent_1
   )^-1
-  * (spaced_comma * (
-      Cg(variable, "type_2")        -- capture type_2
-    * (spaced_colon
-      * Cg(identifier, "parent_2")  -- and capture parent_2
+  * (spaced_comma_p * (
+      Cg(variable_p, "type_2")        -- capture type_2
+    * (spaced_colon_p
+      * Cg(identifier_p, "parent_2")  -- and capture parent_2
     )^-1
   ))^-1
   * capture_comment
 
 local core_param =
-    Cg(variable, "name")
+    Cg(variable_p, "name")
   * named_optional
   * named_types
   * capture_comment
@@ -526,61 +526,73 @@ local NAME_p = R("az", "09") * (R("az", "09") + S("_-."))^0
 local core_module = Cg(NAME_p, "name") * capture_comment
 
 local core_global =
-    Cg(identifier, "name")
-  * white^0
+    Cg(identifier_p, "name")
+  * white_p^0
   * Cg(
     Ct(-- collect all the captures in an array
       ( C(lua_type)
-        * ( get_spaced("|") * C(lua_type) )^0
+        * ( get_spaced_p("|") * C(lua_type) )^0
       ) + P(0)
     ), "types")
   * capture_comment
 
+  local core_author =
+  Cg(
+    black_p^0 * ( white_p^1 * black_p^1 )^0,
+    "value"
+  )
+
+local core_see = core_author
+
+local core_function =
+    Cg(identifier_p, "name")  -- capture the name
+  * capture_comment
+
 local guess_function_name = P( {
-  - B(black)
+  - B(black_p)
   * Ct(
       V("local function")
     + V("function ...")
     + V("local ... = function (")
     + V("... = function (")
   )
-  * white^0
+  * white_p^0
   * P("(")
-  + ( P(1) - P("\n") ) * V(1), -- advance one character one the same line and try to match
+  + ( P(1) - P("\n") ) * V(1), -- advance one character on the same line and try to match
   ["local function"] =
       P("local")
-    * white^1
+    * white_p^1
     * P("function")
-    * white^1
+    * white_p^1
     * Cg(
-      variable,
+      variable_p,
       "name"
     )
     * Cg( Cc(true), "is_local"),
   ["function ..."] =
       P("function")
-    * white^1
+    * white_p^1
     * Cg(
-      function_name,
+      function_name_p,
       "name"
     )
     * Cg( Cc(false), "is_local"),
   ["local ... = function ("] =
       P("local")
-    * white^1
+    * white_p^1
     * Cg(
-      variable,
+      variable_p,
       "name"
     )
-    * get_spaced("=")
+    * get_spaced_p("=")
     * P("function")
     * Cg( Cc(true), "is_local"),
   ["... = function ("] =
     Cg(
-      function_name,
+      function_name_p,
       "name"
     )
-    * get_spaced("=")
+    * get_spaced_p("=")
     * P("function")
     * Cg( Cc(false), "is_local"),
 } )
@@ -588,29 +600,10 @@ local guess_function_name = P( {
 local paragraph_break =
     chunk_init
   * Ct(                     -- 1) a table of named captures
-    ( white^0 * P("\n") )^1
+    ( white_p^0 * P("\n") )^1
     * chunk_start
     * chunk_stop
   )
-
-local class_base = Ct(
-    Cg(
-      C (
-        ( variable * P(".") )^0
-        * variable * P(":")
-      + ( variable * P(".") )^1
-      )
-      / function (c)
-        return c:sub(1, -2)
-      end,
-      "class"
-    )
-    * Cg(
-      variable,
-      "base"
-    )
-  )
-  * P(-1)
 
 ---@class lpeg_autodoc_t
 ---@field public line_comment     lpeg_t
@@ -630,11 +623,12 @@ local class_base = Ct(
 ---@field public core_vararg      lpeg_t
 ---@field public core_module      lpeg_t
 ---@field public core_global      lpeg_t
+---@field public core_author      lpeg_t
+---@field public core_see         lpeg_t
+---@field public core_function    lpeg_t
 ---@field public guess_function_name  lpeg_t
 ---@field public paragraph_break  lpeg_t
----@field public class_base       lpeg_t
 --
----@field public fun          lpeg_t
 ---@field public named_pos    fun(str: string, shift: number): lpeg_t
 ---@field public chunk_init   lpeg_t
 ---@field public chunk_start  lpeg_t
@@ -667,20 +661,18 @@ return {
   core_vararg     = core_vararg,
   core_module     = core_module,
   core_global     = core_global,
+  core_author     = core_author,
+  core_see        = core_see,
+  core_function   = core_function,
   guess_function_name = guess_function_name,
   paragraph_break = paragraph_break,
-  class_base      = class_base,
 
-  fun             = function_name,
   named_pos       = named_pos,
   chunk_init      = chunk_init,
   chunk_start     = chunk_start,
   chunk_stop      = chunk_stop,
   one_line_chunk_stop = one_line_chunk_stop,
   special_begin   = special_begin,
-  get_spaced      = get_spaced,
-  colon           = spaced_colon,
-  comma           = spaced_comma,
   capture_comment = capture_comment,
   lua_type        = lua_type,
   named_types     = named_types,
@@ -688,5 +680,5 @@ return {
   at_match        = at_match,
   error_annotation = error_annotation,
   content         = content,
-  consume_1_character = consume_1_character,
+  consume_1_character = consume_1_character_p,
 }
