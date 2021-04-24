@@ -29,14 +29,446 @@ Many iterators.
 
 -- local safety guards and shortcuts
 
----@type corelib_t
-local corelib = require("l3b-corelib")
-local utf8_p = corelib.utf8_p
+local append = table.insert
+
+local standard_print = print
+local current_print = standard_print -- can be changed
+_G.print = function (...)
+  current_print(...)
+end
+
+---@type utlib_t
+local utlib = require("l3b-utillib")
+
+local expect  = require("l3b-test/expect").expect
 
 local lpeg = require("lpeg")
-local C = lpeg.C
-local Ct = lpeg.Ct
-local P = lpeg.P
+local C   = lpeg.C
+local Ct  = lpeg.Ct
+local Cmt = lpeg.Cmt
+local P   = lpeg.P
+
+_G.test_split = function ()
+  local split = utlib.split
+  expect(function () split() end).error()
+  expect(function () split("") end).error()
+  expect(function () split(nil, "") end).error()
+  expect(split("abc", "")).equals({ "a", "b", "c" })
+  expect(split("abc", "a")).equals({ "", "bc" })
+  expect(split("abc", "b")).equals({ "a", "c" })
+  expect(split("abc", "c")).equals({ "ab", "" })
+  expect(split("aabc", "a")).equals({ "", "", "bc" })
+  expect(split("abbc", "b")).equals({ "a", "", "c" })
+  expect(split("abcc", "c")).equals({ "ab", "", "" })
+  expect(split("aabc", P("a")^1)).equals({ "", "bc" })
+  expect(split("abbc", P("b")^1)).equals({ "a", "c" })
+  expect(split("abcc", P("c")^1)).equals({ "ab", "" })
+end
+
+_G.test_path_components = function ()
+  local path_components = utlib.path_components
+  expect(path_components("")).equals({ "" })
+  expect(path_components("a")).equals({ "a" })
+  expect(path_components("a/")).equals({ "a", "" })
+  expect(path_components("/a")).equals({ "", "a" })
+  expect(path_components("a//")).equals({ "a", "" })
+  expect(path_components("//a")).equals({ "", "a" })
+  expect(path_components("a/")).equals({ "a", "" })
+  expect(path_components("/a/")).equals({ "", "a", "" })
+end
+
+_G.test_string_forward_slash = function ()
+  expect("" / "").is("/")
+  expect("a" / "").is("a/")
+  expect("a" / "b").is("a/b")
+  expect("a/" / "b").is("a/b")
+  expect("a" / "/b").is("a/b")
+  expect("/" / "").is("/")
+  expect("" / "/").is("/")
+  expect("/" / "/").is("/")
+end
+
+_G.test_readonly = function ()
+  local rw = {}
+  local ro = utlib.readonly(rw)
+  rw.foo = 421
+  expect(ro.foo).is(421)
+  expect(ro.bar).is(nil)
+  expect(function () ro.bar = 421 end).error()
+  expect(function () utlib.is_readonly(1) end).error()
+  expect(utlib.is_readonly(rw)).is(false)
+  expect(utlib.is_readonly(ro)).is(true)
+end
+
+_G.test_to_quoted_string = function ()
+  local to_quoted_string = utlib.to_quoted_string
+  expect(to_quoted_string( "" )).is('""')
+  expect(to_quoted_string( "" )).is('""')
+  expect(to_quoted_string( "a" )).is('"a"')
+  expect(to_quoted_string( { "a", "b" } )).is('"a" "b"')
+end
+
+_G.test_indices = function ()
+  local track = {}
+  for i in utlib.indices({}) do
+    append(track, i)
+  end
+  expect(track).equals({})
+  for i in utlib.indices({ "1", "2", "3" }) do
+    append(track, i)
+  end
+  expect(track).equals({ 1, 2, 3 })
+end
+
+_G.test_entries = function ()
+  local entries = utlib.entries
+  local track = {}
+  for entry in entries({}) do
+    append(track, entry)
+  end
+  expect(track).equals({})
+  for entry in entries({ 1, 3, 2 }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 1, 3, 2 })
+  track = {}
+  for entry in entries({ 1, 3, 3, 2, 1 }, { unique = true }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 1, 3, 2 })
+  track = {}
+  for entry in entries({ 1, 3, 3, 2, 1 }, { compare = utlib.compare_ascending }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 1, 1, 2, 3, 3 })
+  track = {}
+  for entry in entries({ 1, 3, 3, 2, 1 }, { compare = utlib.compare_descending }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 3, 3, 2, 1, 1 })
+  track = {}
+  for entry in entries({ 1, 3, 3, 2, 1 }, {
+    compare = utlib.compare_descending,
+    unique = true
+  }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 3, 2, 1 })
+  track = {}
+  for entry in entries({ 1, 3, 3, 2, 1 }, {
+    compare = utlib.compare_descending,
+    unique = true,
+    exclude = function (x)
+      return x == 2
+    end,
+  }) do
+    append(track, entry)
+  end
+  expect(track).equals({ 3, 1 })
+end
+
+_G.test_items = function ()
+  local track = {}
+  for i in utlib.items() do
+    append(track, i)
+  end
+  expect(track).equals({ })
+  track = {}
+  for i in utlib.items( 1, 2, 3 ) do
+    append(track, i)
+  end
+  expect(track).equals({ 1, 2, 3 })
+end
+
+_G.test_unique_items = function ()
+  local track = {}
+  for i in utlib.unique_items() do
+    append(track, i)
+  end
+  expect(track).equals({ })
+  for i in utlib.unique_items( 1, 2, 2, 3, 3, 3 ) do
+    append(track, i)
+  end
+  expect(track).equals({ 1, 2, 3 })
+end
+
+_G.test_keys = function ()
+  local keys = utlib.keys
+  local track = {}
+  for k in keys({}) do
+    append(track, k)
+  end
+  expect(track).equals({})
+  for k in keys({
+    a = 1,
+    c = 3,
+    b = 2,
+  }) do
+    track[k] = true
+  end
+  expect(track).equals({ a = true, b = true, c = true })
+  track = {}
+  for k in keys({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, utlib.compare_ascending) do
+    append(track, k)
+  end
+  expect(track).equals({ "a", "b", "c" })
+  track = {}
+  for k in keys({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, utlib.compare_descending) do
+    append(track, k)
+  end
+  expect(track).equals({ "c", "b", "a", })
+end
+
+_G.test_sorted_pairs = function ()
+  local track = {}
+  local sorted_pairs = utlib.sorted_pairs
+  for k, v in sorted_pairs({}) do
+    append(track, k)
+  end
+  expect(track).equals({})
+  track = {}
+  for k, v in sorted_pairs({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, { compare = utlib.compare_ascending}) do
+    append(track, k)
+  end
+  expect(track).equals({ "a", "b", "c" })
+  track = {}
+  for k, v in sorted_pairs({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, { compare = utlib.compare_descending}) do
+    append(track, k)
+  end
+  expect(track).equals({ "c", "b", "a" })
+end
+
+_G.test_values = function ()
+  local track = {}
+  local values = utlib.values
+  for k, v in values({}) do
+    append(track, k)
+  end
+  expect(track).equals({})
+  track = {}
+  for k, v in values({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, { compare = utlib.compare_ascending}) do
+    append(track, k)
+  end
+  expect(track).equals({ 1, 2, 3 })
+  track = {}
+  for k, v in values({
+    a = 1,
+    c = 3,
+    b = 2,
+  }, { compare = utlib.compare_descending}) do
+    append(track, k)
+  end
+  expect(track).equals({ 3, 2, 1 })
+end
+
+_G.test_first_of = function ()
+  local first_of = utlib.first_of
+  expect(first_of()).is(nil)
+  expect(first_of(1)).is(1)
+  expect(first_of(1, 2)).is(1)
+end
+
+_G.test_second_of = function ()
+  local second_of = utlib.second_of
+  expect(second_of()).is(nil)
+  expect(second_of(1)).is(nil)
+  expect(second_of(1, 2)).is(2)
+  expect(second_of(1, 2, 3)).is(2)
+end
+
+_G.test_trim = function ()
+  local trim = utlib.trim
+  expect(trim("")).is("")
+  expect(trim(" ")).is("")
+  expect(trim(" a")).is("a")
+  expect(trim("a ")).is("a")
+  expect(trim(" a ")).is("a")
+  expect(trim(" a b ")).is("a b")
+end
+
+_G.test_extend_with = function ()
+  local extend_with = utlib.extend_with
+  local t = {}
+  extend_with(t, {})
+  expect(t).equals({})
+  t = {}
+  extend_with(t, { foo = 1 } )
+  expect(t).equals({ foo = 1 })
+  extend_with(t, { bar = 2 } )
+  expect(t).equals({ foo = 1, bar = 2 })
+  extend_with(t, { bar = 3 }, true )
+  expect(t).equals({ foo = 1, bar = 3 })
+  expect(function () extend_with(t, { bar = 4 } ) end).error()
+end
+
+_G.test_shallow_copy = function ()
+  local shallow_copy = utlib.shallow_copy
+  local original = {}
+  expect(shallow_copy(original)).equals(original)
+  original = { a = 1 }
+  expect(shallow_copy(original)).equals(original)
+  original = setmetatable({ a = 1 }, {})
+  local copy = shallow_copy(original)
+  expect(copy).equals(original)
+  expect(getmetatable(copy)).is(getmetatable(original))
+  original.foo = {}
+  copy = shallow_copy(original)
+  expect(copy.foo.bar).is(nil)
+  original.foo.bar = 421
+  expect(copy.foo.bar).is(421)
+end
+
+_G.test_deep_copy = function ()
+  local deep_copy = utlib.deep_copy
+  local original = {}
+  expect(deep_copy(original)).equals(original)
+  original = { a = 1 }
+  expect(deep_copy(original)).equals(original)
+  original = setmetatable({ a = 1 }, {})
+  local copy = deep_copy(original)
+  expect(copy).equals(original)
+  expect(getmetatable(copy)).is(getmetatable(original))
+  original.foo = {}
+  copy = deep_copy(original)
+  expect(copy.foo.bar).is(nil)
+  original.foo.bar = 421
+  expect(copy.foo.bar).is(nil)
+end
+
+_G.test_bridge = function ()
+  local primary = {
+    p_1 = 1,
+    p_2 = 2,
+    p_3 = {
+      p_31 = 31,
+    },
+    t = {},
+  }
+  local secondary = {
+    s_1 = 11,
+    s_2 = 21,
+    s_3 = {
+      s_31 = 311,
+    },
+    t = {},
+  }
+  local b = utlib.bridge({
+    primary   = primary,
+    secondary = secondary,
+  })
+  expect(b.p_1).is(primary.p_1)
+  expect(b.p_2).is(primary.p_2)
+  expect(b.p_3).equals({ p_31 = 31 })
+  expect(b.s_1).is(secondary.s_1)
+  expect(b.s_2).is(secondary.s_2)
+  expect(b.s_3).equals({ s_31 = 311 })
+  primary.s_1 = secondary.s_1 + 10
+  expect(b.s_1).is(primary.s_1)
+  primary.s_1 = nil
+  expect(b.s_1).is(secondary.s_1)
+
+  expect(b.t).equals({})
+  primary.t.p = 1 + math.random()
+  expect(b.t.p).equals(primary.t.p)
+  secondary.t.s = 2 + math.random()
+  expect(b.t.s).equals(secondary.t.s)
+
+  b = utlib.bridge({
+    primary = primary,
+    secondary = secondary,
+    prefix = "before_",
+    suffix = "_after",
+  })
+  primary.before_x_after = 1
+  secondary.before_y_after = 2
+  expect(b.x).is(1)
+  expect(b.y).is(2)
+  b = utlib.bridge({
+    primary = {},
+    secondary = {},
+    index = function (self, k)
+      if k == "foo" then
+        return 421
+      end
+    end,
+  })
+  expect(b.foo).is(421)
+  b = utlib.bridge({
+    primary = {
+      foo = 421,
+    },
+    secondary = {
+      bar = 421,
+    },
+    complete = function (self, k, result)
+      if k == "foo" then
+        return 2 * result
+      end
+    end,
+  })
+  expect(b.foo).is(842)
+  expect(b.bar).is(421)
+
+  local track
+  b = utlib.bridge({
+    primary = {
+      foo = 421,
+    },
+    secondary = {
+      bar = 421,
+    },
+    newindex = function (self, k, value)
+      if k == "mee" then
+        track = value
+      end
+    end,
+  })
+  b.mee = 421
+  expect(track).is(421)
+
+  b = utlib.bridge()
+  local key = {}
+  _G[key] = 421
+  expect(b[key]).is(421)
+end
+
+_G.test_to_ymd_hms = function ()
+  local to_ymd_hms = utlib.to_ymd_hms
+  local diff =
+    19 + 60 * (18 + 60 * 17)
+  expect(to_ymd_hms(diff)).is(" 17:18:19")
+  diff =
+    15 + 60 * (
+    14 + 60 * (
+    13 + 24 * (
+    12 + 30 * (
+    11 + 12 * (
+    10
+    )))))
+    expect(to_ymd_hms(diff)).is("10 years, 11 months, 12 days 13:14:15")
+  end
+
+--[=====[
 
 local type    = type
 local print   = print
@@ -49,87 +481,12 @@ local sort        = table.sort
 local append      = table.insert
 local concat      = table.concat
 local tbl_unpack  = table.unpack
-local move        = table.move
 
 --[=[ Package implementation ]=]
 
----Split the given string according to the given separator
----@param str string @ 
----@param sep string | lpeg_t | nil @ 
-local function split(str, sep)
-  if sep == "" then
-    return Ct(C(utf8_p)^0):match(str)
-  end
-  local p = P(sep)
-  local q = 1-p
-  local r =
-    ( C(q^0) * p )^1
-    * C(q^0)
-    + C(q^1)
-  return Ct(r):match(str) or { str }
-end
-
----Split the given string into its path components
----@function path_components
----@param str string
-local path_components = setmetatable({}, {
-  __mode = "k",
-  __call = function (self, k)
-    local result = split(k, P("/")^1)
-    self[k] = result
-    return result
-  end,
-})
-
-local function merge_path(a, b)
-  local a_components = path_components(a)
-  local b_components = path_components(b)
-  local components = {}
-  if a == "" then
-    if b == "" then
-      return "/"
-    end
-    if b_components[1] == "" then
-      return b
-    end
-  end
-  if b == "" then
-    if a_components[#a_components] == "" then
-      return a
-    end
-    move(
-      a_components, 1, #a_components,
-      1, components
-    )
-    append(components, "")
-  else
-    local e = #a_components
-    e = a_components[e] == ""
-      and e - 1
-      or  e
-    move(
-      a_components, 1, e,
-      1, components
-    )
-    local f = b_components[1] == ""
-      and 2
-      or  1 -- no "" allowed in the middle
-    move(
-      b_components, f, #b_components,
-      #components + 1 ,components
-    )
-  end
-  local result = concat(components, "/")
-  path_components[result] = components
-  return result
-end
-
--- implement the / operator for string as path merger
-do
-  local MT = getmetatable("")
-  function MT.__div(a, b)
-    return merge_path(a, b)
-  end
+local MT = getmetatable("")
+function MT.__div(a, b)
+  return a .."/".. b
 end
 
 --[==[ Readonly business
@@ -139,7 +496,7 @@ With a level of indirections, we loose the `pairs` benefit
 unless we define a `__pairs` event handler.
 ]==]
 
-local KEY_READONLY_ORIGINAL = {} -- unique key to point to the original table
+local KEY_READONLY_ORIGINAL = {} -- unique key to point to the orginal table
 
 ---Return a readony proxy to the given table.
 ---@param t     table
@@ -188,13 +545,10 @@ local Vars = {
 ---@alias error_level_n integer
 
 ---Turn the string list into quoted items separated by a sep
----@param table string[] | string
+---@param table table
 ---@param separator string|nil @defaults to " "
 ---@return string
 local function to_quoted_string(table, separator)
-  if type(table) ~= "table" then
-    table = { table }
-  end
   local t = {}
   for i = 1, #table do
     t[i] = ("%q"):format(table[i])
@@ -288,7 +642,7 @@ local function entries(table, kv)
     sort(table, kv.compare)
   end
   local iterator = raw_iterator(table)
-  if not kv.unique and not kv.exclude then
+  if not kv.exclude then
     return iterator
   end
   local already = {}
@@ -430,9 +784,7 @@ end
 ---@return T
 local function shallow_copy(original)
   local res = {}
-  for k, v in next, original do
-    res[k] = v
-  end
+  for k, v in next, original do res[k] = v end
   return setmetatable(res, getmetatable(original))
 end
 
@@ -447,7 +799,7 @@ local function deep_copy(original)
     if type(obj) ~= 'table' then  -- return as is
       return obj
     end
-    if seen[obj] then             -- return already seen if any
+    if seen[obj] then             -- return already see if any
       return seen[obj]
     end
     local res = {}                                -- make a new table
@@ -480,7 +832,7 @@ local function bridge(kv)
   local MT = {}
   if kv then
     kv = shallow_copy(kv)
-    MT.__index = function (self --[[: table]], k --[[: string]])
+    MT.__index = function (t --[[: table]], k --[[: string]])
       if type(k) == "string" then
         if kv.map then
           k = kv.map[k]
@@ -492,39 +844,36 @@ local function bridge(kv)
         local primary = kv.primary or _G
         local result  = primary[k_G]
         if result == nil and kv.index then
-          result = kv.index(self, k)
+          result = kv.index(t, k)
         end
         if kv.complete then
-          result = kv.complete(self, k, result)
+          result = kv.complete(t, k, result)
         end
         if kv.secondary then
           local result_2 = kv.secondary[k_G]
-          if  result ~= result_2 then
-            if  type(result)   == "table"
-            and type(result_2) == "table"
-            then
-              result = bridge({
-                primary   = result,
-                secondary = result_2
-              })
-            else
-              result = result or result_2
-            end
+          if  result ~= result_2
+          and type(result)   == "table"
+          and type(result_2) == "table"
+          then
+            result = bridge({
+              primary   = result,
+              secondary = result_2
+            })
           end
         end
         return result
       end
     end
     if kv.newindex then
-      MT.__newindex = kv.newindex
-    else
-      MT.__newindex = function (self, k, v)
-        assert(kv.newindex(self, k, v), "Readonly bridge ".. tostring(k) .." ".. tostring(v))
+      MT.__newindex = function (t, k, v)
+        assert(kv.newindex(t, k, v), "Readonly bridge ".. tostring(k) .." ".. tostring(v))
       end
     end
   else
-    MT.__index = _G
-    MT.__newindex = function (self, k, v)
+    MT.__index = function (t, k)
+      return _G[k]
+    end
+    MT.__newindex = function (t, k, v)
       error("Readonly bridge".. tostring(k) .." ".. tostring(v))
     end
   end
@@ -551,7 +900,7 @@ local function to_ymd_hms(diff)
   for item in items("year", "month", "day") do
     local n = diff_date[item]
     if n > 0 then
-      append(display_date, ("%d %s%s"):format(n, item, n > 1 and "s" or ""))
+      append(display_date, ("%d %s"):format(n, item))
     end
   end
   local display_time = {}
@@ -559,15 +908,10 @@ local function to_ymd_hms(diff)
     local n = diff_date[item]
     append(display_time, ("%02d"):format(n))
   end
-  display_time = concat(display_time, ':')
-  if display_date == "" then
-    return display_time
-  else
-    return concat({
-      concat(display_date, ", "),
-      display_time
-    }, ' ')
-  end
+  return concat({
+    concat(display_date, ", "),
+    concat(display_time, ':')
+  }, ' ')
 end
 
 ---Print the diff time, if any.
@@ -587,7 +931,6 @@ local flags = {}
 ---@class utlib_t
 ---@field public Vars               utlib_vars_t
 ---@field public flags              flags_t
----@field public split              fun(str: string, sep: string): string[]
 ---@field public to_quoted_string   fun(table: table, separator: string|nil): string
 ---@field public indices            fun(table: table, reverse: boolean): fun(): integer
 ---@field public compare_ascending  compare_f
@@ -613,9 +956,6 @@ local flags = {}
 return {
   Vars                = Vars,
   flags               = flags,
-  split               = split,
-  path_components     = path_components,
-  merge_path          = merge_path,
   to_quoted_string    = to_quoted_string,
   indices             = indices,
   entries             = entries,
@@ -638,3 +978,4 @@ return {
   to_ymd_hms          = to_ymd_hms,
   print_diff_time     = print_diff_time,
 }
+]=====]

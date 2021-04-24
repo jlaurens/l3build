@@ -78,6 +78,7 @@ local run = function ()
   dofile(
     arg[2]:gsub( "%.lua$", "") .. ".lua"
   )
+  arg[#arg + 1] = "-v" -- error without this
   os.exit( LU["LuaUnit"].run(table.unpack(arg, 3)) )
   return
 end

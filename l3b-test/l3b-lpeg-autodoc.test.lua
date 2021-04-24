@@ -7,8 +7,7 @@ local P     = lpeg.P
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")
 
-local adata  = require("l3b-test/autodoc_data")
-local DB = adata.DB
+local DB = require("l3b-test/autodoc_db")
 
 _G.test_line_comment = function ()
   local p = lpad.line_comment

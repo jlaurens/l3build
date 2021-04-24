@@ -140,14 +140,18 @@ function Expect.__call(self, expected, options)
       end
       return
     end
-    expect(self.actual).NOT(nil)
-    ;(options.case_insensitive
-      and LU.assert_str_icontains
-      or  LU.assert_str_contains
-    )(
-        self.actual,
-        expected
-      )
+    if self.expected == nil then
+      expect(self.actual).is(nil)
+    else
+      expect(self.actual).NOT(nil)
+      ;(options.case_insensitive
+        and LU.assert_str_icontains
+        or  LU.assert_str_contains
+      )(
+          self.actual,
+          expected
+        )
+    end
   end
   self.op = ""
   return self

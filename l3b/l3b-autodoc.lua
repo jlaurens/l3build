@@ -376,7 +376,6 @@ do
             AD.LineDoc:get_capture_p(),
             function (_, i, short)
               local result = AD.Description({
-                TYPE  = "AD.Description",
                 short = short,
                 min   = short.min,
                 max   = short.max,
@@ -467,10 +466,6 @@ AD.At = AD.Content:make_subclass("AD.At", {
 ---@param self AD.At @ self is a "subclass" of AD.At
 ---@return lpeg_t
 function AD.At:get_capture_p()
-  print("DEBUG AD.At:get_capture_p", self.__TYPE, self.key)
-  if self:is_instance_of(AD.At.Class) then
-    print("DEBUG CLASS", self.key, "core_".. self.key, lpad["core_".. self.key], lpad.get_annotation(self.key, lpad["core_".. self.key]))
-  end
   return
       lpad.get_annotation(self.key, lpad["core_".. self.key])
     / function (at)
@@ -1687,12 +1682,6 @@ function AD.Module.__computed_table:all_fun_names()
     repeat
       local at = iterator()
       if at:is_instance_of(AD.At.Function) then
-        print("DEBUG")
-        if type(at.name) ~= "string" then
-          print(debug.traceback())
-          print("ERR@R", type(at.name), at.name, "FIALIED")
-          error("FAILED")
-        end
         return at.name
       end
     until not at
