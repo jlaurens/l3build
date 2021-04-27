@@ -37,9 +37,6 @@ _G.print = function (...)
   current_print(...)
 end
 
----@type pathlib_t
-local pathlib = require("l3b-pathlib")
-
 -- Next is an _ENV that will allow a module to export
 -- more symbols than usually done in order to finegrain testing
 local __ = setmetatable({
@@ -52,6 +49,7 @@ local l3build = require("l3build")
 
 local PATHLIB_NAME = "l3b-pathlib"
 local PATHLIB_PATH = l3build.work_dir .."l3b/".. PATHLIB_NAME ..".lua"
+---@type pathlib_t
 local pathlib = loadfile(
   PATHLIB_PATH,
   "t",
@@ -64,9 +62,6 @@ local Path = __.Path
 expect(Path).NOT(nil)
 
 local lpeg = require("lpeg")
-local C   = lpeg.C
-local Ct  = lpeg.Ct
-local Cmt = lpeg.Cmt
 local P   = lpeg.P
 
 function _G.test_Path()
