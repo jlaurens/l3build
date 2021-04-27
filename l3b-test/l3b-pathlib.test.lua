@@ -179,3 +179,43 @@ _G.test_string_forward_slash = function ()
   expect("/a" / "../").is("/")
   expect(function () print("/a" / "../..") end).error()
 end
+
+function _G.test_dir_name()
+  local dir_name = pathlib.dir_name
+  expect(dir_name("")).is(".")
+  expect(dir_name("abc")).is(".")
+  expect(dir_name("a/c")).is("a")
+  expect(dir_name("/a/c")).is("/a")
+  expect(dir_name("..")).is(".")
+  expect(dir_name("../..")).is("..")
+end
+
+function _G.test_base_name()
+  local base_name = pathlib.base_name
+  expect(base_name("")).is("")
+  expect(base_name("abc")).is("abc")
+  expect(base_name("a/c")).is("c")
+  expect(base_name("..")).is("..")
+  expect(base_name("../..")).is("..")
+end
+
+function _G.test_core_name()
+  local core_name = pathlib.core_name
+  expect(core_name("")).is("")
+  expect(core_name("abc.d")).is("abc")
+  expect(core_name("a/c.d")).is("c")
+  expect(core_name("a/.d")).is("")
+  expect(core_name("..")).is(".")
+  expect(core_name("../..")).is(".")
+end
+
+function _G.test_extension()
+  local extension = pathlib.extension
+  expect(extension("")).is(nil)
+  expect(extension("abc.d")).is("d")
+  expect(extension("a/c.d")).is("d")
+  expect(extension("a/.d")).is("d")
+  expect(extension("..")).is(nil)
+end
+
+

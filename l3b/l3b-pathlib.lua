@@ -123,6 +123,10 @@ function Path.__instance_table:is_void()
   return #self.up + #self.down == 0
 end
 
+function Path.__instance_table:extension()
+  return self.base_name:match("%.([^%.])$")
+end
+
 function Path.__instance_table:as_string()
   local result
   if self.is_absolute then
@@ -143,7 +147,15 @@ function Path.__instance_table:base_name()
   local result =
         self.down[#self.down]
     or  self.up[#self.up]
+    or ""
   self.base_name = result
+  return result
+end
+
+function Path.__instance_table:core_name()
+  local result = self.base_name
+  result = result:match("^(.*)%.") or result
+  self.core_name = result
   return result
 end
 
@@ -156,14 +168,17 @@ function Path.__instance_table:dir_name()
   local result
   if self.is_absolute then
     result = '/' .. concat(down, '/')
+  elseif down then
+    local t = { unpack(up or {}) }
+    move(down, 1, #down, #t + 1, t)
+    result = concat(t, "/")
+  elseif up then
+    result = concat( up, "/")
   else
-    result = concat(
-      { unpack(up or {}), unpack(down or {}) },
-      '/'
-    )
-    if result == "" then
-      result = "."
-    end
+    result = "."
+  end
+  if result == "" then
+    result = "."
   end
   self.dir_name = result
   return result
@@ -269,9 +284,15 @@ end
 ---Strip the extension from a file name (if present)
 ---@param file string
 ---@return string
-local function job_name(file)
-  local name = base_name(file):match("^(.*)%.")
-  return name or file
+local function core_name(file)
+  return path_properties(file).core_name
+end
+
+---Return the extension, may be nil.
+---@param file string
+---@return string | nil
+local function extension(file)
+  return path_properties(file).extension
 end
 
 ---@class pathlib_t
@@ -279,10 +300,14 @@ end
 ---@field public dir_name  fun(path: string): string
 ---@field public base_name fun(path: string): string
 ---@field public job_name  fun(path: string): string
+---@field public core_name fun(path: string): string
+---@field public extension fun(path: string): string
 
 return {
   dir_base  = dir_base,
   dir_name  = dir_name,
   base_name = base_name,
-  job_name  = job_name,
+  core_name = core_name,
+  extension = extension,
+  job_name  = core_name,
 }

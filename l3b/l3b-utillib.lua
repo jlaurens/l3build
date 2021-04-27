@@ -552,8 +552,6 @@ return {
   Vars                = Vars,
   flags               = flags,
   split               = split,
-  path_components     = path_properties,
-  merge_path          = merge_path,
   to_quoted_string    = to_quoted_string,
   indices             = indices,
   entries             = entries,
