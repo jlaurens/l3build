@@ -29,6 +29,7 @@ for those people who are interested.
 -- Safeguard and shortcuts
 
 local unpack  = table.unpack
+local append  = table.insert
 local concat  = table.concat
 local max     = math.max
 
@@ -46,6 +47,7 @@ local Cg      = lpeg.Cg
 local Cmt     = lpeg.Cmt
 local Cp      = lpeg.Cp
 local Ct      = lpeg.Ct
+local Cf      = lpeg.Cf
 
 --[[ lpeg patterns
 All forthcoming variables with suffix "_p" are
@@ -80,7 +82,10 @@ local utf8_p        =
 local consume_1_character_p =
     utf8_p
   + Cmt( 1 - P("\n"),   -- and consume one byte for an erroneous UTF8 character
-    function (s, i) print("UTF8 problem ".. s:sub(i-1, i-1)) end
+    function (s, i)
+      _G.UFT8_DECODING_ERROR = true
+      print("UTF8 problem ".. s:sub(i-1, i-1))
+    end
   )
 
 ---Pattern with horizontal spaces before and after
@@ -107,8 +112,30 @@ local identifier_p =
 -- for a function
 local function_name_p =
     variable_p
-  * ( P(".")  * variable_p )^0
+  * ( P(".") * variable_p )^0
   * ( P(":") * variable_p )^-1
+
+local function get_base_class(str)
+  ---@type lpeg_t
+  local p = Cf(
+      Cc({
+        parents = {}, -- new table at each run
+      })
+    * C(variable_p)
+    * ( P(".") * C(variable_p) )^0
+    * ( P(":") * C(variable_p) )^-1,
+    function (t, base)
+      append(t.parents, t.base)
+      t.base = base
+      return t
+    end
+  )
+  local t = p:match(str)
+  return t.base,
+    #t.parents > 0
+      and concat(t.parents, ".")
+      or  nil
+end
 
 ---Get the line number for the given string
 ---Should cache intermediate results.
@@ -125,25 +152,7 @@ local function get_line_number(str, index)
   return result
 end
 
-local class_base_p = Ct(
-    Cg(
-      C (
-        ( variable_p * P(".") )^0
-        * variable_p * P(":")
-        + ( variable_p * P(".") )^1
-      )
-      / function (c)
-        return c:sub(1, -2)
-      end,
-      "class"
-    )
-    * Cg(
-      variable_p,
-      "base"
-    )
-  )
-  * P(-1)
-
+assert(string.get_base_extension == nil)
 local dot_p = P(".")
 local no_dot_p = P(1) - dot_p
 local base_extension_p = Ct(
@@ -156,7 +165,7 @@ local base_extension_p = Ct(
     }
   end
 
-string.l3b_base_extension = function (self)
+string.get_base_extension = function (self)
   return base_extension_p:match(self)
 end
 
@@ -173,7 +182,6 @@ end
 ---@field public variable_p             lpeg_t
 ---@field public identifier_p           lpeg_t
 ---@field public function_name_p        lpeg_t
----@field public class_base_p           lpeg_t
 
 return {
   white_p               = white_p,
@@ -189,5 +197,5 @@ return {
   identifier_p          = identifier_p,
   function_name_p       = function_name_p,
   get_line_number       = get_line_number,
-  class_base_p          = class_base_p,
+  get_base_class        = get_base_class,
 }

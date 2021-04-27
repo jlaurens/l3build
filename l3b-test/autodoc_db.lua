@@ -429,10 +429,10 @@ DB:fill(
 ---456789
 ]=====],
   {
-    min         = 1,
-    content_min = 4,
-    content_max = 9,
-    max         = 10,
+    min         = 11,
+    content_min = 14,
+    content_max = 19,
+    max         = 20,
   },
   11,
   [=====[
@@ -441,10 +441,10 @@ DB:fill(
 ---456789
 ]=====],
   {
-    min         = 1,
-    content_min = 4,
-    content_max = 9,
-    max         = 10,
+    min         = 21,
+    content_min = 24,
+    content_max = 29,
+    max         = 30,
   },
   21
 )
@@ -1637,7 +1637,8 @@ DB:fill(
   "fun(foo : bar, ...)", 20,
   "fun(foo : bar, foo: bar, ...)", 30,
   "fun():foo", 10,
-  "fun():foo, bar", 15
+  "fun():foo, bar", 15,
+  "fun():foo | bar", 16
 )
 DB:fill(
   "named_types",

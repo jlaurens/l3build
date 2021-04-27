@@ -30,6 +30,14 @@ function _G.test_constructor()
   expect(foo.__TYPE).is("Foo")
 end
 
+function _G.test_is_instance()
+  expect(Object.is_instance).is(false)
+  local Foo = Object:make_subclass("Foo")
+  expect(Foo.is_instance).is(false)
+  local foo = Foo()
+  expect(foo.is_instance).is(true)
+end
+
 function _G.test_is_instance_of()
   expect(Object.is_instance_of).type("function")
   local Foo = Object:make_subclass("Foo")
@@ -238,62 +246,322 @@ _G.test_make_another_subclass = {
   end,
 }
 
-_G.test_computed_table = function ()
-  local A = Object:make_subclass("A")
-  local a = A()
-  expect(a.foo).is(nil)
-  local AA = A:make_subclass("AA")
-  local aa = AA()
-  expect(A.foo).is(nil)
-  expect(a.foo).is(nil)
-  A.__computed_table.foo = function (self)
-    return "bar"
-  end
-  expect(a.foo).is("bar")
-  expect(aa.foo).is("bar")
-  AA.__computed_table.foo = function (self)
-    return "baz"
-  end
-  expect(a.foo).is("bar")
-  expect(aa.foo).is("baz")
-end
+-- where inheritance is illutsrated
+_G.test_computed_index = {
+  test_one_level = function ()
+    local A = Object:make_subclass("A")
+    expect(A.p_1).is(nil)
+    local a = A()
+    expect(a.p_1).is(nil)
+    local old = A.__computed_index
+    A.__computed_index = function (self, k)
+      if k == "p_1" then
+        return "A/1"
+      end
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    A.__computed_index = old
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is(nil)
+  end,
+  test_two_levels = function ()
+    local A = Object:make_subclass("A")
+    expect(A.p_1).is(nil)
+    local a = A()
+    expect(a.p_1).is(nil)
+    local AA = A:make_subclass("AA")
+    expect(AA.p_1).is(nil)
+    local aa = AA()
+    expect(aa.p_1).is(nil)
+    local old = A.__computed_index
+    A.__computed_index = function (self, k)
+      if k == "p_1" then
+        return "A/1"
+      end
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("A/1")
+    AA.__computed_index = function (self, k)
+      if k == "p_1" then
+        return "AA/1"
+      end
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("AA/1")
+    A.__computed_index = old
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is(nil)
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is("AA/1")
+  end,
+  test_dynamic = function ()
+    local A = Object:make_subclass("A")
+    local a = A()
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    A.__computed_index = function (self, k)
+      if k == "p_1" then
+        return "A/1"
+      end
+      if k == "p_2" then
+        return self.p_1 .."/A/2"
+      end
+    end
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
+    AA.p_1 = "AA/1"
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("AA/1")     -- Change here
+    expect(AA.p_2).is("AA/1/A/2") -- Change here
+    expect(aa.p_1).is("AA/1")     -- Change here
+    expect(aa.p_2).is("AA/1/A/2") -- Change here
+    -- Revert
+    AA.p_1 = nil
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
+    -- Change only the `aa` instance property
+    aa.p_1 = "aa/1"
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("aa/1")     -- Change here
+    expect(aa.p_2).is("A/1/A/2") -- But not here
+    -- change both the class and instance properties
+    AA.p_1 = "AA/1"
+    aa.p_1 = "aa/1"
+    expect(AA.p_1).is("AA/1")
+    expect(AA.p_2).is("AA/1/A/2") -- Change here
+    expect(aa.p_1).is("aa/1")     -- Different change here
+    expect(aa.p_2).is("AA/1/A/2") -- and here
+  end,
+  test_object_nil = function ()
+    local A = Object:make_subclass("A")
+    expect(A.p_1).is(nil)
+    local a = A()
+    expect(a.p_1).is(nil)
+    local AA = A:make_subclass("AA")
+    expect(AA.p_1).is(nil)
+    local aa = AA()
+    expect(aa.p_1).is(nil)
+    local old = A.__computed_index
+    A.__computed_index = function (self, k)
+      if k == "p_1" then
+        return "A/1"
+      end
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("A/1")
+    AA.__computed_index = function (self, k)
+      if k == "p_1" then
+        return Object.NIL -- override `p_1` to nil
+      end
+    end
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is(nil) -- `p_1` is overriden to nil
+    A.__computed_index = old
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is(nil)
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is(nil)
+  end,
+}
 
-_G.test_computed_index = function ()
-  local A = Object:make_subclass("A")
-  local a = A()
-  expect(a.foo).is(nil)
-  local AA = A:make_subclass("AA")
-  local aa = AA()
-  expect(A.foo).is(nil)
-  expect(a.foo).is(nil)
-  A.__computed_index = function (self, k)
-    if k == "foo" then
-      return "bar"
+-- where inheritance is illutsrated
+_G.test_instance_table = {
+  test_one_level = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    expect(a.p_1).is(nil)
+    A.__instance_table.p_1 = function (self)
+      return "A/1"
     end
-  end
-  expect(a.foo).is("bar")
-  expect(aa.foo).is("bar")
-  AA.__computed_index = function (self, k)
-    if k == "foo" then
-      return "baz"
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    A.__instance_table.p_1 = function (self)
+      return nil
     end
-  end
-  expect(a.foo).is("bar")
-  expect(aa.foo).is("baz")
-  local AB = A:make_subclass("AB")
-  local ab = AB()
-  expect(ab.foo).is("bar")
-  AB.__computed_index = function (self, k)
-    if k == "bar" then
-      return 421
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is(nil)
+  end,
+  test_two_levels = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    A.__instance_table.p_1 = function (self)
+      return "A/1"
     end
-    if k == "foo" then
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is("A/1")
+    -- override instance property to some value
+    AA.__instance_table.p_1 = function (self)
+      return "AA/1"
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is("AA/1")
+    -- override instance property to nil
+    AA.__instance_table.p_1 = function (self)
       return Object.NIL
     end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is(nil)
+    -- Revert to the initial setting
+    AA.__instance_table.p_1 = nil
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is(nil)
+    expect(aa.p_1).is("A/1")
+  end,
+  test_dynamic = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    A.__instance_table.p_1 = function (self)
+      return "A/1"
+    end
+    A.__instance_table.p_2 = function (self)
+      return self.p_1 .."/A/2"
+    end
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is(nil)
+    expect(AA.p_2).is(nil)
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
+    -- override the class property in the subclass:
+    AA.__instance_table.p_1 = function (self)
+      return "AA/1"
+    end
+    expect(AA.p_1).is(nil)
+    expect(AA.p_2).is(nil)
+    expect(aa.p_1).is("AA/1")
+    expect(aa.p_2).is("AA/1/A/2")
+    -- override the subclass instance property
+    aa.p_1 = "aa/1"
+    expect(aa.p_1).is("aa/1")
+    expect(aa.p_2).is("aa/1/A/2") -- now the computed property refers to the instance
+    -- revert to the initial state
+    aa.p_1 = nil
+    AA.__instance_table.p_1 = nil
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
   end
-  expect(ab.bar).is(421)
-  expect(ab.foo).is(nil)
-end
+}
+
+-- where inheritance is illutsrated
+_G.test_class_table = {
+  test_one_level = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    expect(a.p_1).is(nil)
+    A.__class_table.p_1 = function (self)
+      return "A/1"
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    A.__class_table.p_1 = function (self)
+      return nil
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is(nil)
+  end,
+  test_two_levels = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    A.__class_table.p_1 = function (self)
+      return "A/1"
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("A/1")
+    -- override instance property to some value
+    AA.__class_table.p_1 = function (self)
+      return "AA/1"
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("AA/1")
+    -- override instance property to nil
+    AA.__class_table.p_1 = function (self)
+      return Object.NIL
+    end
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is(nil)
+    -- Revert to the initial setting
+    AA.__class_table.p_1 = nil
+    expect(A.p_1).is(nil)
+    expect(a.p_1).is("A/1")
+    expect(AA.p_1).is("A/1")
+    expect(aa.p_1).is("A/1")
+  end,
+  test_dynamic = function (_self)
+    local A = Object:make_subclass("A")
+    local a = A()
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    A.__class_table.p_1 = function (self)
+      return "A/1"
+    end
+    A.__class_table.p_2 = function (self)
+      return self.p_1 .."/A/2"
+    end
+    expect(a.p_1).is("A/1")
+    expect(a.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
+    -- override the class property in the subclass:
+    AA.__class_table.p_1 = function (self)
+      return "AA/1"
+    end
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("AA/1")
+    expect(aa.p_2).is("AA/1/A/2")
+    -- override the subclass instance property
+    aa.p_1 = "aa/1"
+    expect(aa.p_1).is("aa/1")
+    expect(aa.p_2).is("aa/1/A/2") -- now the computed property refers to the instance
+    -- revert to the initial state
+    aa.p_1 = nil
+    AA.__class_table.p_1 = nil
+    expect(AA.p_1).is("A/1")
+    expect(AA.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A/1")
+    expect(aa.p_2).is("A/1/A/2")
+  end
+}
 
 _G.test_key = function ()
   local A = Object:make_subclass("A", {
@@ -311,3 +579,23 @@ _G.test_key = function ()
   local AA = A:make_subclass("AA")
   expect(AA.key).is("AA")
 end
+
+_G.test_init_data = {
+  test = function (self)
+    -- static class properties,
+    -- interesting for methods
+    local A = Object:make_subclass("A")
+    A.p_1 = "A/1"
+    expect(A.p_1).is("A/1")
+    local a = A()
+    expect(rawget(a, "p_1")).is(nil)
+    expect(a.p_1).is("A/1") --
+    local AA = A:make_subclass("AA")
+    local aa = AA()
+    AA.p_2 = "AA/2"
+    expect(rawget(aa, "p_1")).is(nil)
+    expect(aa.p_1).is("A/1")
+    expect(rawget(aa, "p_2")).is(nil)
+    expect(aa.p_2).is("AA/2")
+  end,
+}

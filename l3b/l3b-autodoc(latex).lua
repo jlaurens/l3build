@@ -45,17 +45,18 @@ for _, Key in ipairs({
   AD[Key].LATEX_ENVIRONMENT = Key
 end
 
-function AD.AtProxy.__computed_table:as_latex_environment()
- local content = self.as_latex
- return content and #content > 1 and
-   ([[\begin{<?>}
+function AD.AtProxy.__instance_table:as_latex_environment()
+  assert(self.is_instance, "self must be an instance")
+  local content = self.as_latex
+  return content and #content > 1 and
+    ([[\begin{<?>}
 ]]):gsub("<%?>", self.LATEX_ENVIRONMENT)
-   .. content
-   .. ([[\end{<?>}
+    .. content
+    .. ([[\end{<?>}
 ]]):gsub("<%?>", self.LATEX_ENVIRONMENT) or ""
 end
 
-function AD.AtProxy.__computed_table:as_latex()
+function AD.AtProxy.__instance_table:as_latex()
   return self.latex_name
       .. self.latex_value
       .. self.latex_types
@@ -64,35 +65,39 @@ function AD.AtProxy.__computed_table:as_latex()
       .. self.latex_long_description
 end
 
-function AD.AtProxy.__computed_table:latex_name()
+function AD.AtProxy.__instance_table:latex_name()
   local replacement = self.name
   return replacement and ([[
 \Name{<?>}
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.AtProxy.__computed_table:latex_types()
+function AD.AtProxy.__instance_table:latex_types()
   local replacement = self.types
   return replacement and ([[
 \Types{<?>}
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.AtProxy.__computed_table:latex_comment()
+---Get the LaTeX comment.
+---@param self AD.AtProxy @ an instance, not a class
+---@return string
+function AD.AtProxy.__instance_table:latex_comment()
+  assert(self.__Class ~= self, "self must be an instance")
   local replacement = self.comment
   return replacement and ([[
 \Comment{<?>}
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.AtProxy.__computed_table:latex_short_description()
+function AD.AtProxy.__instance_table:latex_short_description()
   local replacement = self.short_description
   return replacement and ([[
 \ShortDescription{<?>}
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.AtProxy.__computed_table:latex_long_description()
+function AD.AtProxy.__instance_table:latex_long_description()
   local replacement = self.long_description
   return replacement and ([[
 \begin{LongDescription}
@@ -101,14 +106,14 @@ function AD.AtProxy.__computed_table:latex_long_description()
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.AtProxy.__computed_table:latex_value()
+function AD.AtProxy.__instance_table:latex_value()
   local replacement = self.value
   return replacement and ([[
 \Value{<?>}
 ]]):gsub("<%?>", replacement) or ""
 end
 
-function AD.Function.__computed_table:as_latex()
+function AD.Function.__instance_table:as_latex()
   return self.latex_name
       .. self.latex_comment
       .. self.latex_short_description
@@ -119,7 +124,7 @@ function AD.Function.__computed_table:as_latex()
       .. self.see.as_latex_environment
       .. self.author.as_latex_environment
 end
-function AD.Function.__computed_table:latex_params()
+function AD.Function.__instance_table:latex_params()
   local t = {}
   for param_name in self.all_param_names do
     local p_info = self:get_param(param_name)
@@ -139,10 +144,10 @@ function AD.Function.__computed_table:latex_params()
   end
   return ""
 end
-function AD.Function.__computed_table:latex_vararg()
+function AD.Function.__instance_table:latex_vararg()
   return "vararg"
 end
-function AD.Function.__computed_table:latex_returns()
+function AD.Function.__instance_table:latex_returns()
   local t = {}
   for i in self.all_return_indices do
     local r_info = self:get_return(i)
@@ -162,20 +167,14 @@ function AD.Function.__computed_table:latex_returns()
   end
   return ""
 end
-function AD.Function.__computed_table:latex_see()
-  local replacement = self.see
-  return replacement and ([[
-\See{<?>}
-  ]]):gsub("<?>", replacement) or ""
-end
-function AD.Function.__computed_table:latex_author()
+function AD.Function.__instance_table:latex_author()
   local replacement = self.author
   return replacement and ([[
 \Author{<?>}
   ]]):gsub("<?>", replacement) or ""
 end
 
-function AD.Class.__computed_table:as_latex()
+function AD.Class.__instance_table:as_latex()
   return self.latex_name
       .. self.latex_comment
       .. self.latex_short_description
@@ -185,7 +184,7 @@ function AD.Class.__computed_table:as_latex()
       .. self.author.as_latex_environment
 end
 
-function AD.Class.__computed_table:latex_fields()
+function AD.Class.__instance_table:latex_fields()
   local t = {}
   for field_name in self.all_field_names do
     local f_info = self:get_field(field_name)
@@ -206,7 +205,7 @@ function AD.Class.__computed_table:latex_fields()
   return ""
 end
 
-function AD.Module.__computed_table:as_latex_environment()
+function AD.Module.__instance_table:as_latex_environment()
   local content = self.as_latex
   return content and #content > 1 and
     ([[\begin{<?>}
@@ -216,7 +215,7 @@ function AD.Module.__computed_table:as_latex_environment()
 ]]):gsub("<%?>", self.LATEX_ENVIRONMENT) or ""
 end
 
-function AD.Module.__computed_table:as_latex()
+function AD.Module.__instance_table:as_latex()
   return
       self.latex_name
     .. self.latex_comment

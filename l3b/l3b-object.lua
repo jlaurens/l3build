@@ -22,12 +22,83 @@ for those people who are interested.
 
 --]]
 
----@class Object @ Root class
----@field public  make_subclass     fun(type: string, t: table): Object
----@field private __computed_index  fun(self: Object, key: string): any
----@field private __computed_table  table<string,fun(self: Object): any>
+---@module object
+--[===[
+  This module implements some object oriented paradigm.
 
-Object = {}
+  A class is a table that will be used as metatable of another table.
+
+  An instance of a class is a table which metatable is the class.
+  Some indirection may be required but that is not the case here.
+
+  We will make the difference between properties and methods,
+  either static or computed.
+
+# Instances
+
+  Creating instances follows a simple syntax, the class also
+playing the role of a constructor. Classes are callable such that
+creating an instance of class `Foo` is made with `Foo(...)`
+with appropriate parameters.
+
+# The class hierarchy
+
+## The hierarchy chain
+
+There are 2 fields dedicated to the class hierarchy.
+Each instance's `__Class` field points to its class.
+The class object also has a `__Class` field that points to itself.
+The `is_instance` computed property allows to make the difference
+between a class and an instance.
+
+For each class, the `__Super` field points to the parent class,
+if any. The `is_descendant_of` property tells if an object or a class
+is a descendant of another class.
+
+The class named `Object` is the root class. It has no superclass
+and all other classes are descendants of it, whether directly or not.
+Each class, starting from `Object`, has a `make_subclass` method to create subclasses.
+
+## Inheritance
+
+An instance will inherit properties and methods from its class
+and all the classes above in the class hierarchy.
+A class will inherit properties and methods from all the classes above.
+
+There are two inheritance mechanisms: one for static properties and methods,
+and one for computed properties and methods.
+In fact the distinction between both is not as clear
+because of the versatility of the language.
+
+The most efficient manner to understand how things fit together
+is by reading the tests in `l3b-object.test.lua`.
+Basically, `__computed_index` is for class computed properties
+whereas `__instance_table` is for instance computed properties.
+
+--]===]
+
+---@class Object @ Root class, metatable of other tables
+---@field public  make_subclass     fun(type: string, t: table): Object
+---@field public  is_instance       boolean
+---@field private __computed_index  fun(self: Object, key: string): any
+---@field private __instance_table  table<string,fun(self: Object): any>
+
+Object = {
+  __TYPE      = "Object",
+  is_instance = false,
+}
+Object.__Class = Object
+
+---comment
+---@param self Object
+---@param k any
+function Object.__index(self, k) end
+
+Object.__class_table = {
+  is_instance = function (self)
+    return self.__Class ~= self
+  end
+}
 
 ---For computed properties
 ---The default implementation does nothing.
@@ -38,11 +109,6 @@ Object = {}
 ---@see #make_subclass
 function Object.__computed_index(self, k)
 end
-
-Object.__computed_table = {}
-Object.__index = function () end
-Object.__Class = Object
-Object.__TYPE  = "Object"
 
 ---@see __computed_index
 Object.NIL = setmetatable({}, {
@@ -101,25 +167,59 @@ function Object.make_subclass(Super, TYPE, static)
 
   -- computed properties are inherited by default
   -- either defined directly or by key
-  class.__computed_table = rawget(class, "__computed_table")
+  class.__instance_table = rawget(class, "__instance_table")
       or {}
-  setmetatable(class.__computed_table, {
-      __index = Super.__computed_table
+  setmetatable(class.__instance_table, {
+      __index = Super.__instance_table
   })
+  class.__class_table = rawget(class, "__class_table")
+      or {}
+  setmetatable(class.__class_table, {
+      __index = Super.__class_table
+  })
+
   class.__computed_index
     =  class.__computed_index
     or Super.__computed_index
+  ---comment
+  ---@param self Object
+  ---@param k any
+  ---@return any
   class.__index = function (self, k)
-    local result = class.__computed_index(self, k)
+    if k == "__Class" then
+      return class
+    end
+    -- first: dynamic instance properties
+    local result
+    local computed_k
+    if self and self ~= self.__Class then
+      computed_k = class.__instance_table[k]
+      if computed_k ~= nil then
+        result = computed_k(self, k)
+        if result ~= nil then
+          if result == Object.NIL then
+            return nil
+          end
+          return result
+        end
+      end
+    end
+    computed_k = class.__class_table[k]
+    if computed_k ~= nil then
+      result = computed_k(self, k)
+      if result ~= nil then
+        if result == Object.NIL then
+          return nil
+        end
+        return result
+      end
+    end
+    result = class.__computed_index(self, k)
     if result ~= nil then
       if result == Object.NIL then
         return nil
       end
       return result
-    end
-    local computed_k = class.__computed_table[k]
-    if computed_k then
-      return computed_k(self)
     end
     return class[k]
   end
@@ -159,7 +259,7 @@ end
 ---@param Class table | nil
 ---@return boolean
 function Object:is_instance_of(Class)
-  return Class and self.__Class == Class or false
+  return Class and self.__Class == Class and self.__Class ~= self or false
 end
 
 ---Whether the receiver inherits the given class
@@ -169,8 +269,12 @@ end
 function Object:is_descendant_of(Class)
   if Class then
     local what = self
+    if what:is_instance_of(Class) then
+      return true
+    end
+    what = what.__Class
     repeat
-      if what:is_instance_of(Class) then
+      if what == Class then
         return true
       end
       what = what.__Super

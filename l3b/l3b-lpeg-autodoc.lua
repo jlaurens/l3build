@@ -28,6 +28,9 @@ for those people who are interested.
 
 -- Safeguard and shortcuts
 
+local max     = math.max
+local concat  = table.concat
+
 local lpeg    = require("lpeg")
 local locale  = lpeg.locale()
 local P       = lpeg.P
@@ -132,7 +135,7 @@ local special_begin =
   * P("---") * -P("-")
   * white_p^0
 
----@type lpeg_t
+---@type lpeg_t 
 local capture_comment = (
       get_spaced_p("@")
     * named_pos("content_min")
@@ -145,7 +148,7 @@ local capture_comment = (
     function (s, i)
       error("Missing @ for a comment at line "
         .. get_line_number(s, i - 1)
-        ..": ".. s:sub(i - 1, i + 50))
+        ..": '".. s:sub(i - 1, i + 50) .."'")
     end
   )
   + (
@@ -192,8 +195,11 @@ local lua_type = P({
     V("fun_param") * (spaced_comma_p * V("fun_param"))^0,
   fun_return =
       spaced_colon_p
-    * V("type")
-    * (spaced_comma_p * V("type"))^0,
+    * V("types")
+    * (spaced_comma_p * V("types"))^0,
+  types =
+      V("type")
+    * ( get_spaced_p("|") * V("type")) ^0
 })
 
 ---@type lpeg_t
@@ -453,10 +459,6 @@ end
 ---@param core lpeg_t
 ---@return lpeg_t
 local function get_annotation(key, core)
-  if not core then
-    print("\n**** DEBUG key", key)
-    print(debug.traceback())
-  end
   return
       chunk_init
     * at_match(key) * (

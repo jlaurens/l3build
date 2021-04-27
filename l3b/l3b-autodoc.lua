@@ -155,10 +155,13 @@ We keep track of the parser position in named captures.
 --]]
 
 ---@type corelib_t
-local corelib       = require("l3b-corelib")
-local identifier_p  = corelib.identifier_p
-local white_p       = corelib.white_p
-local eol_p         = corelib.eol_p
+local corelib         = require("l3b-corelib")
+local variable_p      = corelib.variable_p
+local identifier_p    = corelib.identifier_p
+local white_p         = corelib.white_p
+local black_p         = corelib.black_p
+local eol_p           = corelib.eol_p
+local get_base_class  = corelib.get_base_class
 
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")
@@ -188,19 +191,20 @@ AD.Info = Object:make_subclass("AD.Info", {
 ---The core part of the pattern
 ---Default implementation raises a error.
 ---Must be overriden by subclassers.
----@param self AD.Info
+---@param class AD.Info
 ---@return lpeg_t
-function AD.Info:get_core_p()
-  error("Missing AD.Info:get_core_p implementation for ".. self.TYPE)
+function AD.Info.get_core_p(class)
+  error("Missing AD.Info:get_core_p implementation for ".. class.__TYPE)
 end
 
 ---The full pattern
 ---The default implementation just forwards to the receiver's
----`get_core_p`
----@param self AD.Info
+---`get_core_p`.
+---This is a class method and should not be called on instances.
+---@param class AD.Info
 ---@return lpeg_t
-function AD.Info:get_capture_p()
-  return self:get_core_p()
+function AD.Info.get_capture_p(class)
+  return class:get_core_p()
 end
 
 ---Mask the contents
@@ -243,15 +247,13 @@ AD.Content = AD.Info:make_subclass("AD.Content", {
   mask_contents = function (self, t)
     self:do_mask_contents(t)
   end,
-  __computed_index = function (self, k)
-    if k == "key" then
-      ---@type string
-      local result = self.__TYPE:l3b_base_extension().extension:lower()
-      self[k] = result
+  __class_table = {
+    key = function (class, k)
+      local result = class.__TYPE:get_base_extension().extension:lower()
+      class[k] = result
       return result
-    end
-    return AD.Content.__Super.__computed_index(self, k)
-  end,
+    end,
+  },
 })
 
 ---The core pattern
@@ -260,8 +262,8 @@ AD.Content = AD.Info:make_subclass("AD.Content", {
 ---It will be used by the default implementation
 ---of `capture`.
 ---The default implementation fires an error.
----@param self AD.Content
-function AD.Content:get_core_p()
+---@param class AD.Content
+function AD.Content.get_core_p(class)
    return lpad.content
 end
 
@@ -271,7 +273,7 @@ end
 
 ---@type AD.LineComment
 AD.LineComment = AD.Content:make_subclass("AD.LineComment", {
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
         lpad.line_comment
       / function (t)
@@ -285,7 +287,7 @@ AD.LineComment = AD.Content:make_subclass("AD.LineComment", {
 
 ---@type AD.LineDoc
 AD.LineDoc = AD.Content:make_subclass("AD.LineDoc", {
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
         lpad.line_doc
       / function (t)
@@ -298,7 +300,7 @@ AD.LineDoc = AD.Content:make_subclass("AD.LineDoc", {
 
 ---@type AD.ShortLiteral
 AD.ShortLiteral = AD.Content:make_subclass("AD.ShortLiteral", {
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
         lpad.short_literal
       / function (t)
@@ -313,7 +315,7 @@ AD.ShortLiteral = AD.Content:make_subclass("AD.ShortLiteral", {
 ---@type AD.LongLiteral
 AD.LongLiteral = AD.Content:make_subclass("AD.LongLiteral", {
   level = 0,
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
         lpad.long_literal
       / function (t)
@@ -328,7 +330,7 @@ AD.LongLiteral = AD.Content:make_subclass("AD.LongLiteral", {
 ---@type AD.LongComment
 AD.LongComment = AD.Content:make_subclass("AD.LongComment", {
   level = 0,
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
         lpad.long_comment
       / function (t)
@@ -342,7 +344,7 @@ AD.LongComment = AD.Content:make_subclass("AD.LongComment", {
 ---@type AD.LongDoc
 AD.LongDoc = AD.Content:make_subclass("AD.LongDoc", {
   level = 0,
-  get_capture_p = function (self)
+  get_capture_p = function (class)
     return
           lpad.long_doc
         / function (t)
@@ -369,7 +371,7 @@ do
       self.long     = self.long or {}
       self.ignores  = self.ignores or {}
     end,
-    get_capture_p = function (self)
+    get_capture_p = function (class)
       return Cg(
           Cmt(
             -- Must start with a line documentation
@@ -445,8 +447,6 @@ end
 ---@type AD.At
 AD.At = AD.Content:make_subclass("AD.At", {
   is_annotation = true,
-  content_min = 1, -- only valid when content_min > min
-  content_max = 0,
   -- Next fields are defined by subclassers, see `finalize`
   -- complete = nil
   __initialize = function (self)
@@ -463,13 +463,13 @@ AD.At = AD.Content:make_subclass("AD.At", {
 ---pattern between management code.
 ---On success, this pattern returns one capture exactly
 ---which is an instance of itself.
----@param self AD.At @ self is a "subclass" of AD.At
+---@param class AD.At @ self is a "subclass" of AD.At, can be an instance too.
 ---@return lpeg_t
-function AD.At:get_capture_p()
+function AD.At.get_capture_p(class)
   return
-      lpad.get_annotation(self.key, lpad["core_".. self.key])
+      lpad.get_annotation(class.key, lpad["core_".. class.key])
     / function (at)
-        return self(at)
+        return class(at)
       end
 end
 
@@ -483,16 +483,16 @@ local capture_ignores_p = Ct(
 ---combined with the description that precedes it.
 ---The default pattern tries to match one `AD.Description`
 ---if any, and then it tries to match an annotation.
----@param self AD.At
+---@param class AD.At
 ---@return lpeg_t
-function AD.At:get_complete_p()
-  local p = self:get_capture_p()
+function AD.At.get_complete_p(class)
+  local p = class:get_capture_p()
   if not p then
-    print("ERROR", self.__Class.__TYPE)
+    print("ERROR", class.__TYPE)
   end
   return
     ( AD.Description:get_capture_p() + Cc(false) )
-    * self:get_capture_p()
+    * class:get_capture_p()
     * capture_ignores_p
     / function (desc, at, ignores)
         if desc then
@@ -570,11 +570,13 @@ do
       self.fields = self.fields  or {}
     end,
     -- class annotation needs a custom complete method
-    get_complete_p = function (self)
+    get_complete_p = function (class)
       -- capture a description
+      ---@type AD.At
+      local Super = AD.At.Class.__Super
       return Cg(
         Cmt( -- expand
-          AD.At.Class.__Super.get_complete_p(self),
+          Super.get_complete_p(class),
           function (_, i, at)
             return i, at
           end
@@ -656,7 +658,7 @@ AD.At.Return = AD.At:make_subclass("AD.At.Return", {
 ---@type AD.At.Generic
 AD.At.Generic = AD.At:make_subclass("AD.At.Generic", {
   type_1  = "UNKNOWN TYPE NAME",
-  get_core_p = function (self)
+  get_core_p = function (class)
     return lpad.core_generic
   end,
 })
@@ -672,7 +674,7 @@ AD.At.Param = AD.At:make_subclass("AD.At.Param", {
   name      = "UNKNOWN PARAM NAME",
   optional  = false,
   types     = { "UNKNOWN TYPE NAME" },
-  get_core_p = function ()
+  get_core_p = function (class)
     return lpad.core_param
   end,
 })
@@ -684,7 +686,7 @@ AD.At.Param = AD.At:make_subclass("AD.At.Param", {
 ---@type AD.At.Vararg
 AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
   types = { "UNKNOWN TYPE NAME" },
-  get_core_p = function (self)
+  get_core_p = function (class)
     return lpad.core_vararg
   end,
 })
@@ -698,18 +700,20 @@ AD.At.Vararg = AD.At:make_subclass("AD.At.Vararg", {
 ---@type AD.At.Module
 AD.At.Module = AD.At:make_subclass("AD.At.Module", {
   name    = "UNKNOWN MODULE NAME",
-  get_core_p = function(self)
+  get_core_p = function(class)
     return lpad.core_module
   end,
 })
 
 do
   local tag_at = {}
-  function AD.At.Module:get_complete_p()
+  function AD.At.Module.get_complete_p(class)
+    ---@type AD.At
+    local Super = AD.At.Module.__Super
     return
       Cg(
         Cmt( -- necessary because the capture must be evaluated only once
-          AD.At.Module.__Super.get_complete_p(self),
+        Super.get_complete_p(class),
           function (_, i, at)
             return i, at -- return the capture
           end
@@ -744,18 +748,20 @@ end
 ---@type AD.At.Global
 AD.At.Global = AD.At:make_subclass("AD.At.Global", {
   name  = "UNKNOWN GLOBALE NAME",
-  get_core_p = function (self)
+  get_core_p = function (class)
     return lpad.core_global
   end,
 })
 
 do
   local tag_at = {}
-  function AD.At.Global:get_complete_p()
+  function AD.At.Global.get_complete_p(class)
     -- capture a description
+    ---@type AD.At
+    local Super = AD.At.Global.__Super
     return Cg(
       Cmt(
-        AD.At.Global.__Super.get_complete_p(self),
+        Super.get_complete_p(class),
         function (_, i, at)
           return i, at
         end
@@ -894,7 +900,7 @@ do
       self.params   = self.params  or {}
       self.returns  = self.returns or {}
     end,
-    get_complete_p = function (self)
+    get_complete_p = function (class)
       -- capture a description
       return
         -- capture a complete functions annotation:
@@ -903,7 +909,7 @@ do
         Cg(
           Cmt(
               ( AD.Description:get_capture_p() + Cc(false) )
-            * ( self:get_capture_p()
+            * ( class:get_capture_p()
               + start_with_param_p  -- when no ---@function is available
               + start_with_vararg_p
               + start_with_generic_p
@@ -998,7 +1004,7 @@ do
   end
   ---@type AD.Source
   AD.Source = AD.Info:make_subclass("AD.Source", {
-    get_capture_p = function (self)
+    get_capture_p = function (class)
       return
           Ct( Cg( Ct(loop_p^0), "infos") )
         / function (t)
@@ -1079,46 +1085,54 @@ end
 ---@field public    long_description      string
 ---@field public    as_latex              string
 ---@field public    as_latex_environment  string
----@field private   _at AD.At @ "@" annotation info
+---@field private   __at AD.At @ "@" annotation info
 ---@field protected _module AD.Module
 
 AD.AtProxy = Object:make_subclass("AD.AtProxy", {
   __initialize = function (self, module, at)
+    assert(self.is_instance, "self must be an instance")
     self._module = module
-    self._at = at
+    self.__at = at
   end,
-  __computed_index = function (self, k)
-    if k == "source" then
+  __instance_table = {
+    source = function (self)
       return self._module.__contents
-    end
-    if k == "name" then
-      return self._at[k]
-    end
-    if k == "comment" then
-      local result = self._at:get_content(self.source)
-      return #result > 0 and result or nil
-    end
-    if k == "short_description" then
-      local desc = self._at.description
-      if desc then
-        return self._at:get_short_description(self.source)
+    end,
+    name = function (self)
+      if not self.is_instance then
+        print(debug.traceback())
+        error("self must be an instance")
       end
-    end
-    if k == "long_description" then
-      local desc = self._at.description
-      if desc then
-        return self._at:get_long_description(self.source)
+      assert(self.is_instance, "self must be an instance")
+      return self.__at.name
+    end,
+    comment = function (self)
+      assert(self.is_instance, "self must be an instance")
+      local result = self.__at:get_content(self.source)
+      return #result > 0 and result or Object.NIL
+    end,
+    short_description = function (self)
+      if self.__at.description then
+        return self.__at:get_short_description(self.source)
       end
-    end
-    if k == "types" then
-      return self._at[k] and concat(self._at[k], "|")
-    end
-  end,
+      return Object.NIL
+    end,
+    long_description = function (self)
+      if self.__at.description then
+        return self.__at:get_long_description(self.source)
+      end
+      return Object.NIL
+    end,
+    types = function (self)
+      local types = self.__at.types
+      return types and concat(types, "|")
+    end,
+  },
 })
 
 ---@class AD.Param: AD.AtProxy
 ---@field public  types string[]
----@field private _at   AD.At.Param
+---@field private __at   AD.At.Param
 
 AD.Param = AD.AtProxy:make_subclass("AD.Param", {
   __AtClass = AD.At.Param,
@@ -1126,29 +1140,29 @@ AD.Param = AD.AtProxy:make_subclass("AD.Param", {
 
 ---@class AD.Vararg: AD.AtProxy
 ---@field public  types string[]
----@field private _at   AD.At.Vararg
+---@field private __at   AD.At.Vararg
 
 AD.Vararg = AD.AtProxy:make_subclass("AD.Vararg", {
   __AtClass = AD.At.Vararg,
   __computed_index = function (self, k)
     if k == "types" then
-      return self._at[k] and concat(self._at[k], "|")
+      return self.__at[k] and concat(self.__at[k], "|")
     end
-    return AD.Param.__Super.__computed_index(self, k)
+    return AD.Vararg.__Super.__computed_index(self, k)
   end
 })
 
 ---@class AD.Return: AD.AtProxy
 ---@field public  types string[]
----@field private _at   AD.At.Return
+---@field private __at   AD.At.Return
 
 AD.Return = AD.AtProxy:make_subclass("AD.Return", {
   __AtClass = AD.At.Return,
   __computed_index = function (self, k)
     if k == "types" then
-      return self._at[k] and concat(self._at[k], "|")
+      return self.__at[k] and concat(self.__at[k], "|")
     end
-    return AD.Param.__Super.__computed_index(self, k)
+    return AD.Return.__Super.__computed_index(self, k)
   end
 })
 
@@ -1157,30 +1171,28 @@ AD.Return = AD.AtProxy:make_subclass("AD.Return", {
 AD.See = AD.AtProxy:make_subclass("AD.See", {
   __AtClass = AD.At.See,
   -- next is not very clean but it works and is simple
-  __computed_index = function (self, k)
-    if k == "comment" then
-      return nil
-    end
-    if k == "value" then
-      return AD.See.__Super.__computed_index(self, "comment")
-    end
-    return AD.See.__Super.__computed_index(self, k)
-  end,
+  __instance_table = {
+    comment = function ()
+      return Object.NIL
+    end,
+    value = function (self)
+      return self.__at.value
+    end,
+  },
 })
 
 ---@class AD.Author: AD.AtProxy
 AD.Author = AD.AtProxy:make_subclass("AD.Author", {
   __AtClass = AD.At.Author,
   -- next is not very clean but it works and is simple
-  __computed_index = function (self, k)
-    if k == "comment" then
-      return nil
-    end
-    if k == "value" then
-      return AD.Author.__Super.__computed_index(self, "comment")
-    end
-    return AD.Author.__Super.__computed_index(self, k)
-  end,
+  __instance_table = {
+    comment = function (self)
+      return Object.NIL
+    end,
+    value = function (self)
+      return self.__at.value
+    end,
+  },
 })
 
 ---@class AD.Function: AD.AtProxy
@@ -1191,7 +1203,7 @@ AD.Author = AD.AtProxy:make_subclass("AD.Author", {
 ---@field public all_return_indices fun(): integer|nil
 ---@field public all_returns       fun(): AD.Return|nil
 ---@field public get_return        fun(i: integer): AD.Return
----@field private _at AD.At.Function
+---@field private __at AD.At.Function
 ---@field private __params AD.Param[]
 ---@field private __returns AD.Return[]
 
@@ -1203,34 +1215,33 @@ AD.Function = AD.AtProxy:make_subclass("AD.Function", {
     ---@type AD.Return[]
     self.__returns = {}
   end,
-  __computed_index = function (self, k)
-    if k == "vararg" then
-      local result = AD.Vararg({}, self._module, self._at.vararg)
+  __instance_table = {
+    vararg = function (self)
+      local result = AD.Vararg({}, self._module, self.__at.vararg)
       self.vararg = result
       return result
-    end
-    if k == "see" then
-      local result = AD.See({}, self._module, self._at.see)
-      self.vararg = result
+    end,
+    see = function (self)
+      local result = AD.See({}, self._module, self.__at.see)
+      self.see = result
       return result
-    end
-    if k == "author" then
-      local result = AD.Author({}, self._module, self._at.author)
-      self.vararg = result
+    end,
+    author = function (self)
+      local result = AD.Author({}, self._module, self.__at.author)
+      self.author = result
       return result
-    end
-    return AD.Function.__Super.__computed_index(self, k)
-  end,
+    end,
+  },
 })
 
 ---Iterator of the parameter info names
 ---@function AD.Function.all_param_names
 ---@return fun(): string | nil
-function AD.Function.__computed_table:all_param_names()
+function AD.Function.__instance_table:all_param_names()
   local i = 0
   return function ()
     i = i + 1
-    local param = self._at.params[i]
+    local param = self.__at.params[i]
     return param and param.name
   end
 end
@@ -1244,7 +1255,7 @@ function AD.Function:get_param(name)
   if result then
     return result
   end
-  for _, param in ipairs(self._at.params) do
+  for _, param in ipairs(self.__at.params) do
     if param.name == name then
       result = AD.Param({}, self._module, param)
       params[name] = result
@@ -1256,7 +1267,7 @@ end
 ---Parameter info iterator
 ---@function AD.Function.all_params
 ---@return fun(): string | nil
-function AD.Function.__computed_table:all_params()
+function AD.Function.__instance_table:all_params()
   local iterator = self.all_param_names
   return function ()
     local name = iterator()
@@ -1267,11 +1278,11 @@ end
 ---Return info indices iterator
 ---@function AD.Function.all_return_indices
 ---@return fun(): integer | nil
-function AD.Function.__computed_table:all_return_indices()
+function AD.Function.__instance_table:all_return_indices()
   local i = 0
   return function ()
     i = i + 1
-    return i <= #self._at.returns and i or nil
+    return i <= #self.__at.returns and i or nil
   end
 end
 
@@ -1284,7 +1295,7 @@ function AD.Function:get_return(i)
   if result then
     return result
   end
-  local at = self._at.returns[i]
+  local at = self.__at.returns[i]
   if at then
     result = AD.Return({}, self._module, at)
     self.__returns[i] = result
@@ -1295,7 +1306,7 @@ end
 ---Return info iterator
 ---@function AD.Function.all_params
 ---@return fun(): AD.Return | nil
-function AD.Function.__computed_table:all_returns()
+function AD.Function.__instance_table:all_returns()
   local iterator = self.all_return_indices
   return function ()
     local i = iterator()
@@ -1308,12 +1319,11 @@ end
 
 AD.Field = AD.AtProxy:make_subclass("AD.Field", {
   __AtClass = AD.At.Field,
-  __computed_index = function (self, k)
-    if k == "visibility" then
-      return self._at[k]
-    end
-    return AD.Field.__Super.__computed_index(self, k)
-  end
+  __instance_table = {
+    visibility = function (self)
+      return self.__at.visibility
+    end,
+  },
 })
 
 ---@class AD.Method: AD.Function
@@ -1321,36 +1331,33 @@ AD.Field = AD.AtProxy:make_subclass("AD.Field", {
 ---@field public class      AD.Class
 
 AD.Method = AD.Function:make_subclass("AD.Method", {
-  __computed_index = function (self, k)
-    if k == "base_name" then
-      local m = lpad.class_base:match(self.name)
-      if m then
-        self[k] = m.base
-        return m.base
+  __instance_table = {
+    base_name = function (self)
+      local base, _ = get_base_class(self.name)
+      self.base_name = base
+      return base
+    end,
+    class_name = function (self)
+      local _, class = get_base_class(self.name)
+      if class then
+        self.class_name = class
+        return class
       end
-    end
-    if k == "class_name" then
-      local m = lpad.class_base:match(self.name)
-      if m then
-        self[k] = m.class
-        return m.class
-      end
-    end
-    if k == "class" then
+    end,
+    class = function (self)
       local c_info = self._module:get_class(self.class_name)
       if c_info then
-        self[k] = c_info
+        self.class = c_info
         return c_info
       end
-    end
-    return AD.Method.__Super.__computed_index(self, k)
-  end
+    end,
+  },
 })
 
 ---@class AD.Class: AD.AtProxy
 ---@field public    author    AD.Author
 ---@field public    see       AD.See
----@field protected _at       AD.At.Class
+---@field protected __at       AD.At.Class
 ---@field public    all_field_names fun(): nil | string
 ---@field public    all_fields    fun(): nil | AD.Field
 ---@field public    get_field     fun(name: string): nil | AD.Field
@@ -1368,68 +1375,83 @@ AD.Class = AD.AtProxy:make_subclass("AD.Class", {
     ---@type table<string, AD.Method>
     self.__methods = {}
   end,
-  __computed_index = function (self, k)
-    if k == "all_field_names" then
-      local i = 0
-      return function ()
-        i = i + 1
-        local f = self._at.fields[i]
-        if f then
-          return f.name
+  __instance_table = {
+    author = function (self)
+      local at_author = self.__at.author
+      if at_author then
+        local result = AD.Author({}, self._module, at_author)
+        self.author = result
+        return result
+      end
+    end,
+    see = function (self)
+      local at_see = self.__at.see
+      if at_see then
+        local result = AD.See({}, self._module, at_see)
+        self.see = result
+        return result
+      end
+    end,
+  },
+})
+
+---Field names iterator
+---@param self AD.Class
+---@return fun(): string | nil
+function AD.Class.__instance_table:all_field_names()
+  local i = 0
+  return function ()
+    i = i + 1
+    local f = self.__at.fields[i]
+    if f then
+      return f.name
+    end
+  end
+end
+
+---comment
+---@param self AD.Class
+---@return function
+function AD.Class.__instance_table:all_fields()
+  local iterator = self.all_field_names
+  return function ()
+    local name = iterator()
+    return name and self:get_field(name)
+  end
+end
+
+---Method names iterator
+---@param self AD.Class
+---@return fun(): string | nil
+function AD.Class.__instance_table:all_method_names()
+  local p = P(self.name)
+    * P(".")
+    * C(variable_p)
+    * -black_p
+  local iterator = self._module.all_fun_names
+  return function ()
+    repeat
+      local function_name = iterator()
+      if function_name then
+        local result = p:match(function_name)
+        if result then
+          return result
         end
       end
-    end
-    if k == "all_fields" then
-      local iterator = self.all_field_names
-      return function ()
-        local name = iterator()
-        return name and self:get_field(name)
-      end
-    end
-    if k == "all_method_names" then
-      local p = P(self.name)
-        * P(".")
-        * C(lpad.variable)
-        * -lpad.black
-      local iterator = self._module.all_fun_names
-      return function ()
-        repeat
-          local function_name = iterator()
-          if function_name then
-            local result = p:match(function_name)
-            if result then
-              return result
-            end
-          end
-        until not function_name
-      end
-    end
-    if k == "all_methods" then
-      local iterator = self.all_method_names
-      return function ()
-        local name = iterator()
-        return name and self:get_method(name)
-      end
-    end
-    if k == "author" then
-      local at_k = self._at[k]
-      if at_k then
-        local result = AD.Author({}, self._module, at_k)
-        self[k] = result
-        return result
-      end
-    end
-    if k == "see" then
-      local at_k = self._at[k]
-      if at_k then
-        local result = AD.See({}, self._module, at_k)
-        self[k] = result
-        return result
-      end
-    end
-    return AD.Class.__Super.__computed_index(self, k)
-  end,
-})
+    until not function_name
+  end
+end
+
+---Methods iterator
+---@param self AD.Class
+---@return function
+function AD.Class.__instance_table:all_methods()
+  local iterator = self.all_method_names
+  return function ()
+    local name = iterator()
+    return name and self:get_method(name)
+  end
+end
 
 ---Get the paramater with the given name
 ---@param name string   @ one of the srings listed by the receiver's `all_field_names` enumerator.
@@ -1440,7 +1462,7 @@ function AD.Class:get_field(name)
   if result then
     return result
   end
-  for _, field in ipairs(self._at.fields) do
+  for _, field in ipairs(self.__at.fields) do
     if field.name == name then
       result = AD.Field({}, self._module, field)
       fields[name] = result
@@ -1474,64 +1496,72 @@ end
 AD.Type = AD.AtProxy:make_subclass("AD.Type", {
   __AtClass = AD.At.Type,
   GLOBAL_p = white_p^0 * P("_G.") * C(identifier_p),
-  __computed_index = function (self, k)
-    if k == "types" then
-      local at_k = self._at[k]
-      return at_k and concat(at_k, "|")
-    end
-    return AD.Type.__Super.__computed_index(self, k)
-  end,
+  __instance_table = {
+    types = function (self)
+      local at_types = self.__at.types
+      return at_types and concat(at_types, "|")
+    end,
+  },
 })
 
 ---@class AD.Global: AD.AtProxy
 ---@field public    types string[]
 ---@field protected _type AD.Type
----@field private _at AD.At.Global | AD.At.Type
+---@field private __at AD.At.Global | AD.At.Type
 
 AD.Global = AD.AtProxy:make_subclass("AD.Global", {
   __AtClass = AD.At.Global,
-  __computed_index = function (self, k)
-    if k == "_type" then
+  __instance_table = {
+    type = function (self)
+      return self.__at.type
+    end,
+    _type = function (self)
       local result
-      if self._at:is_instance_of(AD.At.Type) then
-        result = AD.Type({}, self._module, self._at)
-        self[k] = result
+      if self.__at:is_instance_of(AD.At.Type) then
+        result = AD.Type({}, self._module, self.__at)
+        self._type = result
         return result
       else
-        local at_type = self._at.type
+        local at_type = self.__at.type
         if at_type then
           result = AD.Type({}, self._module, at_type)
+          self._type = result
+          return result
+        end
+      end
+    end,
+    types = function (self)
+      local at_type = self._type
+      if at_type then
+        local result = at_type.types
+        self.types = result
+        return result
+      end
+    end,
+    value = function (self)
+      return Object.NIL
+    end,
+  },
+})
+
+do
+  local function f(self, k)
+    if self.__at:is_instance_of(AD.At.Type) then
+      local at_type = self.__at
+      if at_type then
+        local result = at_type[k]
+        if result then
           self[k] = result
           return result
         end
       end
     end
-    if k == "types" then
-      local at_type = self._type
-      if at_type then
-        local result = at_type.types
-        self[k] = result
-        return result
-      end
-    end
-    if k == "short_description"
-    or k == "long_description"
-    or k == "comment"
-    then
-      if self._at:is_instance_of(AD.At.Type) then
-        local at_type = self._at
-        if at_type then
-          local result = at_type[k]
-          if result then
-            self[k] = result
-            return result
-          end
-        end
-      end
-    end
-    return AD.Global.__Super.__computed_index(self, k)
-  end,
-})
+    return AD.Global.__Super.__instance_table[k](self, k)
+  end
+  AD.Global.__instance_table.comment = f
+  AD.Global.__instance_table.short_description = f
+  AD.Global.__instance_table.long_description = f
+end
 
 ---@class AD.Module: Object
 ---@field public  path            string      @ the path of the source file
@@ -1544,6 +1574,7 @@ AD.Global = AD.AtProxy:make_subclass("AD.Global", {
 ---@field public  get_global          fun(name: string): AD.Global | nil @ globals name iterator
 ---@field public  get_class           fun(name: string): AD.Class | nil @ globals name iterator
 ---@field public  get_fun             fun(name: string): AD.Function | nil @ globals name iterator
+---@field public  iterator            fun(self: AD.Module, Class: Object, options: table): iterator_f
 ---@field private __contents      string      @ the contents to recover documentation from
 ---@field private __get_instance  fun(name: string, Class: AD.AtProxy, store: table<string,AD.AtProxy>): AD.AtProxy
 ---@field private __all_infos     fun(): AD.Info | nil      @ info iterator
@@ -1584,7 +1615,7 @@ end
 --]===]
 ---@function AD.Module.all_global_names
 ---@return AD.Global | nil
-function AD.Module.__computed_table:all_global_names()
+function AD.Module.__instance_table:all_global_names()
   -- we create 2 iterators:
   -- 1) for ---@global
   -- 2) for ---@type + _G.foo = ...
@@ -1618,7 +1649,7 @@ end
 --]===]
 ---@function AD.Module.all_globals
 ---@return AD.Global | nil
-function AD.Module.__computed_table:all_globals()
+function AD.Module.__instance_table:all_globals()
   local iterator = self.all_global_names
   return function ()
     local name = iterator()
@@ -1636,12 +1667,12 @@ end
 --]===]
 ---@function AD.Module.all_class_names
 ---@return AD.Class | nil
-function AD.Module.__computed_table:all_class_names()
+function AD.Module.__instance_table:all_class_names()
   local iterator = self.__all_infos
   return function ()
     repeat
       local at = iterator()
-      if at:is_instance_of(AD.At.Class) then
+      if at and at:is_instance_of(AD.At.Class) then
         return at.name
       end
     until not at
@@ -1658,7 +1689,7 @@ end
 --]===]
 ---@function AD.Module.all_classes
 ---@return AD.Class | nil
-function AD.Module.__computed_table:all_classes()
+function AD.Module.__instance_table:all_classes()
   local iterator = self.all_class_names
   return function ()
     local name = iterator()
@@ -1676,12 +1707,12 @@ end
 --]===]
 ---@function AD.Module.all_fun_names
 ---@return AD.Class | nil
-function AD.Module.__computed_table:all_fun_names()
+function AD.Module.__instance_table:all_fun_names()
   local iterator = self.__all_infos
   return function ()
     repeat
       local at = iterator()
-      if at:is_instance_of(AD.At.Function) then
+      if at and at:is_instance_of(AD.At.Function) then
         return at.name
       end
     until not at
@@ -1699,7 +1730,7 @@ end
 --]===]
 ---@function AD.Module.all_funs
 ---@return AD.Class | nil
-function AD.Module.__computed_table:all_funs()
+function AD.Module.__instance_table:all_funs()
   local iterator = self.all_fun_names
   return function ()
     local name = iterator()
@@ -1723,6 +1754,7 @@ function AD.Module:__get_instance(name, Class, store)
     and info.name == name
     then
       result = Class(nil, self, info)
+      assert(result.__at == info, "INIT PROBLEM")
       store[name] = result
       return result
     end
@@ -1925,15 +1957,14 @@ do
 
   ---@param self AD.Module
   local function make_is_method(self)
-    local p = lpad.class_base
     for f_name in self.all_fun_names do
       if type(f_name) ~= "string" then
         print("WTH")
         _G.pretty_print(f_name)
       end
-      local m = p:match(f_name)
-      if m then
-        local at = self:get_fun(m.class)
+      local _, class = get_base_class(f_name)
+      if class then
+        local at = self:get_fun(class)
         if at then
           at.is_method = true
         end

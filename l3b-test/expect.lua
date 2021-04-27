@@ -73,6 +73,10 @@ function Expect:__index(k)
   if k == "to" then
     return self
   end
+  if k == "instance_of" then
+    self.op = k
+    return self
+  end
   if k == "than" then
     return self
   end
@@ -129,6 +133,10 @@ function Expect.__call(self, expected, options)
     if  type(self.actual) == "table"
     and type(expected) == "table"
     then
+      if self.__NOT then
+        print("NOT is not supported for contains verb")
+        LU.assertNotIs(self.actual, expected)
+      end
       for k, v in pairs(expected) do
         if  type(v) == "table"
         and type(self.actual[k]) == "table"
@@ -140,7 +148,7 @@ function Expect.__call(self, expected, options)
       end
       return
     end
-    if self.expected == nil then
+    if expected == nil then
       expect(self.actual).is(nil)
     else
       expect(self.actual).NOT(nil)
@@ -152,6 +160,10 @@ function Expect.__call(self, expected, options)
           expected
         )
     end
+  end
+  if self.op == "instance_of" then
+    (self.__NOT and LU.assertFalse or LU.assertTrue)
+    (self.actual:is_instance_of(expected))
   end
   self.op = ""
   return self

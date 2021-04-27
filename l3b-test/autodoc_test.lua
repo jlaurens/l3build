@@ -68,6 +68,49 @@ local Test = {
       end,
     })
   end,
+  get_LINE_COMMENT = function ()
+    return TestData({
+----5----0----5----0----5----0
+      s = [[
+--  LINE CMT WITH 3 SPACES   
+]],
+      x = function (self, min)
+        min = min or 1
+        return {
+          min         = min,
+          content_min = min + 4,
+          content_max = min + 25,
+          max         = min + 29,
+        }
+      end,
+      m = function (self, min)
+        return AD.LineComment(self:x(min))
+      end,
+    })
+  end,
+  get_LONG_COMMENT = function ()
+    return TestData({
+----5----0----5----0----5----0
+      s = [[
+--[==[VEEEEEEEEEERY
+LOOOOOOOOOOOOOOOONG
+CMMMMMMMMMMMMMMMMMT
+              ]==]
+]],
+      x = function (self, min)
+        min = min or 1
+        return {
+          min         = min,
+          content_min = min + 6,
+          content_max = min + 59,
+          max         = min + 78,
+        }
+      end,
+      m = function (self, min)
+        return AD.LongComment(self:x(min))
+      end,
+    })
+  end,
   get_LONG_DOC = function ()
     return TestData({
 ----5----0----5----0----5----0
@@ -102,9 +145,8 @@ DOOOOOOOOOOOOOOOOOC
         offset = offset or 0
         return {
           min         = min,
-          content_min = min + offset + 13,
-          content_max = min + offset + 18,
           max         = min + offset + 19,
+          value       = "pseudo",
         }
       end,
       m = function (self, min, offset)
@@ -148,9 +190,8 @@ DOOOOOOOOOOOOOOOOOC
         offset = offset or 0
         return {
           min         = min,
-          content_min = min + offset + 10,
-          content_max = min + offset + 18,
           max         = min + offset + 19,
+          value       = "reference",
         }
       end,
       m = function (self, min, offset)
@@ -173,6 +214,8 @@ DOOOOOOOOOOOOOOOOOC
           content_min = min + offset + 33,
           content_max = min + offset + 39,
           max         = min + offset + 40,
+          name        = "NAME",
+          parent      = "PARENT",
         }
       end,
       m = function (self, min, offset)
@@ -305,9 +348,8 @@ DOOOOOOOOOOOOOOOOOC
             ignores = {},
           }),
           min         = 381,
-          content_min = 393,
-          content_max = 409,
           max         = 410,
+          value       = "PSEUDO IDENTIFIER",
         }),
         see         = AD.At.See({
           description = AD.Description({
@@ -330,9 +372,8 @@ DOOOOOOOOOOOOOOOOOC
             ignores = {},
           }),
           min         = 471,
-          content_min = 482,
-          content_max = 499,
           max         = 500,
+          value       = "VARIOUS REFERENCES",
         }),
       })
     end,
@@ -353,6 +394,10 @@ DOOOOOOOOOOOOOOOOOC
           content_min = min + offset + 30,
           content_max = min + offset + 38,
           max         = min + offset + 39,
+          types       = {
+            "TYPE",
+            "OTHER_TYPE"
+          },
         }
       end,
       m = function (self, min, offset)
@@ -364,7 +409,7 @@ DOOOOOOOOOOOOOOOOOC
     return TestData({
 ----5----0----5----0----5----0----5----0----5
       s = [[
----   @module name_ @ COMMENT
+---   @module lower @ COMMENT
 ]],
       c = "COMMENT",
       x = function (self, min, offset)
@@ -375,6 +420,7 @@ DOOOOOOOOOOOOOOOOOC
           content_min = min + offset + 22,
           content_max = min + offset + 28,
           max         = min + offset + 29,
+          name        = "lower",
         }
       end,
       m = function (self, min, offset)
@@ -392,12 +438,14 @@ DOOOOOOOOOOOOOOOOOC
       m = function (self, min, offset)
         min = min or 1
         offset = offset or 0
-        return {
+        return AD.At.Alias({
           min         = min,
           content_min = min + offset + 25,
           content_max = min + offset + 38,
           max         = min + offset + 48,
-        }
+          name        = "NAME",
+          types       = { "TYPE" },
+        })
       end,
       x = function (self, min, offset)
         return AD.At.Alias(self:x(min, offset))
@@ -493,6 +541,7 @@ DOOOOOOOOOOOOOOOOOC
           content_max = min + offset + 38,
           max         = min + offset + 39,
           types       = { "TYPE", "OTHER" },
+          optional    = false,
         }
       end,
       m = function (self, min, offset)
@@ -726,13 +775,14 @@ DOOOOOOOOOOOOOOOOOC
       x = function (self, min, offset)
         min = min or 1
         offset = offset or 0
-        return {
+        return AD.At.Global({
           min         = min,
           content_min = min + offset + 21,
           content_max = min + offset + 27,
           max         = min + offset + 28,
           name        = "NAME",
-        }
+          types       = {},
+        })
       end,
       m = function (self, min, offset)
         return AD.At.Global(self:x(min, offset))
@@ -839,7 +889,9 @@ DOOOOOOOOOOOOOOOOOC
   end,
   do_test_TD = function (self, Key)
     local KEY = Key:upper()
-    local TD = self["get_".. KEY]()
+    local TD_f = self["get_".. KEY]
+    assert(TD_f, "Missing get_".. KEY .. " method")
+    local TD = TD_f()
     local t = self.p:match(TD.s)
     expect(t).contains(TD:m())
     if TD.c then
@@ -848,56 +900,68 @@ DOOOOOOOOOOOOOOOOOC
   end,
   do_test_complete = function (self, Key)
     local Class = AD.At[Key]
-    local TYPE = Class.TYPE
     local KEY = Key:upper()
-    local TD = self["get_".. KEY]()
+    local TD_f = self["get_".. KEY]
+    assert(TD_f, "Missing get_".. KEY .. " method")
+    local TD = TD_f()
     local p = AD.At[Key]:get_capture_p()
+    if self.verbose > 0 then
+      print("TEST", Key)
+    end
     local s = TD.s
-    local t = p:match(s)
-    expect(t.TYPE).is(TYPE)
-    expect(t).contains(TD:m())
+    local actual = p:match(s)
+    expect(actual).is.instance_of(Class)
+    local expected = TD:m()
+    if self.verbose > 2 then
+      print("actual:")
+      _G.pretty_print(actual)
+      print("expected:")
+      _G.pretty_print(expected)
+    end
+    expect(actual).equals(expected)
 
     p = AD.At[Key]:get_complete_p()
-    t = p:match(s)
+    actual = p:match(s)
+    expect(actual).is.instance_of(Class)
     local TD_LINE_DOC = self.get_LINE_DOC()
     s = TD_LINE_DOC.s .. TD.s
-    t = p:match(s)
+    actual = p:match(s)
     -- print("t")
     -- pretty_print(t)
-    expect(t.TYPE).is(TYPE)
-    local LINE_DOC_m = TD_LINE_DOC.m()
+  
+    local LINE_DOC_m = TD_LINE_DOC:m()
     -- print("LINE_DOC_m")
     -- pretty_print(LINE_DOC_m)
-    expect(t).contains(TD:m(1 + LINE_DOC_m.max))
-    expect(t.description.short).contains(LINE_DOC_m)
+    expect(actual).contains(TD:m(1 + LINE_DOC_m.max))
+    expect(actual.description.short).contains(LINE_DOC_m)
 
     s = TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD.s
-    t = p:match(s)
-    expect(t.TYPE).is(TYPE)
-    expect(t).contains(TD:m(1 + 2 * LINE_DOC_m.max))
-    expect(t.description.short).contains(LINE_DOC_m)
+    actual = p:match(s)
+    expect(actual).is.instance_of(Class)
+    expect(actual).contains(TD:m(1 + 2 * LINE_DOC_m.max))
+    expect(actual.description.short).contains(LINE_DOC_m)
     
     -- pretty_print(t.description.long[1])
     -- pretty_print(self:get_LINE_DOC_m(LINE_DOC_m.max + 1))
     
-    expect(t.description.long[1]).contains(TD_LINE_DOC.m(LINE_DOC_m.max + 1))
+    expect(actual.description.long[1]).contains(TD_LINE_DOC:m(LINE_DOC_m.max + 1))
     
     s = TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD_LINE_DOC.s .. TD.s
-    t = p:match(s)
-    expect(t.TYPE).is(TYPE)
-    expect(t).contains(TD:m(1 + 3 * LINE_DOC_m.max))
-    expect(t.description.short).contains(LINE_DOC_m)
-    expect(t.description.long[2]).contains(TD_LINE_DOC.m(1 + 2 * LINE_DOC_m.max))
+    actual = p:match(s)
+    expect(actual).is.instance_of(Class)
+    expect(actual).contains(TD:m(1 + 3 * LINE_DOC_m.max))
+    expect(actual.description.short).contains(LINE_DOC_m)
+    expect(actual.description.long[2]).contains(TD_LINE_DOC:m(1 + 2 * LINE_DOC_m.max))
 
     local TD_LONG_DOC = self.get_LONG_DOC()
     s = TD_LINE_DOC.s .. TD_LONG_DOC.s .. TD.s
-    t = p:match(s)
-    expect(t.TYPE).is(TYPE)
-    local LONG_DOC_m = TD_LONG_DOC.m(LINE_DOC_m.max)
+    actual = p:match(s)
+    expect(actual).is.instance_of(Class)
+    local LONG_DOC_m = TD_LONG_DOC:m(LINE_DOC_m.max)
 
-    expect(t).contains(TD:m(1 + 1 + LONG_DOC_m.max))
-    expect(t.description.short).contains(LINE_DOC_m)
-    expect(t.description.long[1]).contains(TD_LONG_DOC.m(LINE_DOC_m.max + 1))
+    expect(actual).contains(TD:m(1 + 1 + LONG_DOC_m.max))
+    expect(actual.description.short).contains(LINE_DOC_m)
+    expect(actual.description.long[1]).contains(TD_LONG_DOC:m(LINE_DOC_m.max + 1))
   end,
 }
 Test.__index = Test
@@ -929,18 +993,20 @@ end
 ---@param contains boolean @ expect `contains` when true, `equals` otherwise.
 function Test:do_test_DB_x(key, contains)
   if self.verbose > 0 then
-    print("TEST", key)
+    print("TEST", key, self.p)
   end
   for _, TD in ipairs(DB[key]) do
-    if self.verbose > 1 then
+    if self.verbose > 2 then
+      print("#" .. _)
+      _G.pretty_print(TD)
+    elseif self.verbose > 1 then
       print("#" .. _, TD.s)
     end
-    local actual = self.p:match(TD.s)
+    -- _G.pretty_print(self.p:match("---@return fun(): string | nil"))
+    -- _G.pretty_print(self.p:match("---@return fun(): string | nil"))
+    local actual = self.p:match(TD.s, TD.d or 1)
     local expected = TD:x() -- `x` here
-    expected.foo = 421
-    expected = TD:x()
-    expect(expected.foo).NOT(421)
-    if type(expected) == "table" then
+    if type(expected) == "table" and not expected.__TYPE then
       expected = self.Class(expected)
     end
     if self.verbose > 2 then
@@ -962,7 +1028,7 @@ end
 ---@param contains boolean @ expect `contains` when true, `equals` otherwise.
 function Test:do_test_DB_m(key, contains)
   for _, TD in ipairs(DB[key]) do
-    local actual = self.p:match(TD.s)
+    local actual = self.p:match(TD.s, TD.d or 1)
     local expected = TD:m() -- `m` here
     if type(expected) == "table" then
       expected = self.Class(expected)

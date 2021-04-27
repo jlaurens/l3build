@@ -9,15 +9,15 @@ local Cb      = lpeg.Cb
 local V       = lpeg.V
 local Cp      = lpeg.Cp
 
-local LU      = require("l3b-test/luaunit")
+---@type corelib_t
+local corelib = require("l3b-corelib")
+
 local expect  = require("l3b-test/expect").expect
 
 local l3build = require("l3build")
 
 local AUTODOC_NAME = "l3b-autodoc"
 local AUTODOC_PATH = l3build.work_dir .."l3b/".. AUTODOC_NAME ..".lua"
-
-local pretty_print = _G.pretty_print
 
 -- Next is an _ENV that will allow a module to export
 -- more symbols than usually done in order to finegrain testing
@@ -74,15 +74,19 @@ _G.test_POC = Test({
       type = V("table") + P("abc"),
       table =
         P("table")   -- table<foo,bar>
-      * P( lpad.get_spaced("<")
+      * P( corelib.get_spaced_p("<")
         * V("type")
-        * lpad.comma
+        * corelib.spaced_comma_p
         * V("type")
-        * lpad.get_spaced(">")
+        * corelib.get_spaced_p(">")
       )^-1,
     })
     expect((p * Cp()):match("table<abc,abc>")).is(15)
-  end
+  end,
+  test_key = function (self)
+    local Subclass = AD.Content:make_subclass("fOo.BaR")
+    expect(Subclass.key).is("bar")
+  end,
 })
 
 _G.test_Info = function ()
@@ -119,6 +123,7 @@ _G.test_LineComment = Test({
   test = function (self)
     self:do_setup(AD.LineComment)
     self:do_test_base(DB.BASE())
+    self:do_test_TD("line_comment")
     self:do_test_DB_x("line_comment")
   end
 })
@@ -127,6 +132,7 @@ _G.test_LongComment = Test({
   test = function (self)
     self:do_setup(AD.LongComment)
     self:do_test_base(DB.BASE())
+    self:do_test_TD("long_comment")
     self:do_test_DB_x("long_comment")
   end,
 })
@@ -135,6 +141,7 @@ _G.test_LineDoc = Test({
   test = function (self)
     self:do_setup(AD.LineDoc)
     self:do_test_base(DB.BASE())
+    self:do_test_TD("line_doc")
     self:do_test_DB_x("line_doc")
   end,
 })
@@ -143,12 +150,13 @@ _G.test_LongDoc = Test({
   test = function (self)
     self:do_setup(AD.LongDoc)
     self:do_test_base(DB.BASE())
+    self:do_test_TD("long_doc")
     self:do_test_DB_x("long_doc")
   end,
 })
 
 DB:fill(
-  "AD.Description",
+  AD.Description.__TYPE,
   "--",
   nil,
   "---",
@@ -275,7 +283,7 @@ _G.test_Description = Test({
   test = function (self)
     self:do_setup(AD.Description)
     self:do_test_base(DB.BASE())
-    self:do_test_DB_x("AD.Description", true)
+    self:do_test_DB_x(AD.Description.__TYPE, true)
   end,
 })
 
@@ -298,7 +306,7 @@ _G.test_At_Author = Test({
     self:do_test_base(DB.BASE())
     self:do_test_DB_x("AD.At.Author", true)
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Author")
   end
 })
@@ -358,7 +366,8 @@ DB:fill(
     visibility  = "private",
     name        = "f22",
     types       = { "b26" },
-  }
+  },
+  10
 )
 
 _G.test_At_Field = Test({
@@ -378,7 +387,7 @@ _G.test_At_Field = Test({
     self:do_test_base(DB.BASE())
     self:do_test_DB_x("AD.At.Field", true)
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Field")
   end
 })
@@ -402,7 +411,7 @@ _G.test_At_See = Test({
     self:do_test_base(DB.BASE())
     self:do_test_DB_x("AD.At.See", true)
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("See")
   end
 })
@@ -442,7 +451,7 @@ _G.test_At_Class = Test({
     expect(t).contains(TD:x())
     expect(t:get_comment(TD.s)).is(TD.c)
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Class")
 
     local p = AD.At.Class:get_complete_p()
@@ -450,19 +459,22 @@ _G.test_At_Class = Test({
     local TD_CLASS = self:get_CLASS()
     local TD_FIELD = self:get_FIELD()
     local TD_AUTHOR = self:get_AUTHOR()
+
     local s = TD_CLASS.s .. TD_FIELD.s .. TD_AUTHOR.s
     local t = p:match(s)
     expect(t).is.NOT(nil)
-    expect(t.fields).contains({
-      TD_FIELD.m(1 + TD_CLASS.m().max)
+    expect(t.fields).equals({
+      TD_FIELD:m(1 + TD_CLASS:m().max)
     })
-    expect(t.author).contains(
-      TD_AUTHOR.m(
-        1 + TD_FIELD.m(1 + TD_CLASS.m().max).max
+    expect(t.author).equals(
+      TD_AUTHOR:m(
+        1 + TD_FIELD:m(1 + TD_CLASS:m().max).max
       )
     )
     local TD = self.get_CLASS_COMPLETE()
-    expect(p:match(TD.s)).contains(TD.m())
+    local actual = p:match(TD.s)
+    local expected = TD:m()
+    expect(actual).contains(expected)
   end,
 
 })
@@ -515,7 +527,7 @@ _G.test_At_Type = Test({
     expect(t).contains(TD:m())
     expect(t:get_comment(TD.s)).is(TD.c)
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Type")
   end,
 })
@@ -576,7 +588,7 @@ _G.test_At_Alias = Test({
     self:do_test_DB_x("AD.At.Alias", true)
     self:do_test_TD("Alias")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Alias")
   end,
 })
@@ -671,7 +683,7 @@ _G.test_At_Param = Test({
     self:do_test_DB_x("AD.At.Param", true)
     self:do_test_TD("Param")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Param")
   end,
 })
@@ -701,6 +713,16 @@ DB:fill(
     content_max = 29,
     types       = { "TYPE" },
     optional    = true,
+  },
+  -----5----0----5----0----5----0----5----0----5----
+  "---@return fun(): string | nil",
+  {
+    min         = 1,
+    max         = 30,
+    content_min = 31,
+    content_max = 30,
+    types       = { "fun(): string | nil" },
+    optional    = false,
   }
 )
 
@@ -712,7 +734,7 @@ _G.test_At_Return = Test({
     self:do_test_DB_x("AD.At.Return", true)
     self:do_test_TD("Return")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Return")
   end,
 })
@@ -794,7 +816,7 @@ _G.test_At_Generic = Test({
     self:do_test_DB_x("AD.At.Generic", true)
     self:do_test_TD("Generic")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Generic")
   end,
 })
@@ -847,7 +869,7 @@ _G.test_At_Vararg = Test({
     self:do_test_DB_x("AD.At.Vararg", true)
     self:do_test_TD("Vararg")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Vararg")
   end,
 })
@@ -888,7 +910,7 @@ _G.test_At_Module = Test({
     self:do_test_DB_x("AD.At.Module", true)
     self:do_test_TD("Module")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Module")
 
 ----5----0----5----0----5----0----5----0----5----0----5----
@@ -907,12 +929,12 @@ _G.test_At_Module = Test({
     }) )
     expect(t.author).contains( AD.At.Author({
       min         = 22,
-      content_min = 33,
-      content_max = 41,
       max         = 42,
+      value       = "my_pseudo",
+      ignores     = {},
     }) )
     expect(t:get_comment(s)).is("")
-    expect(t.author:get_content(s)).is("my_pseudo")
+    expect(t.author.value).is("my_pseudo")
     end,
 })
 
@@ -949,7 +971,7 @@ _G.test_At_Function = Test({
     self:do_test_DB_x("AD.At.Function", true)
     self:do_test_TD("Function")
   end,
-  no_test_complete = function (self)
+  test_complete = function (self)
     self:do_test_complete("Function")
 
     local p = AD.At.Function:get_complete_p()
@@ -976,17 +998,14 @@ _G.test_At_Function = Test({
     })
 
     TD = self.get_FUNCTION_COMPLETE()
-    expect(p:match(TD.s)).contains(TD.m())
+    expect(p:match(TD.s)).contains(TD:m())
   end,
 })
 
 DB:fill(
   "AD.Break",
   "",
-  {
-    min = 1,
-    max = 1,
-  },
+  nil,
   " \n ",
   {
     min = 1,
@@ -1002,11 +1021,9 @@ DB:fill(
 _G.test_Break = Test({
   test = function (self)
     expect(AD.Break().__Class).equals(AD.Break)
-    self.verbose = 3
     self:do_setup(AD.Break)
     self:do_test_base(DB.BASE())
     self:do_test_DB_x("AD.Break", true)
-    self:do_test_TD("Break")
   end,
 })
 
@@ -1048,15 +1065,16 @@ DB:fill(
 
 _G.test_At_Global = Test({
   test = function (self)
-    expect(AD.At.Global()).equals( AD.At.Global(DB.Base) )
+    self:do_setup(AD.At.Global)
+    self:do_test_base(DB.BASE())
+    self:do_test_DB_x("AD.At.Global", true)
     self:do_test_TD("Global")
   end,
   test_complete = function (self)
     self:do_test_complete("Global")
-
     local p = AD.At.Global:get_complete_p()
     local TD = self:get_GLOBAL_COMPLETE()
-    expect(p:match(TD.s)).contains(TD.m())
+    expect(p:match(TD.s)).contains(TD:m())
   end,
 })
 
@@ -1090,10 +1108,11 @@ _G.test_loop_p = Test({
     for _, KEY in ipairs(self.STANDARD_ITEMS) do
       local f = self["get_".. KEY]
       local TD = f(self)
-      local m = self.p:match(TD.s)
-      expect(m).contains(TD.m())
-      if TD.c and m.get_content then
-        expect(m:get_content(TD.s)).is(TD.c)
+      local actual = self.p:match(TD.s)
+      local expected = TD:m()
+      expect(actual).equals(expected)
+      if TD.c and actual.get_content then
+        expect(actual:get_content(TD.s)).is(TD.c)
       end
     end
   end,
@@ -1102,15 +1121,16 @@ _G.test_loop_p = Test({
     for KEY, multi in pairs(self.FUNCTION_ITEMS) do
       local f = self["get_".. KEY]
       local TD = f(self)
-      local m = self.p:match(TD.s)
+      local actual = self.p:match(TD.s)
       local key = multi
         and KEY:lower() .."s"
         or  KEY:lower()
-      expect(m).contains({
-        ID          = AD.At.Function.ID,
-        max         = TD.m().max,
-        [key]       = multi and { TD.m() } or TD.m(),
+      local expected = AD.At.Function({
+        min         = 1,
+        max         = TD:m().max,
+        [key]       = multi and { TD:m() } or TD:m(),
       })
+      expect(actual).equals(expected)
     end
   end,
 })
@@ -1130,7 +1150,7 @@ _G.test_Source = Test({
       local m = self.p:match(TD.s)
       expect(m).contains({
         ID = AD.Source.ID,
-        infos = { TD.m() },
+        infos = { TD:m() },
       })
     end
   end,
@@ -1146,8 +1166,8 @@ _G.test_Source = Test({
         ID = AD.Source.ID,
         infos = { {
           ID          = AD.At.Function.ID,
-          max         = TD.m().max,
-          [key]       = multi and { TD.m() } or TD.m(),
+          max         = TD:m().max,
+          [key]       = multi and { TD:m() } or TD:m(),
         } },
       })
     end
@@ -1165,14 +1185,17 @@ _G.test_Source = Test({
           expect(m).contains({
             ID = AD.Source.ID,
             infos = {
-              TD_1.m(),
-              TD_2.m(1 + TD_1.m().max)
+              TD_1:m(),
+              TD_2:m(1 + TD_1:m().max)
             },
           })
         end
       end
     end
   end,
+  test = function (self)
+    local s
+  end
 })
 
 _G.test_autodoc = Test({
@@ -1322,7 +1345,8 @@ PKG.NAME_6 = function ()
     local g_info = self.module:get_global("NAME")
     expect(g_info).is.NOT(nil)
     expect(g_info).Class(AD.Global)
-    expect(g_info.name).is("NAME")
+    expect(g_info.name)
+      .is("NAME")
     expect(g_info.short_description)
       .is("GLOBAL:  SHORT DESCRIPTION")
     expect(g_info.long_description)
@@ -1373,44 +1397,33 @@ _G.foo = bar
     expect(c_info.__fields).contains({})
     local field_1 = c_info:get_field("FIELD_1")
     expect(field_1).is.NOT(nil)
-    expect(field_1.comment)
-      .is("FIELD_1: CMT")
-    expect(field_1.short_description)
-      .is("FIELD_1: SHORT DESCRIPTION")
-    expect(field_1.long_description )
-      .is("FIELD_1: LONG  DESCRIPTION")
-    expect(field_1.types)
-      .is("TYPE_1")
-    expect(field_1.visibility)
-      .is("protected")
+    expect(field_1).contains({
+      comment = "FIELD_1: CMT",
+      short_description = "FIELD_1: SHORT DESCRIPTION",
+      long_description = "FIELD_1: LONG  DESCRIPTION",
+      types = "TYPE_1",
+      visibility = "protected"
+    })
     local field_2 = c_info:get_field("FIELD_2")
-    expect(field_2).is.NOT(nil)
-    expect(field_2.comment)
-      .is("FIELD_2: CMT")
-    expect(field_2.short_description)
-      .is("FIELD_2: SHORT DESCRIPTION")
-    expect(field_2.long_description )
-      .is("FIELD_2: LONG  DESCRIPTION")
-    expect(field_2.types)
-      .is("TYPE_2")
-    expect(field_2.visibility)
-      .is("protected")
-      local author = c_info.author
-      expect(author).is.NOT(nil)
-      expect(author.value)
-        .is("PSEUDO IDENTIFIER")
-      expect(author.short_description)
-        .is("AUTHOR:  SHORT DESCRIPTION")
-      expect(author.long_description )
-        .is("AUTHOR:  LONG  DESCRIPTION")
-      local see = c_info.see
-      expect(see).is.NOT(nil)
-      expect(see.value)
-        .is("VARIOUS REFERENCES")
-      expect(see.short_description)
-        .is("SEE:     SHORT DESCRIPTION")
-      expect(see.long_description )
-        .is("SEE:     LONG  DESCRIPTION")
+    expect(field_2).contains({
+      comment = "FIELD_2: CMT",
+      short_description = "FIELD_2: SHORT DESCRIPTION",
+      long_description = "FIELD_2: LONG  DESCRIPTION",
+      types = "TYPE_2",
+      visibility = "protected"
+    })
+    local author = c_info.author
+    expect(author).contains({
+      value = "PSEUDO IDENTIFIER",
+      short_description = "AUTHOR:  SHORT DESCRIPTION",
+      long_description = "AUTHOR:  LONG  DESCRIPTION",
+    })
+    local see = c_info.see
+    expect(see).contains({
+      value = "VARIOUS REFERENCES",
+      short_description = "SEE:     SHORT DESCRIPTION",
+      long_description = "SEE:     LONG  DESCRIPTION",
+    })
   end,
   test_Class_field_names = function (self)
     local s = [[
@@ -1493,22 +1506,6 @@ _G.test_Module_2 = Test({
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
       contents = str
-    })
-  end,
-  test_class_base = function (self)
-    local p = lpad.class_base
-    expect(p:match("a")).is(nil)
-    expect(p:match("a.b")).contains({
-      class = "a",
-      base  = "b",
-    })
-    expect(p:match("a.b.c")).contains({
-      class = "a.b",
-      base  = "c",
-    })
-    expect(p:match("a.b:c")).contains({
-      class = "a.b",
-      base  = "c",
     })
   end,
   test_method = function (self)
