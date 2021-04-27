@@ -92,8 +92,8 @@ local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
----@type wklib_t
-local wklib     = require("l3b-walklib")
+---@type pathlib_t
+local wklib     = require("l3b-pathlib")
 local job_name  = wklib.job_name
 
 ---@type gblib_t

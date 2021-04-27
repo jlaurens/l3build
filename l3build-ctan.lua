@@ -30,8 +30,8 @@ local entries = utlib.entries
 local items   = utlib.items
 local to_quoted_string = utlib.to_quoted_string
 
----@type wklib_t
-local wklib    = require("l3b-walklib")
+---@type pathlib_t
+local wklib    = require("l3b-pathlib")
 local dir_name = wklib.dir_name
 
 ---@type oslib_t

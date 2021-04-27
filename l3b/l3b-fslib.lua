@@ -41,8 +41,8 @@ local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 local first_of    = utlib.first_of
 
----@type wklib_t
-local wklib           = require("l3b-walklib")
+---@type pathlib_t
+local wklib           = require("l3b-pathlib")
 local dir_base        = wklib.dir_base
 
 ---@type gblib_t

@@ -57,8 +57,8 @@ local first_of        = utlib.first_of
 local gblib           = require("l3b-globlib")
 local to_glob_match = gblib.to_glob_match
 
----@type wklib_t
-local wklib     = require("l3b-walklib")
+---@type pathlib_t
+local wklib     = require("l3b-pathlib")
 local job_name  = wklib.job_name
 
 ---@type oslib_t

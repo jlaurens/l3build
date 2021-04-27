@@ -25,6 +25,7 @@ for those people who are interested.
 ---@module object
 --[===[
   This module implements some object oriented paradigm.
+  It does not require any other module.
 
   A class is a table that will be used as metatable of another table.
 
@@ -140,6 +141,76 @@ end
 function Object:__initialize(...)
 end
 
+local function make_class__index(class)
+  return function (self, k)
+    if k == "__Class" then
+      return class
+    end
+    -- first: dynamic instance properties
+    local result
+    local computed_k
+    if self and self ~= self.__Class then
+      computed_k = class.__instance_table[k]
+      if computed_k ~= nil then
+        result = computed_k(self, k)
+        if result ~= nil then
+          if result == Object.NIL then
+            return nil
+          end
+          return result
+        end
+      end
+    end
+    computed_k = class.__class_table[k]
+    if computed_k ~= nil then
+      result = computed_k(self, k)
+      if result ~= nil then
+        if result == Object.NIL then
+          return nil
+        end
+        return result
+      end
+    end
+    result = class.__computed_index(self, k)
+    if result ~= nil then
+      if result == Object.NIL then
+        return nil
+      end
+      return result
+    end
+    return class[k]
+  end
+end
+
+local function make_constructor(class)
+  -- Define the constructor with a direct call syntax
+  -- @param class any
+  -- @param d?    any @ initial data of the construction, will be the instance result
+  -- @vararg any      @ parameters to the `initialize` function
+  return function (self, d, ...)
+    -- call Super constructor
+    -- `first` recors if the `d` param was given
+    local first = type(d) ~= "table" and d or nil
+    if first then
+      d = class.__Super(nil, first, ...)
+    else
+      d = class.__Super(d, ...)
+    end
+    setmetatable(d, class)   -- d is an instance of self
+    d.__TYPE = class.__TYPE
+    -- initialize without inheritance, it was made in the Super contructor
+    local initialize = rawget(class, "__initialize")
+    if initialize then
+      if first then
+        initialize(d, first, ...)
+      else
+        initialize(d, ...)
+      end
+    end
+    return d
+  end
+end
+
 ---Class making method
 --[===[
   All classes are descendants of `Object`
@@ -185,59 +256,8 @@ function Object.make_subclass(Super, TYPE, static)
   ---@param self Object
   ---@param k any
   ---@return any
-  class.__index = function (self, k)
-    if k == "__Class" then
-      return class
-    end
-    -- first: dynamic instance properties
-    local result
-    local computed_k
-    if self and self ~= self.__Class then
-      computed_k = class.__instance_table[k]
-      if computed_k ~= nil then
-        result = computed_k(self, k)
-        if result ~= nil then
-          if result == Object.NIL then
-            return nil
-          end
-          return result
-        end
-      end
-    end
-    computed_k = class.__class_table[k]
-    if computed_k ~= nil then
-      result = computed_k(self, k)
-      if result ~= nil then
-        if result == Object.NIL then
-          return nil
-        end
-        return result
-      end
-    end
-    result = class.__computed_index(self, k)
-    if result ~= nil then
-      if result == Object.NIL then
-        return nil
-      end
-      return result
-    end
-    return class[k]
-  end
-  -- Define the constructor with a direct call syntax
-  -- @param class any
-  -- @param d?    any @ iniatail data of the construction, will be the instance result
-  -- @vararg any      @ parameters to the `initialize` function
-  function class:Constructor(d, ...)
-    d = Super(d, ...) -- call Super constructor first
-    setmetatable(d, class)   -- d is an instance of self
-    d.__TYPE = class.__TYPE
-    -- initialize without inheritance, it was made in the Super contructor
-    local initialize = rawget(class, "__initialize")
-    if initialize then
-      initialize(d, ...)
-    end
-    return d
-  end
+  class.__index = make_class__index(class)
+  class.Constructor = make_constructor(class)
   setmetatable(class, {
     __index = function (self, k)
       local result = rawget(Super, k)

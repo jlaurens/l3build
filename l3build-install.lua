@@ -35,8 +35,8 @@ local entries     = utlib.entries
 local gblib           = require("l3b-globlib")
 local to_glob_match = gblib.to_glob_match
 
----@type wklib_t
-local wklib           = require("l3b-walklib")
+---@type pathlib_t
+local wklib           = require("l3b-pathlib")
 local dir_base        = wklib.dir_base
 local base_name       = wklib.base_name
 local dir_name        = wklib.dir_name

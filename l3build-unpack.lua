@@ -32,8 +32,8 @@ local deps_install  = l3b_aux.deps_install
 local utlib   = require("l3b-utillib")
 local entries = utlib.entries
 
----@type wklib_t
-local wklib             = require("l3b-walklib")
+---@type pathlib_t
+local wklib             = require("l3b-pathlib")
 local dir_base          = wklib.dir_base
 
 ---@type oslib_t

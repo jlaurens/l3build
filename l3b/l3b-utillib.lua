@@ -47,6 +47,7 @@ local next    = next
 
 local sort        = table.sort
 local append      = table.insert
+local unappend    = table.remove
 local concat      = table.concat
 local tbl_unpack  = table.unpack
 local move        = table.move
@@ -67,69 +68,6 @@ local function split(str, sep)
     * C(q^0)
     + C(q^1)
   return Ct(r):match(str) or { str }
-end
-
----Split the given string into its path components
----@function path_components
----@param str string
-local path_components = setmetatable({}, {
-  __mode = "k",
-  __call = function (self, k)
-    local result = split(k, P("/")^1)
-    self[k] = result
-    return result
-  end,
-})
-
-local function merge_path(a, b)
-  local a_components = path_components(a)
-  local b_components = path_components(b)
-  local components = {}
-  if a == "" then
-    if b == "" then
-      return "/"
-    end
-    if b_components[1] == "" then
-      return b
-    end
-  end
-  if b == "" then
-    if a_components[#a_components] == "" then
-      return a
-    end
-    move(
-      a_components, 1, #a_components,
-      1, components
-    )
-    append(components, "")
-  else
-    local e = #a_components
-    e = a_components[e] == ""
-      and e - 1
-      or  e
-    move(
-      a_components, 1, e,
-      1, components
-    )
-    local f = b_components[1] == ""
-      and 2
-      or  1 -- no "" allowed in the middle
-    move(
-      b_components, f, #b_components,
-      #components + 1 ,components
-    )
-  end
-  local result = concat(components, "/")
-  path_components[result] = components
-  return result
-end
-
--- implement the / operator for string as path merger
-do
-  local MT = getmetatable("")
-  function MT.__div(a, b)
-    return merge_path(a, b)
-  end
 end
 
 --[==[ Readonly business
@@ -614,7 +552,7 @@ return {
   Vars                = Vars,
   flags               = flags,
   split               = split,
-  path_components     = path_components,
+  path_components     = path_properties,
   merge_path          = merge_path,
   to_quoted_string    = to_quoted_string,
   indices             = indices,

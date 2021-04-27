@@ -65,29 +65,6 @@ _G.test_split = function ()
   expect(split("abcc", P("c")^1)).equals({ "ab", "" })
 end
 
-_G.test_path_components = function ()
-  local path_components = utlib.path_components
-  expect(path_components("")).equals({ "" })
-  expect(path_components("a")).equals({ "a" })
-  expect(path_components("a/")).equals({ "a", "" })
-  expect(path_components("/a")).equals({ "", "a" })
-  expect(path_components("a//")).equals({ "a", "" })
-  expect(path_components("//a")).equals({ "", "a" })
-  expect(path_components("a/")).equals({ "a", "" })
-  expect(path_components("/a/")).equals({ "", "a", "" })
-end
-
-_G.test_string_forward_slash = function ()
-  expect("" / "").is("/")
-  expect("a" / "").is("a/")
-  expect("a" / "b").is("a/b")
-  expect("a/" / "b").is("a/b")
-  expect("a" / "/b").is("a/b")
-  expect("/" / "").is("/")
-  expect("" / "/").is("/")
-  expect("/" / "/").is("/")
-end
-
 _G.test_readonly = function ()
   local rw = {}
   local ro = utlib.readonly(rw)
