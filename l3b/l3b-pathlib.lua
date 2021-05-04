@@ -26,6 +26,21 @@ for those people who are interested.
 --[===[
 This module implements path facilities over strings.
 It only depends on the  `object` module.
+
+# Forbidden characters in file paths
+
+From [micrososft documentation](https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file)
+
+* < (less than)
+* > (greater than)
+* : (colon)
+* " (double quote)
+* / (forward slash)
+* \ (backslash)
+* | (vertical bar or pipe)
+* ? (question mark)
+* * (asterisk)
+
 ---]===]
 ---@module pathlib
 
@@ -289,10 +304,17 @@ local function core_name(file)
 end
 
 ---Return the extension, may be nil.
----@param file string
+---@param path string
 ---@return string | nil
-local function extension(file)
-  return path_properties(file).extension
+local function extension(path)
+  return path_properties(path).extension
+end
+
+---Sanitize the path by removing unecessary parts.
+---@param path string
+---@return string | nil
+local function sanitize(path)
+  return path_properties(path).as_string
 end
 
 ---@class pathlib_t
@@ -310,4 +332,5 @@ return {
   core_name = core_name,
   extension = extension,
   job_name  = core_name,
+  sanitize  = sanitize,
 }

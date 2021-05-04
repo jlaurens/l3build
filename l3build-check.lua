@@ -54,7 +54,7 @@ local entries         = utlib.entries
 local first_of        = utlib.first_of
 
 ---@type gblib_t
-local gblib           = require("l3b-globlib")
+local gblib           = require("l3b-lpeglib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type pathlib_t

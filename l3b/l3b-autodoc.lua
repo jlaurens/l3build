@@ -121,6 +121,7 @@ local V       = lpeg.V
 local B       = lpeg.B
 local Cb      = lpeg.Cb
 local Cc      = lpeg.Cc
+local Cf      = lpeg.Cf
 local Cg      = lpeg.Cg
 local Cmt     = lpeg.Cmt
 local Cp      = lpeg.Cp
@@ -161,7 +162,6 @@ local identifier_p    = corelib.identifier_p
 local white_p         = corelib.white_p
 local black_p         = corelib.black_p
 local eol_p           = corelib.eol_p
-local get_base_class  = corelib.get_base_class
 
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")

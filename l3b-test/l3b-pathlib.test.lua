@@ -31,12 +31,6 @@ Basic path utilities.
 
 local append = table.insert
 
-local standard_print = print
-local current_print = standard_print -- can be changed
-_G.print = function (...)
-  current_print(...)
-end
-
 -- Next is an _ENV that will allow a module to export
 -- more symbols than usually done in order to finegrain testing
 local __ = setmetatable({
@@ -213,4 +207,9 @@ function _G.test_extension()
   expect(extension("..")).is(nil)
 end
 
-
+function _G.test_sanitize()
+  local sanitize = pathlib.sanitize
+  expect(sanitize("")).is("")
+  expect(sanitize("a/..")).is("")
+  expect(sanitize("a/./.")).is("a/")
+end

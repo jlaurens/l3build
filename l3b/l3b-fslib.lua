@@ -46,7 +46,7 @@ local wklib           = require("l3b-pathlib")
 local dir_base        = wklib.dir_base
 
 ---@type gblib_t
-local gblib           = require("l3b-globlib")
+local gblib           = require("l3b-lpeglib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type oslib_t

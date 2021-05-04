@@ -33,14 +33,6 @@ local AD = loadfile(
   __
 )()
 
-local PEG_XTD = setmetatable({}, { __index = _G })
-
-local lpad = loadfile(
-  l3build.work_dir .."l3b/l3b-lpeg-autodoc.lua",
-  "t",
-  PEG_XTD
-)()
-
 local DB    = require("l3b-test/autodoc_db")
 local Test  = require("l3b-test/autodoc_test")
 
@@ -101,6 +93,25 @@ function Test:ad_test(target, expected, content, index)
   expect(m).contains(expected)
   expect(m:get_content(target)).is(content)
   self:add_strip(-1)
+end
+
+function  _G.test_get_base_class()
+  local get_base_class = AD.get_base_class
+  expect({ get_base_class("a") }).equals({
+   "a",
+  })
+  expect({ get_base_class("a.b") }).equals({
+    "b",
+    "a",
+  })
+  expect({ get_base_class("a.b.c") }).equals({
+    "c",
+    "a.b",
+  })
+  expect({ get_base_class("a.b:c") }).equals({
+    "c",
+    "a.b",
+  })
 end
 
 _G.test_ShortLiteral = Test({

@@ -140,7 +140,6 @@ local function cmd_concat(...)
 end
 
 ---Run a command in a given directory
----@function run
 ---@param dir string
 ---@param cmd string
 ---@return error_level_n
@@ -167,7 +166,6 @@ local function run(dir, cmd)
 end
 
 ---Return a quoted version or properly escaped
----@function quoted_path
 ---@param path string
 ---@return string
 local function quoted_path(path)
@@ -226,7 +224,6 @@ local function write_content(file_path, content)
 end
 
 ---Execute the given command and returns the output
----@function read_command
 ---@param command string
 ---@return string
 local function read_command(command)
@@ -238,21 +235,21 @@ local function read_command(command)
 end
 
 ---@class oslib_t
----@field public osdate      OS_t
----@field public Vars        oslib_vars_t
----@field public cmd_concat  fun(...): string
----@field public run         fun(dir: string, cmd: string): boolean?, exitcode?, integer?
----@field public quoted_path fun(path: string): string
----@field public read_content  fun(file_path: string, is_binary: boolean): string|nil
----@field public write_content fun(file_path: string, content: string): error_level_n
----@field public read_command  fun(command: string): string
+---@field public OS             OS_t
+---@field public Vars           oslib_vars_t
+---@field public cmd_concat     fun(...): string
+---@field public run            fun(dir: string, cmd: string): boolean?, exitcode?, integer?
+---@field public quoted_path    fun(path: string): string
+---@field public read_content   fun(file_path: string, is_binary: boolean): string|nil
+---@field public write_content  fun(file_path: string, content: string): error_level_n
+---@field public read_command   fun(command: string): string
 
 return {
-  Vars        = Vars,
-  OS          = OS,
-  cmd_concat  = cmd_concat,
-  run         = run,
-  quoted_path = quoted_path,
+  Vars          = Vars,
+  OS            = OS,
+  cmd_concat    = cmd_concat,
+  run           = run,
+  quoted_path   = quoted_path,
   read_content  = read_content,
   write_content = write_content,
   read_command  = read_command,

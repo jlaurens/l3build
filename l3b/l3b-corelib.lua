@@ -54,89 +54,6 @@ All forthcoming variables with suffix "_p" are
 lpeg patterns or functions that return a lpeg pattern.
 --]]
 
----@class lpeg_t @ convenient type for lpeg patterns
-
----@type lpeg_t
-local white_p = S(" \t")          -- exclude "\n", no unicode space neither.
-
----@type lpeg_t
-local black_p = P(1) - S(" \t\n") -- non space, non LF
-
----@type lpeg_t
-local eol_p   = (
-  P("\n") -- consume an eol
-)^-1      -- 0 or 1 end of line
-
-local ascii_p       = R("\x00\x7F") - P("\n") -- ones ascii char but a newline
-local more_utf8   = R("\x80\xBF")
-local utf8_p        =
-    ascii_p
-  + R("\xC2\xDF") * more_utf8
-  + P("\xE0")     * R("\xA0\xBF") * more_utf8
-  + P("\xED")     * R("\x80\x9F") * more_utf8
-  + R("\xE1\xEF") * more_utf8     * more_utf8
-  + P("\xF0")     * R("\x90\xBF") * more_utf8 * more_utf8
-  + P("\xF4")     * R("\x80\x8F") * more_utf8 * more_utf8
-  + R("\xF1\xF3") * more_utf8     * more_utf8 * more_utf8
-
-local consume_1_character_p =
-    utf8_p
-  + Cmt( 1 - P("\n"),   -- and consume one byte for an erroneous UTF8 character
-    function (s, i)
-      _G.UFT8_DECODING_ERROR = true
-      print("UTF8 problem ".. s:sub(i-1, i-1))
-    end
-  )
-
----Pattern with horizontal spaces before and after
----@param del string|number|table|lpeg_t
----@return lpeg_t
-local function get_spaced_p(del)
-  return white_p^0 * del * white_p^0
-end
-
----@type lpeg_t
-local spaced_colon_p = get_spaced_p(":")
-
----@type lpeg_t
-local spaced_comma_p = get_spaced_p(",")
-
-local variable_p =
-    ("_" + locale.alpha)      -- ascii letter, or "_"
-  * ("_" + locale.alnum)^0    -- ascii letter, or "_" or digit
-
--- for a class, type name
-local identifier_p =
-  variable_p * ("." * variable_p)^0
-
--- for a function
-local function_name_p =
-    variable_p
-  * ( P(".") * variable_p )^0
-  * ( P(":") * variable_p )^-1
-
-local function get_base_class(str)
-  ---@type lpeg_t
-  local p = Cf(
-      Cc({
-        parents = {}, -- new table at each run
-      })
-    * C(variable_p)
-    * ( P(".") * C(variable_p) )^0
-    * ( P(":") * C(variable_p) )^-1,
-    function (t, base)
-      append(t.parents, t.base)
-      t.base = base
-      return t
-    end
-  )
-  local t = p:match(str)
-  return t.base,
-    #t.parents > 0
-      and concat(t.parents, ".")
-      or  nil
-end
-
 ---Get the line number for the given string
 ---Should cache intermediate results.
 ---@param str   string
@@ -169,33 +86,122 @@ string.get_base_extension = function (self)
   return base_extension_p:match(self)
 end
 
+---Make a shallow copy of the given object,
+---taking the metatable into account.
+---@generic T
+---@param original T
+---@return T
+local function shallow_copy(original)
+  local res = {}
+  for k, v in next, original do
+    res[k] = v
+  end
+  return setmetatable(res, getmetatable(original))
+end
+
+--https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222
+---Make a deep copy of the given object
+---@generic T
+---@param original T
+---@return T
+local function deep_copy(original)
+  local seen = {}
+  local function f(obj)
+    if type(obj) ~= 'table' then  -- return as is
+      return obj
+    end
+    if seen[obj] then             -- return already seen if any
+      return seen[obj]
+    end
+    local res = {}                                -- make a new table
+    seen[obj] = res                               -- mark it as seen
+    for k, v in next, obj do res[f(k)] = f(v) end -- copy recursively
+    return setmetatable(res, getmetatable(obj))
+  end
+  return f(original)
+end
+
+--[==[ Bridge business
+Some proxy of both primary and secondary tables,
+with supplemental computed properties given by index.
+--]==]
+
+---@class bridge_kv_t
+---@field public prefix    string
+---@field public suffix    string
+---@field public index     fun(t: table, k: any): any
+---@field public newindex  fun(t: table, k: any, result: any): boolean
+---@field public complete  fun(t: table, k: any, result: any): any
+---@field public map       table<string,string>
+---@field public primary   table @the main object, defaults to _G
+---@field public secondary table @the secondary object
+
+---Return a bridge to "global" variables
+---@param kv bridge_kv_t
+---@return table
+local function bridge(kv)
+  local MT = {}
+  if kv then
+    kv = shallow_copy(kv)
+    MT.__index = function (self --[[: table]], k --[[: string]])
+      if type(k) == "string" then
+        if kv.map then
+          k = kv.map[k]
+          if not k then
+            return
+          end
+        end
+        local k_G = (kv.prefix or "") .. k .. (kv.suffix or "")
+        local primary = kv.primary or _G
+        local result  = primary[k_G]
+        if result == nil and kv.index then
+          result = kv.index(self, k)
+        end
+        if kv.complete then
+          result = kv.complete(self, k, result)
+        end
+        if kv.secondary then
+          local result_2 = kv.secondary[k_G]
+          if  result ~= result_2 then
+            if  type(result)   == "table"
+            and type(result_2) == "table"
+            then
+              result = bridge({
+                primary   = result,
+                secondary = result_2
+              })
+            elseif result == nil then
+              result = result_2
+            end
+          end
+        end
+        return result
+      end
+    end
+    if kv.newindex then
+      MT.__newindex = kv.newindex
+    else
+      MT.__newindex = function (self, k, v)
+        assert(kv.newindex(self, k, v), "Readonly bridge ".. tostring(k) .." ".. tostring(v))
+      end
+    end
+  else
+    MT.__index = _G
+    MT.__newindex = function (self, k, v)
+      error("Readonly bridge".. tostring(k) .." ".. tostring(v))
+    end
+  end
+  return setmetatable({}, MT)
+end
+
 ---@class corelib_t
----@field public white_p                lpeg_t
----@field public black_p                lpeg_t
----@field public eol_p                  lpeg_t
----@field public ascii_p                lpeg_t
----@field public utf8_p                 lpeg_t
----@field public consume_1_character_p  lpeg_t
----@field public get_spaced_p           fun(p: lpeg_t): lpeg_t
----@field public spaced_colon_p         lpeg_t
----@field public spaced_comma_p         lpeg_t
----@field public variable_p             lpeg_t
----@field public identifier_p           lpeg_t
----@field public function_name_p        lpeg_t
+---@field public get_line_number    fun(s: string, i: integer): integer
+---@field public bridge             fun(kv: bridge_kv_t): table
+---@field public shallow_copy       fun(original: any): any
 
 return {
-  white_p               = white_p,
-  black_p               = black_p,
-  eol_p                 = eol_p,
-  ascii_p               = ascii_p,
-  utf8_p                = utf8_p,
-  get_spaced_p          = get_spaced_p,
-  spaced_colon_p        = spaced_colon_p,
-  spaced_comma_p        = spaced_comma_p,
-  consume_1_character_p = consume_1_character_p,
-  variable_p            = variable_p,
-  identifier_p          = identifier_p,
-  function_name_p       = function_name_p,
-  get_line_number       = get_line_number,
-  get_base_class        = get_base_class,
+  get_line_number     = get_line_number,
+  bridge              = bridge,
+  shallow_copy        = shallow_copy,
+  deep_copy           = deep_copy,
 }

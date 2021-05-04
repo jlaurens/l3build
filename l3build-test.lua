@@ -22,9 +22,13 @@ for those people who are interested.
 
 --]]
 
-local write   = io.write
+local write = io.write
+local push  = table.insert
+local pop   = table.remove
 
-function _G.pretty_print(tt, indent, done)
+local lpeg  = require("lpeg")
+
+local function pretty_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
   if type(tt) == "table" then
@@ -74,10 +78,77 @@ function _G.LU_wrap_test(f)
 end
 package.loaded["luaunit"] = LU
 
+local print_stack = {
+  _G.print
+}
+
+function _G.print(...)
+  print_stack[#print_stack](...)
+end
+
+local function push_print(f)
+  push(print_stack, f)
+end
+
+local function pop_print()
+  assert(#print_stack > 0, "pop with no previous push")
+  pop(print_stack)
+end
+
+-- create an environment for test chunks
+local ENV = setmetatable({
+  LU              = LU,
+  expect          = require("l3b-test/expect").expect,
+  pretty_print    = pretty_print,
+  push_print      = push_print,
+  pop_print       = pop_print,
+}, {
+  __index = _G
+})
+
 local run = function ()
-  dofile(
-    arg[2]:gsub( "%.lua$", "") .. ".lua"
-  )
+  ---@type table<string,boolean>
+  local done = {}
+  -- arg[2] is a comma separated list of names
+  -- it means that base names should not contain any comma!
+  -- This is also an assumption made by lua somewhere
+  local function get_key(k, key)
+    local p =
+        lpeg.Cmt(
+          lpeg.C( lpeg.P(4) ),
+          function (s, i, what)
+            if what:lower() == "test" then
+              return i
+            end
+          end
+        )^-1
+      * lpeg.P("_")^0
+      * lpeg.C( lpeg.P(1)^0 )
+    local kk0 = "test_".. key .."_".. p:match(k)
+    local kk = kk0
+    local suffix = 0
+    while _G[kk] ~= nil do
+      suffix = 1 + suffix
+      kk = kk0 .."_".. suffix
+    end
+    return kk
+  end
+
+  for test_name in arg[2]:gmatch("[^,]+") do
+    if not done[test_name] then
+      done[test_name] = true -- don't test it twice
+      local name = test_name:gsub( "%.lua$", "")
+      local key  = name:match("(%a-)%.test")
+      local path = name .. ".lua"
+      print("Register tests for ".. path)
+      local f = loadfile(path, "t", ENV)
+      local tests = f()
+      for k, v in pairs(tests) do
+        _G[get_key(k, key)] = v
+      end
+    end
+  end
+  print("Running all tests")
   arg[#arg + 1] = "-v" -- error without this
   os.exit( LU["LuaUnit"].run(table.unpack(arg, 3)) )
   return

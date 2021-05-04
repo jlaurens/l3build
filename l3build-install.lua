@@ -32,7 +32,7 @@ local utlib       = require("l3b-utillib")
 local entries     = utlib.entries
 
 ---@type gblib_t
-local gblib           = require("l3b-globlib")
+local gblib           = require("l3b-lpeglib")
 local to_glob_match = gblib.to_glob_match
 
 ---@type pathlib_t

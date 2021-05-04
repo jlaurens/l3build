@@ -97,7 +97,7 @@ local wklib     = require("l3b-pathlib")
 local job_name  = wklib.job_name
 
 ---@type gblib_t
-local gblib   = require("l3b-globlib")
+local gblib   = require("l3b-lpeglib")
 
 ---@type utlib_t
 local utlib             = require("l3b-utillib")
