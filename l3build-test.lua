@@ -28,6 +28,8 @@ local pop   = table.remove
 
 local lpeg  = require("lpeg")
 
+local l3build = require("l3build")
+
 local function pretty_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
@@ -102,9 +104,31 @@ local ENV = setmetatable({
   pretty_print    = pretty_print,
   push_print      = push_print,
   pop_print       = pop_print,
+  during_unit_testing = true,
 }, {
   __index = _G
 })
+
+ENV.loadlib = function (name)
+  -- Next is an _ENV that will allow a module to export
+  -- more symbols than usually done in order to finegrain testing
+  local __ = setmetatable({
+    during_unit_testing = true,
+  }, {
+    __index = _G
+  })
+  local loader = loadfile(
+    l3build.work_dir .."l3b/".. name ..".lua",
+    "t",
+    __
+  ) or loadfile(
+    l3build.work_dir .. name ..".lua",
+    "t",
+    __
+  )
+  -- return the module and the extra environment
+  return loader()
+end
 
 local run = function ()
   ---@type table<string,boolean>
