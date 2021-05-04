@@ -48,7 +48,7 @@ local function pretty_print(tt, indent, done)
         done[v] = true
         if next(v) then
           write(('["%s"]%s = {\n'):format(tostring(k), filler))
-          _G.pretty_print(v, indent + w + 7, done)
+          pretty_print(v, indent + w + 7, done)
           write((" "):rep( indent + w + 5)) -- indent it
           write("}\n")
         else

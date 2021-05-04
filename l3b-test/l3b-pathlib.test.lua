@@ -43,6 +43,8 @@ local __
 
 pathlib, __ = _ENV.loadlib("l3b-pathlib")
 
+_ENV.pretty_print(__)
+
 local Path = __.Path
 
 expect(Path).NOT(nil)
