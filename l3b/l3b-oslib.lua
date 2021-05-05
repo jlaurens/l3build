@@ -40,10 +40,11 @@ local time      = os.time
 local difftime  = os.difftime
 
 ---@type utlib_t
-local utlib     = require("l3b-utillib")
-local items     = utlib.items
-local first_of  = utlib.first_of
-local print_diff_time = utlib.print_diff_time
+local utlib             = require("l3b-utillib")
+local to_quoted_string  = utlib.to_quoted_string
+local items             = utlib.items
+local first_of          = utlib.first_of
+local print_diff_time   = utlib.print_diff_time
 
 ---@class oslib_vars_t
 ---@field public debug flags_t
@@ -90,8 +91,11 @@ if os_type == "windows" then
     setenv  = "set",
     yes     = "for /l %I in (1,1,300) do @echo y",
   }
-  if tonumber(luatex_version) < 100
-  or (tonumber(luatex_version) == 100 and tonumber(luatex_revision) < 4)
+  -- Next does not make sense because l3build is shipped
+  -- with a more recent luatex
+  local luatex_version_n = tonumber(luatex_version)
+  if luatex_version_n < 100
+  or (luatex_version_n == 100 and tonumber(luatex_revision) < 4)
   then
     OS.newline = "\r\n"
   else
@@ -115,13 +119,12 @@ else
 end
 
 ---Concat the given strings with `OS.concat`
----@function cmd_concat
----@vararg string ...
+---@vararg string|number @ other input may cause error
 local function cmd_concat(...)
   -- filter out void arguments
   local t = {}
   for item in items(...) do
-    if item and item:len() > 0 then
+    if type(item) == "number" or item and item:len() > 0 then
       append(t, item)
     end
   end
@@ -132,7 +135,7 @@ local function cmd_concat(...)
   if success then
     return result
   end
-  for i, v in ipairs({ ... }) do
+  for v, i in items(...) do
     print("i, v  ", i, v)
   end
   print(debug.traceback())
@@ -144,7 +147,7 @@ end
 ---@param cmd string
 ---@return error_level_n
 local function run(dir, cmd)
-  cmd = cmd_concat("cd " .. dir, cmd)
+  cmd = cmd_concat("cd " .. to_quoted_string(dir), cmd)
   local start_time
   if Vars.debug.run then
     print("DEBUG run: ".. cmd)

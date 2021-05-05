@@ -175,19 +175,21 @@ end
 
 ---Iterator for the entries of a sequencial table
 ---No ordering when compare is not provided.
+---This is `ipairs` with output reversed and
+---more control.
 ---@generic T
 ---@param table T[]
 ---@param kv    iterator_kv_t
 ---@return fun(): T|nil
 local function entries(table, kv)
   local function raw_iterator(t)
+    if not t then
+      print(debug.traceback())
+    end
     local i = 0
     return function ()
       i = i + 1
-      if not t then
-        print(debug.traceback())
-      end
-      return t[i]
+      return t[i], i
     end
   end
   if not kv then
@@ -406,7 +408,6 @@ local flags = {}
 ---@field public extend_with        fun(holder: table, addendum: table, can_overwrite: boolean): boolean|nil
 ---@field public readonly           fun(t: table, quiet: boolean): table
 ---@field public is_readonly        fun(t: table): boolean
----@field public deep_copy          fun(original: any): any
 ---@field public to_ymd_hms         fun(diff: integer): string
 ---@field public print_diff_time    fun(format: string, diff: integer)
 

@@ -1,66 +1,24 @@
---[[
-
-File l3build-utillib.lua Copyright (C) 2018-2020 The LaTeX Project
-
-It may be distributed and/or modified under the conditions of the
-LaTeX Project Public License (LPPL), either version 1.3c of this
-license or (at your option) any later version.  The latest version
-of this license is in the file
-
-   http://www.latex-project.org/lppl.txt
-
-This file is part of the "l3build bundle" (The Work in LPPL)
-and all files in that bundle must be distributed together.
-
------------------------------------------------------------------------
-
-The development version of the bundle can be found at
-
-   https://github.com/latex3/l3build
-
-for those people who are interested.
-
---]]
-
---[=[ Presentation
-Basic utilities.
-Many iterators.
---]=]
-
--- local safety guards and shortcuts
-
 local append = table.insert
-
-local standard_print = print
-local current_print = standard_print -- can be changed
-_G.print = function (...)
-  current_print(...)
-end
 
 ---@type utlib_t
 local utlib = require("l3b-utillib")
 
-local expect  = require("l3b-test/expect").expect
+local expect  = _ENV.expect
 
-local lpeg = require("lpeg")
-local C   = lpeg.C
-local Ct  = lpeg.Ct
-local Cmt = lpeg.Cmt
-local P   = lpeg.P
-
-_G.test_readonly = function ()
+local function test_readonly()
+  local is_readonly = utlib.is_readonly
   local rw = {}
   local ro = utlib.readonly(rw)
   rw.foo = 421
   expect(ro.foo).is(421)
   expect(ro.bar).is(nil)
   expect(function () ro.bar = 421 end).error()
-  expect(function () utlib.is_readonly(1) end).error()
-  expect(utlib.is_readonly(rw)).is(false)
-  expect(utlib.is_readonly(ro)).is(true)
+  expect(function () is_readonly(1) end).error()
+  expect(is_readonly(rw)).is(false)
+  expect(is_readonly(ro)).is(true)
 end
 
-_G.test_to_quoted_string = function ()
+local function test_to_quoted_string()
   local to_quoted_string = utlib.to_quoted_string
   expect(to_quoted_string( "" )).is('""')
   expect(to_quoted_string( "" )).is('""')
@@ -68,7 +26,7 @@ _G.test_to_quoted_string = function ()
   expect(to_quoted_string( { "a", "b" } )).is('"a" "b"')
 end
 
-_G.test_indices = function ()
+local function test_indices()
   local track = {}
   for i in utlib.indices({}) do
     append(track, i)
@@ -80,7 +38,7 @@ _G.test_indices = function ()
   expect(track).equals({ 1, 2, 3 })
 end
 
-_G.test_entries = function ()
+local function test_entries()
   local entries = utlib.entries
   local track = {}
   for entry in entries({}) do
@@ -127,7 +85,7 @@ _G.test_entries = function ()
   expect(track).equals({ 3, 1 })
 end
 
-_G.test_items = function ()
+local function test_items()
   local track = {}
   for i in utlib.items() do
     append(track, i)
@@ -140,7 +98,7 @@ _G.test_items = function ()
   expect(track).equals({ 1, 2, 3 })
 end
 
-_G.test_unique_items = function ()
+local function test_unique_items()
   local track = {}
   for i in utlib.unique_items() do
     append(track, i)
@@ -152,7 +110,7 @@ _G.test_unique_items = function ()
   expect(track).equals({ 1, 2, 3 })
 end
 
-_G.test_keys = function ()
+local function test_keys()
   local keys = utlib.keys
   local track = {}
   for k in keys({}) do
@@ -187,7 +145,7 @@ _G.test_keys = function ()
   expect(track).equals({ "c", "b", "a", })
 end
 
-_G.test_sorted_pairs = function ()
+local function test_sorted_pairs()
   local track = {}
   local sorted_pairs = utlib.sorted_pairs
   for k, v in sorted_pairs({}) do
@@ -214,7 +172,7 @@ _G.test_sorted_pairs = function ()
   expect(track).equals({ "c", "b", "a" })
 end
 
-_G.test_values = function ()
+local function test_values()
   local track = {}
   local values = utlib.values
   for k, v in values({}) do
@@ -241,14 +199,14 @@ _G.test_values = function ()
   expect(track).equals({ 3, 2, 1 })
 end
 
-_G.test_first_of = function ()
+local function test_first_of()
   local first_of = utlib.first_of
   expect(first_of()).is(nil)
   expect(first_of(1)).is(1)
   expect(first_of(1, 2)).is(1)
 end
 
-_G.test_second_of = function ()
+local function test_second_of()
   local second_of = utlib.second_of
   expect(second_of()).is(nil)
   expect(second_of(1)).is(nil)
@@ -256,7 +214,7 @@ _G.test_second_of = function ()
   expect(second_of(1, 2, 3)).is(2)
 end
 
-_G.test_trim = function ()
+local function test_trim()
   local trim = utlib.trim
   expect(trim("")).is("")
   expect(trim(" ")).is("")
@@ -266,7 +224,7 @@ _G.test_trim = function ()
   expect(trim(" a b ")).is("a b")
 end
 
-_G.test_extend_with = function ()
+local function test_extend_with()
   local extend_with = utlib.extend_with
   local t = {}
   extend_with(t, {})
@@ -281,7 +239,7 @@ _G.test_extend_with = function ()
   expect(function () extend_with(t, { bar = 4 } ) end).error()
 end
 
-_G.test_to_ymd_hms = function ()
+local function test_to_ymd_hms()
   local to_ymd_hms = utlib.to_ymd_hms
   local diff =
     19 + 60 * (18 + 60 * 17)
@@ -295,9 +253,27 @@ _G.test_to_ymd_hms = function ()
     10
     )))))
     expect(to_ymd_hms(diff)).is("10 years, 11 months, 12 days 13:14:15")
-  end
+end
+
+return {
+  test_readonly         = test_readonly,
+  test_to_quoted_string = test_to_quoted_string,
+  test_indices          = test_indices,
+  test_entries          = test_entries,
+  test_items            = test_items,
+  test_unique_items     = test_unique_items,
+  test_keys             = test_keys,
+  test_sorted_pairs     = test_sorted_pairs,
+  test_values           = test_values,
+  test_first_of         = test_first_of,
+  test_second_of        = test_second_of,
+  test_trim             = test_trim,
+  test_extend_with      = test_extend_with,
+  test_to_ymd_hms       = test_to_ymd_hms,
+}
 
 --[=====[
+
 
 local type    = type
 local print   = print

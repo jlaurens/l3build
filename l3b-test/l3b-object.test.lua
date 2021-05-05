@@ -1,8 +1,8 @@
 local Object = require("l3b-object")
 
-local expect  = require("l3b-test/expect").expect
+local expect  = _ENV.expect
 
-function _G.test_Object()
+local function test_Object()
   expect(Object).NOT(nil)
   expect(Object.__Super).is(nil)
   expect(Object.__Class).is(Object)
@@ -11,7 +11,7 @@ function _G.test_Object()
   expect(Object()).NOT(nil)
 end
 
-function _G.test_make_subclass()
+local function test_make_subclass()
   expect(function () Object.make_subclass() end).error()
   local Foo = Object:make_subclass("Foo")
   expect(Foo.__Class).is(Foo)
@@ -21,7 +21,7 @@ function _G.test_make_subclass()
   expect(Bar.__Super).is(Foo)
 end
 
-function _G.test_constructor()
+local function test_constructor()
   local Foo = Object:make_subclass("Foo")
   expect(Foo.__Class).is(Foo)
   expect(Foo.__TYPE).is("Foo")
@@ -30,7 +30,7 @@ function _G.test_constructor()
   expect(foo.__TYPE).is("Foo")
 end
 
-function _G.test_is_instance()
+local function test_is_instance()
   expect(Object.is_instance).is(false)
   local Foo = Object:make_subclass("Foo")
   expect(Foo.is_instance).is(false)
@@ -38,7 +38,7 @@ function _G.test_is_instance()
   expect(foo.is_instance).is(true)
 end
 
-function _G.test_is_instance_of()
+local function test_is_instance_of()
   expect(Object.is_instance_of).type("function")
   local Foo = Object:make_subclass("Foo")
   expect(Foo.is_instance_of).type("function")
@@ -58,7 +58,7 @@ function _G.test_is_instance_of()
   expect(Object.is_instance_of(nil, nil)).is(false)
 end
 
-function _G.test_is_descendant_of()
+local function test_is_descendant_of()
   local Foo = Object:make_subclass("Foo")
   local Bar = Foo:make_subclass("Bar")
   local foo = Foo()
@@ -71,7 +71,7 @@ function _G.test_is_descendant_of()
   expect(foo:is_descendant_of(Bar)).is(false)
 end
 
-function _G.test_finalize()
+local function test_finalize()
   local done
   local Foo = Object:make_subclass("Foo", {
     __finalize = function (class)
@@ -81,7 +81,7 @@ function _G.test_finalize()
   expect(done).is("Foo")
 end
 
-function _G.test_initialize()
+local function test_initialize()
   local done
   local Foo = Object:make_subclass("Foo", {
     __initialize = function (self, x)
@@ -92,7 +92,7 @@ function _G.test_initialize()
   expect(done).is(421)
 end
 
-_G.test_make_another_subclass = {
+local test_make_another_subclass = {
   test_computed = function (_self)
     
     local Class_1 = Object:make_subclass("Class_1", {
@@ -247,7 +247,7 @@ _G.test_make_another_subclass = {
 }
 
 -- where inheritance is illutsrated
-_G.test_computed_index = {
+local test_computed_index = {
   test_one_level = function ()
     local A = Object:make_subclass("A")
     expect(A.p_1).is(nil)
@@ -384,7 +384,7 @@ _G.test_computed_index = {
 }
 
 -- where inheritance is illutsrated
-_G.test_instance_table = {
+local test_instance_table = {
   test_one_level = function (_self)
     local A = Object:make_subclass("A")
     local a = A()
@@ -473,7 +473,7 @@ _G.test_instance_table = {
 }
 
 -- where inheritance is illutsrated
-_G.test_class_table = {
+local test_class_table = {
   test_one_level = function (_self)
     local A = Object:make_subclass("A")
     local a = A()
@@ -563,7 +563,7 @@ _G.test_class_table = {
   end
 }
 
-_G.test_key = function ()
+local function test_key ()
   local A = Object:make_subclass("A", {
     __computed_index = function (self, k)
       if k == "key" then
@@ -580,7 +580,7 @@ _G.test_key = function ()
   expect(AA.key).is("AA")
 end
 
-_G.test_init_data = {
+local test_init_data = {
   test = function (self)
     -- static class properties,
     -- interesting for methods
@@ -598,4 +598,22 @@ _G.test_init_data = {
     expect(rawget(aa, "p_2")).is(nil)
     expect(aa.p_2).is("AA/2")
   end,
+}
+
+return {
+  test_Object                = test_Object,
+  test_make_subclass         = test_make_subclass,
+  test_constructor           = test_constructor,
+  test_is_instance           = test_is_instance,
+  test_is_instance_of        = test_is_instance_of,
+  test_is_descendant_of      = test_is_descendant_of,
+  test_finalize              = test_finalize,
+  test_initialize            = test_initialize,
+  test_make_another_subclass = test_make_another_subclass,
+  test_computed_index        = test_computed_index,
+  test_instance_table        = test_instance_table,
+  test_class_table           = test_class_table,
+  test_key                   = test_key,
+  test_init_data             = test_init_data,
+  
 }

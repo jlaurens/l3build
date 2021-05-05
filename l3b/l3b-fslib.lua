@@ -537,7 +537,6 @@ local function copy_tree(glob, source, dest)
 end
 
 ---Remove the file or void directory with the given name at the given location.
----@function remove_name
 ---@param dir_path string
 ---@param name string
 ---@return error_level_n
