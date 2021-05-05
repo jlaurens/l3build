@@ -1,6 +1,6 @@
 --[[
 
-File l3build-pathlib.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3b-pathlib.lua Copyright (C) 2018-2020 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -77,6 +77,25 @@ local bridge  = corelib.bridge
 ---@type lpeglib_t
 local lpeglib = require("l3b-lpeglib")
 local utf8_p = lpeglib.utf8_p
+
+--[=[ Package implementation ]=]
+
+---Split the given string according to the given separator
+---@param str string
+---@param sep string | lpeg_t | nil @ 
+local function split(str, sep)
+  if sep == "" then
+    return Ct(C(utf8_p)^0):match(str)
+  end
+  local p = P(sep)
+  local q = 1-p
+  local r =
+    ( C(q^0) * p )^1
+    * C(q^0)
+    + C(q^1)
+  return Ct(r):match(str) or { str }
+end
+
 
 -- The Path objects are implementation details
 -- private to this module
@@ -541,17 +560,17 @@ local function get_path_grammar(opts)
   -- The glob is parsed as a sequence of patterns.
   -- These patterns are themselves converted to other patterns
   -- The resulting sequence is then folded into a product of lpeg patterns
-  local G = {}
+  local gmr = {}
 
   -- the main rule
-  G[1] =
+  gmr[1] =
     Cf(
       V("content"),
       product_folder
     )
-  G["content"] = V("pattern")^1 * V("$")
+  gmr["content"] = V("pattern")^1 * V("$")
   -- A pattern is an alteration, the key is self explanatory
-  G["pattern"] =
+  gmr["pattern"] =
           V("extglob")  -- extended patterns are defined below
         + V("..")       -- prevent parent reference
         + V("?")        -- wildcard patterns are defined below
@@ -564,7 +583,7 @@ local function get_path_grammar(opts)
         + V("forbidden /")
   -- anchor at the end of the string
   -- (path_sep_p^1 * P(".")^-1 * P(-1) + leading_p) * P(".")
-  G["$"] = verbose_p(
+  gmr["$"] = verbose_p(
     raw_P( end_p ),
     3,
     "matched $"
@@ -579,7 +598,7 @@ local function get_path_grammar(opts)
         * P(")")
       / (f or 1)
     end
-    G["extglob"] = (
+    gmr["extglob"] = (
         get_p(
           "?",
           function (p)
@@ -631,21 +650,21 @@ local function get_path_grammar(opts)
         end
       )
     )
-    G["pattern-list"] =
+    gmr["pattern-list"] =
       Cf(
         V("pattern") * ( '|' * V("pattern") )^0,
         sum_folder
       )
   else
-    G["extglob"] = P(false)
+    gmr["extglob"] = P(false)
   end
-  G[".."] =
+  gmr[".."] =
       is_leading_p
     * ( P("..") * ( path_sep_p + P(-1) ) )^1
     / function ()
         error("No parent reference in glob")
       end
-  G["/"] =
+  gmr["/"] =
       path_sep_p
     / function ()
         return verbose_p(
@@ -654,14 +673,14 @@ local function get_path_grammar(opts)
           "matched /"
         )
     end
-  G["forbidden /"] =
+  gmr["forbidden /"] =
     P("/")
   / function ()
       error("/ forbidden in glob set")
   end
 -- the wildcards may treat the leading . in a special way
   if opts.dotglob then
-    G["?"] =
+    gmr["?"] =
       P("?")
     / function ()
         return verbose_p(
@@ -671,7 +690,7 @@ local function get_path_grammar(opts)
         )
       end
     if opts.globstar then
-      G["/**/"] =
+      gmr["/**/"] =
           path_sep_p
         * P("*")^2
         * path_sep_p
@@ -682,7 +701,7 @@ local function get_path_grammar(opts)
               "matched: /**/ (dotglob, globstar)"
             )
           end
-      G["**"] =
+      gmr["**"] =
             P("*")^2
           / function ()
               return verbose_p(
@@ -692,10 +711,10 @@ local function get_path_grammar(opts)
               )
             end
     else
-      G["/**/"] = P(false) -- never match, fallback to "*" rule below
-      G["**"]   = P(false) -- never match, fallback to "*" rule below
+      gmr["/**/"] = P(false) -- never match, fallback to "*" rule below
+      gmr["**"]   = P(false) -- never match, fallback to "*" rule below
     end
-    G["*"] =
+    gmr["*"] =
         P("*")^1
       / function ()
           return verbose_p(
@@ -706,7 +725,7 @@ local function get_path_grammar(opts)
         end
   else
     -- default mode: the first dot must be matched explicitly
-    G["?"] =
+    gmr["?"] =
         P("?")
       / function ()
           return verbose_p(
@@ -717,7 +736,7 @@ local function get_path_grammar(opts)
         end
     -- The ** may be special as well
     if opts.globstar then
-      G["/**/"] = -- catched here because only one "/" is accepted
+      gmr["/**/"] = -- catched here because only one "/" is accepted
           path_sep_p
         * P("*")^2
         * path_sep_p
@@ -731,7 +750,7 @@ local function get_path_grammar(opts)
               "matched /**/ (no dotglob, globstar)"
             )
           end
-      G["**"] =
+      gmr["**"] =
         P("*")^2
         / function ()
             return verbose_p(
@@ -744,10 +763,10 @@ local function get_path_grammar(opts)
             )
           end
     else
-      G["/**/"] = P(false) -- never match, fallback to "**" rule
-      G["**"]   = P(false) -- never match, fallback to "**" rule
+      gmr["/**/"] = P(false) -- never match, fallback to "**" rule
+      gmr["**"]   = P(false) -- never match, fallback to "**" rule
     end
-    G["*"] =
+    gmr["*"] =
         P("*")^1
       / function ()
           return verbose_p(
@@ -758,7 +777,7 @@ local function get_path_grammar(opts)
         end
   end
   -- Parsing sets
-  G["[...]"] =
+  gmr["[...]"] =
       P("[")
     * ( S("^!") -- negated set
       / function ()
@@ -783,7 +802,7 @@ local function get_path_grammar(opts)
         end
       )
     )
-  G["set"] = Cf(
+  gmr["set"] = Cf(
       V("1st element")
     * V("element")^0
     -- A - may be matched by including it as the last character in the set.
@@ -795,14 +814,14 @@ local function get_path_grammar(opts)
   )
   -- A - may be matched by including it as the first character in the set.
   -- A ] may be matched by including it as the first character in the set
-  G["1st element"]  = V(".-.") + V("-")       + V("]")
-  G["element"]      = V(".-.") + V("[:...:]") + V("1 path char") - P("]")
-  G["last element"] = V("-")   + V("^")       + V("!")
-  G["-"]    = raw_P("-")
-  G["]"]    = raw_P("]")
-  G["^"]    = raw_P("^")
-  G["!"]    = raw_P("!")
-  G[".-."]  =
+  gmr["1st element"]  = V(".-.") + V("-")       + V("]")
+  gmr["element"]      = V(".-.") + V("[:...:]") + V("1 path char") - P("]")
+  gmr["last element"] = V("-")   + V("^")       + V("!")
+  gmr["-"]    = raw_P("-")
+  gmr["]"]    = raw_P("]")
+  gmr["^"]    = raw_P("^")
+  gmr["!"]    = raw_P("!")
+  gmr[".-."]  =
         C(path_char_p)
       * P("-")
       * C(path_char_p)
@@ -824,7 +843,7 @@ local function get_path_grammar(opts)
             end
           )
         end
-  G["1 path char"]  =
+  gmr["1 path char"]  =
       path_char_p
     / function (u)
         if opts.verbose > 2 then
@@ -835,7 +854,7 @@ local function get_path_grammar(opts)
   -- classes
   -- All the POSIX classes are implemented
   -- However, the implementation is sometimes rough
-  G["[:...:]"] =
+  gmr["[:...:]"] =
       V("[:ascii:]")
     + V("[:blank:]")
     + V("[:print:]")
@@ -884,7 +903,7 @@ local function get_path_grammar(opts)
         )
       end
     * P(":]")
-  G["[:blank:]"] =
+  gmr["[:blank:]"] =
     P("[:blank:]")
   / function ()
       return verbose_p(
@@ -893,7 +912,7 @@ local function get_path_grammar(opts)
         "matched [:blank:]"
       )
     end
-  G["[:cntrl:]"] =
+  gmr["[:cntrl:]"] =
     P("[:cntrl:]")
     / function ()
       return verbose_p(
@@ -912,7 +931,7 @@ local function get_path_grammar(opts)
         "matched [:cntrl:]"
       )
     end
-  G["[:ascii:]"] =
+  gmr["[:ascii:]"] =
       P("[:ascii:]")
     / function ()
         return verbose_p(
@@ -928,7 +947,7 @@ local function get_path_grammar(opts)
           "matched [:ascii:]"
         )
       end
-  G["[:print:]"] =
+  gmr["[:print:]"] =
       P("[:print:]")
     / function ()
         return verbose_p(
@@ -944,7 +963,7 @@ local function get_path_grammar(opts)
           "matched [:print:]"
         )
       end
-  G["[:graph:]"] =
+  gmr["[:graph:]"] =
       P("[:graph:]")
     / function ()
         return verbose_p(
@@ -960,7 +979,7 @@ local function get_path_grammar(opts)
           "matched [:graph:]"
         )
       end
-  G["[:word:]"] =
+  gmr["[:word:]"] =
       P("[:word:]")
     / function ()
         return verbose_p(
@@ -976,7 +995,7 @@ local function get_path_grammar(opts)
           "matched [:word:]"
         )
       end
-  return G
+  return gmr
 end
 
 ---Path matcher
@@ -986,8 +1005,8 @@ end
 ---@usage local accept = path_matcher(...); if accept(...) then ... end
 local function path_matcher(glob, opts)
   if glob then
-    local G = get_path_grammar(opts)
-    local pattern = P(G):match(glob)
+    local gmr = get_path_grammar(opts)
+    local pattern = P(gmr):match(glob)
     if pattern then
       return function (str)
         if opts and opts.verbose and opts.verbose > 4 then
@@ -1002,6 +1021,7 @@ end
 ---@alias glob_match_f fun(name: string): boolean
 
 ---@class pathlib_t
+---@field public split        fun(str: string, sep: string|lpeg_t|nil): string[]
 ---@field public dir_base     fun(path: string): string, string
 ---@field public dir_name     fun(path: string): string
 ---@field public base_name    fun(path: string): string
@@ -1010,6 +1030,7 @@ end
 ---@field public extension    fun(path: string): string
 ---@field public path_matcher fun(glob: string): glob_match_f
 return {
+  split         = split,
   dir_base      = dir_base,
   dir_name      = dir_name,
   base_name     = base_name,

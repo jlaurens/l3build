@@ -53,19 +53,16 @@ local deep_copy       = utlib.deep_copy
 local entries         = utlib.entries
 local first_of        = utlib.first_of
 
----@type gblib_t
-local gblib           = require("l3b-lpeglib")
-local to_glob_match = gblib.to_glob_match
-
 ---@type pathlib_t
-local wklib     = require("l3b-pathlib")
-local job_name  = wklib.job_name
+local pathlib       = require("l3b-pathlib")
+local job_name      = pathlib.job_name
+local path_matcher  = pathlib.path_matcher
 
 ---@type oslib_t
-local oslib       = require("l3b-oslib")
-local cmd_concat  = oslib.cmd_concat
-local run         = oslib.run
-local OS          = oslib.OS
+local oslib         = require("l3b-oslib")
+local cmd_concat    = oslib.cmd_concat
+local run           = oslib.run
+local OS            = oslib.OS
 local read_content  = oslib.read_content
 local write_content = oslib.write_content
 
@@ -1076,7 +1073,7 @@ local function check(test_names)
         ---@type glob_match_f[]
         local exclude_glob_matches = {}
         for glob in entries(G.excludetests) do
-          append(exclude_glob_matches, to_glob_match(glob .. ext))
+          append(exclude_glob_matches, path_matcher(glob .. ext))
         end
         for glob in entries(G.includetests) do
           for name in all_names(Dir.testfile, glob .. ext) do

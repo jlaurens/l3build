@@ -33,8 +33,8 @@ local utlib   = require("l3b-utillib")
 local entries = utlib.entries
 
 ---@type pathlib_t
-local wklib             = require("l3b-pathlib")
-local dir_base          = wklib.dir_base
+local pathlib             = require("l3b-pathlib")
+local dir_base          = pathlib.dir_base
 
 ---@type oslib_t
 local oslib             = require("l3b-oslib")

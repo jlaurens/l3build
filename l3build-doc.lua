@@ -36,9 +36,9 @@ local entries     = utlib.entries
 local items       = utlib.items
 
 ---@type pathlib_t
-local wklib             = require("l3b-pathlib")
-local job_name          = wklib.job_name
-local dir_base          = wklib.dir_base
+local pathlib             = require("l3b-pathlib")
+local job_name          = pathlib.job_name
+local dir_base          = pathlib.dir_base
 
 ---@type fslib_t
 local fslib             = require("l3b-fslib")

@@ -93,8 +93,8 @@ local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
 ---@type pathlib_t
-local wklib     = require("l3b-pathlib")
-local job_name  = wklib.job_name
+local pathlib     = require("l3b-pathlib")
+local job_name  = pathlib.job_name
 
 ---@type gblib_t
 local gblib   = require("l3b-lpeglib")
@@ -1256,14 +1256,14 @@ and "C:\absolute\path\to\foo.bar" on windows.
 [[Usage: `dirname("path/to/foo.bar")`
 Returns "path/to".
 ]],
-    value = wklib.dir_name,
+    value = pathlib.dir_name,
   },
   basename = {
     description =
 [[Usage: `basename("path/to/foo.bar")`
 Returns "foo.bar".
 ]],
-    value = wklib.base_name,
+    value = pathlib.base_name,
   },
   cleandir = {
     description =
@@ -1314,14 +1314,14 @@ Returns Lua pattern that corresponds to the glob "*.bar".
 ]],
     value = gblib.glob_to_pattern,
   },
-  to_glob_match = {
+  path_matcher = {
     description = 
-[[`f = to_glob_match("*.bar")`
+[[`f = path_matcher("*.bar")`
 Returns a function that returns true if its file name argument
 matches "*.bar", false otherwise.Lua pattern that corresponds to the glob "*.bar".
 In that example `f("foo.bar") == true` whereas `f("foo.baz") == false`.
 ]],
-    value = gblib.to_glob_match,
+    value = gblib.path_matcher,
   },
   jobname = {
     description =
@@ -1329,7 +1329,7 @@ In that example `f("foo.bar") == true` whereas `f("foo.baz") == false`.
 Returns the argument with no extension and no parent directory path,
 "foo" in the example. 
 ]],
-    value = wklib.job_name,
+    value = pathlib.job_name,
   },
   mkdir = {
     description =
@@ -1362,7 +1362,7 @@ returns an error level.]],
     description =
 [[Returns two strings split at the last |/|: the `dirname(...)` and
 the |basename(...)|.]],
-    value = wklib.dir_base,
+    value = pathlib.dir_base,
   },
   normalize_path = {
     description =

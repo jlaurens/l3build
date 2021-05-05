@@ -43,8 +43,6 @@ local __
 
 pathlib, __ = _ENV.loadlib("l3b-pathlib")
 
-_ENV.pretty_print(__)
-
 local Path = __.Path
 
 expect(Path).NOT(nil)
@@ -78,6 +76,23 @@ local function get_utf8_sample(factor, i)
             return utf8.char(code)
           end
         end
+end
+
+local function test_split ()
+  local split = pathlib.split
+  expect(function () split() end).error()
+  expect(function () split("") end).error()
+  expect(function () split(nil, "") end).error()
+  expect(split("abc", "")).equals({ "a", "b", "c" })
+  expect(split("abc", "a")).equals({ "", "bc" })
+  expect(split("abc", "b")).equals({ "a", "c" })
+  expect(split("abc", "c")).equals({ "ab", "" })
+  expect(split("aabc", "a")).equals({ "", "", "bc" })
+  expect(split("abbc", "b")).equals({ "a", "", "c" })
+  expect(split("abcc", "c")).equals({ "ab", "", "" })
+  expect(split("aabc", P("a")^1)).equals({ "", "bc" })
+  expect(split("abbc", P("b")^1)).equals({ "a", "c" })
+  expect(split("abcc", P("c")^1)).equals({ "ab", "" })
 end
 
 local function test_Path()
@@ -277,10 +292,10 @@ local test___grammar = {
     expect(path_comp_no_dotglob_p:match(s .. s)).is(9)
   end,
   test_1_char = function (self)
-    local G = __.get_path_grammar()
-    G["content"] = G["1 path char"] * G["$"]
+    local gmr = __.get_path_grammar()
+    gmr["content"] = gmr["1 path char"] * gmr["$"]
     ---@type lpeg_t
-    local p = P(G)
+    local p = P(gmr)
     ---@type lpeg_t
     local q = p:match("a")
     expect(lpeg.type(q)).is("pattern")
@@ -288,10 +303,10 @@ local test___grammar = {
     expect(q:match("aa")).is(nil)
     expect(q:match("b")).is(nil)
 
-    G = __.get_path_grammar({
+    gmr = __.get_path_grammar({
       -- verbose = 3,
     })
-    p = P(G)
+    p = P(gmr)
     q = p:match("a")
 
     expect(lpeg.type(q)).is("pattern")
@@ -300,8 +315,8 @@ local test___grammar = {
     expect(q:match("b")).is(nil)
     expect(q:match("")).is(nil)
 
-    G = __.get_path_grammar()
-    p = P(G)
+    gmr = __.get_path_grammar()
+    p = P(gmr)
     for i = 32, 65535 do
       local s = utf8.char(i)
       q = p:match(s)
@@ -320,11 +335,11 @@ local test___grammar = {
 
   end,
   test_end = function (self)
-    local G = __.get_path_grammar({
+    local gmr = __.get_path_grammar({
       -- verbose = 4,
     })
-    G["content"] = V("$")
-    local p = P(G)
+    gmr["content"] = V("$")
+    local p = P(gmr)
     local q = p:match("")
     expect(q).NOT(nil)
     expect(q:match("")).is(1)
@@ -338,43 +353,43 @@ local test___grammar = {
   test_class = function (self)
     -- create a test grammar for each class name
     local function get_class_P(name)
-      local G = __.get_path_grammar({
+      local gmr = __.get_path_grammar({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
-      G["content"] =
-        ( G[class] or  G["[:...:]"] )
-        * G["$"]
-      local result = P(G):match(class)
+      gmr["content"] =
+        ( gmr[class] or  gmr["[:...:]"] )
+        * gmr["$"]
+      local result = P(gmr):match(class)
       expect(result).NOT(nil)
       return result
     end
     local function get_set_P(name)
-      local G = __.get_path_grammar({
+      local gmr = __.get_path_grammar({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
-      G["content"] = G["set"] * G["$"]
-      local result = P(G):match(class)
+      gmr["content"] = gmr["set"] * gmr["$"]
+      local result = P(gmr):match(class)
       expect(result).NOT(nil)
       return result
     end
     local function get_delimited_P(name)
-      local G = __.get_path_grammar({
+      local gmr = __.get_path_grammar({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
-      G["content"] = G["[...]"] * G["$"]
-      local result = P(G):match('['.. class ..']')
+      gmr["content"] = gmr["[...]"] * gmr["$"]
+      local result = P(gmr):match('['.. class ..']')
       expect(result).NOT(nil)
       return result
     end
     local function get_P(name)
-      local G = __.get_path_grammar({
+      local gmr = __.get_path_grammar({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
-      local result = P(G):match('['.. class ..']')
+      local result = P(gmr):match('['.. class ..']')
       expect(result).NOT(nil)
       return result
     end
@@ -459,7 +474,7 @@ local test___grammar = {
         word  = 1,
         xdigit = 0,
       },
-      [{ 'G-Z' }] = {
+      [{ 'gmr-Z' }] = {
         alnum = 1,
         alpha = 1,
         ascii = 1,
@@ -673,11 +688,11 @@ local test___grammar = {
     end
   end,
   test_range = function (self)
-    local G = __.get_path_grammar({
+    local gmr = __.get_path_grammar({
       -- verbose = 4,
     })
-    G["content"] = G[".-."] * G["$"]
-    local p = P(G)
+    gmr["content"] = gmr[".-."] * gmr["$"]
+    local p = P(gmr)
     local q = p:match("b-y")
     expect(q:match("a")).is(nil)
     expect(q:match("b")).is(2)
@@ -694,11 +709,11 @@ local test___grammar = {
     expect(q:match("\xF0\x9D\x90\xB3")).is(nil)
   end,
   test_set = function (self)
-    local G = __.get_path_grammar({
+    local gmr = __.get_path_grammar({
       -- verbose = 4,
     })
-    G["content"] = G["set"] * G["$"]
-    local p = P(G)
+    gmr["content"] = gmr["set"] * gmr["$"]
+    local p = P(gmr)
     local q = p:match("a")
     expect(q:match("a")).is(2)
     expect(q:match("b")).is(nil)
@@ -718,11 +733,11 @@ local test___grammar = {
   end,
   test_globstar = function (self)
     -- globstar is true by default
-    local G = __.get_path_grammar({
+    local gmr = __.get_path_grammar({
       -- verbose = 4,
     })
-    G["content"] = G["**"] * G["$"]
-    local p = P(G)
+    gmr["content"] = gmr["**"] * gmr["$"]
+    local p = P(gmr)
     local q = p:match("**")
     expect(q:match("")).is(1)
     expect(q:match(".")).is(2)
@@ -731,8 +746,8 @@ local test___grammar = {
     expect(q:match("/ .")).is(4)
     expect(q:match("/a/.")).is(5)
     expect(q:match("/a/ .")).is(6)
-    G["content"] = G["/**/"] * G["$"]
-    p = P(G)
+    gmr["content"] = gmr["/**/"] * gmr["$"]
+    p = P(gmr)
     q = p:match("/**/")
     expect(q:match("")).is(nil)
     expect(q:match(".")).is(nil)
@@ -744,19 +759,19 @@ local test___grammar = {
     expect(q:match("/a/.")).is(5)
     expect(q:match("/a/ ./")).is(7)
     -- globstar is true by default
-    G = __.get_path_grammar({
+    gmr = __.get_path_grammar({
       globstar = false,
     })
-    G["content"] = G["**"] * G["$"]
-    p = P(G)
+    gmr["content"] = gmr["**"] * gmr["$"]
+    p = P(gmr)
     q = p:match("**")
     expect(q).is(nil)
   end,
   test_extglob = function (self)
-    local G = __.get_path_grammar({
+    local gmr = __.get_path_grammar({
       extglob = true,
     })
-    local p = P(G)
+    local p = P(gmr)
     local q = p:match("?(a)")
     expect(q:match("")).is(1)
     expect(q:match("a")).is(2)
@@ -890,6 +905,7 @@ local test_path_matcher = {
 }
 
 return {
+  test_split                = test_split,
   test_Path                 = test_Path,
   test_Path_forward_slash   = test_Path_forward_slash,
   test_POC_parts            = test_POC_parts,

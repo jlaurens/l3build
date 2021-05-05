@@ -42,12 +42,9 @@ local entries     = utlib.entries
 local first_of    = utlib.first_of
 
 ---@type pathlib_t
-local wklib           = require("l3b-pathlib")
-local dir_base        = wklib.dir_base
-
----@type gblib_t
-local gblib           = require("l3b-lpeglib")
-local to_glob_match = gblib.to_glob_match
+local pathlib       = require("l3b-pathlib")
+local dir_base      = pathlib.dir_base
+local path_matcher  = pathlib.path_matcher
 
 ---@type oslib_t
 local oslib       = require("l3b-oslib")
@@ -289,10 +286,10 @@ end
 local function file_list(dir_path, glob)
   local files = {}
   if directory_exists(dir_path) then
-    local glob_match = to_glob_match(glob)
-    if glob_match then
+    local matcher = path_matcher(glob)
+    if matcher then
       for entry in get_directory_content(dir_path) do
-        if glob_match(entry) then
+        if matcher(entry) then
           append(files, entry)
         end
       end

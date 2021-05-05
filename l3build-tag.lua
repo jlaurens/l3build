@@ -31,9 +31,9 @@ local entries       = utlib.entries
 local unique_items  = utlib.unique_items
 
 ---@type pathlib_t
-local wklib       = require("l3b-pathlib")
-local dir_name    = wklib.dir_name
-local base_name   = wklib.base_name
+local pathlib       = require("l3b-pathlib")
+local dir_name    = pathlib.dir_name
+local base_name   = pathlib.base_name
 
 ---@type oslib_t
 local oslib         = require("l3b-oslib")

@@ -48,23 +48,6 @@ local Ct  = lpeg.Ct
 local Cmt = lpeg.Cmt
 local P   = lpeg.P
 
-_G.test_split = function ()
-  local split = utlib.split
-  expect(function () split() end).error()
-  expect(function () split("") end).error()
-  expect(function () split(nil, "") end).error()
-  expect(split("abc", "")).equals({ "a", "b", "c" })
-  expect(split("abc", "a")).equals({ "", "bc" })
-  expect(split("abc", "b")).equals({ "a", "c" })
-  expect(split("abc", "c")).equals({ "ab", "" })
-  expect(split("aabc", "a")).equals({ "", "", "bc" })
-  expect(split("abbc", "b")).equals({ "a", "", "c" })
-  expect(split("abcc", "c")).equals({ "ab", "", "" })
-  expect(split("aabc", P("a")^1)).equals({ "", "bc" })
-  expect(split("abbc", P("b")^1)).equals({ "a", "c" })
-  expect(split("abcc", P("c")^1)).equals({ "ab", "" })
-end
-
 _G.test_readonly = function ()
   local rw = {}
   local ro = utlib.readonly(rw)

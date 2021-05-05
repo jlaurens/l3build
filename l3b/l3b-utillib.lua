@@ -29,46 +29,18 @@ Many iterators.
 
 -- local safety guards and shortcuts
 
----@type corelib_t
-local corelib = require("l3b-corelib")
-local alt_utf8_p = corelib.alt_utf8_p
-
-local lpeg = require("lpeg")
-local C = lpeg.C
-local Ct = lpeg.Ct
-local P = lpeg.P
-
 local type    = type
 local print   = print
 local rawget  = rawget
 local assert  = assert
 local pairs   = pairs
-local next    = next
 
 local sort        = table.sort
 local append      = table.insert
-local unappend    = table.remove
 local concat      = table.concat
 local tbl_unpack  = table.unpack
-local move        = table.move
 
 --[=[ Package implementation ]=]
-
----Split the given string according to the given separator
----@param str string @ 
----@param sep string | lpeg_t | nil @ 
-local function split(str, sep)
-  if sep == "" then
-    return Ct(C(alt_utf8_p)^0):match(str)
-  end
-  local p = P(sep)
-  local q = 1-p
-  local r =
-    ( C(q^0) * p )^1
-    * C(q^0)
-    + C(q^1)
-  return Ct(r):match(str) or { str }
-end
 
 --[==[ Readonly business
 A readonly table is not immutable because we can always use `rawset`.
@@ -441,7 +413,6 @@ local flags = {}
 return {
   Vars                = Vars,
   flags               = flags,
-  split               = split,
   to_quoted_string    = to_quoted_string,
   indices             = indices,
   entries             = entries,

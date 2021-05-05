@@ -33,13 +33,13 @@ local entries     = utlib.entries
 
 ---@type gblib_t
 local gblib           = require("l3b-lpeglib")
-local to_glob_match = gblib.to_glob_match
+local path_matcher = gblib.path_matcher
 
 ---@type pathlib_t
-local wklib           = require("l3b-pathlib")
-local dir_base        = wklib.dir_base
-local base_name       = wklib.base_name
-local dir_name        = wklib.dir_name
+local pathlib           = require("l3b-pathlib")
+local dir_base        = pathlib.dir_base
+local base_name       = pathlib.base_name
+local dir_name        = pathlib.dir_name
 
 ---@type fslib_t
 local fslib                 = require("l3b-fslib")
@@ -195,7 +195,7 @@ local function install_files(root_install_dir, full, dry_run)
           local matched = false
           for location in entries(G.tdslocations) do
             local l_dir, l_glob = dir_base(location)
-            local glob_match = to_glob_match(l_glob)
+            local glob_match = path_matcher(l_glob)
             if glob_match(name) then
               append(candidates, {
                 name        = name,

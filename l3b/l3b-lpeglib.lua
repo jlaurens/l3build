@@ -22,6 +22,12 @@ for those people who are interested.
 
 --]]
 
+--[===[
+  This module only relies on lpeg.
+  It defines some patterns for standard string matching and opertions.
+--]===]
+---@module lpeglib
+
 local print   = print
 
 local lpeg    = require("lpeg")
