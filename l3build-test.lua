@@ -126,7 +126,7 @@ ENV.loadlib = function (name)
     "t",
     __
   )
-  -- return the module and the extra environment
+  -- return whatever the module returns
   return loader()
 end
 

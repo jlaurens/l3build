@@ -95,6 +95,41 @@ local function test_split ()
   expect(split("abcc", P("c")^1)).equals({ "ab", "" })
 end
 
+local function test_base_extension()
+  local test = function (s, expected)
+    expect(s:get_base_extension()).equals(expected)
+  end
+  test("", {
+    base = "",
+    extension = ""
+  })
+  test("abc", {
+    base = "abc",
+    extension = ""
+  })
+  for _, base in ipairs({
+    "",
+    "a",
+    ".",
+    ".a",
+    "a.",
+    "..",
+    "..a",
+    ".a.",
+    "a..",
+    "a.b",
+    ".a.b",
+    "a.b.",
+  }) do
+    for _, extension in ipairs({"", "ext"}) do
+      test(base ..".".. extension, {
+        base = base,
+        extension = extension
+      })
+    end
+  end
+end
+
 local function test_Path()
   local p = Path("")
   expect(p).equals(Path())
@@ -906,15 +941,16 @@ local test_path_matcher = {
 
 return {
   test_split                = test_split,
-  test_Path                 = test_Path,
-  test_Path_forward_slash   = test_Path_forward_slash,
-  test_POC_parts            = test_POC_parts,
-  test_string_forward_slash = test_string_forward_slash,
   test_dir_name             = test_dir_name,
   test_base_name            = test_base_name,
   test_core_name            = test_core_name,
   test_extension            = test_extension,
   test_sanitize             = test_sanitize,
+  test_base_extension       = test_base_extension,
+  test_Path                 = test_Path,
+  test_Path_forward_slash   = test_Path_forward_slash,
+  test_POC_parts            = test_POC_parts,
+  test_string_forward_slash = test_string_forward_slash,
   test___grammar            = test___grammar,
   test_path_matcher         = test_path_matcher,
 }

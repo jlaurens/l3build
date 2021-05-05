@@ -1,20 +1,13 @@
-local standard_print = print
-local catched_print = print
-
-_G.print = function (...)
-  catched_print(...)
-end
-
 ---@type corelib_t
 local corelib = require("l3b-corelib")
 
 local expect  = require("l3b-test/expect").expect
 
-function _G.test()
+local function test_base()
   expect(corelib).NOT(nil)
 end
 
-_G.test_shallow_copy = function ()
+local function test_shallow_copy()
   local shallow_copy = corelib.shallow_copy
   local original = {}
   expect(shallow_copy(original)).equals(original)
@@ -31,7 +24,7 @@ _G.test_shallow_copy = function ()
   expect(copy.foo.bar).is(421)
 end
 
-_G.test_deep_copy = function ()
+local function test_deep_copy()
   local deep_copy = corelib.deep_copy
   local original = {}
   expect(deep_copy(original)).equals(original)
@@ -48,7 +41,7 @@ _G.test_deep_copy = function ()
   expect(copy.foo.bar).is(nil)
 end
 
-_G.test_bridge = function ()
+local function test_bridge()
   local primary = {
     p_1 = 1,
     p_2 = 2,
@@ -143,41 +136,12 @@ _G.test_bridge = function ()
   local key = {}
   _G[key] = 421
   expect(b[key]).is(421)
+  _G[key] = nil
 end
 
-function _G.test_base_extension()
-  local test = --_G.LU_wrap_test(
-    function (s, expected)
-      expect(s:get_base_extension()).equals(expected)
-    end
-  --)
-  test("", {
-    base = "",
-    extension = ""
-  })
-  test("abc", {
-    base = "abc",
-    extension = ""
-  })
-  for _, base in ipairs({
-    "",
-    "a",
-    ".",
-    ".a",
-    "a.",
-    "..",
-    "..a",
-    ".a.",
-    "a..",
-    "a.b",
-    ".a.b",
-    "a.b.",
-  }) do
-    for _, extension in ipairs({"", "ext"}) do
-      test(base ..".".. extension, {
-        base = base,
-        extension = extension
-      })
-    end
-  end
-end
+return {
+  test_base           = test_base,
+  test_shallow_copy   = test_shallow_copy,
+  test_deep_copy      = test_deep_copy,
+  test_bridge         = test_bridge,
+}

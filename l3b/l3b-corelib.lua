@@ -69,23 +69,6 @@ local function get_line_number(str, index)
   return result
 end
 
-assert(string.get_base_extension == nil)
-local dot_p = P(".")
-local no_dot_p = P(1) - dot_p
-local base_extension_p = Ct(
-    C( no_dot_p^0) * ( dot_p * C( no_dot_p^0 ) )^0
-  ) / function (t)
-    local last = max(1, #t - 1) -- last index of the base part
-    return {
-      base = concat({ unpack(t, 1, last) }, "."),
-      extension = unpack(t, last + 1, #t) or "",
-    }
-  end
-
-string.get_base_extension = function (self)
-  return base_extension_p:match(self)
-end
-
 ---Make a shallow copy of the given object,
 ---taking the metatable into account.
 ---@generic T

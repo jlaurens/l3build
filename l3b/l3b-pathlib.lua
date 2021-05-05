@@ -50,6 +50,7 @@ local append    = table.insert
 local unappend  = table.remove
 local concat    = table.concat
 local move      = table.move
+local max       = math.max
 
 local codepoint = utf8.codepoint
 
@@ -96,6 +97,25 @@ local function split(str, sep)
   return Ct(r):match(str) or { str }
 end
 
+assert(string.get_base_extension == nil)
+
+local dot_p = P(".")
+---@type lpeg_t
+local no_dot_p = utf8_p - dot_p
+local base_extension_p = Ct(
+    C( no_dot_p^0) * ( dot_p * C( no_dot_p^0 ) )^0
+  ) / function (t)
+    local last = max(1, #t - 1) -- last index of the base part
+    return {
+      base = concat({ unpack(t, 1, last) }, "."),
+      extension = unpack(t, last + 1, #t) or "",
+    }
+  end
+
+string.get_base_extension = function (self)
+  return base_extension_p:match(self)
+end
+
 
 -- The Path objects are implementation details
 -- private to this module
@@ -138,9 +158,9 @@ local path_p = P({
   is_absolute =
       P("/")^1  * Cc(true)    -- leading '/', true means absolute
     + P("./")^0 * Cc(false),  -- leading './'
-  component = C( ( P(1) - "/" )^1 ) - P(".") * P(-1), -- a non void string with no "/" but the last "." component if any
+  component = C( ( P(1) - "/" )^1 ) - dot_p * P(-1), -- a non void string with no "/" but the last "." component if any
   separator = ( P("/") * P("./")^0 )^1,
-  suffix = ( P("/")^1 * Cc("") + P(".") )^-1,
+  suffix = ( P("/")^1 * Cc("") + dot_p )^-1,
 })
 
 ---Initialize a newly created Path object with a given string.
@@ -473,7 +493,7 @@ After the preceding expansions, all unquoted occurrences of the characters \, ',
 
 -- we normalize path separators, just in case
 ---@type lpeg_t
-local path_sep_p = P("/")^1 * ( P(".") * P("/")^1 )^0
+local path_sep_p = P("/")^1 * ( dot_p * P("/")^1 )^0
 -- a path character is anything but a path separator
 ---@type lpeg_t
 local path_char_p = utf8_p - "/"
@@ -482,9 +502,7 @@ local path_char_p = utf8_p - "/"
 local path_comp_p = path_char_p^1
 -- in default mode (not dotglob), the leading dot is special
 ---@type lpeg_t
-local path_char_no_dot_p = path_char_p - P(".")
----@type lpeg_t
-local no_dot_p = utf8_p - P(".")
+local path_char_no_dot_p = path_char_p - dot_p
 -- whether we are at the beginning of a path component
 ---@type lpeg_t
 local is_leading_p = -B(1) + B("/") -- first character or following a "/"
@@ -500,8 +518,8 @@ local path_comp_no_dotglob_p =
 ---@type lpeg_t
 -- catch an ending "/."
 local end_p =
-  ( path_sep_p^1 * P(".")^-1
-  + is_leading_p * P(".")^-1
+  ( path_sep_p^1 * dot_p^-1
+  + is_leading_p * dot_p^-1
   + P(true)
   ) * P(-1)
 
@@ -582,7 +600,7 @@ local function get_path_grammar(opts)
         + V("1 path char")   -- consume 1 raw utf8 char
         + V("forbidden /")
   -- anchor at the end of the string
-  -- (path_sep_p^1 * P(".")^-1 * P(-1) + leading_p) * P(".")
+  -- (path_sep_p^1 * dot_p^-1 * P(-1) + leading_p) * dot_p
   gmr["$"] = verbose_p(
     raw_P( end_p ),
     3,
