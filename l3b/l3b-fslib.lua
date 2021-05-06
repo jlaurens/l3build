@@ -44,6 +44,7 @@ local first_of    = utlib.first_of
 ---@type pathlib_t
 local pathlib       = require("l3b-pathlib")
 local dir_base      = pathlib.dir_base
+local base_name     = pathlib.base_name
 local path_matcher  = pathlib.path_matcher
 
 ---@type oslib_t
@@ -66,16 +67,17 @@ local Vars = setmetatable({
     end
   end
 })
+
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(cmd)
   return first_of(cmd:gsub("/", "\\"))
 end
 
 ---Convert to host directory separator
----@function to_host
 ---@param cmd string
 ---@return string
 local function to_host(cmd)
+  assert(cmd, "missing `to_host` cmd")
   if os_type == "windows" then
     return unix_to_win(cmd)
   end
@@ -110,7 +112,7 @@ end
 ---@param path string
 ---@return boolean
 local function directory_exists(path)
-  if not path then
+  if not path and not _ENV.during_unit_testing then
     print(debug.traceback())
   end
   return attributes(path, "mode") == "directory"
@@ -159,12 +161,15 @@ local cwd_list = {}
 ---@return boolean @ok true means success
 ---@return string @msg error message
 local function push_current_directory(dir)
-  if not directory_exists(dir) then
+  if not directory_exists(dir) and not _ENV.during_unit_testing then
     print(debug.traceback())
   end
-  assert(directory_exists(dir), "No directory at ".. tostring(dir))
-  append(cwd_list, get_current_directory())
-  return change_current_directory(dir)
+  local cwd = get_current_directory()
+  local ok, msg = change_current_directory(dir)
+  if ok then
+    append(cwd_list, cwd)
+  end
+  return ok, msg
 end
 
 ---Remove the top entry from the directory stack,
@@ -174,10 +179,13 @@ end
 ---@return nil|string @msg nil on success, error message on error
 local function pop_current_directory()
   local dir = unappend(cwd_list)
-  if not dir then
+  if not dir and not _ENV.during_unit_testing then
     print(debug.traceback())
   end
-  assert(dir)
+  assert(dir ~= nil)
+  if dir == nil then
+    error("THIS IS AN ERROR")
+  end
   local ok, msg = change_current_directory(dir)
   return ok and dir or nil, msg
 end
@@ -196,11 +204,10 @@ local function push_pop_current_directory(dir, f, ...)
   push_current_directory(dir)
   local packed = { pcall(f, ...) }
   pop_current_directory()
-  return packed[1], { select(2, tbl_unpack(packed)) }
+  return tbl_unpack(packed)
 end
 
 ---Set the working directory. As soon as possible
----@function set_working_directory
 ---@param dir string
 local function set_working_directory(dir)
   assert(not dir:match("^%."),
@@ -213,16 +220,21 @@ end
 ---Return an absolute path from a relative one.
 ---Due to chdir, path must exist and be accessible.
 ---If `is_current` is true, the given path is relative
----to the current directory when not absolute.
+---to the current directory when not already absolute.
 ---If `is_current` is false, the given path is relative
----to the working directory when not absolute.
----@function absolute_path
+---to the working directory when not already absolute.
 ---@see `set_working_directory`.
 ---@param path string
 ---@param is_current boolean @whether `path` is relative to the current directory
 ---@return string
 local function absolute_path(path, is_current)
+  if Vars.debug.absolute_path then
+    print("DEBUG absolute_path", path, is_current)
+  end
   local dir, base = dir_base(path)
+  if Vars.debug.absolute_path then
+    print("DEBUG absolute_path dir, base", dir, base)
+  end
   if not is_current then
     push_current_directory(Vars.working_directory)
   end
@@ -232,16 +244,19 @@ local function absolute_path(path, is_current)
     result = get_current_directory()
     pop_current_directory()
   end
+  if Vars.debug.absolute_path then
+    print("DEBUG absolute_path result", result)
+  end
   if not is_current then
     pop_current_directory()
   end
   if ok then
     result = result:gsub("\\", "/")
     local candidate = result / base
-    if attributes(candidate, "mode") then
-      return candidate
+    if Vars.debug.absolute_path then
+      print("DEBUG absolute_path candidate", candidate)
     end
-    return path
+    return candidate
   end
   error(msg)
 end
@@ -260,7 +275,6 @@ local function quoted_absolute_path(path)
 end
 
 ---Look for files, directory by directory, and return the first existing
----@function locate
 ---@param dirs  string[]
 ---@param names string[]
 ---@return string
@@ -324,7 +338,7 @@ end
 
 ---@alias string_exclude_f  fun(value: string): boolean
 
-local tree_excluder = function (name)
+local tree_excluder = function (_name)
   return false
 end
 
@@ -339,23 +353,21 @@ end
 ---@class tree_entry_t
 ---@field public src string @path relative to the source directory
 ---@field public wrk string @path counterpart relative to the current working directory
+---@field private is_directory boolean
 
----Does what filelist does, but can also glob subdirectories.
----In the returned table, the keys are paths relative to the given source path,
----the values are their counterparts relative to the current working directory.
----@function tree
+---Tree entry enumerator.
 ---@param dir_path string
 ---@param glob string
 ---@return fun(): tree_entry_t|nil
 local function tree(dir_path, glob)
   if Vars.debug.tree then
-    print("DEBUG tree", dir_path, glob)
+    print("DEBUG tree", "<"..dir_path..">", "<"..glob..">")
   end
-  local function cropdots(path)
-    return first_of(path:gsub("^%./", ""):gsub("/%./", "/"))
+  dir_path = pathlib.sanitize(dir_path)
+  glob = pathlib.sanitize(glob, true)
+  if Vars.debug.tree then
+    print("DEBUG tree", "<"..dir_path..">", "<"..glob..">")
   end
-  dir_path = cropdots(dir_path)
-  glob = cropdots(glob)
   local function always_true()
     return true
   end
@@ -366,8 +378,12 @@ local function tree(dir_path, glob)
   local result = { {
     src = ".",
     wrk = dir_path,
+    is_directory = true, -- do not copy this at first
   } }
   for glob_part, sep in glob:gmatch("([^/]+)(/?)/*") do
+    if Vars.debug.tree then
+      print("DEBUG glob:gmatch", glob_part, sep)
+    end
     local accept = sep == "/" and is_dir or always_true
     ---Feeds the given table according to `glob_part`
     ---@param p tree_entry_t @path counterpart relative to the current working directory
@@ -388,8 +404,9 @@ local function tree(dir_path, glob)
           if not tree_excluder(pp.wrk) then
             if accept(pp.wrk) then
               if Vars.debug.tree then
-                print("DEBUG tree fill ACCEPTED", pp.src, pp.wrk)
+                print("DEBUG tree fill ACCEPTED", pp.src, pp.wrk, p.src, p.wrk, file)
               end
+              pp.is_directoy = is_dir(pp.wrk)
               append(table, pp)
             else
               if Vars.debug.tree then
@@ -427,42 +444,37 @@ local function tree(dir_path, glob)
 end
 
 ---Rename. Whether paths are properly escaped is another story...
----@function rename
 ---@param dir_path string
 ---@param source string @the base name of the source
 ---@param dest string @the base name of the destination
----@return boolean?  @suc
----@return exitcode? @exitcode
----@return integer?  @code
+---@return integer  @ 0 on success, 1 on failure
 local function rename(dir_path, source, dest)
-  dir_path = dir_path .. "/"
   if os_type == "windows" then
-    source = source:gsub( "^%./", "")
-    dest = dest:gsub( "^%./", "")
-    return execute("ren " .. unix_to_win(dir_path) .. source .. " " .. dest)
+    -- BEWARE: os.execute return value is not lua's original one!
+    return execute("ren " .. unix_to_win(dir_path / source) .. " " .. base_name(dest) )
   else
-    return execute("mv " .. dir_path .. source .. " " .. dir_path .. dest)
+    return execute("mv " .. dir_path / source .. " " .. dir_path / dest)
   end
 end
 
 ---Private function.
----@function copy_core
 ---@param dest string
 ---@param p_src any
 ---@param p_wrk string
 ---@return integer
 local function copy_core(dest, p_src, p_wrk)
-  -- p_src was a path relative to `source` whereas
+  -- p_src was a path relative to some `source` whereas
   -- p_wrk was the counterpart relative to the current working directory
+  -- when not absolute...
   local dir, base = dir_base(p_src)
-  dest = dest ..'/'.. dir
+  dest = dest / dir
   p_src = base
   make_directory(dest)
   local cmd
   if os_type == "windows" then
     if attributes(p_wrk, "mode") == "directory" then
       cmd = 'xcopy /y /e /i "' .. unix_to_win(p_wrk) .. '" "'
-            .. unix_to_win(dest .. '/' .. p_src) .. '" > nul'
+            .. unix_to_win(dest / p_src) .. '" > nul'
     else
       cmd = 'xcopy /y "' .. unix_to_win(p_wrk) .. '" "'
             .. unix_to_win(dest .. '/') .. '" > nul'
@@ -474,7 +486,7 @@ local function copy_core(dest, p_src, p_wrk)
     --print("make_directory '" .. dest .. "/'", directory_exists(dest))
     print("DEBUG: " .. cmd)
   end
-return execute(cmd) and 0 or 1
+  return execute(cmd)
 end
 
 ---@class copy_name_kv_t @copy_file key/value arguments
@@ -506,6 +518,9 @@ end
 ---@param dest string
 ---@return error_level_n
 local function copy_tree(glob, source, dest)
+  if Vars.debug.copy_tree then
+    print("DEBUG copy_tree", glob, source, dest)
+  end
   local error_level = 0
   local function helper(g)
     for p in tree(source, g) do
@@ -517,7 +532,13 @@ local function copy_tree(glob, source, dest)
   end
   ---@type string[]
   if type(glob) == "function" then
+    if Vars.debug.copy_tree then
+      print("DEBUG copy_tree function iterator")
+    end
     for g in glob do
+      if Vars.debug.copy_tree then
+        print("DEBUG copy_tree", "<"..g..">")
+      end
       helper(g)
       if error_level ~= 0 then
         return error_level
@@ -548,7 +569,6 @@ end
 
 ---Remove the files matching glob starting at source
 ---Empties directories but do not remove them.
----@function remove_tree
 ---@param source string
 ---@param glob string
 ---@return error_level_n
@@ -556,12 +576,10 @@ local function remove_tree(source, glob)
   for entry in tree(source, glob) do
     remove_name(source, entry.src)
   end
-  -- os.remove doesn't give a sensible errorlevel
   return 0
 end
 
 ---For cleaning out a directory, which also ensures that it exists
----@function make_clean_directory
 ---@param path string
 ---@return error_level_n
 local function make_clean_directory(path)
@@ -573,10 +591,7 @@ local function make_clean_directory(path)
 end
 
 ---Remove a directory tree.
----@function remove_directory
 ---@param path string @Must be properly escaped.
----@return boolean?  @suc
----@return exitcode? @exitcode
 ---@return integer?  @code
 local function remove_directory(path)
   -- First, make sure it exists to avoid any errors
@@ -600,7 +615,7 @@ end
 ---@field public file_list                  fun(dir_path: string, glob: string|nil): string[]
 ---@field public all_names                  fun(path: string, glob: string): fun(): string
 ---@field public set_tree_excluder          fun(f: string_exclude_f)
----@field public tree                       fun(dir_path: string, glob: string): table<string, string>)
+---@field public tree                       fun(dir_path: string, glob: string): table<string,string>)
 ---@field public rename                     fun(dir_path: string, source: string, dest: string): boolean?, exitcode?, integer?
 ---@field public copy_file                  fun(file: string, source: string, dest: string): integer
 ---@field public copy_tree                  fun(glob: string, source: string, dest: string): integer
@@ -628,6 +643,7 @@ return {
   all_names             = all_names,
   set_tree_excluder     = set_tree_excluder,
   tree                  = tree,
+  tree2                 = tree,
   rename                = rename,
   copy_file             = copy_file,
   copy_tree             = copy_tree,
@@ -641,4 +657,13 @@ return {
   push_current_directory      = push_current_directory,
   pop_current_directory       = pop_current_directory,
   push_pop_current_directory  = push_pop_current_directory,
+},
+---@class __fslib_t
+---@field private unix_to_win fun(s: string): string
+---@field private cwd_list string[]
+---@field private copy_core fun(dest: string, p_src: string, p_wrk: string): integer
+_ENV.during_unit_testing and {
+  unix_to_win = unix_to_win,
+  cwd_list    = cwd_list,
+  copy_core   = copy_core,
 }

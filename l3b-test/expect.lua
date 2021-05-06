@@ -7,6 +7,7 @@ LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE = 1
 local Expect = {
   __NOT = false,
   __almost = false,
+  __items = false,
 }
 
 local function expect(actual)
@@ -16,12 +17,38 @@ local function expect(actual)
 end
 
 function Expect:__index(k)
+  if k == "map" then
+    return function (f)
+      local modifier = self.modifier
+      self.modifier = modifier
+        and function (before)
+          local result = {}
+          for kk, vv in pairs(modifier(before)) do
+            result[kk] = f(vv)
+          end
+          return result
+        end
+        or function (before)
+          local result = {}
+          for kk, vv in pairs(before) do
+            result[kk] = f(vv)
+          end
+          return result
+        end
+      return self
+    end
+  end
   if k == "NOT" then
     self.__NOT = not self.__NOT
     return self
   end
   if k == "almost" then
     self.__almost = true
+    return self
+  end
+  if k == "items" then
+    self.op = self.op or "=="
+    self.__items = true
     return self
   end
   if k == "equal" or k == "equals" then
@@ -97,6 +124,8 @@ function Expect.__call(self, expected, options)
       end
     elseif self.__almost then
       LU.assertAlmostEquals(self.actual, expected)
+    elseif self.__items then
+      LU.assertItemsEquals(self.actual, expected)
     else
       LU.assertEquals(self.actual, expected)
     end

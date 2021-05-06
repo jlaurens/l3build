@@ -27,19 +27,16 @@ local not_empty = next
 
 local append = table.insert
 
----@type utlib_t
-local utlib       = require("l3b-utillib")
-local entries     = utlib.entries
-
----@type gblib_t
-local gblib           = require("l3b-lpeglib")
-local path_matcher = gblib.path_matcher
-
 ---@type pathlib_t
-local pathlib           = require("l3b-pathlib")
+local pathlib      = require("l3b-pathlib")
+local path_matcher = pathlib.path_matcher
 local dir_base        = pathlib.dir_base
 local base_name       = pathlib.base_name
 local dir_name        = pathlib.dir_name
+
+---@type utlib_t
+local utlib       = require("l3b-utillib")
+local entries     = utlib.entries
 
 ---@type fslib_t
 local fslib                 = require("l3b-fslib")
@@ -189,7 +186,7 @@ local function install_files(root_install_dir, full, dry_run)
             dir = dir:gsub("^%.", "")
             source_dir = src_dir .. dir
             if not flatten then
-              src_path_end = dir .. "/"
+              src_path_end = dir / ""
             end
           end
           local matched = false
@@ -208,17 +205,18 @@ local function install_files(root_install_dir, full, dry_run)
             end
           end
           if not matched then
+            local p = type_module .. src_path_end
             if glob:match("l3blib") then
               print("NOT MATCHED")
               print(name)
               print(source_dir)
-              print(root_install_dir / type_module .. src_path_end .. src_path_end)
-              print(root_install_dir / type_module .. src_path_end)
+              print(root_install_dir / (p .. src_path_end) )
+              print(root_install_dir / p)
             end
             append(candidates, {
               name        = name,
               source      = source_dir,
-              dest        = root_install_dir / type_module .. src_path_end,
+              dest        = root_install_dir / p,
               install_dir = root_install_dir / type_module, -- for cleanup
             })
           end

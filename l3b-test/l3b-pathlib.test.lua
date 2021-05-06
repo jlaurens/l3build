@@ -138,7 +138,7 @@ local function test_Path()
     down        = {},
     up          = {},
   }))
-  expect(p.as_string).is("")
+  expect(p.as_string).is(".")
   local function test(str, down, normalized)
     local p = Path(str)
     expect(p).equals(Path({
@@ -147,17 +147,17 @@ local function test_Path()
     expect(p.as_string).is(normalized or str)
     return
   end
-  test("a", { "a" })
-  test("a/", { "a", "" })
-  test("a/b", { "a", "b" })
-  test("a///b", { "a", "b" }, "a/b")
-  test("a/./b", { "a", "b" }, "a/b")
-  test("a//./b", { "a", "b" }, "a/b")
-  test("a/.//b", { "a", "b" }, "a/b")
-  test("a//.//b", { "a", "b" }, "a/b")
-  test("a//././b", { "a", "b" }, "a/b")
-  test("a/././/b", { "a", "b" }, "a/b")
-  test("a/./././b", { "a", "b" }, "a/b")
+  test("a", { "a" }, "./a")
+  test("a/", { "a", "" }, "./a/")
+  test("a/b", { "a", "b" }, "./a/b")
+  test("a///b", { "a", "b" }, "./a/b")
+  test("a/./b", { "a", "b" }, "./a/b")
+  test("a//./b", { "a", "b" }, "./a/b")
+  test("a/.//b", { "a", "b" }, "./a/b")
+  test("a//.//b", { "a", "b" }, "./a/b")
+  test("a//././b", { "a", "b" }, "./a/b")
+  test("a/././/b", { "a", "b" }, "./a/b")
+  test("a/./././b", { "a", "b" }, "./a/b")
 
   p = Path("/")
   expect(p).equals(Path({
@@ -191,12 +191,18 @@ local function test_Path()
   expect(p.as_string).is("../..")
   p = Path("a/..")
   expect(p).equals(Path())
-  expect(p.as_string).is("")
+  expect(p.as_string).is(".")
   p = Path("a/b/..")
   expect(p).equals(Path({
     down = { "a" },
   }))
-  expect(p.as_string).is("a")
+  expect(p.as_string).is("./a")
+end
+
+local function test_copy()
+  expect(Path(""):copy().as_string).is(".")
+  expect(Path("/"):copy().as_string).is("/")
+  expect(Path("/"):copy().is_absolute).is(true)
 end
 
 local function test_Path_forward_slash()
@@ -207,7 +213,8 @@ local function test_Path_forward_slash()
   end
   test("", "", "/")
   test("a", "", "a/")
-  test("", "a", "/a")
+  test("", "a", "./a")
+  test("/", "a", "/a")
   test("a", "b", "a/b")
 end
 
@@ -227,15 +234,16 @@ end
 
 local function test_string_forward_slash()
   expect("" / "").is("/")
-  expect("a" / "").is("a/")
-  expect("a" / "b").is("a/b")
-  expect("a/" / "b").is("a/b")
+  expect("a" / "").is("./a/")
+  expect("" / "a").is("./a")
+  expect("a" / "b").is("./a/b")
+  expect("a/" / "b").is("./a/b")
   expect(function () print("a" / "/b") end).error()
   expect("/" / "").is("/")
   expect("" / "/").is("/")
   expect("/" / "/").is("/")
-  expect("a" / "..").is("")
-  expect("a" / "../").is("")
+  expect("a" / "..").is(".")
+  expect("a" / "../").is("./")
   expect("/a" / "..").is("/")
   expect("/a" / "../").is("/")
   expect(function () print("/a" / "../..") end).error()
@@ -281,9 +289,10 @@ end
 
 local function test_sanitize()
   local sanitize = pathlib.sanitize
-  expect(sanitize("")).is("")
-  expect(sanitize("a/..")).is("")
-  expect(sanitize("a/./.")).is("a/")
+  expect(sanitize("")).is(".")
+  expect(sanitize("a/..")).is(".")
+  expect(sanitize("a/./.")).is("./a/")
+  expect(sanitize("a/./.", true)).is("a/")
 end
 
 local test___grammar = {
@@ -925,6 +934,13 @@ local test_path_matcher = {
         self.do_test("a?", "a".. s, true)
       end
     end
+
+    self.do_test("*", "abc", true)
+    self.do_test("a*", "abc", true)
+    self.do_test("*c", "abc", true)
+    self.do_test("*b", "abc", false)
+    self.do_test("*b*", "abc", true)
+    self.do_test("b*", "abc", false)
   end,
   test_parent = function (self)
     local function do_test(glob)
@@ -948,6 +964,7 @@ return {
   test_sanitize             = test_sanitize,
   test_base_extension       = test_base_extension,
   test_Path                 = test_Path,
+  test_copy                 = test_copy,
   test_Path_forward_slash   = test_Path_forward_slash,
   test_POC_parts            = test_POC_parts,
   test_string_forward_slash = test_string_forward_slash,

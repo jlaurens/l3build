@@ -199,13 +199,15 @@ function Path.__instance_table:as_string()
   local result
   if self.is_absolute then
     result = '/' .. concat(self.down, '/')
-  elseif #self.up > 0 then
+  else
     local t = {}
-    move(self.up, 1, #self.up, 1, t)
+    if #self.up > 0 then
+      move(self.up, 1, #self.up, 1, t)
+    else
+      t[1] = "."
+    end
     move(self.down, 1, #self.down, #t + 1, t)
     result = concat(t, '/')
-  else
-    result = concat(self.down, '/')
   end
   self.as_string = result -- now this is a property of self
   return result
@@ -256,7 +258,7 @@ function Path:copy()
   return Path(self.as_string)
 end
 
----comment
+---Concatenate paths.
 ---@param self Path
 ---@param r Path
 ---@return Path
@@ -268,7 +270,9 @@ function Path:__div(r)
   if self.is_void then
     ---@type Path
     local result = r:copy()
-    result.is_absolute = true
+    if self.is_absolute or r.is_void then
+      result.is_absolute = true
+    end
     return result
   end
   if r.is_void then
@@ -365,9 +369,11 @@ end
 
 ---Sanitize the path by removing unecessary parts.
 ---@param path string
+---@param is_glob boolean|nil
 ---@return string | nil
-local function sanitize(path)
-  return path_properties(path).as_string
+local function sanitize(path, is_glob)
+  local result = path_properties(path).as_string
+  return is_glob and result:match("^%./(.+)$") or result
 end
 
 ---@class path_matcher_opts_t
@@ -549,15 +555,6 @@ local function get_path_grammar(opts)
         end
   end
 
-  local function product_folder(a, b)
-    return a * b
-  end
-
-  local function sum_folder(a, b)
-    return a + b
-  end
-
-
   local function verbose_p(p, verbose, msg)
     if opts.verbose > verbose then
       return p * Cmt(
@@ -570,6 +567,31 @@ local function get_path_grammar(opts)
     else
       return p
     end
+  end
+
+  local function product_folder(a, b)
+    if a.star then
+      if b.star then
+        return a
+      end
+      local result = P({
+        verbose_p(
+          b + a.star * V(1),
+          3,
+          a.msg
+        )
+      })
+      return a.before and a.before * result or result
+    end
+    if b.star then
+      b.before = a
+      return b
+    end
+    return a * b
+  end
+
+  local function sum_folder(a, b)
+    return a + b
   end
 
   -- define the grammar then define the peg pattern,
@@ -735,11 +757,10 @@ local function get_path_grammar(opts)
     gmr["*"] =
         P("*")^1
       / function ()
-          return verbose_p(
-            path_char_p^0,
-            3,
-            "matched: * (dotglob)"
-          )
+          return {
+            star = path_char_p,
+            msg = "matched: * (dotglob)",
+          }
         end
   else
     -- default mode: the first dot must be matched explicitly
@@ -787,11 +808,10 @@ local function get_path_grammar(opts)
     gmr["*"] =
         P("*")^1
       / function ()
-          return verbose_p(
-            path_comp_no_dotglob_p^-1,
-            3,
-            "matched: * (no dotglob)"
-          )
+          return {
+            star = path_char_no_dotglob_p,
+            msg = "matched: * (no dotglob)",
+          }
         end
   end
   -- Parsing sets
