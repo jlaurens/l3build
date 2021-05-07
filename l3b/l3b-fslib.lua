@@ -87,9 +87,7 @@ end
 ---Make a directory at the given path
 ---@function make_directory
 ---@param path string
----@return boolean? @suc
----@return exitcode? @"exit"|"signal"
----@return integer? @code
+---@return error_level_n @code
 local function make_directory(path)
   if not path then
     print(debug.traceback())
@@ -447,7 +445,7 @@ end
 ---@param dir_path string
 ---@param source string @the base name of the source
 ---@param dest string @the base name of the destination
----@return integer  @ 0 on success, 1 on failure
+---@return error_level_n  @ 0 on success, 1 on failure
 local function rename(dir_path, source, dest)
   if os_type == "windows" then
     -- BEWARE: os.execute return value is not lua's original one!
@@ -461,7 +459,7 @@ end
 ---@param dest string
 ---@param p_src any
 ---@param p_wrk string
----@return integer
+---@return error_level_n
 local function copy_core(dest, p_src, p_wrk)
   -- p_src was a path relative to some `source` whereas
   -- p_wrk was the counterpart relative to the current working directory
@@ -469,7 +467,10 @@ local function copy_core(dest, p_src, p_wrk)
   local dir, base = dir_base(p_src)
   dest = dest / dir
   p_src = base
-  make_directory(dest)
+  local error_level = make_directory(dest)
+  if error_level > 0 then
+    return error_level
+  end
   local cmd
   if os_type == "windows" then
     if attributes(p_wrk, "mode") == "directory" then
@@ -580,6 +581,9 @@ local function remove_tree(source, glob)
 end
 
 ---For cleaning out a directory, which also ensures that it exists
+---Only files are cleaned.
+---The best way to completely clean out a directory with all its contents
+---is to remove then recreate it.
 ---@param path string
 ---@return error_level_n
 local function make_clean_directory(path)
@@ -592,10 +596,11 @@ end
 
 ---Remove a directory tree.
 ---@param path string @Must be properly escaped.
----@return integer?  @code
+---@return error_level_n  @code
 local function remove_directory(path)
-  -- First, make sure it exists to avoid any errors
   if os_type == "windows" then
+    -- First, make sure it exists to avoid any errors
+    -- this is a weird coding style
     make_directory(path)
     return execute("rmdir /s /q " .. unix_to_win(path))
   else
@@ -616,7 +621,7 @@ end
 ---@field public all_names                  fun(path: string, glob: string): fun(): string
 ---@field public set_tree_excluder          fun(f: string_exclude_f)
 ---@field public tree                       fun(dir_path: string, glob: string): table<string,string>)
----@field public rename                     fun(dir_path: string, source: string, dest: string): boolean?, exitcode?, integer?
+---@field public rename                     fun(dir_path: string, source: string, dest: string): integer
 ---@field public copy_file                  fun(file: string, source: string, dest: string): integer
 ---@field public copy_tree                  fun(glob: string, source: string, dest: string): integer
 ---@field public make_clean_directory       fun(path: string): integer

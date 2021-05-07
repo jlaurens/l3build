@@ -165,7 +165,7 @@ local test_directory = {
     function f(name)
       error(name)
     end
-    b = tostring(math.random(1000000))
+    b = tostring(math.random(999999))
     succ, a = push_pop_current_directory("A", f, b)
     expect(succ).is(false)
     expect(a:match(b)).NOT(nil)
@@ -240,6 +240,11 @@ local test_directory = {
     end
   end,
   test_file_list = function (self)
+    self:make_random_directory()
+    write_content(".tex", "foo")
+    expect(file_list(".")).items.equals({ ".tex" })
+  end,
+  test_file_list_2 = function (self)
     self:make_tree("x-")
     expect(function () file_list() end).error()
     expect(file_list(".")).items.equals({ "A", "B" })
@@ -351,6 +356,7 @@ local test_directory = {
     expect(rename(".", "b", "b")).is(0)
     expect(file_exists("a")).is(false)
     expect(file_exists("b")).is(true)
+    print("\nNext error is expected")
     expect(rename("..", "."..self.random_name, "a")).NOT(0)
   end,
   test___copy_core = function (self)
