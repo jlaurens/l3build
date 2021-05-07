@@ -23,7 +23,7 @@ for those people who are interested.
 
 --]]
 
-local append = table.insert
+local push   = table.insert
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
@@ -83,7 +83,7 @@ local function clean()
     local exclude = {}
     for glob in entries(Files.clean) do
       for p in tree(dir, glob) do
-        append(clean_list, p.src)
+        push(clean_list, p.src)
       end
     end
     for glob in entries(Files.source) do

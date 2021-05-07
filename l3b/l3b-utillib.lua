@@ -36,7 +36,7 @@ local assert  = assert
 local pairs   = pairs
 
 local sort        = table.sort
-local append      = table.insert
+local push        = table.insert
 local concat      = table.concat
 local tbl_unpack  = table.unpack
 
@@ -245,7 +245,7 @@ end
 local function keys(table, compare)
   local kk = {}
   for k, _ in pairs(table) do
-    append(kk, k)
+    push(kk, k)
   end
   return entries(kk, { compare = compare })
 end
@@ -355,13 +355,13 @@ local function to_ymd_hms(diff)
   for item in items("year", "month", "day") do
     local n = diff_date[item]
     if n > 0 then
-      append(display_date, ("%d %s%s"):format(n, item, n > 1 and "s" or ""))
+      push(display_date, ("%d %s%s"):format(n, item, n > 1 and "s" or ""))
     end
   end
   local display_time = {}
   for item in items("hour", "min", "sec") do
     local n = diff_date[item]
-    append(display_time, ("%02d"):format(n))
+    push(display_time, ("%02d"):format(n))
   end
   display_time = concat(display_time, ':')
   if display_date == "" then

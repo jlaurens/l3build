@@ -1,35 +1,11 @@
+#!/usr/bin/env texlua
 --[[
-
-File l3b-pathlib.lua Copyright (C) 2018-2020 The LaTeX Project
-
-It may be distributed and/or modified under the conditions of the
-LaTeX Project Public License (LPPL), either version 1.3c of this
-license or (at your option) any later version.  The latest version
-of this license is in the file
-
-   http://www.latex-project.org/lppl.txt
-
-This file is part of the "l3build bundle" (The Work in LPPL)
-and all files in that bundle must be distributed together.
-
------------------------------------------------------------------------
-
-The development version of the bundle can be found at
-
-   https://github.com/latex3/l3build
-
-for those people who are interested.
-
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
 --]]
 
---[=[ Presentation
-Basic path utilities.
---]=]
----@module pathlib
-
--- local safety guards and shortcuts
-
-local append = table.insert
+local push   = table.insert
 
 local expect  = _ENV.expect
 
@@ -455,7 +431,7 @@ local test___grammar = {
       "word",
       "xdigit",
     }) do
-      append(
+      push(
         classes,
         {
           name,

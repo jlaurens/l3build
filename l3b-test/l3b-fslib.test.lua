@@ -1,12 +1,16 @@
-local append = table.insert
+#!/usr/bin/env texlua
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
+
+local push   = table.insert
 
 local expect  = _ENV.expect
 
 ---@type corelib_t
 local corelib = require("l3b-corelib")
-
----@type pathlib_t
-local pathlib = require("l3b-pathlib")
 
 ---@type utlib_t
 local utlib = require("l3b-utillib")
@@ -92,7 +96,7 @@ local test_directory = {
     expect(#__.cwd_list).is(0)
   end,
   add_to_remove = function (self, path)
-    append(self.to_remove, path)
+    push(self.to_remove, path)
   end,
   test_directory = function (self)
     local name = "TEST".. tostring(math.random(999999))
@@ -250,7 +254,7 @@ local test_directory = {
   iterate = function (self, dir, glob)
     local result = {}
     for leaf in tree(dir, glob) do
-      append(result, leaf)
+      push(result, leaf)
     end
     return result
   end,

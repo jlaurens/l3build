@@ -1,7 +1,14 @@
+#!/usr/bin/env texlua
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
+
+local expect  = _ENV.expect
+
 ---@type corelib_t
 local corelib = require("l3b-corelib")
-
-local expect  = require("l3b-test/expect").expect
 
 local function test_base()
   expect(corelib).NOT(nil)

@@ -28,14 +28,12 @@ for those people who are interested.
 
 -- Safeguard and shortcuts
 
-local concat  = table.concat
-local append  = table.insert
-
 local lpeg    = require("lpeg")
 local P       = lpeg.P
 local R       = lpeg.R
 local S       = lpeg.S
 local C       = lpeg.C
+local Cf      = lpeg.Cf
 local V       = lpeg.V
 local B       = lpeg.B
 local Cb      = lpeg.Cb
@@ -49,6 +47,7 @@ local Ct      = lpeg.Ct
 local lpeglib         = require("l3b-lpeglib")
 local white_p         = lpeglib.white_p
 local black_p         = lpeglib.black_p
+local after_no_black_p  = lpeglib.after_no_black_p
 local eol_p           = lpeglib.eol_p
 local get_spaced_p    = lpeglib.get_spaced_p
 local spaced_comma_p  = lpeglib.spaced_comma_p
@@ -61,28 +60,6 @@ local function_name_p = lpeglib.function_name_p
 ---@type corelib_t
 local corelib         = require("l3b-corelib")
 local get_line_number = corelib.get_line_number
-
-local function get_base_class(str)
-  ---@type lpeg_t
-  local p = Cf(
-      Cc({
-        parents = {}, -- new table at each run
-      })
-    * C(variable_p)
-    * ( P(".") * C(variable_p) )^0
-    * ( P(":") * C(variable_p) )^-1,
-    function (t, base)
-      append(t.parents, t.base)
-      t.base = base
-      return t
-    end
-  )
-  local t = p:match(str)
-  return t.base,
-    #t.parents > 0
-      and concat(t.parents, ".")
-      or  nil
-end
 
 -- Implementation
 
@@ -575,7 +552,7 @@ local core_function =
   * capture_comment
 
 local guess_function_name = P( {
-  - B(black_p)
+  after_no_black_p
   * Ct(
       V("local function")
     + V("function ...")

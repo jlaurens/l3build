@@ -24,7 +24,7 @@ for those people who are interested.
 
 ---@module l3b-options
 
-local append    = table.insert
+local push      = table.insert
 
 local stderr  = io.stderr
 
@@ -85,7 +85,7 @@ end
 ---Sorted by name
 ---@param hidden boolean @true to list all hidden targets too.
 ---@return function
-local function get_all_info(hidden)
+local function get_all_infos(hidden)
   return values(by_long, {
     compare = compare_ascending,
     exclude = function (info)
@@ -112,7 +112,7 @@ local function load_value(self, options, key, value)
   else -- string sequence
     local t = options[self.name] or {}
     options[self.name] = t
-    append(t, value)
+    push(t, value)
   end
   return 0
 end
@@ -302,7 +302,7 @@ end
 
 ---@class l3b_options_t
 ---@field public ut_flags_t        options_flags_t
----@field public get_all_info      fun(hidden: boolean): fun(): option_info_t|nil
+---@field public get_all_infos      fun(hidden: boolean): fun(): option_info_t|nil
 ---@field public get_info_by_key   fun(key: string): option_info_t
 ---@field public get_info_by_name  fun(name: string): option_info_t
 ---@field public register          fun(info: option_info_t, builtin: boolean)
@@ -310,7 +310,7 @@ end
 
 return {
   flags             = flags,
-  get_all_info      = get_all_info,
+  get_all_infos      = get_all_infos,
   get_info_by_key   = get_info_by_key,
   get_info_by_name  = get_info_by_name,
   register          = register,

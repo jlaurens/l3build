@@ -25,7 +25,7 @@ for those people who are interested.
 local print     = print
 local not_empty = next
 
-local append = table.insert
+local push   = table.insert
 
 ---@type pathlib_t
 local pathlib      = require("l3b-pathlib")
@@ -87,7 +87,7 @@ local function uninstall()
       local install_dir = G.texmf_home .. "/doc/man/"  .. man
       if file_exists(install_dir / p_src) then
         if dry_run then
-          append(man_files, man / base_name(p_src))
+          push(man_files, man / base_name(p_src))
         else
           error_level = error_level + remove_tree(install_dir, p_src)
         end
@@ -194,7 +194,7 @@ local function install_files(root_install_dir, full, dry_run)
             local l_dir, l_glob = dir_base(location)
             local glob_match = path_matcher(l_glob)
             if glob_match(name) then
-              append(candidates, {
+              push(candidates, {
                 name        = name,
                 source      = source_dir,
                 dest        = root_install_dir / l_dir .. src_path_end,
@@ -213,7 +213,7 @@ local function install_files(root_install_dir, full, dry_run)
               print(root_install_dir / (p .. src_path_end) )
               print(root_install_dir / p)
             end
-            append(candidates, {
+            push(candidates, {
               name        = name,
               source      = source_dir,
               dest        = root_install_dir / p,
@@ -241,7 +241,7 @@ local function install_files(root_install_dir, full, dry_run)
             end
             already_cleaned[install_dir] = true
           end
-          append(to_copy, entry)
+          push(to_copy, entry)
         end
       end
     end
@@ -265,7 +265,7 @@ local function install_files(root_install_dir, full, dry_run)
     for glob in entries(includes) do
       for p in tree(dir, glob) do
         if not exclude_list[p.src] then
-          append(result, p.src)
+          push(result, p.src)
         end
       end
     end

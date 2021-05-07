@@ -1,15 +1,25 @@
 #!/usr/bin/env texlua
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
 
-local expect  = require("l3b-test/expect").expect
-local lpeg  = require("lpeg")
-local P     = lpeg.P
+local expect  = _ENV.expect
+local lpeg    = require("lpeg")
+local P       = lpeg.P
 
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")
 
-local DB = require("l3b-test/autodoc_db")
+local DB    = _ENV.autodoc_DB or _ENV.loadlib(
+  "l3b-test/autodoc_db",
+  _ENV
+)
 
-_G.test_line_comment = function ()
+_ENV.autodoc_DB = DB
+
+local function test_line_comment()
   local p = lpad.line_comment
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.line_comment) do
@@ -17,7 +27,7 @@ _G.test_line_comment = function ()
   end
 end
 
-_G.test_line_doc = function ()
+local function test_line_doc()
   local p = lpad.line_doc
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.line_doc) do
@@ -25,7 +35,7 @@ _G.test_line_doc = function ()
   end
 end
 
-_G.test_short_literal = function ()
+local function test_short_literal()
   local p = lpad.short_literal
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.short_literal) do
@@ -33,7 +43,7 @@ _G.test_short_literal = function ()
   end
 end
 
-_G.test_long_literal = function ()
+local function test_long_literal()
   local p = lpad.long_literal
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.long_literal) do
@@ -41,7 +51,7 @@ _G.test_long_literal = function ()
   end
 end
 
-_G.test_long_comment = function ()
+local function test_long_comment()
   local p = lpad.long_comment
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.long_comment) do
@@ -49,7 +59,7 @@ _G.test_long_comment = function ()
   end
 end
 
-_G.test_long_doc = function ()
+local function test_long_doc()
   local p = lpad.long_doc
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.long_doc) do
@@ -57,7 +67,7 @@ _G.test_long_doc = function ()
   end
 end
 
-_G.test_get_annotation = function ()
+local function test_get_annotation()
   local p = lpad.get_annotation("foo", P("?"))
   expect(p).NOT(nil)
   expect(p:match("---@foo ?")).equals({
@@ -67,7 +77,7 @@ _G.test_get_annotation = function ()
   expect(function () p:match("---@foo +") end).error()
 end
 
-_G.test_core_field = function ()
+local function test_core_field()
   local p = lpad.core_field
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -76,7 +86,7 @@ _G.test_core_field = function ()
   end
 end
 
-_G.test_core_class = function ()
+local function test_core_class()
   local p = lpad.core_class
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -85,7 +95,7 @@ _G.test_core_class = function ()
   end
 end
 
-_G.test_core_type = function ()
+local function test_core_type()
   local p = lpad.core_type
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -94,7 +104,7 @@ _G.test_core_type = function ()
   end
 end
 
-_G.test_core_alias = function ()
+local function test_core_alias()
   local p = lpad.core_alias
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -103,7 +113,7 @@ _G.test_core_alias = function ()
   end
 end
 
-_G.test_core_return = function ()
+local function test_core_return()
   local p = lpad.core_return
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -112,7 +122,7 @@ _G.test_core_return = function ()
   end
 end
 
-_G.test_core_generic = function ()
+local function test_core_generic()
   local p = lpad.core_generic
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -121,7 +131,7 @@ _G.test_core_generic = function ()
   end
 end
 
-_G.test_core_param = function ()
+local function test_core_param()
   local p = lpad.core_param
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -130,7 +140,7 @@ _G.test_core_param = function ()
   end
 end
 
-_G.test_core_vararg = function ()
+local function test_core_vararg()
   local p = lpad.core_vararg
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -139,7 +149,7 @@ _G.test_core_vararg = function ()
   end
 end
 
-_G.test_core_module = function ()
+local function test_core_module()
   local p = lpad.core_module
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -148,7 +158,7 @@ _G.test_core_module = function ()
   end
 end
 
-_G.test_core_global = function ()
+local function test_core_global()
   local p = lpad.core_global
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -157,7 +167,7 @@ _G.test_core_global = function ()
   end
 end
 
-_G.test_core_author = function ()
+local function test_core_author()
   local p = lpad.core_author
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -166,7 +176,7 @@ _G.test_core_author = function ()
   end
 end
 
-_G.test_core_see = function ()
+local function test_core_see()
   local p = lpad.core_see
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -175,7 +185,7 @@ _G.test_core_see = function ()
   end
 end
 
-_G.test_core_function = function ()
+local function test_core_function()
   local p = lpad.core_function
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -184,7 +194,7 @@ _G.test_core_function = function ()
   end
 end
 
-_G.test_guess_function_name = function ()
+local function test_guess_function_name()
   local p = lpad.guess_function_name
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.guess_function_name) do
@@ -192,7 +202,7 @@ _G.test_guess_function_name = function ()
   end
 end
 
-_G.test_paragraph_break = function ()
+local function test_paragraph_break()
   local p = lpad.paragraph_break
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.paragraph_break) do
@@ -200,7 +210,7 @@ _G.test_paragraph_break = function ()
   end
 end
 
-_G.test_named_pos = function ()
+local function test_named_pos()
   local p = lpad.named_pos
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.named_pos) do
@@ -212,7 +222,7 @@ _G.test_named_pos = function ()
   end
 end
 
-_G.test_chunk_init = function ()
+local function test_chunk_init()
   local p = lpad.chunk_init
   expect(p).NOT(nil)
   expect(lpeg.Ct(p):match("")).equals({
@@ -221,7 +231,7 @@ _G.test_chunk_init = function ()
   })
 end
 
-_G.test_chunk_start = function ()
+local function test_chunk_start()
   local p = lpad.chunk_start
   expect(p).NOT(nil)
   expect(
@@ -233,7 +243,7 @@ _G.test_chunk_start = function ()
   })
 end
 
-_G.test_chunk_stop = function ()
+local function test_chunk_stop()
   local p = lpad.chunk_stop
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -242,7 +252,7 @@ _G.test_chunk_stop = function ()
   end
 end
 
-_G.test_one_line_chunk_stop = function ()
+local function test_one_line_chunk_stop()
   local p = lpad.one_line_chunk_stop
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -251,7 +261,7 @@ _G.test_one_line_chunk_stop = function ()
   end
 end
 
-_G.test_special_begin = function ()
+local function test_special_begin()
   local p = lpad.special_begin
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.special_begin) do
@@ -259,7 +269,7 @@ _G.test_special_begin = function ()
   end
 end
 
-_G.test_capture_comment = function ()
+local function test_capture_comment()
   local p = lpad.capture_comment
   expect(p).NOT(nil)
   expect(function () p:match("abc") end).error()
@@ -269,7 +279,7 @@ _G.test_capture_comment = function ()
   end
 end
 
-_G.test_lua_type = function ()
+local function test_lua_type()
   local p = lpad.lua_type
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.lua_type) do
@@ -277,7 +287,7 @@ _G.test_lua_type = function ()
   end
 end
 
-_G.test_named_types = function ()
+local function test_named_types()
   local p = lpad.named_types
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -286,7 +296,7 @@ _G.test_named_types = function ()
   end
 end
 
-_G.test_named_optional = function ()
+local function test_named_optional()
   local p = lpad.named_optional
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -295,7 +305,7 @@ _G.test_named_optional = function ()
   end
 end
 
-_G.test_at_match = function ()
+local function test_at_match()
   local p = lpad.at_match
   expect(p).NOT(nil)
   for _, TD in ipairs(DB.at_match) do
@@ -304,13 +314,13 @@ _G.test_at_match = function ()
   end
 end
 
-_G.test_error_annotation = function ()
+local function test_error_annotation()
   local p = lpad.error_annotation
   expect(p).NOT(nil)
   expect(function () p:match("") end).error()
 end
 
-_G.test_content = function ()
+local function test_content()
   local p = lpad.content
   expect(p).NOT(nil)
   p = lpeg.Ct(p)
@@ -319,7 +329,7 @@ _G.test_content = function ()
   end
 end
 
-_G.test_comment_2 = function ()
+local function test_comment_2()
   local p = lpeg.Ct(
       lpad.chunk_init
     * lpad.capture_comment
@@ -343,3 +353,43 @@ _G.test_comment_2 = function ()
     max = 7,
   })
 end
+
+return {
+  test_line_comment         = test_line_comment,
+  test_line_doc             = test_line_doc,
+  test_short_literal        = test_short_literal,
+  test_long_literal         = test_long_literal,
+  test_long_comment         = test_long_comment,
+  test_long_doc             = test_long_doc,
+  test_get_annotation       = test_get_annotation,
+  test_core_field           = test_core_field,
+  test_core_class           = test_core_class,
+  test_core_type            = test_core_type,
+  test_core_alias           = test_core_alias,
+  test_core_return          = test_core_return,
+  test_core_generic         = test_core_generic,
+  test_core_param           = test_core_param,
+  test_core_vararg          = test_core_vararg,
+  test_core_module          = test_core_module,
+  test_core_global          = test_core_global,
+  test_core_author          = test_core_author,
+  test_core_see             = test_core_see,
+  test_core_function        = test_core_function,
+  test_guess_function_name  = test_guess_function_name,
+  test_paragraph_break      = test_paragraph_break,
+  test_named_pos            = test_named_pos,
+  test_chunk_init           = test_chunk_init,
+  test_chunk_start          = test_chunk_start,
+  test_chunk_stop           = test_chunk_stop,
+  test_one_line_chunk_stop  = test_one_line_chunk_stop,
+  test_special_begin        = test_special_begin,
+  test_capture_comment      = test_capture_comment,
+  test_lua_type             = test_lua_type,
+  test_named_types          = test_named_types,
+  test_named_optional       = test_named_optional,
+  test_at_match             = test_at_match,
+  test_error_annotation     = test_error_annotation,
+  test_content              = test_content,
+  test_comment              = test_comment_2,
+}
+

@@ -26,8 +26,8 @@ local execute     = os.execute
 local remove      = os.remove
 local os_type     = os["type"]
 
-local append      = table.insert
-local unappend    = table.remove
+local push        = table.insert
+local pop         = table.remove
 local tbl_unpack  = table.unpack
 
 local lfs         = require("lfs")
@@ -167,7 +167,7 @@ local function push_current_directory(dir)
   local cwd = get_current_directory()
   local ok, msg = change_current_directory(dir)
   if ok then
-    append(cwd_list, cwd)
+    push(cwd_list, cwd)
   end
   return ok, msg
 end
@@ -178,7 +178,7 @@ end
 ---@return string|nil @dir the new current directory on success, nil on error
 ---@return nil|string @msg nil on success, error message on error
 local function pop_current_directory()
-  local dir = unappend(cwd_list)
+  local dir = pop(cwd_list)
   if not dir and not _ENV.during_unit_testing then
     print(debug.traceback())
   end
@@ -304,13 +304,13 @@ local function file_list(dir_path, glob)
     if matcher then
       for entry in get_directory_content(dir_path) do
         if matcher(entry) then
-          append(files, entry)
+          push(files, entry)
         end
       end
     else
       for entry in get_directory_content(dir_path) do
         if entry ~= "." and entry ~= ".." then
-          append(files, entry)
+          push(files, entry)
         end
       end
     end
@@ -407,7 +407,7 @@ local function tree(dir_path, glob)
                 print("DEBUG tree fill ACCEPTED", pp.src, pp.wrk, p.src, p.wrk, file)
               end
               pp.is_directoy = is_dir(pp.wrk)
-              append(table, pp)
+              push(table, pp)
             else
               if Vars.debug.tree then
                 print("DEBUG tree fill REFUSED", pp.src, pp.wrk)
@@ -430,7 +430,7 @@ local function tree(dir_path, glob)
         if not p then
           break
         end
-        append(new_result, p)
+        push(new_result, p)
         fill(p, result)
       until false
     else

@@ -30,6 +30,9 @@ local lpeg  = require("lpeg")
 
 local l3build = require("l3build")
 
+local TEST_DIR = "l3b-test"
+
+-- next is redundant
 local function pretty_print(tt, indent, done)
   done = done or {}
   indent = indent or 0
@@ -68,6 +71,9 @@ local function pretty_print(tt, indent, done)
 end
 
 local LU = require("l3b-test/luaunit")
+
+LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE = 1
+
 function _G.LU_wrap_test(f)
   return function (...)
     LU.STRIP_EXTRA_ENTRIES_IN_STACK_TRACE =
@@ -97,10 +103,204 @@ local function pop_print()
   pop(print_stack)
 end
 
+local Expect = {
+  __NOT = false,
+  __almost = false,
+  __items = false,
+}
+
+local function expect(actual)
+  return setmetatable({
+    actual = actual,
+  }, Expect)
+end
+
+function Expect:__index(k)
+  if k == "map" then
+    return function (f)
+      local modifier = self.modifier
+      self.modifier = modifier
+        and function (before)
+          local result = {}
+          for kk, vv in pairs(modifier(before)) do
+            result[kk] = f(vv)
+          end
+          return result
+        end
+        or function (before)
+          local result = {}
+          for kk, vv in pairs(before) do
+            result[kk] = f(vv)
+          end
+          return result
+        end
+      return self
+    end
+  end
+  if k == "NOT" then
+    self.__NOT = not self.__NOT
+    return self
+  end
+  if k == "almost" then
+    self.__almost = true
+    return self
+  end
+  if k == "items" then
+    self.op = self.op or "=="
+    self.__items = true
+    return self
+  end
+  if k == "equal" or k == "equals" then
+    self.op = "=="
+    return self
+  end
+  if k == "error" then
+    self.op = "error"
+    return self
+  end
+  if k == "is" then
+    self.op = "is"
+    return self
+  end
+  if k == "type" then
+    local modifier = self.modifier
+    self.modifier = modifier
+      and function (before)
+        return type(modifier(before))
+      end
+      or function (before)
+        return type(before)
+      end
+    return self
+  end
+  if k == "Class" then
+    local modifier = self.modifier
+    self.modifier = modifier
+      and function (before)
+        return modifier(before).__Class
+      end
+      or function (before)
+        return before.__Class
+      end
+    return self
+  end
+  if k == "greater" then
+    self.op = ">"
+    return self
+  end
+  if k == "less" then
+    self.op = "<"
+    return self
+  end
+  if k == "contains" then
+    self.op = "⊇"
+    return self
+  end
+  if k == "to" then
+    return self
+  end
+  if k == "instance_of" then
+    self.op = k
+    return self
+  end
+  if k == "than" then
+    return self
+  end
+  return Expect[k]
+end
+
+function Expect.__call(self, expected, options)
+  options = options or {}
+  if self.modifier then
+    self.actual = self.modifier(self.actual)
+  end
+  if self.op == "==" then
+    if self.__NOT then
+      if self.__almost then
+        LU.assertNotAlmostEquals(self.actual, expected)
+      else
+        LU.assertNotEquals(self.actual, expected)
+      end
+    elseif self.__almost then
+      LU.assertAlmostEquals(self.actual, expected)
+    elseif self.__items then
+      LU.assertItemsEquals(self.actual, expected)
+    else
+      LU.assertEquals(self.actual, expected)
+    end
+  end
+  if self.op == "error" then
+    if self.__NOT then
+      self.actual()
+    else
+      LU.assertError(self.actual)
+    end
+  end
+  if self.op == "is" or not self.op then
+    if self.__NOT then
+      LU.assertNotIs(self.actual, expected)
+    else
+      LU.assertIs(self.actual, expected)
+    end
+  end
+  if self.op == ">" then
+    if self.__NOT then
+      LU.assertFalse(self.actual > expected)
+    else
+      LU.assertTrue(self.actual > expected)
+    end
+  end
+  if self.op == "<" then
+    if self.__NOT then
+      LU.assertFalse(self.actual < expected)
+    else
+      LU.assertTrue(self.actual < expected)
+    end
+  end
+  if self.op == "⊇" then
+    if  type(self.actual) == "table"
+    and type(expected) == "table"
+    then
+      if self.__NOT then
+        print("NOT is not supported for contains verb")
+        LU.assertNotIs(self.actual, expected)
+      end
+      for k, v in pairs(expected) do
+        if  type(v) == "table"
+        and type(self.actual[k]) == "table"
+        then
+          expect(self.actual[k]).contains(v)
+        else
+          LU.assertEquals(self.actual[k], v)
+        end
+      end
+      return
+    end
+    if expected == nil then
+      expect(self.actual).is(nil)
+    else
+      expect(self.actual).NOT(nil)
+      ;(options.case_insensitive
+        and LU.assert_str_icontains
+        or  LU.assert_str_contains
+      )(
+          self.actual,
+          expected
+        )
+    end
+  end
+  if self.op == "instance_of" then
+    (self.__NOT and LU.assertFalse or LU.assertTrue)
+    (self.actual:is_instance_of(expected))
+  end
+  self.op = ""
+  return self
+end
+
 -- create an environment for test chunks
 local ENV = setmetatable({
   LU              = LU,
-  expect          = require("l3b-test/expect").expect,
+  expect          = expect,
   pretty_print    = pretty_print,
   push_print      = push_print,
   pop_print       = pop_print,
@@ -109,10 +309,10 @@ local ENV = setmetatable({
   __index = _G
 })
 
-ENV.loadlib = function (name)
+ENV.loadlib = function (name, __)
   -- Next is an _ENV that will allow a module to export
   -- more symbols than usually done in order to finegrain testing
-  local __ = setmetatable({
+  __ = __ or setmetatable({
     during_unit_testing = true,
   }, {
     __index = _G
@@ -131,6 +331,24 @@ ENV.loadlib = function (name)
 end
 
 local run = function ()
+  if arg[2] == "-h" or arg[2] == "--help" then
+    print([[
+Launching tests from the l3b-test/ directory:
+
+> texlua ../l3build.lua test *
+
+run all the testsuites
+
+> texlua ../l3build.lua test foo,bar
+
+run tests files which names contain either "foo" or "bar"
+
+> texlua ../l3build.lua test * -p foo -p bar
+
+from all test files run only test containing either "foo" or "bar".
+]])
+    os.exit(0)
+  end
   ---@type table<string,boolean>
   local done = {}
   -- arg[2] is a comma separated list of names
@@ -158,7 +376,29 @@ local run = function ()
     return kk
   end
 
-  for test_name in arg[2]:gmatch("[^,]+") do
+  local all_names
+
+  do
+    local test_names = {}
+    local lfs = require("lfs")
+    for test_name in lfs.dir(l3build.work_dir .. TEST_DIR) do
+      if test_name:match(".*%.test%..*") then
+        for test in arg[2]:gmatch("[^,]+") do
+          if test_name:match(test) then
+            push(test_names, test_name)
+            break
+          end
+        end
+      end
+    end
+    local i = 0
+    all_names = function ()
+      i = i + 1
+      return test_names[i]
+    end
+  end
+
+  for test_name in all_names do
     if not done[test_name] then
       done[test_name] = true -- don't test it twice
       local name = test_name:gsub( "%.lua$", "")

@@ -3287,6 +3287,7 @@ end
 
                 if instance == nil then
                     self:unregisterSuite()
+                    print(debug.traceback())
                     error( "No such name in global space: "..instanceName )
                 end
 

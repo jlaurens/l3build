@@ -22,7 +22,7 @@ for those people who are interested.
 
 --]]
 
-local append = table.insert
+local push   = table.insert
 local concat = table.concat
 
 local AD = _ENV.AD
@@ -130,7 +130,7 @@ function AD.Function.__instance_table:latex_params()
     local p_info = self:get_param(param_name)
     local as_latex = p_info.as_latex_environment
     if as_latex and #as_latex>0 then
-      append(t, as_latex)
+      push(t, as_latex)
     end
   end
   if #t > 0 then
@@ -153,7 +153,7 @@ function AD.Function.__instance_table:latex_returns()
     local r_info = self:get_return(i)
     local as_latex = r_info.as_latex_environment
     if as_latex and #as_latex>0 then
-      append(t, as_latex)
+      push(t, as_latex)
     end
   end
   if #t > 0 then
@@ -190,7 +190,7 @@ function AD.Class.__instance_table:latex_fields()
     local f_info = self:get_field(field_name)
     local as_latex = f_info.as_latex_environment
     if as_latex and #as_latex>0 then
-      append(t, as_latex)
+      push(t, as_latex)
     end
   end
   if #t > 0 then

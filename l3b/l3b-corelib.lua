@@ -29,7 +29,7 @@ for those people who are interested.
 -- Safeguard and shortcuts
 
 local unpack  = table.unpack
-local append  = table.insert
+local push    = table.insert
 local concat  = table.concat
 local max     = math.max
 

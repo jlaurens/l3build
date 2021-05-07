@@ -1,5 +1,9 @@
 #!/usr/bin/env texlua
-
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
 local lpeg    = require("lpeg")
 local P       = lpeg.P
 local Cg      = lpeg.Cg
@@ -9,10 +13,10 @@ local Cb      = lpeg.Cb
 local V       = lpeg.V
 local Cp      = lpeg.Cp
 
----@type corelib_t
-local corelib = require("l3b-corelib")
+---@type lpeglib_t
+local lpeglib = require("l3b-lpeglib")
 
-local expect  = require("l3b-test/expect").expect
+local expect  = _ENV.expect
 
 local l3build = require("l3build")
 
@@ -33,10 +37,14 @@ local AD = loadfile(
   __
 )()
 
-local DB    = require("l3b-test/autodoc_db")
-local Test  = require("l3b-test/autodoc_test")
+local Test  = _ENV.autodoc_Test or _ENV.loadlib(
+  "l3b-test/autodoc_test",
+  _ENV
+)
 
-_G.test_POC = Test({
+local DB    = _ENV.autodoc_DB
+
+local test_POC = Test({
   test_Ct = function ()
     local p_one = Cg(P(1), "one")
     local p_two = Cg(P(1), "two")
@@ -66,11 +74,11 @@ _G.test_POC = Test({
       type = V("table") + P("abc"),
       table =
         P("table")   -- table<foo,bar>
-      * P( corelib.get_spaced_p("<")
+      * P( lpeglib.get_spaced_p("<")
         * V("type")
-        * corelib.spaced_comma_p
+        * lpeglib.spaced_comma_p
         * V("type")
-        * corelib.get_spaced_p(">")
+        * lpeglib.get_spaced_p(">")
       )^-1,
     })
     expect((p * Cp()):match("table<abc,abc>")).is(15)
@@ -81,7 +89,7 @@ _G.test_POC = Test({
   end,
 })
 
-_G.test_Info = function ()
+local test_Info = function ()
   expect(AD.Info).is.NOT(nil)
   expect(AD.Info.__Class).is(AD.Info)
 end
@@ -95,26 +103,7 @@ function Test:ad_test(target, expected, content, index)
   self:add_strip(-1)
 end
 
-function  _G.test_get_base_class()
-  local get_base_class = AD.get_base_class
-  expect({ get_base_class("a") }).equals({
-   "a",
-  })
-  expect({ get_base_class("a.b") }).equals({
-    "b",
-    "a",
-  })
-  expect({ get_base_class("a.b.c") }).equals({
-    "c",
-    "a.b",
-  })
-  expect({ get_base_class("a.b:c") }).equals({
-    "c",
-    "a.b",
-  })
-end
-
-_G.test_ShortLiteral = Test({
+local test_ShortLiteral = Test({
   test = function (self)
     self:do_setup(AD.ShortLiteral)
     self:do_test_base(DB.BASE())
@@ -122,7 +111,7 @@ _G.test_ShortLiteral = Test({
   end
 })
 
-_G.test_LongLiteral = Test({
+local test_LongLiteral = Test({
   test = function (self)
     self:do_setup(AD.LongLiteral)
     self:do_test_base(DB.BASE())
@@ -130,7 +119,7 @@ _G.test_LongLiteral = Test({
   end
 })
 
-_G.test_LineComment = Test({
+local test_LineComment = Test({
   test = function (self)
     self:do_setup(AD.LineComment)
     self:do_test_base(DB.BASE())
@@ -139,7 +128,7 @@ _G.test_LineComment = Test({
   end
 })
 
-_G.test_LongComment = Test({
+local test_LongComment = Test({
   test = function (self)
     self:do_setup(AD.LongComment)
     self:do_test_base(DB.BASE())
@@ -148,7 +137,7 @@ _G.test_LongComment = Test({
   end,
 })
 
-_G.test_LineDoc = Test({
+local test_LineDoc = Test({
   test = function (self)
     self:do_setup(AD.LineDoc)
     self:do_test_base(DB.BASE())
@@ -157,7 +146,7 @@ _G.test_LineDoc = Test({
   end,
 })
 
-_G.test_LongDoc = Test({
+local test_LongDoc = Test({
   test = function (self)
     self:do_setup(AD.LongDoc)
     self:do_test_base(DB.BASE())
@@ -290,7 +279,7 @@ s   s
   }
 )
 
-_G.test_Description = Test({
+local test_Description = Test({
   test = function (self)
     self:do_setup(AD.Description)
     self:do_test_base(DB.BASE())
@@ -311,7 +300,7 @@ DB:fill(
     ignores     = {},
   }
 )
-_G.test_At_Author = Test({
+local test_At_Author = Test({
   test = function (self)
     self:do_setup(AD.At.Author)
     self:do_test_base(DB.BASE())
@@ -381,7 +370,7 @@ DB:fill(
   10
 )
 
-_G.test_At_Field = Test({
+local test_At_Field = Test({
   test = function (self)
     expect(AD.At.Field()).contains(AD.At.Field(DB.Base))
     expect(
@@ -415,7 +404,7 @@ DB:fill(
   }
 )
 
-_G.test_At_See = Test({
+local test_At_See = Test({
   test = function (self)
     expect(AD.At.See()).contains( AD.At.See(DB.Base) )
     self:do_setup(AD.At.See)
@@ -450,7 +439,7 @@ DB:fill(
 )
 
 -- @class MY_TYPE[:PARENT_TYPE] [@comment]
-_G.test_At_Class = Test({
+local test_At_Class = Test({
   test = function (self)
     expect(AD.At.Class()).equals( AD.At.Class(DB.Base) )
     self:do_setup(AD.At.Class)
@@ -525,7 +514,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Type = Test({
+local test_At_Type = Test({
   test = function (self)
     expect(AD.At.Type()).contains( AD.At.Type(DB.Base) )
     self:do_setup(AD.At.Type)
@@ -591,7 +580,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Alias = Test({
+local test_At_Alias = Test({
   test = function (self)
     expect(AD.At.Alias()).contains( AD.At.Alias(DB.Base) )
     self:do_setup(AD.At.Alias)
@@ -686,7 +675,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Param = Test({
+local test_At_Param = Test({
   test = function (self)
     expect(AD.At.Param()).contains( AD.At.Param(DB.Base) )
     self:do_setup(AD.At.Param)
@@ -737,7 +726,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Return = Test({
+local test_At_Return = Test({
   test = function (self)
     expect(AD.At.Return()).equals(AD.At.Return(DB:BASE()))
     self:do_setup(AD.At.Return)
@@ -819,7 +808,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Generic = Test({
+local test_At_Generic = Test({
   test = function (self)
     expect(AD.At.Generic()).contains(AD.At.Generic(DB:BASE()))
     self:do_setup(AD.At.Generic)
@@ -872,7 +861,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Vararg = Test({
+local test_At_Vararg = Test({
   test = function (self)
     expect(AD.At.Vararg()).contains( AD.At.Vararg(DB.Base) )
     self:do_setup(AD.At.Vararg)
@@ -913,7 +902,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Module = Test({
+local test_At_Module = Test({
   test = function (self)
     expect(AD.At.Module()).equals( AD.At.Module(DB:BASE()) )
     self:do_setup(AD.At.Module)
@@ -974,7 +963,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Function = Test({
+local test_At_Function = Test({
   test = function (self)
     expect(AD.At.Function()).equals( AD.At.Function(DB:BASE()) )
     self:do_setup(AD.At.Function)
@@ -1029,7 +1018,7 @@ DB:fill(
   }
 )
 
-_G.test_Break = Test({
+local test_Break = Test({
   test = function (self)
     expect(AD.Break().__Class).equals(AD.Break)
     self:do_setup(AD.Break)
@@ -1074,7 +1063,7 @@ DB:fill(
   }
 )
 
-_G.test_At_Global = Test({
+local test_At_Global = Test({
   test = function (self)
     self:do_setup(AD.At.Global)
     self:do_test_base(DB.BASE())
@@ -1111,7 +1100,8 @@ Test.FUNCTION_ITEMS = {
   VARARG = false,
   RETURN = true,
 }
-_G.test_loop_p = Test({
+
+local test_loop_p = Test({
   setup = function (self)
     self.p = __.loop_p
   end,
@@ -1146,7 +1136,7 @@ _G.test_loop_p = Test({
   end,
 })
 
-_G.test_Source = Test({
+local test_Source = Test({
   test_base = function ()
     local t = AD.Source()
     expect(t).contains( AD.Source() )
@@ -1209,7 +1199,7 @@ _G.test_Source = Test({
   end
 })
 
-_G.test_autodoc = Test({
+local test_autodoc = Test({
   setup = function (self)
     self.p = AD.Source:get_capture_p()
   end,
@@ -1222,7 +1212,7 @@ _G.test_autodoc = Test({
   end,
 })
 
-_G.test_autodoc_Module = Test({
+local test_autodoc_Module = Test({
   setup = function (self)
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
@@ -1281,7 +1271,7 @@ _G.test_autodoc_Module = Test({
   end,
 })
 
-_G.test_Module = Test({
+local test_Module = Test({
   prepare = function (self, str)
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
@@ -1512,7 +1502,7 @@ _G.foo = bar
   end,
 })
 
-_G.test_Module_2 = Test({
+local test_Module_2 = Test({
   prepare = function (self, str)
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
@@ -1559,7 +1549,7 @@ _G.test_Module_2 = Test({
   end,
 })
 
-_G.test_latex = Test({
+local test_latex = Test({
   prepare = function (self, str)
     self.module = AD.Module({
       file_path = AUTODOC_PATH,
@@ -1727,3 +1717,36 @@ AUTHOR: LONG  DESCRIPTION
     expect(as_latex_environment).is(expected)
   end
 })
+
+return {
+  test_POC            = test_POC,
+  test_Info           = test_Info,
+  test_ShortLiteral   = test_ShortLiteral,
+  test_LongLiteral    = test_LongLiteral,
+  test_LineComment    = test_LineComment,
+  test_LongComment    = test_LongComment,
+  test_LineDoc        = test_LineDoc,
+  test_LongDoc        = test_LongDoc,
+  test_Description    = test_Description,
+  test_At_Author      = test_At_Author,
+  test_At_Field       = test_At_Field,
+  test_At_See         = test_At_See,
+  test_At_Class       = test_At_Class,
+  test_At_Type        = test_At_Type,
+  test_At_Alias       = test_At_Alias,
+  test_At_Param       = test_At_Param,
+  test_At_Return      = test_At_Return,
+  test_At_Generic     = test_At_Generic,
+  test_At_Vararg      = test_At_Vararg,
+  test_At_Module      = test_At_Module,
+  test_At_Function    = test_At_Function,
+  test_Break          = test_Break,
+  test_At_Global      = test_At_Global,
+  test_loop_p         = test_loop_p,
+  test_Source         = test_Source,
+  test_autodoc        = test_autodoc,
+  test_autodoc_Module = test_autodoc_Module,
+  test_Module         = test_Module,
+  test_Module_2       = test_Module_2,
+  test_latex          = test_latex,
+}

@@ -36,7 +36,7 @@ local str_format      = string.format
 local gsub            = string.gsub
 local match           = string.match
 
-local append          = table.insert
+local push            = table.insert
 local sort            = table.sort
 local tbl_unpack      = table.unpack
 
@@ -1073,7 +1073,7 @@ local function check(test_names)
         ---@type glob_match_f[]
         local exclude_glob_matches = {}
         for glob in entries(G.excludetests) do
-          append(exclude_glob_matches, path_matcher(glob .. ext))
+          push(exclude_glob_matches, path_matcher(glob .. ext))
         end
         for glob in entries(G.includetests) do
           for name in all_names(Dir.testfile, glob .. ext) do
@@ -1085,7 +1085,7 @@ local function check(test_names)
               end
             end
             if not is_excluded then
-              append(test_names, job_name(name))
+              push(test_names, job_name(name))
             end
           end
           for name in all_names(Dir.unpack, glob .. ext) do
@@ -1100,7 +1100,7 @@ local function check(test_names)
               if file_exists(Dir.testfile / name) then
                 return 1
               end
-              append(test_names, job_name(name))
+              push(test_names, job_name(name))
             end
           end
         end
@@ -1234,7 +1234,7 @@ local function check_high(options)
         if halt_on_error then
           return error_level
         else
-          append(failed_configs, config)
+          push(failed_configs, config)
         end
       end
     end

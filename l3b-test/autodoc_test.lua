@@ -1,31 +1,18 @@
 #!/usr/bin/env texlua
 
---[[
+-- This file is required for autodoc testing
 
-File l3b-test/autodoc_db.lua Copyright (C) 2018-2020 The LaTeX Project
-
-It may be distributed and/or modified under the conditions of the
-LaTeX Project Public License (LPPL), either version 1.3c of this
-license or (at your option) any later version.  The latest version
-of this license is in the file
-
-   http://www.latex-project.org/lppl.txt
-
-This file is part of the "l3build development bundle" (The Work in LPPL)
-which can be found at
-
-   https://github.com/latex3/l3build
-
---]]
-
--- This file is required
-
-local expect  = require("l3b-test/expect").expect
-local LU      = require("l3b-test/luaunit")
+local expect        = _ENV.expect
+local LU            = _ENV.LU
+local pretty_print  = _ENV.pretty_print
 
 local AD = require("l3b-autodoc")
 
-local DB = require("l3b-test/autodoc_db")
+local DB    = _ENV.autodoc_DB or _ENV.loadlib(
+  "l3b-test/autodoc_db",
+  _ENV
+)
+_ENV.autodoc_DB = DB
 
 ---@class AD.TestData
 ---@field public s string   @ target
@@ -914,9 +901,9 @@ DOOOOOOOOOOOOOOOOOC
     local expected = TD:m()
     if self.verbose > 2 then
       print("actual:")
-      _G.pretty_print(actual)
+      pretty_print(actual)
       print("expected:")
-      _G.pretty_print(expected)
+      pretty_print(expected)
     end
     expect(actual).equals(expected)
 
@@ -993,17 +980,18 @@ end
 ---@param contains boolean @ expect `contains` when true, `equals` otherwise.
 function Test:do_test_DB_x(key, contains)
   if self.verbose > 0 then
-    print("TEST", key, self.p)
+    print("TEST do_test_DB_x", key, self.p, DB)
   end
+  assert(DB[key], "No test for ".. key)
   for _, TD in ipairs(DB[key]) do
     if self.verbose > 2 then
       print("#" .. _)
-      _G.pretty_print(TD)
+      pretty_print(TD)
     elseif self.verbose > 1 then
       print("#" .. _, TD.s)
     end
-    -- _G.pretty_print(self.p:match("---@return fun(): string | nil"))
-    -- _G.pretty_print(self.p:match("---@return fun(): string | nil"))
+    -- pretty_print(self.p:match("---@return fun(): string | nil"))
+    -- pretty_print(self.p:match("---@return fun(): string | nil"))
     local actual = self.p:match(TD.s, TD.d or 1)
     local expected = TD:x() -- `x` here
     if type(expected) == "table" and not expected.__TYPE then
@@ -1011,9 +999,9 @@ function Test:do_test_DB_x(key, contains)
     end
     if self.verbose > 2 then
       print("actual:")
-      _G.pretty_print(actual)
+      pretty_print(actual)
       print("expected:")
-      _G.pretty_print(expected)
+      pretty_print(expected)
     end
     if contains then
       expect(actual).contains(expected)

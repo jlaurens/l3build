@@ -46,8 +46,8 @@ From [micrososft documentation](https://docs.microsoft.com/en-us/windows/win32/f
 
 -- Safeguards and shortcuts
 
-local append    = table.insert
-local unappend  = table.remove
+local push      = table.insert
+local pop       = table.remove
 local concat    = table.concat
 local move      = table.move
 local max       = math.max
@@ -97,23 +97,24 @@ local function split(str, sep)
   return Ct(r):match(str) or { str }
 end
 
-assert(string.get_base_extension == nil)
-
 local dot_p = P(".")
 ---@type lpeg_t
 local no_dot_p = utf8_p - dot_p
-local base_extension_p = Ct(
-    C( no_dot_p^0) * ( dot_p * C( no_dot_p^0 ) )^0
-  ) / function (t)
-    local last = max(1, #t - 1) -- last index of the base part
-    return {
-      base = concat({ unpack(t, 1, last) }, "."),
-      extension = unpack(t, last + 1, #t) or "",
-    }
-  end
 
-string.get_base_extension = function (self)
-  return base_extension_p:match(self)
+if not string.get_base_extension then
+  local base_extension_p = Ct(
+      C( no_dot_p^0) * ( dot_p * C( no_dot_p^0 ) )^0
+    ) / function (t)
+      local last = max(1, #t - 1) -- last index of the base part
+      return {
+        base = concat({ unpack(t, 1, last) }, "."),
+        extension = unpack(t, last + 1, #t) or "",
+      }
+    end
+
+  string.get_base_extension = function (self)
+    return base_extension_p:match(self)
+  end
 end
 
 
@@ -135,14 +136,14 @@ local Path = Object:make_subclass("Path")
 ---@param component string
 function Path:append_component(component)
   if component == ".." then
-    if not unappend(self.down) then
-      append(self.up, component)
+    if not pop(self.down) then
+      push(self.up, component)
     end
   else
     if self.down[#self.down] == "" then
-      unappend(self.down)
+      pop(self.down)
     end
-    append(self.down, component)
+    push(self.down, component)
   end
 end
 
@@ -278,7 +279,7 @@ function Path:__div(r)
   if r.is_void then
     ---@type Path
     local result = self:copy()
-    append(result.down, "")
+    push(result.down, "")
     return result
   end
   ---@type Path

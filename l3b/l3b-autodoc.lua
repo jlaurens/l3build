@@ -108,7 +108,7 @@ Regular comments are ignored.
 -- Safeguard and shortcuts
 
 local open    = io.open
-local append  = table.insert
+local push    = table.insert
 local concat  = table.concat
 local move    = table.move
 
@@ -128,6 +128,8 @@ local Cp      = lpeg.Cp
 local Ct      = lpeg.Ct
 
 local Object = require("l3b-object")
+
+require("l3b-pathlib") -- for get_base_extension
 
 -- Module namespace
 
@@ -155,13 +157,14 @@ We keep track of the parser position in named captures.
 
 --]]
 
----@type corelib_t
-local corelib         = require("l3b-corelib")
-local variable_p      = corelib.variable_p
-local identifier_p    = corelib.identifier_p
-local white_p         = corelib.white_p
-local black_p         = corelib.black_p
-local eol_p           = corelib.eol_p
+---@type lpeglib_t
+local lpeglib         = require("l3b-lpeglib")
+local variable_p      = lpeglib.variable_p
+local identifier_p    = lpeglib.identifier_p
+local white_p         = lpeglib.white_p
+local black_p         = lpeglib.black_p
+local eol_p           = lpeglib.eol_p
+local get_base_class  = lpeglib.get_base_class
 
 ---@type lpeg_autodoc_t
 local lpad = require("l3b-lpeg-autodoc")
@@ -391,14 +394,14 @@ do
           ( AD.LineDoc:get_capture_p() + AD.LongDoc:get_capture_p() )
           * Cb(tag_desc)
           / function (doc, desc)
-              append(desc.long, doc)
+              push(desc.long, doc)
               desc.max = doc.max
             end
           -- other comments are recorded as ignored
           + ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
           * Cb(tag_desc)
           / function (comment, desc)
-              append(desc.ignores, comment)
+              push(desc.ignores, comment)
               desc.max = comment.max
             end
         )^0
@@ -429,7 +432,7 @@ end
 function AD.Description:get_long_value(s)
   local t = {}
   for _, d in ipairs(self.long) do
-    append(t, s:sub(d.content_min, d.content_max))
+    push(t, s:sub(d.content_min, d.content_max))
   end
   return concat(t, "\n")
 end
@@ -586,7 +589,7 @@ do
       * (   AD.At.Field:get_complete_p()
           * Cb(tag_at)
           / function (at_field, at)
-            append(at.fields, at_field)
+            push(at.fields, at_field)
           end
         +   AD.At.Author:get_complete_p()
           * Cb(tag_at)
@@ -816,7 +819,7 @@ do
       AD.At.Param:get_complete_p()
     * Cb(tag_at)
     / function (at_param, at)
-        append(at.params, at_param)
+        push(at.params, at_param)
         -- returning no capture for this very pattern
         -- does not affect captures already made outside
         -- either named or not
@@ -870,14 +873,14 @@ do
       AD.At.Return:get_complete_p()
     * Cb(tag_at)
     / function (at_return, at)
-        append(at.returns, at_return)
+        push(at.returns, at_return)
       end
   ---@type lpeg_t
   local more_ignore_p =
     ( AD.LineComment:get_capture_p() + AD.LongComment:get_capture_p() )
     * Cb(tag_at)
     / function (at_ignore, at)
-        append(at.ignores, at_ignore)
+        push(at.ignores, at_ignore)
       end
   ---@type lpeg_t
   local author_p =
@@ -1037,7 +1040,7 @@ AD.Scope = Object:make_subclass("AD.Scope", {
 ---Append an inner scope
 ---@param scope AD.Scope
 function AD.Scope:append_scope(scope)
-  append(self._scopes, scope)
+  push(self._scopes, scope)
 end
 
 ---Scopes iterator
@@ -1955,12 +1958,53 @@ do
     end
   end
 
+  -- next is redundant
+  -- the problem is where to place this code
+  -- descussion required
+  local function pretty_print(tt, indent, done)
+    local write = io.write
+    done = done or {}
+    indent = indent or 0
+    if type(tt) == "table" then
+      local w = 0
+      for k, _ in pairs(tt) do
+        local l = #tostring(k)
+        if l > w then
+          w = l
+        end
+      end
+      for k, v in pairs(tt) do
+        local filler = (" "):rep(w - #tostring(k))
+        write((" "):rep(indent)) -- indent it
+        if type(v) == "table" and not done[v] then
+          done[v] = true
+          if next(v) then
+            write(('["%s"]%s = {\n'):format(tostring(k), filler))
+            pretty_print(v, indent + w + 7, done)
+            write((" "):rep( indent + w + 5)) -- indent it
+            write("}\n")
+          else
+            write(('["%s"]%s = {}\n'):format(tostring(k), filler))
+          end
+        elseif type(v) == "string" then
+          write(('["%s"]%s = "%s"\n'):format(
+              tostring(k), filler, tostring(v)))
+        else
+          write(('["%s"]%s = %s\n'):format(
+              tostring(k), filler, tostring(v)))
+        end
+      end
+    else
+      write(tostring(tt) .."\n")
+    end
+  end
+    
   ---@param self AD.Module
   local function make_is_method(self)
     for f_name in self.all_fun_names do
       if type(f_name) ~= "string" then
         print("WTH")
-        _G.pretty_print(f_name)
+        _ENV.pretty_print(f_name)
       end
       local _, class = get_base_class(f_name)
       if class then

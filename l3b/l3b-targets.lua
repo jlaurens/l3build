@@ -58,9 +58,9 @@ Due to code separation, the `run` is not always provided.
 
 -- function signatures
 
----@alias run_high_f           fun(options: options_t): error_level_n|nil
+---@alias run_high_f          fun(options: options_t): error_level_n|nil
 ---@alias target_preflight_f  fun(options: options_t): error_level_n
----@alias target_process_f        fun(names: string[]): error_level_n
+---@alias target_process_f    fun(names: string[]): error_level_n
 
 ---@class target_impl_t
 ---@field public configure   target_preflight_f|nil @function to run preflight code
@@ -76,15 +76,15 @@ Due to code separation, the `run` is not always provided.
 ---@field public builtin     boolean @whether the target is builtin
 ---@field public impl        target_impl_t @the target implementation
 
----@type table<string, target_info_t>
+---@type table<string,target_info_t>
 local DB = {}
 
 ---Enumerator of all the target infos.
 ---Sorted by name
 ---@kvarg hidden boolean true to list all hidden targets too.
 ---@return function
----@usage `for info in get_all_info() do ... end`
-local function get_all_info(hidden)
+---@usage `for info in get_all_infos() do ... end`
+local function get_all_infos(hidden)
   return values(DB, {
     compare = compare_ascending,
     exclude = function (info)
@@ -101,8 +101,8 @@ local function get_info(name)
 end
 
 ---Register the target with the given name and info
----@kvarg info target_info_t
----@kvarg builtin boolean|nil
+---@param info target_info_t
+---@param builtin boolean|nil
 local function register_info(info, builtin)
   if DB[info.name] then
     error("Target name is already used: ".. info.name)
@@ -188,7 +188,7 @@ local function process(options, kvarg)
   local target = options.target
   local info = get_info(target)
   if not info then
-    error("Unknown target name: ".. target)
+    error("Unknown target name: ".. tostring(target) )
   end
   local debug = options.debug
   ---@type target_impl_t
@@ -203,11 +203,13 @@ local function process(options, kvarg)
     end
   end
   local error_level = 0
+  local preflight = false
   if impl.run_high then -- before configure
     if debug then
       print("DEBUG: run_high ".. target)
     end
     kvarg.preflight()
+    preflight = true
     error_level = impl.run_high(options)
     if error_level ~= nil then
       print_diff_time(("Done %s in %%s"):format(target), difftime(time(), start))
@@ -224,7 +226,9 @@ local function process(options, kvarg)
     end
   end
   -- From now on, we can cache results in choosers
-  kvarg.preflight()
+  if not preflight then
+    kvarg.preflight()
+  end
   --[[utlib.flags.cache_bridge = true
   require("l3build-globals")]]
   local names = options.names
@@ -260,16 +264,21 @@ local function process(options, kvarg)
 end
 
 ---@class l3b_targets_t
----@field public get_all_info  fun(hidden: boolean): fun(): target_info_t|nil
+---@field public get_all_infos  fun(hidden: boolean): fun(): target_info_t|nil
 ---@field public get_info      fun(key: string): target_info_t
 ---@field public register      fun(info: target_info_t, builtin: boolean)
 ---@field public register_info fun(info: target_info_t, builtin: boolean)
 ---@field public process       target_process_f
 
 return {
-  get_all_info  = get_all_info,
+  get_all_infos = get_all_infos,
   get_info      = get_info,
   register      = register,
   register_info = register_info,
   process       = process,
+},
+---@class __l3b_targets_t
+---@field private DB table<string,target_info_t>
+_ENV.during_unit_testing and {
+  DB = DB,
 }

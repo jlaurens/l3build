@@ -20,11 +20,11 @@ which can be found at
 
 -- This file is required
 
-local append = table.insert
+local push   = table.insert
 
----@type utlib_t
-local utlib = require("l3b-utillib")
-local deep_copy = utlib.deep_copy
+---@type corelib_t
+local corelib = require("l3b-corelib")
+local deep_copy = corelib.deep_copy
 
 local DB = {
   BASE = function ()
@@ -85,7 +85,7 @@ function DB:fill(category, ...)
   repeat
     if type(p) == "string" then
       if t then
-        append(storage, t)
+        push(storage, t)
       end
       t = {
         s = p
@@ -107,7 +107,7 @@ function DB:fill(category, ...)
       break
     end
   until false
-  append(storage, t)
+  push(storage, t)
 end
 
 DB:fill(

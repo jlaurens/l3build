@@ -1,8 +1,15 @@
+#!/usr/bin/env texlua
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
 
 local expect  = _ENV.expect
 
 ---@type lpeglib_t
 local lpeglib = require("l3b-lpeglib")
+local get_base_class = lpeglib.get_base_class
 
 local function test_base()
   expect(lpeglib).NOT(nil)
@@ -136,8 +143,28 @@ local test_consume_1_character_p = {
   end
 }
 
+local function test_get_base_class()
+  expect({ get_base_class("a") }).equals({
+   "a",
+  })
+  expect({ get_base_class("a.b") }).equals({
+    "b",
+    "a",
+  })
+  expect({ get_base_class("a.b.c") }).equals({
+    "c",
+    "a.b",
+  })
+  expect({ get_base_class("a.b:c") }).equals({
+    "c",
+    "a.b",
+  })
+end
+
+
 return {
-  test_base         = test_base,
-  test_lpeg         = test_lpeg,
+  test_base           = test_base,
+  test_lpeg           = test_lpeg,
   test_consume_1_character_p  = test_consume_1_character_p,
+  test_get_base_class = test_get_base_class,
 }

@@ -34,7 +34,7 @@ local luatex_revision = status.luatex_revision
 local luatex_version  = status.luatex_version
 
 local concat    = table.concat
-local append    = table.insert
+local push      = table.insert
 
 local time      = os.time
 local difftime  = os.difftime
@@ -125,7 +125,7 @@ local function cmd_concat(...)
   local t = {}
   for item in items(...) do
     if type(item) == "number" or item and item:len() > 0 then
-      append(t, item)
+      push(t, item)
     end
   end
   local result

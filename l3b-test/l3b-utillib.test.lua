@@ -1,4 +1,11 @@
-local append = table.insert
+#!/usr/bin/env texlua
+--[[
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
+--]]
+
+local push = table.insert
 
 ---@type utlib_t
 local utlib = require("l3b-utillib")
@@ -29,11 +36,11 @@ end
 local function test_indices()
   local track = {}
   for i in utlib.indices({}) do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({})
   for i in utlib.indices({ "1", "2", "3" }) do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({ 1, 2, 3 })
 end
@@ -42,26 +49,26 @@ local function test_entries()
   local entries = utlib.entries
   local track = {}
   for entry in entries({}) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({})
   for entry in entries({ 1, 3, 2 }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 1, 3, 2 })
   track = {}
   for entry in entries({ 1, 3, 3, 2, 1 }, { unique = true }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 1, 3, 2 })
   track = {}
   for entry in entries({ 1, 3, 3, 2, 1 }, { compare = utlib.compare_ascending }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 1, 1, 2, 3, 3 })
   track = {}
   for entry in entries({ 1, 3, 3, 2, 1 }, { compare = utlib.compare_descending }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 3, 3, 2, 1, 1 })
   track = {}
@@ -69,7 +76,7 @@ local function test_entries()
     compare = utlib.compare_descending,
     unique = true
   }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 3, 2, 1 })
   track = {}
@@ -80,7 +87,7 @@ local function test_entries()
       return x == 2
     end,
   }) do
-    append(track, entry)
+    push(track, entry)
   end
   expect(track).equals({ 3, 1 })
 end
@@ -88,12 +95,12 @@ end
 local function test_items()
   local track = {}
   for i in utlib.items() do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({ })
   track = {}
   for i in utlib.items( 1, 2, 3 ) do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({ 1, 2, 3 })
 end
@@ -101,11 +108,11 @@ end
 local function test_unique_items()
   local track = {}
   for i in utlib.unique_items() do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({ })
   for i in utlib.unique_items( 1, 2, 2, 3, 3, 3 ) do
-    append(track, i)
+    push(track, i)
   end
   expect(track).equals({ 1, 2, 3 })
 end
@@ -114,7 +121,7 @@ local function test_keys()
   local keys = utlib.keys
   local track = {}
   for k in keys({}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({})
   for k in keys({
@@ -131,7 +138,7 @@ local function test_keys()
     c = 3,
     b = 2,
   }, utlib.compare_ascending) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ "a", "b", "c" })
   track = {}
@@ -140,7 +147,7 @@ local function test_keys()
     c = 3,
     b = 2,
   }, utlib.compare_descending) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ "c", "b", "a", })
 end
@@ -149,7 +156,7 @@ local function test_sorted_pairs()
   local track = {}
   local sorted_pairs = utlib.sorted_pairs
   for k, v in sorted_pairs({}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({})
   track = {}
@@ -158,7 +165,7 @@ local function test_sorted_pairs()
     c = 3,
     b = 2,
   }, { compare = utlib.compare_ascending}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ "a", "b", "c" })
   track = {}
@@ -167,7 +174,7 @@ local function test_sorted_pairs()
     c = 3,
     b = 2,
   }, { compare = utlib.compare_descending}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ "c", "b", "a" })
 end
@@ -176,7 +183,7 @@ local function test_values()
   local track = {}
   local values = utlib.values
   for k, v in values({}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({})
   track = {}
@@ -185,7 +192,7 @@ local function test_values()
     c = 3,
     b = 2,
   }, { compare = utlib.compare_ascending}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ 1, 2, 3 })
   track = {}
@@ -194,7 +201,7 @@ local function test_values()
     c = 3,
     b = 2,
   }, { compare = utlib.compare_descending}) do
-    append(track, k)
+    push(track, k)
   end
   expect(track).equals({ 3, 2, 1 })
 end
@@ -283,7 +290,7 @@ local pairs   = pairs
 local next    = next
 
 local sort        = table.sort
-local append      = table.insert
+local push      = table.insert
 local concat      = table.concat
 local tbl_unpack  = table.unpack
 
@@ -492,7 +499,7 @@ end
 local function keys(table, compare)
   local kk = {}
   for k, _ in pairs(table) do
-    append(kk, k)
+    push(kk, k)
   end
   return entries(kk, { compare = compare })
 end
@@ -705,13 +712,13 @@ local function to_ymd_hms(diff)
   for item in items("year", "month", "day") do
     local n = diff_date[item]
     if n > 0 then
-      append(display_date, ("%d %s"):format(n, item))
+      push(display_date, ("%d %s"):format(n, item))
     end
   end
   local display_time = {}
   for item in items("hour", "min", "sec") do
     local n = diff_date[item]
-    append(display_time, ("%02d"):format(n))
+    push(display_time, ("%02d"):format(n))
   end
   return concat({
     concat(display_date, ", "),

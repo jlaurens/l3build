@@ -29,6 +29,8 @@ for those people who are interested.
 ---@module lpeglib
 
 local print   = print
+local push    = table.insert
+local concat  = table.concat
 
 local lpeg    = require("lpeg")
 local locale  = lpeg.locale()
@@ -36,6 +38,10 @@ local P       = lpeg.P
 local Cmt     = lpeg.Cmt
 local S       = lpeg.S
 local R       = lpeg.R
+local B       = lpeg.B
+local C       = lpeg.C
+local Cc      = lpeg.Cc
+local Cf      = lpeg.Cf
 
 ---@class lpeg_t @ convenient type for lpeg patterns
 
@@ -51,21 +57,38 @@ local ascii_p     = R("\x00\x7F") -- one ascii char
 
 local more_utf8   = R("\x80\xBF")
 
-local strict_utf8_p =
-    R("\xC2\xDF") * more_utf8
-  + P("\xE0")     * R("\xA0\xBF") * more_utf8
+local strict_utf8_2_p =
+  R("\xC2\xDF") * more_utf8
+local strict_utf8_3_p =
+    P("\xE0")     * R("\xA0\xBF") * more_utf8
   + P("\xED")     * R("\x80\x9F") * more_utf8
   + R("\xE1\xEF") * more_utf8     * more_utf8
-  + P("\xF0")     * R("\x90\xBF") * more_utf8 * more_utf8
+local strict_utf8_4_p =
+    P("\xF0")     * R("\x90\xBF") * more_utf8 * more_utf8
   + P("\xF4")     * R("\x80\x8F") * more_utf8 * more_utf8
   + R("\xF1\xF3") * more_utf8     * more_utf8 * more_utf8
 
+local strict_utf8_p =
+      strict_utf8_2_p
+    + strict_utf8_3_p
+    + strict_utf8_4_p
+
 local utf8_p      = ascii_p + strict_utf8_p
+
 local alt_ascii_p = R("\x00\x7F") - P("\n") -- one ascii char but a newline
 local alt_utf8_p  = alt_ascii_p + strict_utf8_p
 
 ---@type lpeg_t
 local black_p = utf8_p - S(" \t\n") -- non horizontal space, non LF
+
+-- black_p has no fixed length and can't be backed matched
+---@type lpeg_t
+local after_no_black_p =
+    B( S(" \t\n") )
+  + - B(ascii_p)
+  * - B(strict_utf8_2_p)
+  * - B(strict_utf8_3_p)
+  * - B(strict_utf8_4_p)
 
 local consume_1_character_p =
     alt_utf8_p
@@ -104,9 +127,33 @@ local function_name_p =
   * ( P(".") * variable_p )^0
   * ( P(":") * variable_p )^-1
 
+local function get_base_class(str)
+  ---@type lpeg_t
+  local p = Cf(
+      Cc({
+        parents = {}, -- new table at each run
+      })
+    * C(variable_p)
+    * ( P(".") * C(variable_p) )^0
+    * ( P(":") * C(variable_p) )^-1,
+    function (t, base)
+      push(t.parents, t.base)
+      t.base = base
+      return t
+    end
+  )
+  local t = p:match(str)
+  return t.base,
+    #t.parents > 0
+      and concat(t.parents, ".")
+      or  nil
+end
+
+  
 ---@class lpeglib_t
 ---@field public white_p                lpeg_t
 ---@field public black_p                lpeg_t
+---@field public after_no_black_p       lpeg_t
 ---@field public eol_p                  lpeg_t
 ---@field public alt_ascii_p            lpeg_t
 ---@field public alt_utf8_p             lpeg_t
@@ -121,6 +168,7 @@ local function_name_p =
 return {
   white_p               = white_p,
   black_p               = black_p,
+  after_no_black_p      = after_no_black_p,
   eol_p                 = eol_p,
   ascii_p               = ascii_p,
   utf8_p                = utf8_p,
@@ -133,4 +181,5 @@ return {
   variable_p            = variable_p,
   identifier_p          = identifier_p,
   function_name_p       = function_name_p,
+  get_base_class        = get_base_class,
 }

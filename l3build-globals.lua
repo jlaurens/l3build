@@ -81,7 +81,7 @@ end
 
 local tostring  = tostring
 local print     = print
-local append    = table.insert
+local push      = table.insert
 local exit      = os.exit
 local os_time   = os.time
 local os_type   = os["type"]
@@ -461,7 +461,7 @@ local function declare(by_name)
     assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
     entry.name = name
     entry_by_name[name] = entry
-    append(entry_by_index, entry)
+    push(entry_by_index, entry)
     setmetatable(entry, MT_variable_entry)
   end
 end
@@ -614,7 +614,7 @@ declare({
       for name in all_names(Dir.work) do
         if directory_exists(name) and not excl_modules[name] then
           if file_exists(name .."/build.lua") then
-            append(result, name)
+            push(result, name)
           end
         end
       end
@@ -1896,17 +1896,17 @@ Files = bridge({
     if k == "_all_typeset" then
       local result = {}
       for glob in entries(t.typeset) do
-        append(result, glob)
+        push(result, glob)
       end
       for glob in entries(t.typesetdemo) do
-        append(result, glob)
+        push(result, glob)
       end
       return result
     end
     if k == "_all_pdf" then
       local result = {}
       for glob in entries(t._all_typeset) do
-        append(result, first_of(glob:gsub( "%.%w+$", ".pdf")))
+        push(result, first_of(glob:gsub( "%.%w+$", ".pdf")))
       end
       return result
     end
