@@ -335,7 +335,7 @@ local run = function ()
     print([[
 Launching tests from the l3b-test/ directory:
 
-> texlua ../l3build.lua test *
+> texlua ../l3build.lua test ".*"
 
 run all the testsuites
 
@@ -343,7 +343,7 @@ run all the testsuites
 
 run tests files which names contain either "foo" or "bar"
 
-> texlua ../l3build.lua test * -p foo -p bar
+> texlua ../l3build.lua test ".*" -p foo -p bar
 
 from all test files run only test containing either "foo" or "bar".
 ]])
@@ -391,14 +391,16 @@ from all test files run only test containing either "foo" or "bar".
         end
       end
     end
-    local i = 0
     all_names = function ()
-      i = i + 1
-      return test_names[i]
+      local i = 0
+      return function ()
+        i = i + 1
+        return test_names[i]
+      end
     end
   end
 
-  for test_name in all_names do
+  for test_name in all_names() do
     if not done[test_name] then
       done[test_name] = true -- don't test it twice
       local name = test_name:gsub( "%.lua$", "")
