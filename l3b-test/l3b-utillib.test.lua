@@ -262,6 +262,13 @@ local function test_to_ymd_hms()
     expect(to_ymd_hms(diff)).is("10 years, 11 months, 12 days 13:14:15")
 end
 
+local function test_is_error()
+  local is_error = utlib.is_error
+  expect(is_error(nil)).is(false)
+  expect(is_error(0)).is(false)
+  expect(is_error(math.random(999999))).is(false)
+end
+
 return {
   test_readonly         = test_readonly,
   test_to_quoted_string = test_to_quoted_string,
@@ -277,6 +284,7 @@ return {
   test_trim             = test_trim,
   test_extend_with      = test_extend_with,
   test_to_ymd_hms       = test_to_ymd_hms,
+  test_is_error         = test_is_error,
 }
 
 --[=====[

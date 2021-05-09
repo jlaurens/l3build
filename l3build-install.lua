@@ -22,20 +22,23 @@ for those people who are interested.
 
 --]]
 
+--[=[ safe guards and shortcuts ]=]
+
 local print     = print
 local not_empty = next
 
 local push   = table.insert
 
 ---@type pathlib_t
-local pathlib      = require("l3b-pathlib")
-local path_matcher = pathlib.path_matcher
-local dir_base        = pathlib.dir_base
-local base_name       = pathlib.base_name
-local dir_name        = pathlib.dir_name
+local pathlib       = require("l3b-pathlib")
+local path_matcher  = pathlib.path_matcher
+local dir_base      = pathlib.dir_base
+local base_name     = pathlib.base_name
+local dir_name      = pathlib.dir_name
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
+local is_error    = utlib.is_error
 local entries     = utlib.entries
 
 ---@type fslib_t
@@ -71,6 +74,8 @@ local unpack    = l3b_unpk.unpack
 ---@type l3b_doc_t
 local l3b_doc  = require("l3build-doc")
 local doc       = l3b_doc.doc
+
+--[=[ Module implementation ]=]
 
 ---Uninstall
 ---@return error_level_n
@@ -126,14 +131,14 @@ local function uninstall()
               + zap_dir("makeindex/"  .. G.module)
               + zap_dir("scripts/"    .. G.module)
               + error_level
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   -- Finally, clean up special locations
   for location in entries(G.tdslocations) do
     local path = dir_name(location)
     error_level = zap_dir(path)
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
   end
@@ -142,13 +147,14 @@ end
 
 ---Install files
 ---@param root_install_dir string
----@param full boolean, @true means with documentation and man pages
----@param dry_run boolean
+---@param full boolean @true means with documentation and man pages
+---@param dry_run boolean @true means simulate install
 ---@return error_level_n
+-- Public API
 local function install_files(root_install_dir, full, dry_run)
 
   local error_level = unpack()
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
 
@@ -236,7 +242,7 @@ local function install_files(root_install_dir, full, dry_run)
           local install_dir = entry.install_dir
           if not already_cleaned[install_dir] then
             error_level = make_clean_directory(install_dir)
-            if error_level ~= 0 then
+            if is_error(error_level) then
               return error_level
             end
             already_cleaned[install_dir] = true
@@ -274,7 +280,7 @@ local function install_files(root_install_dir, full, dry_run)
 
   if full then
     error_level = doc()
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
 
@@ -332,7 +338,7 @@ local function install_files(root_install_dir, full, dry_run)
         G.flattentds,
         G.tds_module
       )
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
 
@@ -340,7 +346,7 @@ local function install_files(root_install_dir, full, dry_run)
     if not dry_run then
       local readme = G.ctanreadme
       if readme ~= "" and not readme:lower():match("^readme%.%w+") then
-        local install_dir = root_install_dir .. "/doc/" .. G.tds_module
+        local install_dir = root_install_dir / "doc" / G.tds_module
         if file_exists(install_dir / readme) then
           rename(install_dir, readme, "README." .. readme:match("%.(%w+)$"))
         end
@@ -353,10 +359,10 @@ local function install_files(root_install_dir, full, dry_run)
         local p_src = p.src
         local man = "man" .. p_src:match(".$")
         if dry_run then
-          print("- doc/man/" .. man / base_name(p_src))
+          print("- doc/man" / man / base_name(p_src))
         else
           -- Man files should have a single-digit tail: the type
-          local install_dir = root_install_dir .. "/doc/man/"  .. man
+          local install_dir = root_install_dir / "doc" / "man" / man
           error_level = error_level
             + make_directory(install_dir)
             + copy_file(p_src, Dir.docfile, install_dir)
@@ -367,7 +373,7 @@ local function install_files(root_install_dir, full, dry_run)
 
   local install_list = create_file_list(Dir.unpack, Files.install, { Files.script })
 
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   error_level =
@@ -376,7 +382,7 @@ local function install_files(root_install_dir, full, dry_run)
     + feed_to_copy(Dir.unpack, "makeindex",  { Files.makeindex }, G.flattentds,    G.module)
     + feed_to_copy(Dir.unpack, "scripts",    { Files.script },    G.flattenscript, G.module)
 
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
 
@@ -384,7 +390,7 @@ local function install_files(root_install_dir, full, dry_run)
   -- can't be an issue even if there are complex set-ups
   for entry in entries(to_copy) do
     error_level = copy_file(entry)
-    if error_level ~= 0  then
+    if is_error(error_level) then
       return error_level
     end
   end

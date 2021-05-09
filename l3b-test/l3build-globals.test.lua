@@ -1,27 +1,12 @@
+#!/usr/bin/env texlua
 --[[
-
-File l3build-globals.lua Copyright (C) 2018-2020 The LaTeX Project
-
-It may be distributed and/or modified under the conditions of the
-LaTeX Project Public License (LPPL), either version 1.3c of this
-license or (at your option) any later version.  The latest version
-of this license is in the file
-
-   http://www.latex-project.org/lppl.txt
-
-This file is part of the "l3build bundle" (The Work in LPPL)
-and all files in that bundle must be distributed together.
-
------------------------------------------------------------------------
-
-The development version of the bundle can be found at
-
-   https://github.com/latex3/l3build
-
-for those people who are interested.
-
+  This is a test file for l3build package.
+  It is only intending for development and should appear in any distribution of the l3build package.
+  For help, run `texlua ../l3build.lua test -h`
 --]]
 
+
+--[=====[
 --[=[
 Global variables are used as static parameters to customize
 the behaviour of `l3build`. Default values are defined before
@@ -93,15 +78,15 @@ local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
 ---@type pathlib_t
-local pathlib   = require("l3b-pathlib")
+local pathlib     = require("l3b-pathlib")
 local job_name  = pathlib.job_name
 
----@type corelib_t
-local corelib           = require("l3b-corelib")
-local bridge            = corelib.bridge
+---@type gblib_t
+local gblib   = require("l3b-lpeglib")
 
 ---@type utlib_t
 local utlib             = require("l3b-utillib")
+local bridge            = utlib.bridge
 local entries           = utlib.entries
 local compare_ascending = utlib.compare_ascending
 local first_of          = utlib.first_of
@@ -1312,16 +1297,16 @@ all files at "path/to/dir".]],
 [[`glob_to_pattern("*.bar")`
 Returns Lua pattern that corresponds to the glob "*.bar".
 ]],
-    value = pathlib.glob_to_pattern,
+    value = gblib.glob_to_pattern,
   },
   path_matcher = {
-    description =
+    description = 
 [[`f = path_matcher("*.bar")`
 Returns a function that returns true if its file name argument
 matches "*.bar", false otherwise.Lua pattern that corresponds to the glob "*.bar".
 In that example `f("foo.bar") == true` whereas `f("foo.baz") == false`.
 ]],
-    value = pathlib.path_matcher,
+    value = gblib.path_matcher,
   },
   jobname = {
     description =
@@ -2081,3 +2066,4 @@ return {
   get_description       = get_description,
   all_entries           = all_entries,
 }
+]=====]

@@ -62,6 +62,7 @@ local P       = lpeg.P
 local V       = lpeg.V
 local Cg      = lpeg.Cg
 local Cc      = lpeg.Cc
+local Cs      = lpeg.Cs
 local Cf      = lpeg.Cf
 local Cmt     = lpeg.Cmt
 local B       = lpeg.B
@@ -377,6 +378,39 @@ local function sanitize(path, is_glob)
   return is_glob and result:match("^%./(.+)$") or result
 end
 
+--- Convert a file glob into a pattern for use by e.g. string.gub
+local function get_glob_to_pattern_gmr()
+  return {
+    Cs( Cc('^') * V("item")^0 * Cc('$') ),
+    item = Cg(
+        V('?')
+      + V('*')
+      + V('\\')
+    )
+    + V('[...]')
+    + V('%'),
+    ['?']   = P('?') * Cc('.'),
+    ['*']   = P('*') * Cc('.*'), -- should be '[^/]*'
+    ['\\']  = P('\\') * ( P(-1) + V('%') ),
+    ['[...]']   = C('[') * C('^')^-1 * (
+        V("set") * C(']')
+      + P(0) / function () error("Missing ']' in glob.") end
+    ),
+    set = V('head') * V('tail')^0 * V("-")^-1,
+    ["-"] = Cc('%') * P('-'),
+    head = V('.-.') + V('%'),
+    tail = V(".-.") + ( V('%') - P("-") - P("]") ),
+    ['.-.'] = Cs( V('%') * C("-") * ( V('%') - P("]") ) ),
+    ["%"] = Cs( Cc('%') * S('^$()%.[]*+-?') + P(1) ),
+  }
+end
+
+local glob_to_pattern_p = P(get_glob_to_pattern_gmr())
+
+local function glob_to_pattern(glob)
+  return glob_to_pattern_p:match(glob)
+end
+
 ---@class path_matcher_opts_t
 ---Matching leading dots
 --[===[
@@ -531,7 +565,7 @@ local end_p =
   ) * P(-1)
 
   ---@param opts path_matcher_opts_t
-local function get_path_grammar(opts)
+local function get_path_gmr(opts)
   opts = bridge({
     primary = opts or {},
     secondary = {
@@ -1044,7 +1078,7 @@ end
 ---@usage local accept = path_matcher(...); if accept(...) then ... end
 local function path_matcher(glob, opts)
   if glob then
-    local gmr = get_path_grammar(opts)
+    local gmr = get_path_gmr(opts)
     local pattern = P(gmr):match(glob)
     if pattern then
       return function (str)
@@ -1068,20 +1102,22 @@ end
 ---@field public core_name    fun(path: string): string
 ---@field public extension    fun(path: string): string
 ---@field public path_matcher fun(glob: string): glob_match_f
+
 return {
-  split         = split,
-  dir_base      = dir_base,
-  dir_name      = dir_name,
-  base_name     = base_name,
-  core_name     = core_name,
-  extension     = extension,
-  job_name      = core_name,
-  sanitize      = sanitize,
-  path_matcher  = path_matcher
+  split           = split,
+  dir_base        = dir_base,
+  dir_name        = dir_name,
+  base_name       = base_name,
+  core_name       = core_name,
+  extension       = extension,
+  job_name        = core_name,
+  sanitize        = sanitize,
+  glob_to_pattern = glob_to_pattern,
+  path_matcher    = path_matcher,
 },
 ---@class __pathlib_t
 ---@field private Path                    Path
----@field private get_path_grammar        fun(opts: path_matcher_opts_t): table<string|integer,lpeg_t>
+---@field private get_path_gmr            fun(opts: path_matcher_opts_t): table<string|integer,lpeg_t>
 ---@field private path_sep_p              lpeg_t
 ---@field private path_char_p             lpeg_t
 ---@field private path_comp_p             lpeg_t
@@ -1091,11 +1127,12 @@ return {
 ---@field private path_char_no_dotglob_p  lpeg_t
 ---@field private path_comp_no_dotglob_p  lpeg_t
 ---@field private end_p                   lpeg_t
+---@field private get_glob_to_pattern_gmr fun(): table<string|integer,lpeg_t>
 _ENV.during_unit_testing and {
   -- next are implementation details
   -- these are exported for testing purposes only
   Path                    = Path,
-  get_path_grammar        = get_path_grammar,
+  get_path_gmr            = get_path_gmr,
   path_sep_p              = path_sep_p,
   path_char_p             = path_char_p,
   path_comp_p             = path_comp_p,
@@ -1105,4 +1142,5 @@ _ENV.during_unit_testing and {
   path_char_no_dotglob_p  = path_char_no_dotglob_p,
   path_comp_no_dotglob_p  = path_comp_no_dotglob_p,
   end_p                   = end_p,
+  get_glob_to_pattern_gmr = get_glob_to_pattern_gmr,
 }

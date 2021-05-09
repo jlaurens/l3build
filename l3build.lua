@@ -301,6 +301,8 @@ end
 
 --[==[ Branching ]==]
 
+require("l3b-pathlib") -- string div
+
 ---@type utlib_t
 -- local utlib = require("l3b-utillib")
 
@@ -314,9 +316,6 @@ oslib.Vars.debug.run = true
 local fslib = require("l3b-fslib")
 local set_tree_excluder = fslib.set_tree_excluder
 fslib.set_working_directory(l3build.work_dir)
-
----@type l3b_globals_t
-local l3b_globals = require("l3build-globals")
 
 -- Terminate here if in document mode
 if in_document then
@@ -340,6 +339,9 @@ l3build.options = l3b_cli.parse(arg, function (arg_i)
     return true
   end
 end)
+
+---@type l3b_globals_t
+local l3b_globals = require("l3build-globals")
 
 l3b_globals.export()
 
@@ -368,9 +370,17 @@ elseif target == "version" then
   exit(0)
 end
 
+---@type l3b_targets_t
+local l3b_targets_t = require("l3b-targets")
+local process       = l3b_targets_t.process
+
+---@type l3b_aux_t
+local l3b_aux = require("l3build-aux")
+local call    = l3b_aux.call
+
 -- Load configuration file if running as a script
 if is_main then
-  local f, msg = loadfile(work_dir .. "/build.lua")
+  local f, msg = loadfile(work_dir / "build.lua")
   if not f then
     error(msg)
   end
@@ -384,14 +394,6 @@ local G   = l3b_globals.G
 ---@type Dir_t
 local Dir = l3b_globals.Dir
 
----@type l3b_targets_t
-local l3b_targets_t = require("l3b-targets")
-local process       = l3b_targets_t.process
-
----@type l3b_aux_t
-local l3b_aux = require("l3build-aux")
-local call    = l3b_aux.call
-
 exit(process(options, {
   preflight     = function ()
     -- utlib.flags.cache_bridge = true not yet implemented
@@ -400,7 +402,7 @@ exit(process(options, {
     end)
   end,
   at_bundle_top = G.at_bundle_top,
-  top_callback  = function (module_target)
+  module_callback  = function (module_target)
     return call(G.modules, module_target)
   end,
 }))

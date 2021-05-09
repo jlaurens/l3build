@@ -95,7 +95,14 @@ local Vars = {
   debug = {}
 }
 
----@alias error_level_n integer
+---@alias error_level_n integer|nil
+
+---Whether the argument is an error
+---@param error_level error_level_n
+---@return boolean
+local function is_error(error_level)
+  return error_level ~= nil and error_level ~= 0
+end
 
 ---Turn the string list into quoted items separated by a sep
 ---@param table string[] | string
@@ -410,6 +417,7 @@ local flags = {}
 ---@field public is_readonly        fun(t: table): boolean
 ---@field public to_ymd_hms         fun(diff: integer): string
 ---@field public print_diff_time    fun(format: string, diff: integer)
+---@field public is_error           fun(error_level: error_level_n|nil): boolean
 
 return {
   Vars                = Vars,
@@ -432,4 +440,5 @@ return {
   is_readonly         = is_readonly,
   to_ymd_hms          = to_ymd_hms,
   print_diff_time     = print_diff_time,
+  is_error            = is_error,
 }

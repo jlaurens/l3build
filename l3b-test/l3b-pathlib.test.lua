@@ -24,6 +24,8 @@ local Path = __.Path
 expect(Path).NOT(nil)
 
 local lpeg = require("lpeg")
+local C   = lpeg.C
+local Cs  = lpeg.Cs
 local P   = lpeg.P
 local V   = lpeg.V
 
@@ -312,7 +314,7 @@ local test___grammar = {
     expect(path_comp_no_dotglob_p:match(s .. s)).is(9)
   end,
   test_1_char = function (self)
-    local gmr = __.get_path_grammar()
+    local gmr = __.get_path_gmr()
     gmr["content"] = gmr["1 path char"] * gmr["$"]
     ---@type lpeg_t
     local p = P(gmr)
@@ -323,7 +325,7 @@ local test___grammar = {
     expect(q:match("aa")).is(nil)
     expect(q:match("b")).is(nil)
 
-    gmr = __.get_path_grammar({
+    gmr = __.get_path_gmr({
       -- verbose = 3,
     })
     p = P(gmr)
@@ -335,7 +337,7 @@ local test___grammar = {
     expect(q:match("b")).is(nil)
     expect(q:match("")).is(nil)
 
-    gmr = __.get_path_grammar()
+    gmr = __.get_path_gmr()
     p = P(gmr)
     for i = 32, 65535 do
       local s = utf8.char(i)
@@ -355,7 +357,7 @@ local test___grammar = {
 
   end,
   test_end = function (self)
-    local gmr = __.get_path_grammar({
+    local gmr = __.get_path_gmr({
       -- verbose = 4,
     })
     gmr["content"] = V("$")
@@ -373,7 +375,7 @@ local test___grammar = {
   test_class = function (self)
     -- create a test grammar for each class name
     local function get_class_P(name)
-      local gmr = __.get_path_grammar({
+      local gmr = __.get_path_gmr({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
@@ -385,7 +387,7 @@ local test___grammar = {
       return result
     end
     local function get_set_P(name)
-      local gmr = __.get_path_grammar({
+      local gmr = __.get_path_gmr({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
@@ -395,7 +397,7 @@ local test___grammar = {
       return result
     end
     local function get_delimited_P(name)
-      local gmr = __.get_path_grammar({
+      local gmr = __.get_path_gmr({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
@@ -405,7 +407,7 @@ local test___grammar = {
       return result
     end
     local function get_P(name)
-      local gmr = __.get_path_grammar({
+      local gmr = __.get_path_gmr({
         -- verbose = 4,
       })
       local class = "[:".. name ..":]"
@@ -708,7 +710,7 @@ local test___grammar = {
     end
   end,
   test_range = function (self)
-    local gmr = __.get_path_grammar({
+    local gmr = __.get_path_gmr({
       -- verbose = 4,
     })
     gmr["content"] = gmr[".-."] * gmr["$"]
@@ -729,7 +731,7 @@ local test___grammar = {
     expect(q:match("\xF0\x9D\x90\xB3")).is(nil)
   end,
   test_set = function (self)
-    local gmr = __.get_path_grammar({
+    local gmr = __.get_path_gmr({
       -- verbose = 4,
     })
     gmr["content"] = gmr["set"] * gmr["$"]
@@ -753,7 +755,7 @@ local test___grammar = {
   end,
   test_globstar = function (self)
     -- globstar is true by default
-    local gmr = __.get_path_grammar({
+    local gmr = __.get_path_gmr({
       -- verbose = 4,
     })
     gmr["content"] = gmr["**"] * gmr["$"]
@@ -779,7 +781,7 @@ local test___grammar = {
     expect(q:match("/a/.")).is(5)
     expect(q:match("/a/ ./")).is(7)
     -- globstar is true by default
-    gmr = __.get_path_grammar({
+    gmr = __.get_path_gmr({
       globstar = false,
     })
     gmr["content"] = gmr["**"] * gmr["$"]
@@ -788,7 +790,7 @@ local test___grammar = {
     expect(q).is(nil)
   end,
   test_extglob = function (self)
-    local gmr = __.get_path_grammar({
+    local gmr = __.get_path_gmr({
       extglob = true,
     })
     local p = P(gmr)
@@ -930,6 +932,112 @@ local test_path_matcher = {
     do_test("a/../b")
   end,
 }
+local test_glob_to_pattern = {
+  test_grammar = function (self)
+    local gmr = __.get_glob_to_pattern_gmr()
+    gmr[1] = gmr['?']
+    local p = P(gmr)
+    expect(p:match("?")).is(".")
+    gmr[1] = gmr['*']
+    p = P(gmr)
+    expect(p:match("*")).is(".*")
+    gmr[1] = gmr['*']
+    p = P(gmr)
+    expect(p:match("*")).is(".*")
+    gmr[1] = gmr['.-.']
+    p = P(gmr)
+    expect(p:match("a-b")).is("a-b")
+    expect(p:match("a-]")).is(nil)
+    expect(p:match("[-b")).is('%[-b')
+    expect(p:match("---")).is("%--%-")
+    gmr[1] = gmr.head
+    p = P(gmr)
+    expect(p:match("a")).is("a")
+    expect(p:match("]")).is("%]")
+    expect(p:match("-")).is("%-")
+    gmr[1] = gmr.tail
+    p = P(gmr)
+    expect(p:match("a")).is("a")
+    expect(p:match("]")).is(nil)
+    expect(p:match("-")).is(nil)
+    
+    gmr[1] = Cs( gmr.set )
+    p = P(gmr)
+    expect(p:match("a")).is("a")
+    expect(p:match("a-b")).is("a-b")
+    expect(p:match("---")).is("%--%-")
+    expect(p:match("]--")).is("%]-%-")
+    expect(p:match("[--")).is("%[-%-")
+    expect(p:match("-")).is("%-")
+    expect(p:match("]")).is("%]")
+    expect(p:match("ab")).is("ab")
+    expect(p:match("a-")).is("a%-")
+
+    gmr[1] = Cs( gmr['[...]'] )
+    p = P(gmr)
+    expect(p:match("[a]")).is("[a]")
+    expect(p:match("[a-]]")).is("[a%-]")
+    expect(p:match("[a-z-]]")).is("[a-z%-]")
+  end,
+  test = function (self)
+    local glob_to_pattern = pathlib.glob_to_pattern
+    local function test(source, pattern, expected)
+      return expect(
+          source:match( glob_to_pattern(pattern) )
+      ).is(expected or source)
+    end
+    local function no_test(source, pattern)
+      return expect(
+          source:match( glob_to_pattern(pattern) )
+      ).is(nil)
+    end
+    test("a", "a")
+    no_test("b", "a")
+    test("a", "?")
+    no_test("", "?")
+    no_test("aa", "?")
+    test("", "*")
+    test("a", "*")
+    test("abc", "*")
+    test("a", "\\a")
+    no_test("b", "\\a")
+    test("a", "[a]")
+    no_test("b", "[a]")
+    test("b", "[^a]")
+    no_test("a", "[^a]")
+    test("-", "[-]")
+    test("-", "[-a]")
+    test("-", "[a-]")
+    test("5", "[0-9]")
+    test("5", "[a-z0-9]")
+    test("5", "[^a-z]")
+  end,
+}
+
+--[[
+  local function get_glob_to_pattern_gmr()
+  return {
+    Cs( Cc('^') * V("item")^0 * Cc('$') ),
+    item = Cg(
+        V('?')
+      + V('*')
+      + V('\\')
+    )
+    + V('[')
+    + V("%"),
+    ['?']   = P('?') * Cc('.'),
+    ['*']   = P('*') * Cc('.*'), -- should be '[^/]*'
+    ['\\']  = P('\\') * ( P(-1) + C( V("escaped_char") ) ),
+    ['[']   = P('[')
+      / function()
+          print("[...] syntax not supported in globs!")
+          return ''
+        end,
+    ["%"] = Cc('%') * S('^$()%.[]*+-?') + P(1),
+  }
+end
+
+]]
 
 return {
   test_split                = test_split,
@@ -944,6 +1052,7 @@ return {
   test_Path_forward_slash   = test_Path_forward_slash,
   test_POC_parts            = test_POC_parts,
   test_string_forward_slash = test_string_forward_slash,
+  test_glob_to_pattern      = test_glob_to_pattern,
   test___grammar            = test___grammar,
   test_path_matcher         = test_path_matcher,
 }
