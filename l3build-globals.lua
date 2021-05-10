@@ -53,7 +53,7 @@ How things are organized:
   - G for globally shared object
 4) Setting global variables is only made in either `build.lua` or a configuration file.
 
-Each global variable is defined by a table (of type variable_entry_t)
+Each global variable is defined by a table (of type VariableEntry)
 This table keeps track of
 - the name
 - the description
@@ -69,10 +69,10 @@ to the global environment (or any other environment).
 
 --]=]
 
--- module was a known function in lua < 5.3
+-- module was a known function in lua <= 5.3
 -- but we need it as a "module" name
 if type(_G.module) == "function" then
-  module = nil
+  _G.module = nil
 end
 -- the tex name is for the "tex" command
 if type(_G.tex) == "table" then
@@ -92,8 +92,13 @@ local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
+---@type Object
+local Object    = require("l3b-object")
+
 ---@type pathlib_t
 local pathlib   = require("l3b-pathlib")
+local dir_name  = pathlib.dir_name
+local base_name = pathlib.base_name
 local job_name  = pathlib.job_name
 
 ---@type corelib_t
@@ -150,7 +155,7 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 
 ---@alias bundleunpack_f fun(source_dirs: string[], sources: string[]): error_level_n
 
----@class l3b_upld_config_t
+---@class upload_config_t
 ---@field public announcement  string        @Announcement text
 ---@field public author        string        @Author name (semicolon-separated for multiple)
 ---@field public ctanPath      string        @CTAN path
@@ -230,7 +235,7 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 ---@field public packtdszip      boolean @Switch to build a TDS-style zip file for CTAN
 ---@field public manifestfile    string @File name to use for the manifest file
 ---@field public curl_debug      boolean
----@field public uploadconfig    l3b_upld_config_t @Metadata to describe the package for CTAN
+---@field public uploadconfig    upload_config_t @Metadata to describe the package for CTAN
 ---@field public texmf_home      string
 ---@field public typeset_list    string[]
 -- tag
@@ -239,10 +244,10 @@ local set_epoch_cmd = l3b_aux.set_epoch_cmd
 
 ---@class G_t: _G_t
 -- unexposed computed properties
----@field public is_embedded   boolean @True means the module belongs to a bundle
----@field public is_standalone boolean @False means the module belongs to a bundle
----@field public at_top        boolean @True means there is no bundle above
----@field public at_bundle_top boolean @True means we are at the top of the bundle
+---@field public is_embedded   boolean @true means the module belongs to a bundle
+---@field public is_standalone boolean @false means the module belongs to a bundle
+---@field public at_top        boolean @true means there is no bundle above
+---@field public at_bundle_top boolean @true means we are at the top of the bundle
 ---@field public config        string
 ---@field public tds_module    string
 ---@field public tds_main      string  @G.tdsroot / G.bundle or G.module
@@ -269,7 +274,6 @@ local G
 ---@field public unpack      string @Directory for unpacking sources
 ---@field public ctan        string @Directory for organising files for CTAN
 ---@field public tds         string @Directory for organised files into TDS structure
----@field public test_config string @Computed directory for running tests
 
 ---@type Dir_t
 local Dir
@@ -315,9 +319,7 @@ local Files
 ---@field public unpack  string[] @-- List of dependencies for unpacking
 
 ---@type Deps_t
-local Deps = bridge({
-  suffix = "deps",
-})
+local Deps
 
 -- Executable names plus following options
 
@@ -331,9 +333,7 @@ local Deps = bridge({
 ---@field public curl      string @Curl executable for `upload`
 
 ---@type Exe_t
-local Exe = bridge({
-  suffix = "exe",
-})
+local Exe
 
 ---@class Opts_t
 ---@field public check     string @Options passed to engine when running checks
@@ -345,9 +345,7 @@ local Exe = bridge({
 ---@field public makeindex string @MakeIndex options
 
 ---@type Opts_t
-local Opts = bridge({
-  suffix = "opts"
-})
+local Opts
 
 -- Extensions for various file types: used to abstract out stuff a bit
 
@@ -364,9 +362,7 @@ local Opts = bridge({
 ---@field public ps  string  @Extension of PostScript files
 
 ---@type Xtn_t
-local Xtn = bridge({
-  suffix = "ext", -- Xtn.bak -> _G.bakext
-})
+local Xtn
 
 --[==[ Main variable query business
 Allows a module to get the value of a global variable
@@ -376,7 +372,7 @@ Used for "l3build --get-global-variable bundle"
 and      "l3build --get-global-variable maindir"
 ]==]
 
----Get the variable with the given name,
+---Get the main variable with the given name,
 ---@param name string
 ---@return string|nil
 local function get_main_variable(name)
@@ -415,7 +411,7 @@ end
 ---@return error_level_n
 local function handle_get_main_variable(name, config)
   name = name or "MISSING VARIABLE NAME"
-  local f, msg = loadfile(l3build.work_dir .. "build.lua")
+  local f, msg = loadfile(l3build.work_dir / "build.lua")
   if not f then
     error(msg)
   end
@@ -434,41 +430,41 @@ local function NYI()
 end
 
 ---@class pre_variable_entry_t
----@field public name        string
 ---@field public description string
 ---@field public value       any
----@field public index       fun(t: table, k: string): any takes precedence over the value
----@field public complete    fun(t: table, k: string, v: any): any
+---@field public index       fun(self: VariableEntry, env: table, k: string): any @ takes precedence over the value
+---@field public complete    fun(self: VariableEntry, env: table, k: string, v: any): any
 
----@class variable_entry_t: pre_variable_entry_t
----@field public get_vanilla_value fun(self: variable_entry_t): any
----@field public get_level         fun(self: variable_entry_t): integer
----@field public get_type          fun(self: variable_entry_t): string
+---@class VariableEntry: pre_variable_entry_t
+---@field public name   string
+---@field public level  integer
+---@field public type   string
 
----@type table<string,variable_entry_t>
+local VariableEntry = Object:make_subclass("VariableEntry")
+
+function VariableEntry:__initialize(name)
+  self.name = name
+end
+
+---@type table<string,VariableEntry>
 local entry_by_name = {}
----@type variable_entry_t[]
+---@type VariableEntry[]
 local entry_by_index = {}
-
--- All variable entries share the same metatable
-local MT_variable_entry = {}
-MT_variable_entry.__index = MT_variable_entry
 
 ---Declare the given variable
 ---@param by_name table<string,pre_variable_entry_t>
 local function declare(by_name)
   for name, entry in pairs(by_name) do
     assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
-    entry.name = name
+    entry = VariableEntry(entry, name)
     entry_by_name[name] = entry
     push(entry_by_index, entry)
-    setmetatable(entry, MT_variable_entry)
   end
 end
 
 ---Get the variable entry for the given name.
 ---@param name string
----@return variable_entry_t
+---@return VariableEntry
 local function get_entry(name)
   return entry_by_name[name]
 end
@@ -521,7 +517,7 @@ local function guess_bundle_module(env)
   -- We act as if bundle and module were not already provided.
   -- This allows to make tests and eventually inform the user
   -- of a non standard shape, in case she has made a mistake.
-  if G.is_embedded then
+  if env.is_embedded then
     -- A module inside a bundle: the current directory is
     -- .../<bundle>/<module>/...
     -- The bundle name must be provided, but can be a void string
@@ -541,7 +537,7 @@ local function guess_bundle_module(env)
             :format(bundle, s))
     end
     -- embedded module names are the base name
-    s = Dir.work:match("([^/]+)/$"):lower()
+    s = base_name(dir_name(Dir.work)):lower()
     if not module then
       module = s
     elseif module ~= s then
@@ -571,11 +567,16 @@ local function guess_bundle_module(env)
         print("Warning, module name ignored: ".. module)
       end
       module = "" -- not nil!
-    elseif not module or module == "" then
-      -- this is a standalone module (not in a bundle),
-      -- the module name must be provided append
-      -- the bundle name does not make sense
-      error('Missing in top build.lua: module = "<module name>"')
+    else
+      bundle = ""
+      if not module or module == "" then
+        -- this is a standalone module (not in a bundle),
+        -- the module name must be provided explicitly
+        -- the bundle name does not make sense
+        -- and we cannot guess the module name from
+        -- any path
+        error('Missing in top build.lua: module = "<module name>"')
+      end
     end
   end
   -- MISSING naming constraints
@@ -584,51 +585,51 @@ local function guess_bundle_module(env)
 end
 
 declare({
-  module = {
-    description = "The name of the module",
-    index = function (t, k)
-      guess_bundle_module(t)
-      return rawget(t, k)
-    end,
-  },
-  bundle = {
-    description = "The name of the bundle in which the module belongs (where relevant)",
-    index = function (t, k)
-      guess_bundle_module(t)
-      return rawget(t, k)
-    end,
-  },
-  ctanpkg = {
-    description = "Name of the CTAN package matching this module",
-    index = function (t, k)
-      return  t.is_standalone
-          and t.module
-          or (t.bundle / t.module)
-    end,
-  },
   modules = {
     description = "The list of all modules in a bundle (when not auto-detecting)",
-    index = function (t, k)
+    index = function (env, k)
       local result = {}
-      local excl_modules = t.exclmodules
+      local excl_modules = env.exclmodules
       for name in all_names(Dir.work) do
         if directory_exists(name) and not excl_modules[name] then
-          if file_exists(name .."/build.lua") then
+          if file_exists(name / "build.lua") then
             push(result, name)
           end
         end
       end
-      rawset(t, k, result)
+      rawset(env, k, result)
       return result
     end,
   },
   exclmodules = {
     description = "Directories to be excluded from automatic module detection",
-    value = {},
+    value       = {},
   },
   options = {
-    index = function (t, k)
+    index = function (env, k)
       return l3build.options
+    end,
+  },
+  module = {
+    description = "The name of the module",
+    index = function (env, k)
+      guess_bundle_module(env)
+      return rawget(env, k)
+    end,
+  },
+  bundle = {
+    description = "The name of the bundle in which the module belongs (where relevant)",
+    index = function (env, k)
+      guess_bundle_module(env)
+      return rawget(env, k)
+    end,
+  },
+  ctanpkg = {
+    description = "Name of the CTAN package matching this module",
+    index = function (env, k)
+      return  env.is_standalone
+          and env.module
+          or (env.bundle / env.module)
     end,
   },
 })
@@ -636,8 +637,8 @@ declare({
 declare({
   maindir = {
     description = "Top level directory for the module/bundle",
-    index = function (t, k)
-      if t.is_embedded then
+    index = function (env, k)
+      if env.is_embedded then
         -- retrieve the maindir from the main build.lua
         local s = get_main_variable(k)
         if s then
@@ -649,105 +650,105 @@ declare({
   },
   docfiledir = {
     description = "Directory containing documentation files",
-    value = ".",
+    value       = dot_dir,
   },
   sourcefiledir = {
     description = "Directory containing source files",
-    value = ".",
+    value       = dot_dir,
   },
   supportdir = {
     description = "Directory containing general support files",
-    index = function (t, k)
-      return t.maindir .. "/support"
+    index = function (env, k)
+      return env.maindir / "support"
     end,
   },
   testfiledir = {
     description = "Directory containing test files",
-    index = function (t, k)
-      return dot_dir .. "/testfiles"
+    index = function (env, k)
+      return dot_dir / "testfiles"
     end,
   },
   testsuppdir = {
     description = "Directory containing test-specific support files",
-    index = function (t, k)
-      return t.testfiledir .. "/support"
+    index = function (env, k)
+      return env.testfiledir / "support"
     end
   },
   texmfdir = {
     description = "Directory containing support files in tree form",
-    index = function (t, k)
-      return t.maindir .. "/texmf"
+    index = function (env, k)
+      return env.maindir / "texmf"
     end
   },
   -- Structure within a development area
   textfiledir = {
     description = "Directory containing plain text files",
-    value = dot_dir,
+    value       = dot_dir,
   },
   builddir = {
     description = "Directory for building and testing",
-    index = function (t, k)
-      return t.maindir .. "/build"
+    index = function (env, k)
+      return env.maindir / "build"
     end
   },
   distribdir = {
     description = "Directory for generating distribution structure",
-    index = function (t, k)
-      return t.builddir .. "/distrib"
+    index = function (env, k)
+      return env.builddir / "distrib"
     end
   },
   -- Substructure for CTAN release material
   localdir = {
     description = "Directory for extracted files in 'sandboxed' TeX runs",
-    index = function (t, k)
-      return t.builddir .. "/local"
+    index = function (env, k)
+      return env.builddir / "local"
     end
   },
   resultdir = {
     description = "Directory for PDF files when using PDF-based tests",
-    index = function (t, k)
-      return t.builddir .. "/result"
+    index = function (env, k)
+      return env.builddir / "result"
     end
   },
   testdir = {
     description = "Directory for running tests",
-    index = function (t, k)
-      return t.builddir .. "/test" .. t.config_suffix
+    index = function (env, k)
+      return env.builddir / "test" .. env.config_suffix
     end
   },
   config_suffix = {
     -- overwritten after load_unique_config call
-    index = function (t, k)
+    index = function (env, k)
       return ""
     end,
   },
   typesetdir = {
     description = "Directory for building documentation",
-    index = function (t, k)
-      return t.builddir .. "/doc"
+    index = function (env, k)
+      return env.builddir / "doc"
     end
   },
   unpackdir = {
     description = "Directory for unpacking sources",
-    index = function (t, k)
-      return t.builddir .. "/unpacked"
+    index = function (env, k)
+      return env.builddir / "unpacked"
     end
   },
   ctandir = {
     description = "Directory for organising files for CTAN",
-    index = function (t, k)
-      return t.distribdir .. "/ctan"
+    index = function (env, k)
+      return env.distribdir / "ctan"
     end
   },
   tdsdir = {
     description = "Directory for organised files into TDS structure",
-    index = function (t, k)
-      return t.distribdir .. "/tds"
+    index = function (env, k)
+      return env.distribdir / "tds"
     end
   },
   workdir = {
     description = "Working directory",
-    index = function (t, k)
+    index = function (env, k)
       return l3build.work_dir:gsub(1, -2) -- no trailing "/"
     end
   },
@@ -755,138 +756,138 @@ declare({
 declare({
   tdsroot = {
     description = "Root directory of the TDS structure for the bundle/module to be installed into",
-    value = "latex",
+    value       = "latex",
   },
   ctanupload = {
     description = "Only validation is attempted",
-    value = false,
+    value       = false,
   },
 })
 -- file globs
 declare({
   auxfiles = {
     description = "Secondary files to be saved as part of running tests",
-    value = { "*.aux", "*.lof", "*.lot", "*.toc" },
+    value       = { "*.aux", "*.lof", "*.lot", "*.toc" },
   },
   bibfiles = {
     description = "BibTeX database files",
-    value = { "*.bib" },
+    value       = { "*.bib" },
   },
   binaryfiles = {
     description = "Files to be added in binary mode to zip files",
-    value = { "*.pdf", "*.zip" },
+    value       = { "*.pdf", "*.zip" },
   },
   bstfiles = {
     description = "BibTeX style files to install",
-    value = { "*.bst" },
+    value       = { "*.bst" },
   },
   checkfiles = {
     description = "Extra files unpacked purely for tests",
-    value = {},
+    value       = {},
   },
   checksuppfiles = {
     description = "Files in the support directory needed for regression tests",
-    value = {},
+    value       = {},
   },
   cleanfiles = {
     description = "Files to delete when cleaning",
-    value = { "*.log", "*.pdf", "*.zip" },
+    value       = { "*.log", "*.pdf", "*.zip" },
   },
   demofiles = {
     description = "Demonstration files to use a module",
-    value = {},
+    value       = {},
   },
   docfiles = {
     description = "Files which are part of the documentation but should not be typeset",
-    value = {},
+    value       = {},
   },
   dynamicfiles = {
     description = "Secondary files to be cleared before each test is run",
-    value = {},
+    value       = {},
   },
   excludefiles = {
-    value = { "*~" },
     description = "Files to ignore entirely (default for Emacs backup files)",
+    value       = { "*~" },
   },
   installfiles = {
     description = "Files to install under the `tex` area of the `texmf` tree",
-    value = { "*.sty", "*.cls" },
+    value       = { "*.sty", "*.cls" },
   },
   makeindexfiles = {
     description = "MakeIndex files to be included in a TDS-style zip",
-    value = { "*.ist" },
+    value       = { "*.ist" },
   },
   scriptfiles = {
     description = "Files to install to the `scripts` area of the `texmf` tree",
-    value = {},
+    value       = {},
   },
   scriptmanfiles = {
     description = "Files to install to the `doc/man` area of the `texmf` tree",
-    value = {},
+    value       = {},
   },
   sourcefiles = {
     description = "Files to copy for unpacking",
-    value = { "*.dtx", "*.ins", "*-????-??-??.sty" },
+    value       = { "*.dtx", "*.ins", "*-????-??-??.sty" },
   },
   tagfiles = {
     description = "Files for automatic tagging",
-    value = { "*.dtx" },
+    value       = { "*.dtx" },
   },
   textfiles = {
     description = "Plain text files to send to CTAN as-is",
-    value = { "*.md", "*.txt" },
+    value       = { "*.md", "*.txt" },
   },
   typesetdemofiles = {
     description = "Files to typeset before the documentation for inclusion in main documentation files",
-    value = {},
+    value       = {},
   },
   typesetfiles = {
     description = "Files to typeset for documentation",
-    value = { "*.dtx" },
+    value       = { "*.dtx" },
   },
   typesetsuppfiles = {
     description = "Files needed to support typesetting when sandboxed",
-    value = {},
+    value       = {},
   },
   typesetsourcefiles = {
     description = "Files to copy to unpacking when typesetting",
-    value = {},
+    value       = {},
   },
   unpackfiles = {
     description = "Files to run to perform unpacking",
-    value = { "*.ins" },
+    value       = { "*.ins" },
   },
   unpacksuppfiles = {
     description = "Files needed to support unpacking when 'sandboxed'",
-    value = {},
+    value       = {},
   },
 })
 -- check
 declare({
   includetests = {
     description = "Test names to include when checking",
-    value = { "*" },
+    value       = { "*" },
   },
   excludetests = {
     description = "Test names to exclude when checking",
-    value = {},
+    value       = {},
   },
   checkdeps = {
     description = "List of dependencies for running checks",
-    value = {},
+    value       = {},
   },
   typesetdeps = {
     description = "List of dependencies for typesetting docs",
-    value = {},
+    value       = {},
   },
   unpackdeps = {
     description = "List of dependencies for unpacking",
-    value = {},
+    value       = {},
   },
   checkengines = {
     description = "Engines to check with `check` by default",
-    value = { "pdftex", "xetex", "luatex" },
-    complete = function (t, k, result)
+    value       = { "pdftex", "xetex", "luatex" },
+    complete = function (env, k, result)
       local options = l3build.options
       if options.engine then
         if not options.force then
@@ -909,25 +910,25 @@ declare({
         end
         result = options.engine
       end
-      rawset(t, k, result)
+      rawset(env, k, result) -- cached here
       return result
     end,
   },
   stdengine = {
     description = "Engine to generate `.tlg` files",
-    value = "pdftex",
+    value       = "pdftex",
   },
   checkformat = {
     description = "Format to use for tests",
-    value = "latex",
+    value       = "latex",
   },
   specialformats = {
     description = "Non-standard engine/format combinations",
-    value = specialformats,
+    value       = specialformats,
   },
   test_types = {
     description = "Custom test variants",
-    index = function (t, k)
+    index = function (env, k)
       ---@type l3b_check_t
       local l3b_check = require("l3build-check")
       return {
@@ -950,18 +951,18 @@ declare({
   },
   test_order = {
     description = "Which kinds of tests to perform, keys of `test_types`",
-    value = { "log", "pdf" },
+    value       = { "log", "pdf" },
   },
   checkconfigs = {
     description = "Configurations to use for tests",
-    value = {  "build"  },
-    complete = function (t, k, result)
+    value       = {  "build"  },
+    complete = function (env, k, result)
       local options = l3build.options
       -- When we have specific files to deal with, only use explicit configs
       -- (or just the std one)
       -- TODO: Justify this...
       if options.names then
-        return options.config or { _G.stdconfig }
+        return options.config or { _G["stdconfig"] }
       else
         return options.config or result
       end
@@ -972,71 +973,75 @@ declare({
 declare({
   typesetexe = {
     description = "Executable for running `doc`",
-    value = "pdflatex",
+    value       = "pdflatex",
   },
   unpackexe = {
     description = "Executable for running `unpack`",
-    value = "pdftex",
+    value       = "pdftex",
   },
   zipexe = {
     description = "Executable for creating archive with `ctan`",
-    value = "zip",
+    value       = "zip",
   },
   biberexe = {
     description = "Biber executable",
-    value = "biber",
+    value       = "biber",
   },
   bibtexexe = {
     description = "BibTeX executable",
-    value = "bibtex8",
+    value       = "bibtex8",
   },
   makeindexexe = {
     description = "MakeIndex executable",
-    value = "makeindex",
+    value       = "makeindex",
   },
   curlexe = {
     description = "Curl executable for `upload`",
-    value = "curl",
+    value       = "curl",
   },
 })
 -- CLI Options
 declare({
   checkopts = {
     description = "Options passed to engine when running checks",
-    value = "-interaction=nonstopmode",
+    value       = "-interaction=nonstopmode",
   },
   typesetopts = {
     description = "Options passed to engine when typesetting",
-    value = "-interaction=nonstopmode",
+    value       = "-interaction=nonstopmode",
   },
   unpackopts = {
     description = "Options passed to engine when unpacking",
-    value = "",
+    value       = "",
   },
   zipopts = {
     description = "Options passed to zip program",
-    value = "-v -r -X",
+    value       = "-v -r -X",
   },
   biberopts = {
     description = "Biber options",
-    value = "",
+    value       = "",
   },
   bibtexopts = {
     description = "BibTeX options",
-    value = "-W",
+    value       = "-W",
   },
   makeindexopts = {
     description = "MakeIndex options",
-    value = "",
+    value       = "",
+  },
+  ps2pdfopt = { -- beware of the ending s (long term error)
+    description = "ps2pdf options",
+    value       = "",
   },
 })
 
 declare({
   config = {
-    value = "",
+    value       = "",
   },
   curl_debug  = {
-    value = false,
+    value       = false,
   },
 })
 
@@ -1072,29 +1077,33 @@ declare({
   -- As these may be set false, a more elaborate test than normal is needed
   typesetsearch = {
     description = "Switch to search the system `texmf` for during typesetting",
-    value = true,
+    value       = true,
   },
   unpacksearch = {
     description = "Switch to search the system `texmf` for during unpacking",
-    value = true,
+    value       = true,
+  },
+  checksearch = {
+    description = "Switch to search the system `texmf` for during checking",
+    value       = true,
   },
   -- Additional settings to fine-tune typesetting
   glossarystyle = {
     description = "MakeIndex style file for glossary/changes creation",
-    value = "gglo.ist",
+    value       = "gglo.ist",
   },
   indexstyle = {
     description = "MakeIndex style for index creation",
-    value = "gind.ist",
+    value       = "gind.ist",
   },
   specialtypesetting = {
     description = "Non-standard typesetting combinations",
-    value = {},
+    value       = {},
   },
   forcecheckepoch = {
     description = "Force epoch when running tests",
-    value = "true",
-    complete = function (t, k, result)
+    value       = true,
+    complete = function (env, k, result)
       local options = l3build.options
       if options.epoch then
         return true
@@ -1104,94 +1113,94 @@ declare({
   },
   forcedocepoch = {
     description = "Force epoch when typesetting",
-    value = "false",
-    complete = function (t, k, result)
+    value       = "false",
+    complete = function (env, k, result)
       local options = l3build.options
       return (options.epoch or result) and true or false
     end,
   },
   asciiengines = {
     description = "Engines which should log as pure ASCII",
-    value = { "pdftex" },
+    value       = { "pdftex" },
   },
   checkruns = {
     description = "Number of runs to complete for a test before comparing the log",
-    value = 1,
+    value       = 1,
   },
   ctanreadme = {
     description = "Name of the file to send to CTAN as `README`.md",
-    value = "README.md",
+    value       = "README.md",
   },
   ctanzip = {
     description = "Name of the zip file (without extension) created for upload to CTAN",
-    index = function (t, k)
-      return t.ctanpkg .. "-ctan"
+    index = function (env, k)
+      return env.ctanpkg .. "-ctan"
     end,
   },
   epoch = {
     description = "Epoch (Unix date) to set for test runs",
-    index = function (t, k)
+    index = function (env, k)
       local options = l3build.options
       return options.epoch or rawget(_G, "epoch") or 1463734800
     end,
-    complete = function (t, k, result)
+    complete = function (env, k, result)
       return normalise_epoch(result)
     end,
   },
   flatten = {
     description = "Switch to flatten any source structure when sending to CTAN",
-    value = true,
+    value       = true,
   },
   flattentds = {
     description = "Switch to flatten any source structure when creating a TDS structure",
-    value = true,
+    value       = true,
   },
   flattenscript = {
     description = "Switch to flatten any script structure when creating a TDS structure",
-    index = function (t, k)
+    index = function (env, k)
       return G.flattentds -- by defaut flattentds and flattenscript are synonyms
     end,
   },
   maxprintline = {
     description = "Length of line to use in log files",
-    value = 79,
+    value       = 79,
   },
   packtdszip = {
     description = "Switch to build a TDS-style zip file for CTAN",
-    value = false,
+    value       = false,
   },
   ps2pdfopts = {
     description = "Options for `ps2pdf`",
-    value = "",
+    value       = "",
   },
   typesetcmds = {
     description = "Instructions to be passed to TeX when doing typesetting",
-    value = "",
+    value       = "",
   },
   typesetruns = {
     description = "Number of cycles of typesetting to carry out",
-    value = 3,
+    value       = 3,
   },
   recordstatus = {
     description = "Switch to include error level from test runs in `.tlg` files",
-    value = false,
+    value       = false,
   },
   manifestfile = {
     description = "File name to use for the manifest file",
-    value = "MANIFEST.md",
+    value       = "MANIFEST.md",
   },
   tdslocations = {
     description = "For non-standard file installations",
-    value = {},
+    value       = {},
   },
   uploadconfig = {
-    value = {},
+    value       = {},
     description = "Metadata to describe the package for CTAN",
-    index =  function (t, k)
+    index =  function (env, k)
       return setmetatable({}, {
         __index = function (tt, kk)
           if kk == "pkg" then
-            return t.ctanpkg
+            return env.ctanpkg
           end
         end
       })
@@ -1202,270 +1211,278 @@ declare({
 declare({
   bakext = {
     description = "Extension of backup files",
-    value = ".bak",
+    value       = ".bak",
   },
   dviext = {
     description = "Extension of DVI files",
-    value = ".dvi",
+    value       = ".dvi",
   },
   lvtext = {
     description = "Extension of log-based test files",
-    value = ".lvt",
+    value       = ".lvt",
   },
   tlgext = {
     description = "Extension of test file output",
-    value = ".tlg",
+    value       = ".tlg",
   },
   tpfext = {
     description = "Extension of PDF-based test output",
-    value = ".tpf",
+    value       = ".tpf",
   },
   lveext = {
     description = "Extension of auto-generating test file output",
-    value = ".lve",
+    value       = ".lve",
   },
   logext = {
     description = "Extension of checking output, before processing it into a `.tlg`",
-    value = ".log",
+    value       = ".log",
   },
   pvtext = {
     description = "Extension of PDF-based test files",
-    value = ".pvt",
+    value       = ".pvt",
   },
   pdfext = {
     description = "Extension of PDF file for checking and saving",
-    value = ".pdf",
+    value       = ".pdf",
   },
   psext = {
     description = "Extension of PostScript files",
-    value = ".ps",
+    value       = ".ps",
   }
 })
 
 declare({
   abspath = {
-    description =
-[[Usage: `abspath("foo.bar")`
+    description = [[
+Usage: `abspath("foo.bar")`
 Returns "/absolute/path/to/foo.bar" on unix like systems
 and "C:\absolute\path\to\foo.bar" on windows.
 ]],
-    value = fslib.absolute_path,
+    value       = fslib.absolute_path,
   },
   dirname = {
-    description =
-[[Usage: `dirname("path/to/foo.bar")`
+    description = [[
+Usage: `dirname("path/to/foo.bar")`
 Returns "path/to".
 ]],
-    value = pathlib.dir_name,
+    value       = pathlib.dir_name,
   },
   basename = {
-    description =
-[[Usage: `basename("path/to/foo.bar")`
+    description = [[
+Usage: `basename("path/to/foo.bar")`
 Returns "foo.bar".
 ]],
-    value = pathlib.base_name,
+    value       = pathlib.base_name,
   },
   cleandir = {
-    description =
-[[Usage: `cleandir("path/to/dir")`
+    description = [[
+Usage: `cleandir("path/to/dir")`
 Removes any content in "path/to/dir" directory.
 Returns 0 on success, a positive number on error.
 ]],
-    value = fslib.make_clean_directory,
+    value       = fslib.make_clean_directory,
   },
   cp = {
-    description =
-[[Usage: `cp("*.bar", "path/to/source", "path/to/destination")`
+    description = [[
+Usage: `cp("*.bar", "path/to/source", "path/to/destination")`
 Copies files matching the "*.bar" from "path/to/source" directory
 to the "path/to/destination" directory.
 Returns 0 on success, a positive number on error.
 ]],
-    value = fslib.copy_tree,
+    value       = fslib.copy_tree,
   },
   direxists = {
-    description =
-[[`direxists("path/to/dir")`
+    description = [[
+`direxists("path/to/dir")`
 Returns `true` if there is a directory at "path/to/dir",
 `false` otherwise.
 ]],
-    value = fslib.directory_exists,
+    value       = fslib.directory_exists,
   },
   fileexists = {
-    description =
-[[`fileexists("path/to/foo.bar")`
+    description = [[
+`fileexists("path/to/foo.bar")`
 Returns `true` if there is a file at "path/to/foo.bar",
 `false` otherwise.
 ]],
-    value = fslib.file_exists,
+    value       = fslib.file_exists,
   },
   filelist = {
-    description =
-[[`filelist("path/to/dir", "*.bar")
+    description = [[
+`filelist("path/to/dir", "*.bar")
 Returns a regular table of all the files within "path/to/dir"
 which name matches "*.bar";
 if no glob is provided, returns a list of
-all files at "path/to/dir".]],
-    value = fslib.file_list,
+all files at "path/to/dir".
+]],
+    value       = fslib.file_list,
   },
   glob_to_pattern = {
-    description =
-[[`glob_to_pattern("*.bar")`
+    description = [[
+`glob_to_pattern("*.bar")`
 Returns Lua pattern that corresponds to the glob "*.bar".
 ]],
-    value = pathlib.glob_to_pattern,
+    value       = pathlib.glob_to_pattern,
   },
   path_matcher = {
-    description =
-[[`f = path_matcher("*.bar")`
+    description = [[
+`f = path_matcher("*.bar")`
 Returns a function that returns true if its file name argument
 matches "*.bar", false otherwise.Lua pattern that corresponds to the glob "*.bar".
 In that example `f("foo.bar") == true` whereas `f("foo.baz") == false`.
 ]],
-    value = pathlib.path_matcher,
+    value       = pathlib.path_matcher,
   },
   jobname = {
-    description =
-[[`jobname("path/to/dir/foo.bar")`
+    description = [[
+`jobname("path/to/dir/foo.bar")`
 Returns the argument with no extension and no parent directory path,
 "foo" in the example. 
 ]],
-    value = pathlib.job_name,
+    value       = pathlib.job_name,
   },
   mkdir = {
-    description =
-[[`mkdir("path/to/dir")`
+    description = [[
+`mkdir("path/to/dir")`
 Create "path/to/dir" with all intermediate levels;
-returns 0 on success, a positive number on error.]],
-    value = fslib.make_directory,
+returns 0 on success, a positive number on error.
+]],
+    value       = fslib.make_directory,
   },
   ren = {
-    description =
-[[`ren("foo.bar", "path/to/source", "path/to/destination")`
+    description = [[
+`ren("foo.bar", "path/to/source", "path/to/destination")`
 Renames "path/to/source/foo.bar" into "path/to/destination/foo.bar";
-returns 0 on success, a positive number on error.]],
-    value = fslib.rename,
+returns 0 on success, a positive number on error.
+]],
+    value       = fslib.rename,
   },
   rm = {
-    description =
-[[`rm("path/to/dir", "*.bar")
+    description = [[
+`rm("path/to/dir", "*.bar")
 Removes all files in "path/to/dir" matching "*.bar";
-returns 0 on success, a positive number on error.]],
-    value = fslib.remove_tree,
+returns 0 on success, a positive number on error.
+]],
+    value       = fslib.remove_tree,
   },
   run = {
-    description =
-[[Executes `cmd`, from the `dir` directory;
-returns an error level.]],
-    value = oslib.run,
+    description = [[
+Executes `cmd`, from the `dir` directory;
+returns an error level.
+]],
+    value       = oslib.run,
   },
   splitpath = {
-    description =
-[[Returns two strings split at the last |/|: the `dirname(...)` and
-the |basename(...)|.]],
-    value = pathlib.dir_base,
+    description = [[
+Returns two strings split at the last |/|: the `dirname(...)` and
+the |basename(...)|.
+]],
+    value       = pathlib.dir_base,
   },
   normalize_path = {
-    description =
-[[When called on Windows, returns a string comprising the `path` argument with
-`/` characters replaced by `\\`. In other cases returns the path unchanged.]],
-    value = fslib.to_host,
+    description = [[
+When called on Windows, returns a string comprising the `path` argument with
+`/` characters replaced by `\\`. In other cases returns the path unchanged.
+]],
+    value       = fslib.to_host,
   },
   call = {
-    description =
-[[Runs the  `l3build` `target` (a string) for each directory in the
+    description = [[
+Runs the  `l3build` `target` (a string) for each directory in the
 `dirs` list. This will pass command line options from the parent
 script to the child processes. The `options` table should take the
 same form as the global `options`, described above. If it is
 absent then the global list is used.
-Note that the `target` field in this table is ignored.]],
-    value = l3b_aux.call,
+Note that the `target` field in this table is ignored.
+]],
+    value       = l3b_aux.call,
   },
   install_files = {
     description = "",
-    value = NYI, -- l3b_inst.install_files,
+    value       = NYI, -- l3b_inst.install_files,
   },
   manifest_setup = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_extract_filedesc = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_write_subheading = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_sort_within_match = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_sort_within_group = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_write_opening = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_write_group_heading = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_write_group_file_descr = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
   manifest_write_group_file = {
     description = "",
-    value = NYI,
+    value       = NYI,
   },
 })
 
 declare({
   os_concat = {
     description = "The concatenation operation for using multiple commands in one system call",
-    value = OS.concat,
+    value       = OS.concat,
   },
   os_null = {
     description = "The location to redirect commands which should produce no output at the terminal: almost always used preceded by `>`",
-    value = OS.null,
+    value       = OS.null,
   },
   os_pathsep = {
     description = "The separator used when setting an environment variable to multiple paths.",
-    value = OS.pathsep,
+    value       = OS.pathsep,
   },
   os_setenv = {
     description = "The command to set an environmental variable.",
-    value = OS.setenv,
+    value       = OS.setenv,
   },
   os_yes = {
     description = "DEPRECATED.",
-    value = OS.yes,
+    value       = OS.yes,
   },
   os_ascii = {
     -- description = "",
-    value = OS.ascii,
+    value       = OS.ascii,
   },
   os_cmpexe = {
     -- description = "",
-    value = OS.cmpexe,
+    value       = OS.cmpexe,
   },
   os_cmpext = {
     -- description = "",
-    value = OS.cmpext,
+    value       = OS.cmpext,
   },
   os_diffexe = {
     -- description = "",
-    value = OS.diffexe,
+    value       = OS.diffexe,
   },
   os_diffext = {
     -- description = "",
-    value = OS.diffext,
+    value       = OS.diffext,
   },
   os_grepexe = {
     -- description = "",
-    value = OS.grepexe,
+    value       = OS.grepexe,
   },
 })
 -- global fields
@@ -1541,33 +1558,34 @@ local LOCAL = "local"
 ---comment
 ---@param cmd   string
 ---@param dir?  string
----@param vars? table
+---@param vars? string[]
 ---@return boolean?  @suc
 ---@return exitcode? @exitcode
 ---@return integer?  @code
 local function runcmd(cmd, dir, vars)
   dir = quoted_absolute_path(dir or ".")
   vars = vars or {}
-  -- Allow for local texmf files
-  local env = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
   local local_texmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
     local_texmf = OS.pathsep .. quoted_absolute_path(Dir.texmf) .. "//"
   end
-  local env_paths = "." .. local_texmf .. OS.pathsep
+  local env_paths = "."
+    .. local_texmf .. OS.pathsep
     .. quoted_absolute_path(Dir[LOCAL]) .. OS.pathsep
     .. dir .. (G.typesetsearch and OS.pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and env_paths:match(" ") then
     env_paths = first_of(env_paths:gsub('"', '')) -- no '"' in windows!!!
   end
+  -- Allow for local texmf files
+  local setenv_cmd = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
   for var in entries(vars) do
-    env = cmd_concat(env, OS.setenv .. " " .. var .. "=" .. env_paths)
+    setenv_cmd = cmd_concat(setenv_cmd, OS.setenv .. " " .. var .. "=" .. env_paths)
   end
   print("set_epoch_cmd(G.epoch, G.forcedocepoch)", set_epoch_cmd(G.epoch, G.forcedocepoch))
-  print(env)
+  print(setenv_cmd)
   print(cmd)
-  return run(dir, cmd_concat(set_epoch_cmd(G.epoch, G.forcedocepoch), env, cmd))
+  return run(dir, cmd_concat(set_epoch_cmd(G.epoch, G.forcedocepoch), setenv_cmd, cmd))
 end
 
 ---biber
@@ -1704,59 +1722,64 @@ end
 
 declare({
   biber = {
-    description =
-[[Runs Biber on file `name` (i.e a jobname lacking any extension)
+    description = [[
+Runs Biber on file `name` (i.e a jobname lacking any extension)
 inside the dir` folder. If there is no `.bcf` file then
-no action is taken with a return value of `0`.]],
-    value = biber,
+no action is taken with a return value of `0`.
+]],
+    value       = biber,
   },
   bibtex = {
-    description =
-[[Runs BibTeX on file `name` (i.e a jobname lacking any extension)
+    description = [[
+Runs BibTeX on file `name` (i.e a jobname lacking any extension)
 inside the `dir` folder. If there are no `\citation` lines in
-the `.aux` file then no action is taken with a return value of `0`.]],
-    value = bibtex,
+the `.aux` file then no action is taken with a return value of `0`.
+]],
+    value       = bibtex,
   },
   tex = {
-    description =
-[[Runs `cmd` (by default `typesetexe` `typesetopts`) on the
-`name` inside the `dir` folder.]],
-    value = tex,
+    description = [[
+Runs `cmd` (by default `typesetexe` `typesetopts`) on the
+`name` inside the `dir` folder.
+]],
+    value       = tex,
   },
   makeindex = {
-    description =
-[[Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
+    description = [[
+Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
 inside the `dir` folder. The various extensions and the `style`
-should normally be given as standard for MakeIndex.]],
-    value = makeindex,
+should normally be given as standard for MakeIndex.
+]],
+    value       = makeindex,
   },
   runcmd = {
-    description =
-[[A generic function which runs the `cmd` in the `dir`, first
+    description = [[
+A generic function which runs the `cmd` in the `dir`, first
 setting up all of the environmental variables specified to
 point to the `local` and `working` directories. This function is useful
-when creating non-standard typesetting steps]],
-    value = runcmd,
+when creating non-standard typesetting steps.
+]],
+    value       = runcmd,
   },
   typeset = {
     description = "",
-    value = typeset,
+    value       = typeset,
   },
   typeset_demo_tasks = {
     description = "runs after copying files to the typesetting location but before the main typesetting run.",
-    value = typeset_demo_tasks,
+    value       = typeset_demo_tasks,
   },
   docinit_hook = {
     description = "A hook to initialize doc process",
-    value = docinit_hook,
+    value       = docinit_hook,
   },
   checkinit_hook = {
     description = "A hook to initialize check process",
-    value = checkinit_hook,
+    value       = checkinit_hook,
   },
   tag_hook = {
-    description =
-[[Usage: `function tag_hook(tag_name, date)
+    description = [[
+Usage: `function tag_hook(tag_name, date)
   ...
 end`
   To allow more complex tasks to take place, a hook `tag_hook()` is also
@@ -1764,13 +1787,13 @@ available. It will receive the tag name and date as arguments, and
 may be used to carry out arbitrary tasks after all files have been updated.
 For example, this can be used to set a version control tag for an entire repository.
 ]],
-    index = function (t, k)
+    index = function (env, k)
       return require("l3build-tag").tag_hook
     end,
   },
   update_tag = {
-    description =
-[[Usage: function update_tag(file, content, tag_name, tag_date)
+    description = [[
+Usage: function update_tag(file, content, tag_name, tag_date)
   ...
   return content
 end
@@ -1779,39 +1802,36 @@ modify date and release tag name. As standard, no automatic
 replacement takes place, but setting up a `update_tag` function
 will allow this to happen.
 ]],
-    index = function (t, k)
+    index = function (env, k)
       return require("l3build-tag").update_tag
     end,
   },
   runtest_tasks = {
     description = "A hook to allow additional tasks to run for the tests",
-    value = runtest_tasks,
+    value       = runtest_tasks,
   },
-})
-
----Static global variables
----@type table
-local G_values = setmetatable({}, {
-  __index = function (t, k)
-    ---@type variable_entry_t
-    local entry = get_entry(k)
-    if not entry then
-      return
-    end
-    return entry.value
-  end
 })
 
 ---Computed global variables
 ---Used only when the eponym global variable is not set.
----@param t table
----@param k string
+---@param env table
+---@param k   string
 ---@return any
-local G_index = function (t, k)
-  ---@type variable_entry_t
+local G_index = function (env, k)
+  ---@type VariableEntry
   local entry = get_entry(k)
   if entry then
-    return entry.index and entry.index(t, k)
+    local result
+    if entry.index then
+      result = entry.index(env, k)
+      if result ~= nil then
+        return result
+      end
+    end
+    result = entry.value
+    if result ~= nil then
+      return result
+    end
   end
   if k == "typeset_list" then
     error("Documentation is not installed")
@@ -1828,61 +1848,63 @@ local G_index = function (t, k)
     return l3build.main_dir ~= l3build.work_dir
   end
   if k == "is_standalone" then
-    return t.bundle == ""
+    return env.bundle == ""
   end
   if k == "at_top" then
     return l3build.main_dir == l3build.work_dir
   end
   if k == "at_bundle_top" then
-    return t.at_top and not t.is_standalone
+    return env.at_top and not env.is_standalone
   end
   if k == "bundleunpack" then
     return require("l3build-unpack").bundleunpack
   end
   if k == "tds_main" then
-    return t.is_standalone
-      and t.tdsroot / t.module
-      or  t.tdsroot / t.bundle
+    return env.is_standalone
+      and env.tdsroot / env.module
+      or  env.tdsroot / env.bundle
   end
   if k == "tds_module" then
-    return t.is_standalone
-      and t.module
-      or  t.bundle / t.module
+    return env.is_standalone
+      and env.module
+      or  env.bundle / env.module
   end
 end
 
 G = bridge({
-  index     = G_index,
-  complete = function (t, k, result)
+  index    = G_index,
+  complete = function (env, k, result)
     local entry = get_entry(k)
     if entry and entry.complete then
-      return entry.complete(t, k, result)
+      return entry.complete(env, k, result)
     end
     return result
   end,
-  newindex = function (t, k, v)
+  newindex = function (env, k, v)
     if k == "typeset_list" then
-      rawset(t, k, v)
+      rawset(env, k, v)
       return true
     end
     if k == "config_suffix" then
       --print(debug.traceback())
-      rawset(t, k, v)
+      rawset(env, k, v)
       return true
     end
   end,
 })
 
 Dir = bridge({
+  primary = G,
   suffix = "dir",
-  complete = function (t, k, result) -- In progress
+  complete = function (env, k, result) -- In progress
     -- No trailing /
     -- What about the leading "./"
-    if k.match and k:match("dir$") then
+    if k.match then
       if not result then
         error("No result for key ".. k)
       end
-      return quoted_path(result:match("^(.-)/*$")) -- any return result will be quoted_path
+      result = result / "."
+      return quoted_path(result) -- any return result will be quoted_path
     end
     return result
   end,
@@ -1891,6 +1913,7 @@ Dir = bridge({
 -- Dir.work = work TODO: what is this ?
 
 Files = bridge({
+  primary = G,
   suffix = "files",
   index = function (t, k)
     if k == "_all_typeset" then
@@ -1913,11 +1936,31 @@ Files = bridge({
   end
 })
 
+Deps = bridge({
+  primary = G,
+  suffix = "deps",
+})
+
+Exe = bridge({
+  primary = G,
+  suffix = "exe",
+})
+
+Opts = bridge({
+  primary = G,
+  suffix = "opts"
+})
+
+Xtn = bridge({
+  primary = G,
+  suffix = "ext", -- Xtn.bak -> _G.bakext
+})
+
 ---Get the description of the named global variable
 ---@param name string
 ---@return string
 local function get_description(name)
-  ---@type variable_entry_t
+  ---@type VariableEntry
   local entry = get_entry(name)
   return entry and entry.description
     or ("No global variable named ".. name)
@@ -1935,11 +1978,13 @@ local function export(env)
   -- if there is no such metamethod, we add a fresh one
   local MT = getmetatable(env) or {}
   local __index = MT.__index
-  local f_index = type(__index) == "function" and __index
-  local t_index = type(__index) == "table"    and __index
+  ---@type function | nil
+  local f_index = type(__index) == "function" and __index or nil
+  ---@type table | nil
+  local t_index = type(__index) == "table"    and __index or nil
   function MT.__index(t, k)
     local result
-    ---@type variable_entry_t
+    ---@type VariableEntry
     local entry = get_entry(k)
     if entry then
       -- this is a global declared variable
@@ -1950,8 +1995,11 @@ local function export(env)
           return result
         end
       end
-      -- fall back to the static value
-      return entry.value
+      -- fall back to the static value when defined
+      result = entry.value
+      if result ~= nil then
+        return result
+      end
     end
     -- use the original metamethod, if any
     if t_index then
@@ -1975,26 +2023,13 @@ local function get_vanilla()
   return vanilla
 end
 
-local VANILLA_VALUE = {}
----Get the value of the receiver in the vanilla environment
----@return any
-function MT_variable_entry:get_vanilla_value()
-  if self[VANILLA_VALUE] == nil then
-    self[VANILLA_VALUE] = get_vanilla()[self.name]
-  end
-  return self[VANILLA_VALUE]
-end
-
-local TYPE = {}
----Get the level of the receiver
----@param self variable_entry_t
----@return integer
-function MT_variable_entry.get_type(self)
-  if self[TYPE] == nil then
-    self[TYPE] = type(self:get_vanilla_value())
-  end
-  return self[TYPE]
-end
+VariableEntry.__instance_table = {
+  type = function (self)
+    local result = type(get_vanilla()[self.name])
+    rawset(self, "type", result)
+    return result
+  end,
+}
 
 local level_by_type = {
   ["nil"] = 5,
@@ -2007,24 +2042,22 @@ local level_by_type = {
   ["userdata"] = 4,
 }
 
-local LEVEL = {}
 ---Get the level of the receiver
----@param self variable_entry_t
+---@param self VariableEntry
 ---@return integer
-function MT_variable_entry.get_level(self)
-  if self[LEVEL] == nil then
-    self[LEVEL] = level_by_type[self:get_type()]
-  end
-  return self[LEVEL]
+function VariableEntry.__instance_table:level()
+  local result = level_by_type[self.type]
+  rawset(self, "level", result)
+  return result
 end
 
 ---metamethod to compare 2 variable entries
----@param lhs variable_entry_t
----@param rhs variable_entry_t
+---@param lhs VariableEntry
+---@param rhs VariableEntry
 ---@return boolean
-function MT_variable_entry.__lt(lhs, rhs)
-  local lhs_level = lhs:get_level()
-  local rhs_level = rhs:get_level()
+function VariableEntry.__lt(lhs, rhs)
+  local lhs_level = lhs.level
+  local rhs_level = rhs.level
   if lhs_level < rhs_level then
     return true
   elseif lhs_level > rhs_level then
@@ -2034,8 +2067,8 @@ function MT_variable_entry.__lt(lhs, rhs)
   end
 end
 
----@alias entry_exclude_f fun(entry: variable_entry_t): boolean
----@alias entry_enumerator_f fun(): variable_entry_t
+---@alias entry_exclude_f fun(entry: VariableEntry): boolean
+---@alias entry_enumerator_f fun(): VariableEntry
 
 ---Iterator over all the global variable names
 ---@param exclude? entry_exclude_f
@@ -2060,7 +2093,7 @@ end
 ---@field public handle_get_main_variable  fun(name: string): error_level_n
 ---@field public export                    function
 ---@field public get_vanilla               fun(): table
----@field public get_entry                 fun(name: string): variable_entry_t
+---@field public get_entry                 fun(name: string): VariableEntry
 ---@field public get_descriptions          fun(name: string): string
 ---@field public all_entries               fun(exclude: entry_exclude_f): entry_enumerator_f
 
@@ -2080,4 +2113,17 @@ return {
   get_entry             = get_entry,
   get_description       = get_description,
   all_entries           = all_entries,
+},
+---@class __l3b_globals_t
+---@field private VariableEntry   VariableEntry
+---@field private entry_by_name   table<string,VariableEntry>
+---@field private entry_by_index  VariableEntry[]
+---@field private declare         fun(by_name: table<string,pre_variable_entry_t>)
+---@field private get_entry       fun(name: string), ValiableEntry
+_ENV.during_unit_testing and {
+  VariableEntry   = VariableEntry,
+  entry_by_name   = entry_by_name,
+  entry_by_index  = entry_by_index,
+  declare         = declare,
+  get_entry       = get_entry,
 }

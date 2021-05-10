@@ -149,25 +149,25 @@ local function print_status()
   print("Hooks and functions, (*) for custom ones")
   local width = 0
   for entry in all_global_entries(function (e)
-    return e:get_type() ~= "function"
+    return e.type ~= "function"
   end) do
     if #entry.name > width then
       width = #entry.name
     end
   end
   for entry in all_global_entries(function (e)
-    return e:get_type() ~= "function"
+    return e.type ~= "function"
   end) do
     local filler = (" "):rep(width - #entry.name)
     local is_custom = entry:get_vanilla_value() ~= G[entry.name]
-    print("  ".. entry.name .. filler .. (is_custom and " (*)" or ""), entry:get_type())
+    print("  ".. entry.name .. filler .. (is_custom and " (*)" or ""), entry.type)
   end
 
   ---Display the list of exported variables
   local variables = {}
   local variables_n = 0
   for entry in all_global_entries(function (e)
-    return e:get_type() == "function"
+    return e.type == "function"
   end) do
     variables[entry.name] = G[entry.name]
     if variables[entry.name] ~= nil then

@@ -330,6 +330,8 @@ ENV.loadlib = function (name, __)
   return loader()
 end
 
+l3build.options = {}
+
 local run = function ()
   if arg[2] == "-h" or arg[2] == "--help" then
     print([[

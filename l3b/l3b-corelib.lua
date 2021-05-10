@@ -155,6 +155,9 @@ local function bridge(kv)
               })
             elseif result == nil then
               result = result_2
+              if kv.complete then
+                result = kv.complete(self, k, result)
+              end
             end
           end
         end

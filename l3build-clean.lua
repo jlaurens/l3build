@@ -62,7 +62,7 @@ local function clean()
   local error_level = remove_directory(Dir.distrib)
                     + make_directory(Dir.distrib)
                     + make_clean_directory(Dir[l3b_globals.LOCAL])
-                    + make_clean_directory(Dir.test_config)
+                    + make_clean_directory(Dir.test)
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
   if error_level ~= 0 then

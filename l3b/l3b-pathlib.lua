@@ -280,7 +280,9 @@ function Path:__div(r)
   if r.is_void then
     ---@type Path
     local result = self:copy()
-    push(result.down, "")
+    if result.down[#result.down] ~= "" then
+      push(result.down, "")
+    end
     return result
   end
   ---@type Path

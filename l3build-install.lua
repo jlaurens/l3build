@@ -404,7 +404,7 @@ local function install()
 end
 
 do
-  ---@type variable_entry_t
+  ---@type VariableEntry
   local entry = get_global_variable_entry("install_files")
   entry.value = install_files
 end

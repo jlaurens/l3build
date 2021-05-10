@@ -225,6 +225,7 @@ local function test_string_forward_slash()
   expect("/a" / "..").is("/")
   expect("/a" / "../").is("/")
   expect(function () print("/a" / "../..") end).error()
+  expect("a/" / ".").is("./a/")
 end
 
 local function test_dir_name()

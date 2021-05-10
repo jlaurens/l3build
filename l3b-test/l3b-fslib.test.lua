@@ -38,6 +38,7 @@ local pop_current_directory     = fslib.pop_current_directory
 local push_pop_current_directory  = fslib.push_pop_current_directory
 local absolute_path             = fslib.absolute_path
 local quoted_absolute_path      = fslib.quoted_absolute_path
+-- TODO test get_current_directory
 local get_current_directory     = fslib.get_current_directory
 local locate                    = fslib.locate
 local file_list                 = fslib.file_list
