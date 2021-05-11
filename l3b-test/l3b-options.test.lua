@@ -16,7 +16,7 @@ local __
 
 l3b_options, __ = _ENV.loadlib("l3b-options")
 
-local Manager          = l3b_options.Manager
+local Manager          = l3b_options.OptionManager
 
 local function test_basic()
   expect(l3b_options).NOT(nil)

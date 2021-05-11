@@ -266,7 +266,7 @@ local function test_is_error()
   local is_error = utlib.is_error
   expect(is_error(nil)).is(false)
   expect(is_error(0)).is(false)
-  expect(is_error(_ENV.random_number())).is(false)
+  expect(is_error(_ENV.random_number())).is(true)
 end
 
 return {

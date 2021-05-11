@@ -101,8 +101,8 @@ as from a standalone module.
 ---@field public builtin      boolean @whether the target is builtin
 ---@field public impl         target_impl_t @the target implementation
 
----@alias target_run_f      fun(self: TargetInfo, options: options_t, kvargs: target_process_kvargs_t): error_level_n
----@alias target_done_run_f fun(self: TargetInfo, options: options_t, kvargs: target_process_kvargs_t): boolean, error_level_n
+---@alias target_run_f      fun(self: TargetInfo, options: options_t, kvargs: process_kvargs_t): error_level_n
+---@alias target_done_run_f fun(self: TargetInfo, options: options_t, kvargs: process_kvargs_t): boolean, error_level_n
 
 ---@class TargetInfo: target_info_t -- model for a target
 ---@field public manager    TargetManager
@@ -173,7 +173,7 @@ local CONTINUE = {}
 
 ---comment
 ---@param options options_t
----@param kvargs target_process_kvargs_t
+---@param kvargs process_kvargs_t
 ---@return boolean
 ---@return any
 function TargetInfo:run_high(options, kvargs)
@@ -246,7 +246,7 @@ function TargetManager:get_all_infos(hidden)
   return values(self.__DB, {
     compare = compare_ascending,
     exclude = function (info)
-      return not info.description
+      return not hidden and not info.description
     end
   })
 end
@@ -298,66 +298,14 @@ end
 
 ---@alias target_process_module_callback_f fun(module_target: string): error_level_n call the target against all the modules
 
----@class target_process_kvargs_t
+---@class process_kvargs_t
 ---@field public preflight        target_preflight_f
 ---@field public at_bundle_top    nil|boolean
 ---@field public module_callback  nil|target_process_module_callback_f
 
 ---Action processor.
---[===[
-
-## arguments
-
-### `options`
-
-The `options` table can come from two different situations
-
-1)  it collects the CLI options given by the user
-2)  it collects the CLI options given by l3build
-    when it fires another action
-
-The process workflows is
-
-```
-if run_high then
-  preflight
-  run_high
-end
-if configure then
-  configure
-end
-if not already preflight then
-  preflight
-end
-if at bundle top then
-  if run_bundle then
-    run_bundle
-    return
-  end
-  module_callback
-  return
-end
-run
-```
-
-### `kvargs`
-
-Must define a `preflight`, may define a flag and a call back.
-See target_process_kvargs_t.
-
---]===]
----Get the implementation table of the target.
----Run its `prepare`, return on error.
----Run its `run_high` call if possible, after `preflight`. Return the result when not nil.
----Run its `configure` if possible, return on error.
----Run the `preflight`.
----Return its `main` call if any.
----If at bundle top:
----  Return its `run_bundle` call if possible
----  Return its `caller` call with the proper target name
----Finally return its `run` call.
 ---@param options options_t @ Options from the command line
----@param kvargs   target_process_kvargs_t
+---@param kvargs   process_kvargs_t
 ---@return error_level_n
 function TargetManager:process(options, kvargs)
   local start = time()

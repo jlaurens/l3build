@@ -132,12 +132,13 @@ local push_pop_current_directory = fslib.push_pop_current_directory
 ---@type l3build_t
 local l3build = require("l3build")
 
----@type l3b_cli_t
-local l3b_cli = require("l3build-cli")
-
 ---@type l3b_aux_t
 local l3b_aux       = require("l3build-aux")
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
+
+local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
+
+--[==[ Module implementation ]==]
 
 ---@alias biber_f     fun(name: string, dir: string): error_level_n
 ---@alias bibtex_f    fun(name: string, dir: string): error_level_n
@@ -380,7 +381,7 @@ local function get_main_variable(name)
     "texlua",
     quoted_path(l3build.script_path),
     "status",
-    "--".. l3b_cli.GET_MAIN_VARIABLE,
+    "--".. GET_MAIN_VARIABLE,
     name,
   })
   local ok, packed = push_pop_current_directory(
@@ -2089,14 +2090,14 @@ local function all_entries(exclude)
 end
 
 ---@class l3b_globals_t
----@field public LOCAL     any
----@field public G         G_t
----@field public Dir       Dir_t
----@field public Files     Files_t
----@field public Deps      Deps_t
----@field public Exe       Exe_t
----@field public Opts      Opts_t
----@field public Xtn       Xtn_t
+---@field public LOCAL  any
+---@field public G      G_t
+---@field public Dir    Dir_t
+---@field public Files  Files_t
+---@field public Deps   Deps_t
+---@field public Exe    Exe_t
+---@field public Opts   Opts_t
+---@field public Xtn    Xtn_t
 ---@field public get_main_variable         fun(name: string, dir: string): string
 ---@field public handle_get_main_variable  fun(name: string): error_level_n
 ---@field public export                    function

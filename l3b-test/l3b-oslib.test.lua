@@ -70,7 +70,7 @@ local function test_run()
       before = true
     end
   end
-  -- THIS DOES NOT WORK ON WINDOWS 
+  -- THIS DOES NOT WORK ON WINDOWS
   expect(before).is(false)
 end
 

@@ -71,26 +71,26 @@ local function help()
   print("")
   print("Valid targets are:")
   local width = 0
-  local get_all_infos = require("l3b-targets").get_all_infos
-  for info in get_all_infos() do
+  local main = l3build.main
+  assert(main, "l3build.main is undefined")
+  for info in main:get_all_target_infos() do
     if #info.name > width then
       width = #info.name
     end
   end
-  for info in get_all_infos() do
+  for info in main:get_all_target_infos() do
     local filler = (" "):rep(width - #info.name + 1)
     print("   " .. info.name .. filler .. info.description)
   end
   print("")
   print("Valid options are:")
   width = 0
-  get_all_infos = require("l3b-options").get_all_infos
-  for info in get_all_infos() do
+  for info in main:get_all_option_infos() do
     if #info.long > width then
       width = #info.long
     end
   end
-  for info in get_all_infos() do
+  for info in main:get_all_option_infos() do
     local filler = (" "):rep(width - #info.long + 1)
     if info.short then
       print("   --" .. info.long .. "|-" .. info.short .. filler .. info.description)

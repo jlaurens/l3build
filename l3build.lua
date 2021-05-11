@@ -38,8 +38,6 @@ release_date = "2020-06-04"
 -- Local access to functions
 
 local ipairs    = ipairs
-local gmatch    = string.gmatch
-local exit      = os.exit
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
@@ -48,10 +46,6 @@ local lfs = require("lfs")
 local currentdir  = lfs.currentdir
 local chdir       = lfs.chdir
 local attributes  = lfs.attributes
-
--- these are reserved directory names
-local TEST_DIR      = "l3b-test"
-local TEST_ALT_DIR  = "l3b-test-alt"
 
 -- # Start of the booting process
 
@@ -64,7 +58,7 @@ A module does not contain any bundle or directory as direct descendant.
 A bundle does not contain other bundles as direct descendants.
 --]=]
 
-local is_main     -- Whether the script is called first
+local is_l3build     -- Whether the script is called first
 ---@alias dir_path_s string -- path ending with a '/'
 ---@type dir_path_s
 local work_dir    -- the directory containing the closest "build.lua" and friends
@@ -77,27 +71,34 @@ local main_dir    -- the directory containing the topmost "build.lua" and friend
 ---@field public call             boolean
 ---@field public no_curl_posting  boolean
 ---@field public copy_core        boolean
+
+---@type l3build_debug_t
 local the_debug = {}
 
 ---@class l3build_t
----@field public debug       l3build_debug_t  @the special --debug-foo CLI arguments
----@field public PACKAGE     string           @"l3build", `package.loaded` key
----@field public NAME        string           @"l3build", display name
----@field public PATH        string           @synonym of `launch_dir` .. "/l3build.lua"
----@field public is_main     boolean          @True means "l3build" is the main controller.
----@field public in_document boolean          @True means no "build.lua"
----@field public work_dir    dir_path_s|nil   @where the closest "build.lua" lives, nil means not in_document
----@field public main_dir    dir_path_s|nil   @where the topmost "build.lua" lives, nil means not in_document
----@field public launch_dir  dir_path_s       @where "l3build.lua" and friends live
----@field public start_dir   dir_path_s       @the current directory at load time
----@field public script_path string           @the path of the `l3build.lua` in action.
----@field public options     options_t
----@field public flags       flags_t
----@field public G           table            @Global environment for build.lua and configs
+---@field public debug        l3build_debug_t  @the special --debug-foo CLI arguments
+---@field public TEST_DIR     string           @"l3build", `package.loaded` key
+---@field public TEST_ALT_DIR string           @"l3build", `package.loaded` key
+---@field public PACKAGE      string           @"l3build", `package.loaded` key
+---@field public NAME         string           @"l3build", display name
+---@field public PATH         string           @synonym of `launch_dir` .. "/l3build.lua"
+---@field public is_l3build   boolean          @True means "l3build" is the main controller.
+---@field public in_document  boolean          @True means no "build.lua"
+---@field public work_dir     dir_path_s|nil   @where the closest "build.lua" lives, nil means not in_document
+---@field public main_dir     dir_path_s|nil   @where the topmost "build.lua" lives, nil means not in_document
+---@field public launch_dir   dir_path_s       @where "l3build.lua" and friends live
+---@field public start_dir    dir_path_s       @the current directory at load time
+---@field public script_path  string           @the path of the `l3build.lua` in action.
+---@field public options      options_t
+---@field public flags        flags_t
+---@field public main         Main
 
 local l3build = { -- global data available as package.
-  debug = the_debug, -- storage for special debug flags (private UI)
-  flags = {}, -- various shared flags
+  debug         = the_debug, -- storage for special debug flags (private UI)
+  flags         = {}, -- various shared flags
+  -- these are reserved directory names
+  TEST_DIR      = "l3b-test",
+  TEST_ALT_DIR  = "l3b-test-alt",
 }
 
 print(in_document and "Document mode" or "Bundle mode")
@@ -109,7 +110,7 @@ do
   -- Setup dirs where require will look for modules.
 
   local start_dir = currentdir() .. "/" -- this is the current dir at launch time, absolute
-  -- is_main: whether required by someone else, or not
+  -- is_l3build: whether required by someone else, or not
   local cmd_path = arg[0]
   local cmd_dir, cmd_base = cmd_path:match("(.*/)(.*)")
   if not cmd_dir then
@@ -120,7 +121,7 @@ do
     cmd_dir = start_dir .. cmd_dir
   end
   -- start_dir and cmd_dir are absolute
-  is_main = cmd_base == "l3build" or cmd_base == "l3build.lua"
+  is_l3build = cmd_base == "l3build" or cmd_base == "l3build.lua"
 
   ---Central function to allow launching l3build from a subdirectory
   ---of a local repository.
@@ -195,7 +196,7 @@ do
         print("  kpse:  ".. kpse_dir)
         print("  launch: ".. launch_dir)
         local dir, base = start_dir, "build.lua"
-        for _ in gmatch(dir .. currentdir(), "[^/]+") do
+        for _ in dir .. currentdir():gmatch("[^/]+") do
           local p = dir .. base
           print(p)
           if attributes(p, "mode") then -- true iff file or dir at the given path
@@ -232,9 +233,7 @@ do
     return pkg
   end
 
-  l3build.TEST_DIR      = TEST_DIR
-  l3build.TEST_ALT_DIR  = TEST_ALT_DIR
-  l3build.is_main       = is_main
+  l3build.is_l3build       = is_l3build
   l3build.in_document   = in_document
   l3build.start_dir     = start_dir -- all these are expected to end with a "/"
   l3build.launch_dir    = launch_dir
@@ -308,10 +307,22 @@ end
 
 --[==[ end of booting process ]==]
 
---[==[ Special actions ]==]
-
 if arg[1] == "test" then
   return require("l3build-test").run()
 end
 
-return require("l3build-main").run()
+require("l3b-fslib").set_working_directory(work_dir)
+
+-- Terminate here if in document mode
+if in_document then
+  return l3build
+end
+
+---@type l3b_main_t
+local l3b_main = require("l3build-main")
+
+local main = l3b_main.Main()
+
+l3build.main = main
+
+return main:run(work_dir, is_l3build)

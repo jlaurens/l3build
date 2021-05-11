@@ -186,12 +186,16 @@ local function bridge(kv)
   return setmetatable({}, MT)
 end
 
+local GET_MAIN_VARIABLE = "get_main_variable"
+
 ---@class corelib_t
+---@field public GET_MAIN_VARIABLE  string
 ---@field public get_line_number    fun(s: string, i: integer): integer
 ---@field public bridge             fun(kv: bridge_kv_t): table
 ---@field public shallow_copy       fun(original: any): any
 
 return {
+  GET_MAIN_VARIABLE   = GET_MAIN_VARIABLE,
   get_line_number     = get_line_number,
   bridge              = bridge,
   shallow_copy        = shallow_copy,

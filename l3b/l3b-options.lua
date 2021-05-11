@@ -194,8 +194,8 @@ end
 ---Parse the command line arguments.
 ---When the key is not recognized by the system,
 ---`on_unknown` gets a chance to recognize it.
----When this function returns `nil` it means no recognition.
----When it returns 0, all is ok otherwise an error occurred.
+---When this function returns a falsy value it means no recognition.
+---More details to follow.
 ---@param arg table
 ---@param on_unknown fun(key: string): boolean|fun(any: any, options: options_base_t) true when catched, false otherwise
 ---@return table

@@ -7,23 +7,27 @@
 
 local push = table.insert
 
+---@type corelib_t
+local corelib = _ENV.loadlib("l3b-corelib")
+local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
+
 ---@type oslib_t
 local oslib = require("l3b-oslib")
 local write_content = oslib.write_content
 
 local expect  = _ENV.expect
 
----@type l3b_cli_t
-local l3b_cli = _ENV.loadlib("l3build-cli")
-local CLIManager = l3b_cli.CLIManager
+---@type l3b_main_t
+local l3b_main = _ENV.loadlib("l3build-main")
+local Main = l3b_main.Main
 
 local function test_basic()
-  expect(l3b_cli).NOT(nil)
+  expect(l3b_main).NOT(nil)
 end
 
 local test_declared_options = {
   setup = function (self)
-    self.manager = CLIManager()
+    self.manager = Main()
   end,
   test_options = function (self)
     self.manager:register_builtin_options()
@@ -54,7 +58,7 @@ local test_declared_options = {
       "shuffle",
       "texmfhome",
       "version",
-      l3b_cli.GET_MAIN_VARIABLE
+      GET_MAIN_VARIABLE
     })
   end,
   test_custom_options = function (self)
@@ -71,10 +75,94 @@ register_option({
 })
 ]]
     local config_path = dir / 'options.lua'
-    write_content(dir / 'options.lua', content)
+    write_content(config_path, content)
     self.manager:register_custom_options(dir)
     local info = self.manager:option_info_with_key('my-option')
     expect(info).NOT(nil)
+    expect(os.remove(config_path)).is(true)
+    expect(os.remove(dir)).is(true)
+  end,
+  test_targets = function (self)
+    self.manager:register_targets()
+    local names = {}
+    for info in self.manager:get_all_target_infos() do
+      push(names, info.name)
+    end
+    expect(names).items.equals({
+        -- Some hidden targets
+      "check",
+      "clean",
+      "ctan",
+      "doc",
+      "install",
+      "manifest",
+      "save",
+      "status",
+      "tag",
+      "uninstall",
+      "unpack",
+      "upload",
+    })
+    names = {}
+    for info in self.manager:get_all_target_infos(true) do
+      push(names, info.name)
+    end
+    expect(names).items.equals({
+        -- Some hidden targets
+      "module_check",
+      "module_ctan",
+      "module_unpack" ,
+      "module_tag",
+      "check",
+      "clean",
+      "ctan",
+      "doc",
+      "install",
+      "manifest",
+      "save",
+      "status",
+      "tag",
+      "uninstall",
+      "unpack",
+      "upload",
+    })
+  end,
+  test_custom_target = function (self)
+    -- create a "options.lua" file in the temp domain
+    local dir = _ENV.make_temporary_dir(_ENV.random_string())
+    expect(dir).NOT(nil)
+    local content = [[
+register_target({
+  name = "foo",
+  description = "FOO DESCRIPTION",
+  impl = {
+    run = function (names)
+      print(table.unpack(names))
+    end,
+  },
+})
+]]
+    local config_path = dir / 'build.lua'
+    write_content(config_path, content)
+    local main = Main()
+    main:load_build(dir)
+    local info = main:target_info_with_name('foo')
+    expect(info).NOT(nil)
+    local expected = _ENV.random_string()
+    local options = {
+      target = 'foo',
+      names = { expected },
+    }
+    local kvargs = {
+      preflight = function () end
+    }
+    local done
+    _ENV.push_print(function (x)
+      done = x
+    end)
+    main:process(options, kvargs)
+    _ENV.pop_print()
+    expect(done).is(expected)
     expect(os.remove(config_path)).is(true)
     expect(os.remove(dir)).is(true)
   end,
