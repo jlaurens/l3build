@@ -100,7 +100,7 @@ local test_directory = {
     push(self.to_remove, path)
   end,
   test_directory = function (self)
-    local name = "TEST".. tostring(math.random(999999))
+    local name = "TEST".. _ENV.random_string()
     local path = self.dir_name .."/" .. name
     expect(directory_exists(path)).is(false)
     expect(make_directory(path)).is(0)
@@ -131,7 +131,7 @@ local test_directory = {
     expect(file_exists(self.name.."???")).is(false)
   end,
   make_random_directory = function (self)
-    local name = "TEST"..tostring(math.random(1000000))
+    local name = "TEST".._ENV.random_string()
     expect(change_current_directory(self.dir_name)).is(true)
     expect(make_directory(name)).is(0)
     self:add_to_remove(name)
@@ -166,7 +166,7 @@ local test_directory = {
     function f(name)
       error(name)
     end
-    b = tostring(math.random(999999))
+    b = _ENV.random_string()
     succ, a = push_pop_current_directory("A", f, b)
     expect(succ).is(false)
     expect(a:match(b)).NOT(nil)
@@ -365,7 +365,7 @@ local test_directory = {
     local dir = "A/B/C"
     make_directory(dir)
     local p_wrk = dir / "a"
-    local s = tostring(math.random(999999))
+    local s = _ENV.random_string()
     write_content(p_wrk, s)
     local p_src = "C/a"
     local dest = "A/D"
@@ -383,7 +383,7 @@ local test_directory = {
     local source = "A/B"
     local dest = "C/D"
     make_directory(source)
-    local s = tostring(math.random(999999))
+    local s = _ENV.random_string()
     write_content(source / name, s)
     expect(file_exists(source / name)).is(true)
     expect(file_exists(dest / name)).is(false)

@@ -58,10 +58,16 @@ local process     = l3b_targets.process
 ---@type l3b_aux_t
 local l3b_aux = require("l3build-aux")
 local call    = l3b_aux.call
+  
+local function run()
+  fslib.set_working_directory(l3build.work_dir)
 
-local function manage_cli()
---[=[ Dealing with options ]=]
+  -- Terminate here if in document mode
+  if in_document then
+    return l3build
+  end
 
+  --[=[ Dealing with options ]=]
   l3b_cli.register_builtin_options()
   l3b_cli.register_custom_options(work_dir)
   l3b_cli.register_targets()
@@ -74,17 +80,6 @@ local function manage_cli()
       return true
     end
   end)
-end
-
-local function run()
-  fslib.set_working_directory(l3build.work_dir)
-
-  -- Terminate here if in document mode
-  if in_document then
-    return l3build
-  end
-
-  manage_cli()
 
   ---@type l3b_globals_t
   local l3b_globals = require("l3build-globals")
@@ -105,15 +100,11 @@ local function run()
 
   ---@type l3b_help_t
   local l3b_help  = require("l3build-help")
-  local help      = l3b_help.help
-  local version   = l3b_help.version
 
   if target == "help" then
-    help()
-    exit(0)
+    return l3b_help.help()
   elseif target == "version" then
-    version()
-    exit(0)
+    return l3b_help.version()
   end
 
   -- Load configuration file if running as a script
@@ -151,9 +142,4 @@ end
 
 return {
   run = run,
-},
----@class __main_t
----@field private run fun()
-_ENV.during_unit_testing and {
-  manage_cli = manage_cli,
 }

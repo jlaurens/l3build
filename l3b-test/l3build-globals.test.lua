@@ -106,7 +106,7 @@ local test_Dir = function ()
   local function test(key)
     local path = Dir[key]
     expect(path:match("/$")).is("/")
-    local expected = tostring(math.random(999999))
+    local expected = _ENV.random_string()
     _G[key .."dir"] = expected
     expect(Dir[key]).is("./"..expected.."/")
     _G[key .."dir"] = nil
@@ -135,7 +135,7 @@ local test_Files = function ()
   local Files = l3b_globals.Files
   local function test(key)
     expect(Files[key]).type("table")
-    local expected = { tostring(math.random(999999)) }
+    local expected = { _ENV.random_string() }
     _G[key.."files"] = expected
     expect(Files[key]).equals(expected)
     _G[key.."files"] = nil
@@ -172,7 +172,7 @@ local test_Deps = function ()
   local Deps = l3b_globals.Deps
   local function test(key)
     expect(Deps[key]).type("table")
-    local expected = { tostring(math.random(999999)) }
+    local expected = { _ENV.random_string() }
     _G[key.."deps"] = expected
     expect(Deps[key]).equals(expected)
     _G[key.."deps"] = nil
@@ -186,7 +186,7 @@ local test_Exe = function ()
   local Exe = l3b_globals.Exe
   local function test(key)
     expect(Exe[key]).type("string")
-    local expected = "X" .. tostring(math.random(999999))
+    local expected = "X" .. _ENV.random_string()
     _G[key.."exe"] = expected
     expect(Exe[key]).equals(expected)
     _G[key.."exe"] = nil
@@ -204,7 +204,7 @@ local test_Opts = function ()
   local Opts = l3b_globals.Opts
   local function test(key)
     expect(Opts[key]).type("string")
-    local expected = "X" .. tostring(math.random(999999))
+    local expected = "X" .. _ENV.random_string()
     _G[key.."opts"] = expected
     expect(Opts[key]).equals(expected)
     _G[key.."opts"] = nil
@@ -222,7 +222,7 @@ local test_Xtn = function ()
   local Xtn = l3b_globals.Xtn
   local function test(key)
     expect(Xtn[key]).type("string")
-    local expected = "X" .. tostring(math.random(999999))
+    local expected = "X" .. _ENV.random_string()
     _G[key.."ext"] = expected
     expect(Xtn[key]).equals(expected)
     _G[key.."ext"] = nil
@@ -261,7 +261,7 @@ local test_G = {
   test_checkengines = function (self)
     expect(self.G.checkengines).equals({"pdftex", "xetex", "luatex"})
     self.G.checkengines = nil -- values have ben cached
-    local expected = { tostring( math.random(999999) ) }
+    local expected = { _ENV.random_string() }
     expect(_G.checkengines).is(nil)
     _G.checkengines = expected
     expect(self.G.checkengines).equals(expected)
@@ -276,7 +276,7 @@ local test_G = {
   test_str = function (self)
     local test = function (key)
       expect(self.G[key]).type("string")
-      local expected = tostring( math.random(999999) )
+      local expected = _ENV.random_string()
       _G[key] = expected
       expect(self.G[key]).equals(expected)
       _G[key] = nil
@@ -320,7 +320,7 @@ local test_G = {
   test_number = function (self)
     local test = function (key)
       expect(self.G[key]).type("number")
-      local expected = math.random(999999)
+      local expected = _ENV.random_number()
       _G[key] = expected
       expect(self.G[key]).equals(expected)
       _G[key] = nil
@@ -355,7 +355,7 @@ local test_G = {
   test_table = function (self)
     local test = function (key)
       expect(self.G[key]).type("table")
-      local expected = { tostring( math.random(999999) ) }
+      local expected = { _ENV.random_string() }
       _G[key] = expected
       expect(self.G[key]).equals(expected)
       _G[key] = nil
@@ -409,7 +409,7 @@ local test__G = {
   test_str = function (self)
     local function test(key)
       expect(self.G[key]).type("string")
-      local expected = "X" .. tostring(math.random(999999))
+      local expected = "X" .. _ENV.random_string()
       _G[key] = expected
       expect(self.G[key]).equals(expected)
       _G[key] = nil

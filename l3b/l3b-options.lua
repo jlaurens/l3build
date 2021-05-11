@@ -62,51 +62,14 @@ local flags = {}
 
 local OptionInfo = Object:make_subclass("OptionInfo")
 
----@type table<string, OptionInfo>
-local by_key = {}
----@type table<string, OptionInfo>
-local by_name = {}
----@type table<string, OptionInfo>
-local by_long = {}
-
----Return the option info for the given key.
----An option info is meant read only.
----`key` is "version", "v"...
----@param key string
----@return OptionInfo
-local function get_info_by_key(key)
-  return  by_key[key]
-end
-
----Return the option info for the given key.
----An option info is read only.
----`key` is "version", "v"...
----@param name string
----@return OptionInfo
-local function get_info_by_name(name)
-  return  by_name[name]
-end
-
----Enumerator of all the target infos.
----Sorted by name
----@param hidden boolean @true to list all hidden targets too.
----@return function
-local function get_all_infos(hidden)
-  return values(by_long, {
-    compare = compare_ascending,
-    exclude = function (info)
-      return not info.description
-    end,
-  })
-end
-
 ---Load the given value in the given table
 ---Raise an error if no value is required
+---@param self    OptionInfo
 ---@param options table
 ---@param key     string
 ---@param value?  string
 ---@return error_level_n
-function OptionInfo:load_value(options, key, value)
+function OptionInfo.load_value(self, options, key, value)
   if self.type == "boolean" then
     options[self.name] = not key:match("^no%-")
   elseif self.type == "string" then
@@ -136,28 +99,75 @@ OptionInfo.__instance_table = {
   end,
 }
 
+---@class OptionManager
+---@field private __by_key  table<string, OptionInfo>
+---@field private __by_name table<string, OptionInfo>
+---@field private __by_long table<string, OptionInfo>
+
+local OptionManager = Object:make_subclass("OptionManager")
+
+---Return the option info for the given key.
+---An option info is meant read only.
+---`key` is "version", "v"...
+function OptionManager:__initialize()
+  self.__by_key = {}
+  self.__by_long = {}
+  self.__by_name = {}
+end
+
+---Return the option info for the given key.
+---An option info is meant read only.
+---`key` is "version", "v"...
+---@param key string
+---@return OptionInfo
+function OptionManager:info_with_key(key)
+  return  self.__by_key[key]
+end
+
+---Return the option info for the given key.
+---An option info is read only.
+---`key` is "version", "v"...
+---@param name string
+---@return OptionInfo
+function OptionManager:info_with_name(name)
+  return  self.__by_name[name]
+end
+
+---Enumerator of all the target infos.
+---Sorted by name
+---@param hidden boolean @true to list all hidden targets too.
+---@return function
+function OptionManager:get_all_infos(hidden)
+  return values(self.__by_long, {
+    compare = compare_ascending,
+    exclude = function (info)
+      return not hidden and not info.description
+    end,
+  })
+end
+
 ---Register the given option.
 ---If there is a conflict, an error is raised.
 ---@param info    option_info_t
 ---@param builtin boolean|nil
 ---@return OptionInfo
-local function register(info, builtin)
+function OptionManager:register(info, builtin)
   local long  = info.long
-  if by_key[long] then
-    error("Option aleady registered for key ".. long)
+  if self.__by_key[long] then
+    error("Option already registered for key ".. long)
   end
   local short = info.short
   if short then
     if #short > 1 then
       error("Short option is too long: ".. short)
     end
-    if by_key[short] then
-      error("Option aleady registered for key ".. short)
+    if self.__by_key[short] then
+      error("Option already registered for key ".. short)
     end
   end
   local name  = info.name or long
-  if by_name[name] then
-    error("Option aleady registered for name".. name)
+  if self.__by_name[name] then
+    error("Option already registered for name".. name)
   end
   if name == "target" or name == "names" then
     error("Reserved option name ".. name)
@@ -172,17 +182,16 @@ local function register(info, builtin)
     builtin = builtin and true or false,
   })
   info = readonly(info)
-  by_name[name] = info
-  by_long[long] = info
-  by_key[long]  = info
+  self.__by_name[name] = info
+  self.__by_long[long] = info
+  self.__by_key[long]  = info
   if short then
-    by_key[short] = info
+    self.__by_key[short] = info
   end
   return info
 end
 
--- This is done as a function (rather than do ... end) as it allows early
--- termination (break)
+---Parse the command line arguments.
 ---When the key is not recognized by the system,
 ---`on_unknown` gets a chance to recognize it.
 ---When this function returns `nil` it means no recognition.
@@ -190,7 +199,7 @@ end
 ---@param arg table
 ---@param on_unknown fun(key: string): boolean|fun(any: any, options: options_base_t) true when catched, false otherwise
 ---@return table
-local function parse(arg, on_unknown)
+function OptionManager:parse(arg, on_unknown)
   local result = {
     target = "help",
   }
@@ -250,11 +259,11 @@ local function parse(arg, on_unknown)
       end
     end
     ---@type OptionInfo
-    local info = get_info_by_key(k)
+    local info = self:info_with_key(k)
     if not info then
       local no_no = k:match("^no%-(.*)$")
       if no_no then
-        info = get_info_by_key(no_no)
+        info = self:info_with_key(no_no)
       end
       if not info then
         if on_unknown then
@@ -308,35 +317,17 @@ local function parse(arg, on_unknown)
   return result
 end
 
-local function reset()
-  local result = by_key
-  by_key = {}
-  by_name = {}
-  return result
-end
----@alias l3b_options_parse_f fun(arg: string[]): table<string, any>
-
 ---@class l3b_options_t
----@field public ut_flags_t        options_flags_t
----@field public get_all_infos     fun(hidden: boolean): fun(): OptionInfo|nil
----@field public get_info_by_key   fun(key: string): OptionInfo
----@field public get_info_by_name  fun(name: string): OptionInfo
----@field public register          fun(info: option_info_t, builtin: boolean)
----@field public parse             l3b_options_parse_f
+---@field public flags          options_flags_t
+---@field public OptionManager  OptionManager
 
 return {
-  flags             = flags,
-  get_all_infos     = get_all_infos,
-  get_info_by_key   = get_info_by_key,
-  get_info_by_name  = get_info_by_name,
-  register          = register,
-  parse             = parse,
+  flags = flags,
+  OptionManager = OptionManager,
 },
 ---@class __l3b_options_t
----@field private reset fun()
 ---@field private OptionInfo OptionInfo
 _ENV.during_unit_testing and
 {
-  reset       = reset,
   OptionInfo  = OptionInfo,
 }

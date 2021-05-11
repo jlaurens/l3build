@@ -36,8 +36,8 @@ local test_status = {
     _ENV.pop_print()
     expect(track).equals({ "NOT A RUN HIGH" })
     track = {}
-    local name = "FOO".. math.random(999999)
-    local value = tostring(math.random(999999))
+    local name = "FOO".. _ENV.random_string()
+    local value = _ENV.random_string()
     l3build.options.get_main_variable = name
     _G[name] = value
     _ENV.push_print(function (x)

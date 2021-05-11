@@ -27,6 +27,7 @@ local push  = table.insert
 local pop   = table.remove
 
 local lpeg  = require("lpeg")
+local lfs   = require("lfs")
 
 local l3build = require("l3build")
 
@@ -379,11 +380,30 @@ from all test files run only test containing either "foo" or "bar".
     return kk
   end
 
-  local all_names
+  function ENV.random_number()
+    return math.random(100000, 999999)
+  end
 
+  function ENV.random_string()
+    return "_".. tostring(ENV.random_number())
+  end
+
+  local temporary_file_name = os.tmpname()
+  os.remove(temporary_file_name)
+  local temporary_dir = temporary_file_name:match("^.*/")
+    .. '/l3build'
+    .. ENV.random_string()
+  lfs.mkdir(temporary_dir)
+
+  function ENV.make_temporary_dir(name)
+    local result = temporary_dir .. '/' .. name
+    return lfs.mkdir(result) and result or nil
+  end
+
+  ---@type fun(): string|nil @ string iterator
+  local all_names
   do
     local test_names = {}
-    local lfs = require("lfs")
     local test_dir = l3build.work_dir .. l3build.TEST_DIR
     if lfs.attributes(test_dir, "mode") then
       for test_name in lfs.dir(test_dir) do
@@ -400,6 +420,7 @@ from all test files run only test containing either "foo" or "bar".
           end
         end
       end
+      -- name iterator
       all_names = function ()
         local i = 0
         return function ()
@@ -423,7 +444,7 @@ from all test files run only test containing either "foo" or "bar".
       end
     else
       print("No test to perform")
-      os.exit(1)
+      return 1
     end
   end
   for test_name in all_names() do
@@ -446,7 +467,9 @@ from all test files run only test containing either "foo" or "bar".
     i = 3
   end
   arg[#arg + 1] = "-v"
-  os.exit( LU["LuaUnit"].run(table.unpack(arg, i)) )
+  local result = LU["LuaUnit"].run(table.unpack(arg, i))
+  lfs.rmdir(temporary_dir)
+  os.exit( result )
   return
 end
 

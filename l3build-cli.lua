@@ -28,8 +28,10 @@ Add new options in `option_list` and add new targets in `target_list`.
 New targets must have their counterpart in the corresponding package.
 --]=]
 
-local dofile  = dofile
 local pairs   = pairs
+
+---@type Object
+local Object = require("l3b-object")
 
 ---@type fslib_t
 local fslib = require("l3b-fslib")
@@ -37,11 +39,12 @@ local file_exists = fslib.file_exists
 
 ---@type l3b_options_t
 local l3b_options     = require("l3b-options")
-local register_option = l3b_options.register
+---@type OptionManager
+local OptionManager = l3b_options.OptionManager
 
 ---@type l3b_targets_t
-local l3b_targets     = require("l3b-targets")
-local register_target = l3b_targets.register_info
+local l3b_targets = require("l3b-targets")
+local TargetManager = l3b_targets.TargetManager
 
 -- Implementation
 
@@ -175,30 +178,83 @@ local option_list = {
   }
 }
 
+---@class CLIManager: Object
+local CLIManager = Object:make_subclass("CLIManager")
+
+function CLIManager:__initialize()
+  self.option_manager = OptionManager()
+  self.target_manager = TargetManager()
+end
+
+---comment
+---@param info OptionInfo
+---@param builtin boolean|nil
+---@return OptionInfo
+function CLIManager:register_option(info, builtin)
+  return self.option_manager:register(info, builtin)
+end
+
 ---Register the builtin options
-local function register_builtin_options()
+---@param self CLIManager
+function CLIManager.register_builtin_options(self)
   for k, v in pairs(option_list) do
     v.long = k
-    register_option(v, true)
+    assert(self:register_option(v, true))
   end
 end
 
 ---Register the custom options by loading and executing
 ---the `options.lua` located at `work_dir`.
 ---@param work_dir string
-local function register_custom_options(work_dir)
-  local options_cfg = work_dir .. "options.lua"
+function CLIManager:register_custom_options(work_dir)
+  local options_cfg = work_dir / "options.lua"
   if file_exists(options_cfg) then
     local ENV = setmetatable({}, {
       __index = _G
     })
-    ENV.register_option = register_option
+    ENV.register_option = function (info)
+      return self:register_option(info)
+    end
     local f, msg = loadfile(options_cfg, "t", ENV)
     if not f then
       error(msg)
     end
     f()
   end
+end
+
+---Retrieve the OptionInfo for the given name.
+---@param name string
+---@return OptionInfo|nil
+function CLIManager:option_info_with_name(name)
+  return self.option_manager:info_with_name(name)
+end
+
+---Retrieve the OptionInfo for the given key.
+---@param name string
+---@return OptionInfo|nil
+function CLIManager:option_info_with_key(name)
+  return self.option_manager:info_with_key(name)
+end
+
+---Iterator over all the options
+---@return fun(): OptionInfo|nil
+function CLIManager:get_all_option_infos()
+  return self.option_manager:get_all_infos()
+end
+
+---Register the custom options by loading and executing
+---the `options.lua` located at `work_dir`.
+---@param info target_info_t
+function CLIManager:register_target(info)
+  return self.target_manager:register(info)
+end
+
+---Iterator over all the targets
+---@param hidden boolean true to list all hidden targets too.
+---@return fun(): TargetInfo|nil
+function CLIManager:get_all_target_infos(hidden)
+  return self.target_manager:get_all_infos(hidden)
 end
 
 local target_list = {
@@ -269,25 +325,19 @@ local target_list = {
   },
 }
 
-local function register_targets()
+function CLIManager:register_targets()
   -- register builtin targets
   for name, info in pairs(target_list) do
     info.name = name
-    register_target(info, true)
+    self.target_manager:register_target(info, true)
   end
 end
 
 ---@class l3b_cli_t
----@field public GET_MAIN_VARIABLE         string
----@field public register_builtin_options  fun()
----@field public register_custom_options   fun()
----@field public register_targets          fun()
----@field public parse                     l3b_options_parse_f
+---@field public GET_MAIN_VARIABLE  string
+---@field public CLIManager   CLIManager
 
 return {
-  GET_MAIN_VARIABLE         = GET_MAIN_VARIABLE,
-  register_builtin_options  = register_builtin_options,
-  register_custom_options   = register_custom_options,
-  register_targets          = register_targets,
-  parse                     = l3b_options.parse
+  GET_MAIN_VARIABLE = GET_MAIN_VARIABLE,
+  CLIManager  = CLIManager,
 }

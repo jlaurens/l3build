@@ -83,8 +83,6 @@ as from a standalone module.
 
 --]===]
 
-local get_info
-
 ---@class target_impl_t
 ---@field public configure   target_preflight_f|nil @function to run preflight code
 ---Default required run action
@@ -107,6 +105,7 @@ local get_info
 ---@alias target_done_run_f fun(self: TargetInfo, options: options_t, kvargs: target_process_kvargs_t): boolean, error_level_n
 
 ---@class TargetInfo: target_info_t -- model for a target
+---@field public manager    TargetManager
 ---@field public configure  target_run_f
 ---@field public run        target_run_f
 ---@field public run_high   target_done_run_f
@@ -125,7 +124,7 @@ local TargetInfo = Object:make_subclass("TargetInfo", {
       return impl
     end,
   },
-  __initialize = function (self, info, builtin)
+  __initialize = function (self, info, manager, builtin)
     for k in items(
       "description",
       "package",
@@ -135,11 +134,16 @@ local TargetInfo = Object:make_subclass("TargetInfo", {
     ) do
       self[k] = info[k]
     end
+    self.manager = manager
     self.builtin = not not ( info.builtin or builtin )
   end
 })
 
-function TargetInfo:configure(options)
+---Configure the receiver
+---@param self TargetInfo
+---@param options table
+---@return any
+function TargetInfo.configure(self, options)
   local configure = self.impl.configure
   if configure then
     if options.debug then
@@ -199,10 +203,16 @@ function TargetInfo:run_bundle(options, kvargs)
   return false
 end
 
-function TargetInfo:run_module(options, kvargs)
+---run
+---@param self TargetInfo
+---@param options table
+---@param kvargs table
+---@return boolean
+---@return any
+function TargetInfo.run_module(self, options, kvargs)
   if kvargs.at_bundle_top then
     local module_target = "module_".. options.target
-    module_target = get_info(module_target)
+    module_target = self.manager:get_info(module_target)
       and module_target
       or options.target
     if options.debug then
@@ -214,16 +224,26 @@ function TargetInfo:run_module(options, kvargs)
 end
 
 ---@alias __target_DB_t table<string,TargetInfo>
----@type __target_DB_t
-local DB = {}
+
+---@class TargetManager: Object
+---@field private __DB __target_DB_t
+
+---@type TargetManager
+local TargetManager = Object:make_subclass("TargetManager")
+
+---Initialize the receiver
+---@param self TargetManager
+function TargetManager.__initialize(self)
+  self.__DB = {}
+end
 
 ---Enumerator of all the target infos.
 ---Target infos are sorted by name.
 ---@param hidden boolean true to list all hidden targets too.
 ---@return function
 ---@usage `for info in get_all_infos() do ... end`
-local function get_all_infos(hidden)
-  return values(DB, {
+function TargetManager:get_all_infos(hidden)
+  return values(self.__DB, {
     compare = compare_ascending,
     exclude = function (info)
       return not info.description
@@ -231,41 +251,42 @@ local function get_all_infos(hidden)
   })
 end
 
----Return the target info for the given name, if any.
----@param name string
----@return TargetInfo|nil
-function get_info(name)
-  return DB[name]
-end
-
 ---Register the target with the given target info
 ---
 ---@param info target_info_t
 ---@param builtin boolean|nil
-local function register_info(info, builtin)
+function TargetManager:register(info, builtin)
   assert(
     info.name,
     "l3b-targets.register_info: Missing info.name"
   )
-  if DB[info.name] then
+  if self.__DB[info.name] then
     error(
       "l3b-targets.register_info: Target name is already used: "
       .. tostring(info.name)
     )
   end
-  if info.alias and DB[info.alias] then
+  if info.alias and self.__DB[info.alias] then
     error("l3b-targets.register_info: Target alias "
       .. tostring(info.alias)
       .." is already used by "
-      .. tostring(DB[info.alias].name)
+      .. tostring(self.__DB[info.alias].name)
     )
   end
-  local result = TargetInfo(nil, info, builtin)
-  DB[info.name] = result
+  local result = TargetInfo(nil, info, self, builtin)
+  self.__DB[info.name] = result
   if info.alias then
-    DB[info.alias] = result -- latex2e
+    self.__DB[info.alias] = result -- latex2e
   end
 end
+
+---Return the target info for the given name, if any.
+---@param name string
+---@return TargetInfo|nil
+function TargetManager:get_info(name)
+  return self.__DB[name]
+end
+
 
 ---@class target_register_kvargs_t
 ---@field public description   string|nil @description
@@ -338,11 +359,11 @@ See target_process_kvargs_t.
 ---@param options options_t @ Options from the command line
 ---@param kvargs   target_process_kvargs_t
 ---@return error_level_n
-local function process(options, kvargs)
+function TargetManager:process(options, kvargs)
   local start = time()
   local target = options.target
   ---@type TargetInfo
-  local info  = get_info(target)
+  local info  = self:get_info(target)
   assert(info, "Unknown target name: ".. tostring(target))
   ---@type boolean
   local done
@@ -378,21 +399,14 @@ end
 
 ---@class l3b_targets_t
 ---@field public CONTINUE       any @ Special return value
----@field public get_all_infos  fun(hidden: boolean): fun(): TargetInfo|nil
----@field public get_info       fun(key: string): TargetInfo
----@field public register_info  fun(info: TargetInfo, builtin: boolean)
----@field public process        target_process_f
+---@field public TargetManager  TargetManager
 
 return {
   CONTINUE      = CONTINUE,
-  get_all_infos = get_all_infos,
-  get_info      = get_info,
-  register_info = register_info,
-  process       = process,
+  TargetManager = TargetManager,
 },
 ---@class __l3b_targets_t
----@field private DB __target_DB_t
+---@field private TargetInfo TargetInfo
 _ENV.during_unit_testing and {
-  DB = DB,
   TargetInfo = TargetInfo,
 }

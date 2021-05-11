@@ -16,9 +16,8 @@ local __
 
 l3b_options, __ = _ENV.loadlib("l3b-options")
 
-local register          = l3b_options.register
-local get_info_by_name  = l3b_options.get_info_by_name
-local parse             = l3b_options.parse
+local Manager          = l3b_options.Manager
+
 local function test_basic()
   expect(l3b_options).NOT(nil)
   expect(__).NOT(nil)
@@ -26,7 +25,7 @@ end
 
 local test_options = {
   setup = function (self)
-    self.old = __.reset()
+    self.manager = Manager()
     self.info_number = {
       description = "DESCRIPTION NUMBER",
       long = "number",
@@ -58,96 +57,90 @@ local test_options = {
       type  = "boolean",
     }
   end,
-  teardown = function (self)
-    __.reset()
-    for _, info in pairs(self.old) do
-      register(info, info.builtin)
-    end
-  end,
   do_test = function (self, arg, expected)
     table.insert(arg, 1, "FOO")
-    local actual = parse(arg)
+    local actual = self.manager:parse(arg)
     expect(actual).contains(expected)
   end,
   test_number = function (self)
-    local info = register(self.info_number)
-    expect(info).is(get_info_by_name(self.info_number.long))
+    local info = self.manager:register(self.info_number)
+    expect(info).is(self.manager:info_with_name(self.info_number.long))
     expect(info).contains(__.OptionInfo(self.info_number))
-    local n = math.random(999999)
+    local n = _ENV.random_number()
     self:do_test({ "--number", tostring(n) }, {
       number = n,
     })
     self:do_test({ "--number", "421", "--number", tostring(n) }, {
       number = n,
     })
-    expect(function () parse({ "FOO", "--number" }) end).error()
-    n = math.random(999999)
+    expect(function () self.manager:parse({ "FOO", "--number" }) end).error()
+    n = _ENV.random_number()
     self:do_test({ "-n", tostring(n) }, {
       number = n,
     })
     self:do_test({ "-n", "421", "-n", tostring(n) }, {
       number = n,
     })
-    expect(function () parse({ "FOO", "-n" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "-n" }) end).error()
   end,
   test_number_array = function (self)
-    local info = register(self.info_number_array)
-    expect(info).is(get_info_by_name(self.info_number_array.long))
+    local info = self.manager:register(self.info_number_array)
+    expect(info).is(self.manager:info_with_name(self.info_number_array.long))
     expect(info).contains(__.OptionInfo(self.info_number_array))
-    local n = math.random(999999)
+    local n = _ENV.random_number()
     self:do_test({ "--numbers", tostring(n) }, {
       numbers = { n },
     })
     self:do_test({ "--numbers", tostring(n), "--numbers", tostring(n) }, {
       numbers = { n, n },
     })
-    expect(function () parse({ "FOO", "--numbers" }) end).error()
-    n = math.random(999999)
+    expect(function () self.manager:parse({ "FOO", "--numbers" }) end).error()
+    n = _ENV.random_number()
     self:do_test({ "-N", tostring(n), "-N", tostring(n) }, {
       numbers = { n, n },
     })
     self:do_test({ "-N", "421", "-N", tostring(n) }, {
       numbers = { 421, n },
     })
-    expect(function () parse({ "FOO", "-N" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "-N" }) end).error()
   end,
   test_string = function (self)
-    local info = register(self.info_string)
-    expect(info).is(get_info_by_name(self.info_string.long))
+    local info = self.manager:register(self.info_string)
+    expect(info).is(self.manager:info_with_name(self.info_string.long))
     expect(info).contains(__.OptionInfo(self.info_string))
-    local s = tostring(math.random(999999))
+    local s = _ENV.random_string()
     self:do_test({ "--string", s }, {
       string = s,
     })
-    expect(function () parse({ "FOO", "--string" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "--string" }) end).error()
     self:do_test({ "-s", s }, {
       string = s,
     })
-    expect(function () parse({ "FOO", "-s" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "-s" }) end).error()
   end,
   test_string_array = function (self)
-    local info = register(self.info_string_array)
-    expect(info).is(get_info_by_name(self.info_string_array.long))
+    local info = self.manager:register(self.info_string_array)
+    expect(info).is(self.manager:info_with_name(self.info_string_array.long))
     expect(info).contains(__.OptionInfo(self.info_string_array))
-    local s = tostring(math.random(999999))
+    local s = _ENV.random_string()
     self:do_test({ "--strings", s }, {
       strings = { s },
     })
     self:do_test({ "--strings", s, "--strings", s }, {
       strings = { s, s },
     })
-    expect(function () parse({ "FOO", "--strings" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "--strings" }) end).error()
     self:do_test({ "-S", s }, {
       strings = { s },
     })
     self:do_test({ "-S", s, "-S", s }, {
       strings = { s, s },
     })
-    expect(function () parse({ "FOO", "-S" }) end).error()
+    expect(function () self.manager:parse({ "FOO", "-S" }) end).error()
   end,
   test_boolean = function (self)
-    local info = register(self.info_boolean)
-    expect(info).is(get_info_by_name(self.info_boolean.long))
+    local info = self.manager:register(self.info_boolean)
+    expect(info).is(self.manager:info_with_name(self.info_boolean.long))
     expect(info).contains(__.OptionInfo(self.info_boolean))
     self:do_test({ "--boolean" }, {
       boolean = true,
@@ -176,7 +169,7 @@ local test_options = {
         self.info_number_array,
       }
       while #infos > 0 do
-        register(table.remove(infos, math.random(#infos)))
+        self.manager:register(table.remove(infos, math.random(#infos)))
       end
       local t = {
         { "-b" },
@@ -198,7 +191,7 @@ local test_options = {
           args
         )
       end
-      local options = parse(args)
+      local options = self.manager:parse(args)
       expect(options).contains({
         boolean = true,
         number  = 421,
@@ -208,43 +201,42 @@ local test_options = {
       })
       expect(options.numbers).items.equals({ 123, 421 })
       expect(options.strings).items.equals({ "123", "421" })
-      self:teardown()
     end
   end,
   test_action = function (self)
-    expect(parse({ "ACTION" })).contains({
+    expect(self.manager:parse({ "ACTION" })).contains({
       target = "ACTION"
     })
-    expect(parse({ "--version" })).contains({
+    expect(self.manager:parse({ "--version" })).contains({
       target = "version"
     })
-    expect(parse({ "-" })).contains({
+    expect(self.manager:parse({ "-" })).contains({
       target = "help"
     })
   end,
   test_names = function (self)
-    expect(parse({ "ACTION", "A" })).contains({
+    expect(self.manager:parse({ "ACTION", "A" })).contains({
       names = { "A" },
     })
-    expect(parse({ "ACTION", "A", "B" })).contains({
+    expect(self.manager:parse({ "ACTION", "A", "B" })).contains({
       names = { "A", "B" },
     })
   end,
   test_unknown = function (self)
     local track = {}
-    parse({ "ACTION", "-A", "a" }, function (k)
+    self.manager:parse({ "ACTION", "-A", "a" }, function (k)
       push(track, k)
       return true
     end)
     expect(track).equals({ "A" })
     track = {}
-    parse({ "ACTION", "-A", "-B", "a" }, function (k)
+    self.manager:parse({ "ACTION", "-A", "-B", "a" }, function (k)
       push(track, k)
       return true
     end)
     expect(track).equals({ "A", "B" })
     track = {}
-    local options = parse({ "ACTION", "-A", "-B", "b" }, function (k)
+    local options = self.manager:parse({ "ACTION", "-A", "-B", "b" }, function (k)
       if k == "A" then
         push(track, k)
         return true
@@ -259,6 +251,20 @@ local test_options = {
     expect(options).contains({
       B = "b",
       target = "ACTION",
+    })
+  end,
+  test_get_all_infos = function (self)
+    local info_b = self.manager:register(self.info_boolean)
+    local info_n = self.manager:register(self.info_number)
+    local info_s = self.manager:register(self.info_string)
+    local track = {}
+    for info in self.manager:get_all_infos(true) do
+      push(track, info)
+    end
+    expect(track).equals({
+      info_b,
+      info_n,
+      info_s,
     })
   end,
 }
