@@ -1,8 +1,8 @@
 #!/usr/bin/env texlua
 --[[
   This is a test file for l3build package.
-  It is only intending for development and should appear in any distribution of the l3build package.
-  For help, run `texlua ../l3build.lua test -h`
+  It is only intended for development and should appear in any distribution of the l3build package.
+  For help, run `texlua l3build.lua test -h`
 --]]
 
 local push   = table.insert
@@ -24,7 +24,6 @@ local Path = __.Path
 expect(Path).NOT(nil)
 
 local lpeg = require("lpeg")
-local C   = lpeg.C
 local Cs  = lpeg.Cs
 local P   = lpeg.P
 local V   = lpeg.V

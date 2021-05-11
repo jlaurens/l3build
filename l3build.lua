@@ -27,7 +27,6 @@ for those people who are interested.
 --@module l3build
 
 local assert  = assert
-local print   = print
 
 assert(not _G.options, "No self call")
 
@@ -46,8 +45,13 @@ local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
 
 local lfs = require("lfs")
-local currentdir = lfs.currentdir
-local attributes = lfs.attributes
+local currentdir  = lfs.currentdir
+local chdir       = lfs.chdir
+local attributes  = lfs.attributes
+
+-- these are reserved directory names
+local TEST_DIR      = "l3b-test"
+local TEST_ALT_DIR  = "l3b-test-alt"
 
 -- # Start of the booting process
 
@@ -105,7 +109,6 @@ do
   -- Setup dirs where require will look for modules.
 
   local start_dir = currentdir() .. "/" -- this is the current dir at launch time, absolute
-
   -- is_main: whether required by someone else, or not
   local cmd_path = arg[0]
   local cmd_dir, cmd_base = cmd_path:match("(.*/)(.*)")
@@ -128,17 +131,28 @@ do
   ---The max number of trials is the number of components
   ---of the absolute path of `dir`, which majorated in the for loop
   ---Intermediate directories must exist.
+  ---For testing reasons, we do not cross the `l3b-test-alt` component and alike.
   ---@param dir   string @must end with '/'
   ---@param base  string @relative file or directory name
   ---@return string? @dir ends with '/' when non nil
   local function container(dir, base)
-    for _ in gmatch(dir .. currentdir(), "[^/]+") do -- tricky loop
-      local p = dir .. base
-      if attributes(p, "mode") then -- true iff something at the given path
-        return dir
+    local old = currentdir()
+    local result
+    while chdir(dir) do
+      local cwd = currentdir()
+      if cwd:match("/l3b-test-alt$") then
+        break
       end
-      dir = dir .. "../"
+      if attributes(base, "mode") then -- true iff something at the given path
+        result = cwd .. "/"
+        break
+      end
+      dir = dir .. "/../"
     end
+    -- loop over path components
+    chdir(old)
+    print(result)
+    return result
   end
 
   local launch_dir -- the directory containing "l3build.lua"
@@ -152,7 +166,6 @@ do
     launch_dir = container(currentdir(), "l3build.lua") or kpse_dir
   end
   -- launch_dir is absolute as well
-
   ---Calls f when one CLI option starts with "--debug"
   ---@param f fun()
   local function on_debug(f) end -- do nothing by default
@@ -219,13 +232,15 @@ do
     return pkg
   end
 
-  l3build.is_main     = is_main
-  l3build.in_document = in_document
-  l3build.start_dir   = start_dir -- all these are expected to end with a "/"
-  l3build.launch_dir  = launch_dir
-  l3build.script_path = launch_dir .."l3build.lua"
-  l3build.work_dir    = work_dir  -- may be nil
-  l3build.main_dir    = main_dir  -- may be nil as well
+  l3build.TEST_DIR      = TEST_DIR
+  l3build.TEST_ALT_DIR  = TEST_ALT_DIR
+  l3build.is_main       = is_main
+  l3build.in_document   = in_document
+  l3build.start_dir     = start_dir -- all these are expected to end with a "/"
+  l3build.launch_dir    = launch_dir
+  l3build.script_path   = launch_dir .."l3build.lua"
+  l3build.work_dir      = work_dir  -- may be nil
+  l3build.main_dir      = main_dir  -- may be nil as well
 
   register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
 
@@ -299,110 +314,4 @@ if arg[1] == "test" then
   return require("l3build-test").run()
 end
 
---[==[ Branching ]==]
-
-require("l3b-pathlib") -- string div
-
----@type utlib_t
--- local utlib = require("l3b-utillib")
-
---[===[ DEBUG flags ]===]
----@type oslib_t
-local oslib = require("l3b-oslib")
-oslib.Vars.debug.run = true
---[===[ DEBUG flags end ]===]
-
----@type fslib_t
-local fslib = require("l3b-fslib")
-local set_tree_excluder = fslib.set_tree_excluder
-fslib.set_working_directory(l3build.work_dir)
-
--- Terminate here if in document mode
-if in_document then
-  return l3build
-end
-
---[=[ Dealing with options ]=]
-
----@type l3b_cli_t
-local l3b_cli = require("l3build-cli")
-
-l3b_cli.register_builtin_options()
-l3b_cli.register_custom_options(work_dir)
-l3b_cli.register_targets()
-
-l3build.options = l3b_cli.parse(arg, function (arg_i)
-  -- Private special debugging options "--debug-<key>"
-  local key = arg_i:match("^debug%-(%w[%w%d_-]*)")
-  if key then
-    l3build.debug[key:gsub("-", "_")] = true
-    return true
-  end
-end)
-
----@type l3b_globals_t
-local l3b_globals = require("l3build-globals")
-
-l3b_globals.export()
-
-local options   = l3build.options
-
-local debug = options.debug
-
-if debug then -- activate the private special debugging options
-  require("l3b-oslib").Vars.debug.run = l3build.debug.run -- options --debug-run
-  fslib.Vars.debug.copy_core = l3build.debug.copy_core-- options --debug-copy-core
-  fslib.Vars.debug.all  = true
-end
-
-local target = options.target
-
----@type l3b_help_t
-local l3b_help  = require("l3build-help")
-local help      = l3b_help.help
-local version   = l3b_help.version
-
-if target == "help" then
-  help()
-  exit(0)
-elseif target == "version" then
-  version()
-  exit(0)
-end
-
----@type l3b_targets_t
-local l3b_targets_t = require("l3b-targets")
-local process       = l3b_targets_t.process
-
----@type l3b_aux_t
-local l3b_aux = require("l3build-aux")
-local call    = l3b_aux.call
-
--- Load configuration file if running as a script
-if is_main then
-  local f, msg = loadfile(work_dir / "build.lua")
-  if not f then
-    error(msg)
-  end
-  f() -- ignore any output
-end
-
--- bundle and module names recovery
-
----@type G_t
-local G   = l3b_globals.G
----@type Dir_t
-local Dir = l3b_globals.Dir
-
-exit(process(options, {
-  preflight     = function ()
-    -- utlib.flags.cache_bridge = true not yet implemented
-    set_tree_excluder(function (path)
-      return path == Dir.build -- problem with path comparison
-    end)
-  end,
-  at_bundle_top = G.at_bundle_top,
-  module_callback  = function (module_target)
-    return call(G.modules, module_target)
-  end,
-}))
+return require("l3build-main").run()

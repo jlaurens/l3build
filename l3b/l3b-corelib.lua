@@ -141,7 +141,10 @@ local function bridge(kv)
           result = kv.index(self, k)
         end
         if kv.complete then
-          result = kv.complete(self, k, result)
+          local complete = kv.complete(self, k, result)
+          if complete ~= nil then
+            result = complete
+          end
         end
         if kv.secondary then
           local result_2 = kv.secondary[k_G]
@@ -156,7 +159,10 @@ local function bridge(kv)
             elseif result == nil then
               result = result_2
               if kv.complete then
-                result = kv.complete(self, k, result)
+                local complete = kv.complete(self, k, result)
+                if complete ~= nil then
+                  result = complete
+                end
               end
             end
           end

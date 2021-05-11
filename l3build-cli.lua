@@ -189,8 +189,15 @@ end
 local function register_custom_options(work_dir)
   local options_cfg = work_dir .. "options.lua"
   if file_exists(options_cfg) then
-    _G.register_option = register_option
-    dofile(options_cfg)
+    local ENV = setmetatable({}, {
+      __index = _G
+    })
+    ENV.register_option = register_option
+    local f, msg = loadfile(options_cfg, "t", ENV)
+    if not f then
+      error(msg)
+    end
+    f()
   end
 end
 

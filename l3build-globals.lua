@@ -395,7 +395,7 @@ local function get_main_variable(name)
   print("t", packed[1])
   print("l3build.main_dir", l3build.main_dir)
   print("Dir.main" , Dir.main)
-  print("build.lua", read_content(l3build.main_dir .."build.lua"))
+  print("build.lua", read_content(l3build.main_dir / "build.lua"))
   if ok then
     local k, v = packed[1]:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
     return name == k and v or nil
@@ -436,9 +436,10 @@ end
 ---@field public complete    fun(self: VariableEntry, env: table, k: string, v: any): any
 
 ---@class VariableEntry: pre_variable_entry_t
----@field public name   string
----@field public level  integer
----@field public type   string
+---@field public name           string
+---@field public level          integer
+---@field public type           string
+---@field public vanilla_value  any
 
 local VariableEntry = Object:make_subclass("VariableEntry")
 
@@ -557,10 +558,10 @@ local function guess_bundle_module(env)
         end
       end
       if module and module ~= "" then
-        print("Warning, module name ignored: ".. module)
+        print("Warning, module name ignored (in bundle): ".. module)
       end
       module = "" -- not nil!
-    elseif bundle then
+    elseif bundle and bundle ~= "" then
       -- this is a bundle with no modules,
       -- like latex2e
       if module and module ~= "" then
@@ -749,7 +750,7 @@ declare({
   workdir = {
     description = "Working directory",
     index = function (env, k)
-      return l3build.work_dir:gsub(1, -2) -- no trailing "/"
+      return l3build.work_dir:sub(1, -2) -- no trailing "/"
     end
   },
 })
@@ -1328,8 +1329,8 @@ Returns Lua pattern that corresponds to the glob "*.bar".
     description = [[
 `f = path_matcher("*.bar")`
 Returns a function that returns true if its file name argument
-matches "*.bar", false otherwise.Lua pattern that corresponds to the glob "*.bar".
-In that example `f("foo.bar") == true` whereas `f("foo.baz") == false`.
+matches "*.bar", false otherwise. Lua pattern that corresponds to the glob "*.bar".
+In that example `f("foo.bar")` is true whereas `f("foo.baz")` is false.
 ]],
     value       = pathlib.path_matcher,
   },
@@ -1367,6 +1368,7 @@ returns 0 on success, a positive number on error.
   },
   run = {
     description = [[
+`run(cmd, dir)`.
 Executes `cmd`, from the `dir` directory;
 returns an error level.
 ]],
@@ -1374,8 +1376,8 @@ returns an error level.
   },
   splitpath = {
     description = [[
-Returns two strings split at the last |/|: the `dirname(...)` and
-the |basename(...)|.
+Returns two strings split at the last `/`: the `dirname(...)` and
+the `basename(...)`.
 ]],
     value       = pathlib.dir_base,
   },
@@ -1388,7 +1390,8 @@ When called on Windows, returns a string comprising the `path` argument with
   },
   call = {
     description = [[
-Runs the  `l3build` `target` (a string) for each directory in the
+`call(modules, target, options)`.
+Runs the  `l3build` given `target` (a string) for each directory in the
 `dirs` list. This will pass command line options from the parent
 script to the child processes. The `options` table should take the
 same form as the global `options`, described above. If it is
@@ -2025,8 +2028,13 @@ end
 
 VariableEntry.__instance_table = {
   type = function (self)
-    local result = type(get_vanilla()[self.name])
+    local result = type(self.vanilla_value)
     rawset(self, "type", result)
+    return result
+  end,
+  vanilla_value = function (self)
+    local result = get_vanilla()[self.name]
+    rawset(self, "vanilla_value", result)
     return result
   end,
 }

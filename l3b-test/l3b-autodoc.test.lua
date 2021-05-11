@@ -1,8 +1,8 @@
 #!/usr/bin/env texlua
 --[[
   This is a test file for l3build package.
-  It is only intending for development and should appear in any distribution of the l3build package.
-  For help, run `texlua ../l3build.lua test -h`
+  It is only intended for development and should appear in any distribution of the l3build package.
+  For help, run `texlua l3build.lua test -h`
 --]]
 local lpeg    = require("lpeg")
 local P       = lpeg.P

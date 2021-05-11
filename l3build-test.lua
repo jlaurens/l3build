@@ -30,8 +30,6 @@ local lpeg  = require("lpeg")
 
 local l3build = require("l3build")
 
-local TEST_DIR = "l3b-test"
-
 -- next is redundant
 local function pretty_print(tt, indent, done)
   done = done or {}
@@ -299,11 +297,14 @@ end
 
 -- create an environment for test chunks
 local ENV = setmetatable({
+  TEST_DIR        = l3build.TEST_DIR,
+  TEST_ALT_DIR    = l3build.TEST_ALT_DIR,
   LU              = LU,
   expect          = expect,
   pretty_print    = pretty_print,
   push_print      = push_print,
   pop_print       = pop_print,
+  l3build         = l3build,
   during_unit_testing = true,
 }, {
   __index = _G
@@ -335,17 +336,17 @@ l3build.options = {}
 local run = function ()
   if arg[2] == "-h" or arg[2] == "--help" then
     print([[
-Launching tests from the l3b-test/ directory:
+Launching tests from the main directory:
 
-> texlua ../l3build.lua test ".*"
+> texlua l3build.lua test
 
 run all the testsuites
 
-> texlua ../l3build.lua test foo,bar
+> texlua l3build.lua test foo,bar
 
 run tests files which names contain either "foo" or "bar"
 
-> texlua ../l3build.lua test ".*" -p foo -p bar
+> texlua l3build.lua test -p foo -p bar
 
 from all test files run only test containing either "foo" or "bar".
 ]])
@@ -383,32 +384,55 @@ from all test files run only test containing either "foo" or "bar".
   do
     local test_names = {}
     local lfs = require("lfs")
-    for test_name in lfs.dir(l3build.work_dir .. TEST_DIR) do
-      if test_name:match(".*%.test%..*") then
-        for test in arg[2]:gmatch("[^,]+") do
-          if test_name:match(test) then
+    local test_dir = l3build.work_dir .. l3build.TEST_DIR
+    if lfs.attributes(test_dir, "mode") then
+      for test_name in lfs.dir(test_dir) do
+        if test_name:match(".*%.test%..*") then
+          if arg[2] and not arg[2]:match("^%-") then
+            for test in arg[2]:gmatch("[^,]+") do
+              if test_name:match(test) then
+                push(test_names, test_name)
+                break
+              end
+            end
+          else
             push(test_names, test_name)
-            break
           end
         end
       end
-    end
-    all_names = function ()
-      local i = 0
-      return function ()
-        i = i + 1
-        return test_names[i]
+      all_names = function ()
+        local i = 0
+        return function ()
+          i = i + 1
+          return test_names[i] and test_dir .."/".. test_names[i]
+        end
       end
+    elseif arg[2] and not arg[2]:match("^%-") then
+      for test_name in arg[2]:gmatch("[^,]+") do
+        print(test_name)
+        if test_name:match("%.test*.lua$") then
+          push(test_names, test_name)
+        end
+      end
+      all_names = function ()
+        local i = 0
+        return function ()
+          i = i + 1
+          return test_names[i]
+        end
+      end
+    else
+      print("No test to perform")
+      os.exit(1)
     end
   end
-
   for test_name in all_names() do
     if not done[test_name] then
       done[test_name] = true -- don't test it twice
       local name = test_name:gsub( "%.lua$", "")
-      local key  = name:match("(%a-)%.test")
+      local key  = name:match("(%w+)%.test$")
       local path = name .. ".lua"
-      print("Register tests for ".. path)
+      print("Register tests for ".. path:match("[^/]+$"))
       local f = loadfile(path, "t", ENV)
       local tests = f()
       for k, v in pairs(tests) do
@@ -416,9 +440,13 @@ from all test files run only test containing either "foo" or "bar".
       end
     end
   end
-  print("Running all tests")
-  arg[#arg + 1] = "-v" -- error without this
-  os.exit( LU["LuaUnit"].run(table.unpack(arg, 3)) )
+  print("Running all requested tests")
+  local i = 2
+  if arg[2] and not arg[2]:match("^%-") then
+    i = 3
+  end
+  arg[#arg + 1] = "-v"
+  os.exit( LU["LuaUnit"].run(table.unpack(arg, i)) )
   return
 end
 

@@ -165,6 +165,13 @@ function TargetInfo:run(options)
   return run(options.names)
 end
 
+local CONTINUE = {}
+
+---comment
+---@param options options_t
+---@param kvargs target_process_kvargs_t
+---@return boolean
+---@return any
 function TargetInfo:run_high(options, kvargs)
   if self.impl.run_high then
     if options.debug then
@@ -174,7 +181,8 @@ function TargetInfo:run_high(options, kvargs)
     if is_error(error_level) then
       return true, error_level
     end
-    return true, self.impl.run_high(options)
+    local result = self.impl.run_high(options)
+    return result ~= CONTINUE, result
   end
   return false
 end
@@ -369,12 +377,14 @@ local function process(options, kvargs)
 end
 
 ---@class l3b_targets_t
----@field public get_all_infos fun(hidden: boolean): fun(): TargetInfo|nil
----@field public get_info      fun(key: string): TargetInfo
----@field public register_info fun(info: TargetInfo, builtin: boolean)
----@field public process       target_process_f
+---@field public CONTINUE       any @ Special return value
+---@field public get_all_infos  fun(hidden: boolean): fun(): TargetInfo|nil
+---@field public get_info       fun(key: string): TargetInfo
+---@field public register_info  fun(info: TargetInfo, builtin: boolean)
+---@field public process        target_process_f
 
 return {
+  CONTINUE      = CONTINUE,
   get_all_infos = get_all_infos,
   get_info      = get_info,
   register_info = register_info,

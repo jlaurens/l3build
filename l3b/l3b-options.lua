@@ -28,6 +28,8 @@ local push      = table.insert
 
 local stderr  = io.stderr
 
+local Object = require("l3b-object")
+
 ---@type utlib_t
 local utlib             = require("l3b-utillib")
 local readonly          = utlib.readonly
@@ -47,27 +49,31 @@ local flags = {}
 ---@alias option_type_f fun(options: table, key: string, value: string): error_level_n
 
 ---@class option_info_t
----@field public description  string  @short description
+---@field public description  string    @short description
 ---@field public type  string|option_type_f|nil @How to manage values.
----@field public short string|nil  @short CLI key
----@field public long  string  @long CLI key
----@field public name  string  @name in the options table
----@field public expect_value  boolean @False for boolean type, true for the others.
----@field public load_value    fun(options: table, key: string, value?: string): error_level_n load the given value
----@field public builtin       boolean @whether the option is builtin
+---@field public short string|nil       @short CLI key
+---@field public long  string           @long CLI key
+---@field public name  string           @name in the options table
 
----@type table<string, option_info_t>
+---@class OptionInfo: option_info_t
+---@field public builtin       boolean  @whether the option is builtin
+---@field public expect_value  boolean  @False for boolean type, true for the others.
+---@field public load_value    fun(options: table, key: string, value?: string): error_level_n @ load the given value
+
+local OptionInfo = Object:make_subclass("OptionInfo")
+
+---@type table<string, OptionInfo>
 local by_key = {}
----@type table<string, option_info_t>
+---@type table<string, OptionInfo>
 local by_name = {}
----@type table<string, option_info_t>
+---@type table<string, OptionInfo>
 local by_long = {}
 
 ---Return the option info for the given key.
 ---An option info is meant read only.
 ---`key` is "version", "v"...
 ---@param key string
----@return option_info_t
+---@return OptionInfo
 local function get_info_by_key(key)
   return  by_key[key]
 end
@@ -76,7 +82,7 @@ end
 ---An option info is read only.
 ---`key` is "version", "v"...
 ---@param name string
----@return option_info_t
+---@return OptionInfo
 local function get_info_by_name(name)
   return  by_name[name]
 end
@@ -100,48 +106,45 @@ end
 ---@param key     string
 ---@param value?  string
 ---@return error_level_n
-local function load_value(self, options, key, value)
+function OptionInfo:load_value(options, key, value)
   if self.type == "boolean" then
-    options[self.name] = not key:match("^no-")
+    options[self.name] = not key:match("^no%-")
   elseif self.type == "string" then
     options[self.name] = value
   elseif self.type == "number" then
     options[self.name] = tonumber(value)
   elseif type(self.type) == "function" then
     return self.type(options, key, value)
-  else -- string sequence
+  else
     local t = options[self.name] or {}
     options[self.name] = t
-    push(t, value)
+    if self.type == "number[]" then
+      push(t, tonumber(value))
+    else -- string sequence
+      push(t, value)
+    end
   end
   return 0
 end
 
-local chooser_index = function (t, k)
-  if k == "expect_value" then
+OptionInfo.__instance_table = {
+  expect_value = function (self)
     if flags.debug then
-      print("DEBUG options parse expect_value:", t.type)
+      print("DEBUG options parse expect_value:", self.type)
     end
-    return t.type ~= "boolean"
-  end
-  if k == "short" then
-    return nil
-  end
-  if k == "load_value" then
-    return load_value
-  end
-  print(debug.traceback())
-  error("Unknown field name ".. k)
-end
+    return self.type ~= "boolean"
+  end,
+}
 
 ---Register the given option.
 ---If there is a conflict, an error is raised.
 ---@param info    option_info_t
 ---@param builtin boolean|nil
+---@return OptionInfo
 local function register(info, builtin)
   local long  = info.long
   if by_key[long] then
-    error("Option aleady registered for key".. long)
+    error("Option aleady registered for key ".. long)
   end
   local short = info.short
   if short then
@@ -149,7 +152,7 @@ local function register(info, builtin)
       error("Short option is too long: ".. short)
     end
     if by_key[short] then
-      error("Option aleady registered for key".. short)
+      error("Option aleady registered for key ".. short)
     end
   end
   local name  = info.name or long
@@ -160,24 +163,22 @@ local function register(info, builtin)
     error("Reserved option name ".. name)
   end
   assert(info.type)
-  info = {
+  info = OptionInfo({
     short = short,
     long = long,
     name = name,
     description = info.description,
     type = info.type,
     builtin = builtin and true or false,
-  }
-  info = setmetatable(info, {
-    __index = chooser_index
   })
   info = readonly(info)
-  by_name[name] = true
+  by_name[name] = info
   by_long[long] = info
   by_key[long]  = info
   if short then
     by_key[short] = info
   end
+  return info
 end
 
 -- This is done as a function (rather than do ... end) as it allows early
@@ -202,6 +203,8 @@ local function parse(arg, on_unknown)
     -- No options are allowed in position 1, so filter those out
     if a == "--version" then
       result.target = "version"
+    elseif a:match("^%-") then
+      result.target = "help"
     elseif not a:match("^%-") then
       result.target = a
     end
@@ -246,36 +249,43 @@ local function parse(arg, on_unknown)
         print("DEBUG options parse: long")
       end
     end
-    ---@type option_info_t
+    ---@type OptionInfo
     local info = get_info_by_key(k)
     if not info then
-      if on_unknown then
-        local catched = on_unknown(k)
-        if type(catched) == "function" then
-          -- this is a callback to require an associate value
-          if #v == 0 then
-            i = i + 1
-            v = arg[i]
-            if v == nil then
-              error("Missing option value for ".. arg_i);
-            end
-          end
-          if flags.debug then
-            print("DEBUG options parse: catched unknown with value")
-          end
-          catched(v, result)
-        elseif catched then
-          if #v > 1 then
-            error("Unexpected option value in ".. arg_i / v);
-          end
-          if flags.debug then
-            print("DEBUG options parse: catched unknown")
-          end
-          goto top
-        end
+      local no_no = k:match("^no%-(.*)$")
+      if no_no then
+        info = get_info_by_key(no_no)
       end
-      stderr:write("Unknown option " .. arg_i .."\n")
-      return { target = "help" }
+      if not info then
+        if on_unknown then
+          local catched = on_unknown(k)
+          if type(catched) == "function" then
+            -- this is a callback to require an associate value
+            if #v == 0 then
+              i = i + 1
+              v = arg[i]
+              if v == nil then
+                error("Missing option value for ".. arg_i);
+              end
+            end
+            if flags.debug then
+              print("DEBUG options parse: catched unknown with value")
+            end
+            catched(v, result)
+            goto top
+          elseif catched then
+            if #v > 1 then
+              error("Unexpected option value in ".. arg_i / v);
+            end
+            if flags.debug then
+              print("DEBUG options parse: catched unknown")
+            end
+            goto top
+          end
+        end
+        stderr:write("Unknown option " .. arg_i .."\n")
+        return { target = "help" }
+      end
     end
     if info.expect_value then
       if #v == 0 then
@@ -298,21 +308,35 @@ local function parse(arg, on_unknown)
   return result
 end
 
+local function reset()
+  local result = by_key
+  by_key = {}
+  by_name = {}
+  return result
+end
 ---@alias l3b_options_parse_f fun(arg: string[]): table<string, any>
 
 ---@class l3b_options_t
 ---@field public ut_flags_t        options_flags_t
----@field public get_all_infos      fun(hidden: boolean): fun(): option_info_t|nil
----@field public get_info_by_key   fun(key: string): option_info_t
----@field public get_info_by_name  fun(name: string): option_info_t
+---@field public get_all_infos     fun(hidden: boolean): fun(): OptionInfo|nil
+---@field public get_info_by_key   fun(key: string): OptionInfo
+---@field public get_info_by_name  fun(name: string): OptionInfo
 ---@field public register          fun(info: option_info_t, builtin: boolean)
 ---@field public parse             l3b_options_parse_f
 
 return {
   flags             = flags,
-  get_all_infos      = get_all_infos,
+  get_all_infos     = get_all_infos,
   get_info_by_key   = get_info_by_key,
   get_info_by_name  = get_info_by_name,
   register          = register,
   parse             = parse,
+},
+---@class __l3b_options_t
+---@field private reset fun()
+---@field private OptionInfo OptionInfo
+_ENV.during_unit_testing and
+{
+  reset       = reset,
+  OptionInfo  = OptionInfo,
 }

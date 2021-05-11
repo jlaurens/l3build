@@ -72,7 +72,7 @@ end
 ---A module is the path of a directory relative to the main one.
 ---Uses `run` to launch a command: change to the module directory,
 ---then executes texlua with proper arguments.
----@param modules string[] @List of modules.
+---@param modules string[] @List of directory modules.
 ---@param target  string
 ---@param opts    options_t|nil
 ---@return error_level_n @0 on proper termination, a non 0 error code otherwise.

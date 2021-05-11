@@ -47,7 +47,11 @@ local G     = l3b_globals.G
 ---@type Dir_t
 local Dir   = l3b_globals.Dir
 local get_vanilla_globals = l3b_globals.get_vanilla
-local all_global_entries = l3b_globals.all_entries
+local all_global_entries  = l3b_globals.all_entries
+
+---@type l3b_targets_t
+local l3b_targets = require("l3b-targets")
+local CONTINUE = l3b_targets.CONTINUE
 
 local function version()
   print(
@@ -159,7 +163,7 @@ local function print_status()
     return e.type ~= "function"
   end) do
     local filler = (" "):rep(width - #entry.name)
-    local is_custom = entry:get_vanilla_value() ~= G[entry.name]
+    local is_custom = entry.vanilla_value ~= G[entry.name]
     print("  ".. entry.name .. filler .. (is_custom and " (*)" or ""), entry.type)
   end
 
@@ -226,14 +230,14 @@ local function print_status()
 end
 
 ---High level status runner
+---@param options options_t
 ---@return error_level_n?
-local function status_high()
-  local options = l3build.options
+local function status_high(options)
   local name = options.get_main_variable
   if name then
     return l3b_globals.handle_get_main_variable(name, options.config)
   end
-  print("NOT A RUN HIGH")
+  return CONTINUE
 end
 
 ---Display status information.
@@ -245,12 +249,15 @@ local function status_run()
   print("Status information:")
   local bundle, module = G.bundle, G.module
   if not l3build.in_document then
-    if G.at_bundle_top then
+    if G.is_standalone then
+      print(  "  module: ".. module)
+      print(  "  path:  ".. absolute_path(Dir.work))
+    elseif G.at_bundle_top then
+      -- this is a top bundle
+      print(  "  bundle: ".. bundle)
+      print(  "  path:  ".. absolute_path(Dir.work))
       local modules = G.modules
       if #modules > 0 then
-        -- this is a top bundle
-        print(  "  bundle: ".. bundle)
-        print(  "  path:  ".. absolute_path(Dir.work))
         local mm = {}
         for m in entries(modules, { compare = compare_ascending}) do
           push(mm, ("%s (./%s)"):format(m:lower(), m))
@@ -260,10 +267,6 @@ local function status_run()
         else
           print("  module: ".. mm[1])
         end
-      else
-        -- this is a standalone module (not in a bundle).
-        print(  "  module: ".. module)
-        print(  "  path:  ".. absolute_path(Dir.work))
       end
     else
       -- a module inside a bundle
@@ -271,8 +274,8 @@ local function status_run()
       print(    "  module: ".. module)
       print(    "  path:  ".. absolute_path(Dir.work))
     end
-    print(      "  start: ".. l3build.start_dir)
-    print(      "  launch: ".. l3build.launch_dir)
+    print(      "  start: ".. l3build.start_dir / '.')
+    print(      "  launch: ".. l3build.launch_dir / '.')
   end
   print()
   if l3build.options.debug then
