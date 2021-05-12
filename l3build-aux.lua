@@ -31,6 +31,7 @@ local concat  = table.concat
 local utlib             = require("l3b-utillib")
 local entries           = utlib.entries
 local to_quoted_string  = utlib.to_quoted_string
+local is_error          = utlib.is_error
 
 local pairs   = pairs -- cache after `l3b-utillib` is loaded.
 
@@ -120,7 +121,7 @@ local function call(modules, target, opts)
       print("DEBUG Info: execute ".. cmd)
     end
     local error_level = run(module, cmd)
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
   end
@@ -138,7 +139,7 @@ local function deps_install(deps)
   for dep in entries(deps) do
     print("Installing dependency: " .. dep)
     error_level = run(dep, "texlua " .. quoted_path(l3build.script_path) .. " unpack -q")
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
   end

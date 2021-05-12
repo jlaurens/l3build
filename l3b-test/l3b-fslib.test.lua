@@ -357,8 +357,29 @@ local test_directory = {
     expect(rename(".", "b", "b")).is(0)
     expect(file_exists("a")).is(false)
     expect(file_exists("b")).is(true)
-    print("\nNext error is expected")
+    local track
+    _ENV.push_print(function (x)
+      track = x
+    end)
     expect(rename("..", "."..self.random_name, "a")).NOT(0)
+    _ENV.pop_print()
+    expect(track:match(self.random_name)).NOT(nil)
+  end,
+  test_poor_man_rename = function (self)
+    self:make_random_directory()
+    fslib.Vars.poor_man_rename = true
+    write_content("a", "")
+    expect(file_exists("a")).is(true)
+    expect(file_exists("b")).is(false)
+    expect(rename(".", "a", "b")).is(0)
+    expect(file_exists("a")).is(false)
+    expect(file_exists("b")).is(true)
+    expect(rename(".", "b", "b")).is(0)
+    expect(file_exists("a")).is(false)
+    expect(file_exists("b")).is(true)
+    print("Next error is expected")
+    expect(rename("..", "."..self.random_name, "a")).NOT(0)
+    fslib.Vars.poor_man_rename = false
   end,
   test___copy_core = function (self)
     self:make_random_directory()

@@ -25,6 +25,7 @@ for those people who are interested.
 local execute     = os.execute
 local remove      = os.remove
 local os_type     = os["type"]
+local os_rename   = os.rename
 
 local push        = table.insert
 local pop         = table.remove
@@ -38,6 +39,7 @@ local get_directory_content     = lfs.dir
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
+local is_error    = utlib.is_error
 local entries     = utlib.entries
 local first_of    = utlib.first_of
 
@@ -54,11 +56,13 @@ local quoted_path = oslib.quoted_path
 -- implementation
 
 ---@class fslib_vars_t
----@field public debug     flags_t
+---@field public debug          flags_t
+---@field public poor_man_rename boolean
 
 ---@type fslib_vars_t
 local Vars = setmetatable({
-  debug = {}
+  debug = {},
+  poor_man_rename = false,
 }, {
   __index = function (t, k)
     if k == "working_directory" then
@@ -442,17 +446,27 @@ local function tree(dir_path, glob)
 end
 
 ---Rename. Whether paths are properly escaped is another story...
+---Implementation detail: For what reason `os.rename` is not used ?
 ---@param dir_path string
 ---@param source string @the base name of the source
 ---@param dest string @the base name of the destination
 ---@return error_level_n  @ 0 on success, 1 on failure
 local function rename(dir_path, source, dest)
-  if os_type == "windows" then
-    -- BEWARE: os.execute return value is not lua's original one!
-    return execute("ren " .. unix_to_win(dir_path / source) .. " " .. base_name(dest) )
-  else
-    return execute("mv " .. dir_path / source .. " " .. dir_path / dest)
+  if Vars.poor_man_rename then
+    if os_type == "windows" then
+      -- BEWARE: os.execute return value is not lua's original one!
+      return execute("ren " .. unix_to_win(dir_path / source) .. " " .. base_name(dest) )
+    else
+      return execute("mv " .. dir_path / source .. " " .. dir_path / dest)
+    end
   end
+  source  = dir_path / source
+  dest    = dir_path / dest
+  local ok, msg = os_rename(source, dest)
+  if not ok then
+    print(("rename %s to %s: %s"):format(source, dest, msg))
+  end
+  return ok and 0 or 1
 end
 
 ---Private function.
@@ -526,7 +540,7 @@ local function copy_tree(glob, source, dest)
   local function helper(g)
     for p in tree(source, g) do
       error_level = copy_core(dest, p.src, p.wrk)
-      if error_level ~= 0 then
+      if is_error(error_level) then
         return
       end
     end
@@ -541,14 +555,14 @@ local function copy_tree(glob, source, dest)
         print("DEBUG copy_tree", "<"..g..">")
       end
       helper(g)
-      if error_level ~= 0 then
+      if is_error(error_level) then
         return error_level
       end
     end
   elseif type(glob) == "table" then
     for g in entries(glob) do
       helper(g)
-      if error_level ~= 0 then
+      if is_error(error_level) then
         return error_level
       end
     end
@@ -588,7 +602,7 @@ end
 ---@return error_level_n
 local function make_clean_directory(path)
   local error_level = make_directory(path)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   return remove_tree(path, "**")

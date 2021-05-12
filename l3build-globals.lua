@@ -107,6 +107,7 @@ local bridge            = corelib.bridge
 
 ---@type utlib_t
 local utlib             = require("l3b-utillib")
+local is_error          = utlib.is_error
 local entries           = utlib.entries
 local compare_ascending = utlib.compare_ascending
 local first_of          = utlib.first_of
@@ -1681,19 +1682,19 @@ end
 ---@return error_level_n
 local function typeset(file, dir, cmd)
   local error_level = G.tex(file, dir, cmd)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   local name = job_name(file)
   error_level = G.biber(name, dir) + G.bibtex(name, dir)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   for i = 2, G.typesetruns do
     error_level = G.makeindex(name, dir, ".glo", ".gls", ".glg", G.glossarystyle)
                 + G.makeindex(name, dir, ".idx", ".ind", ".ilg", G.indexstyle)
                 + G.tex(file, dir, cmd)
-    if error_level ~= 0 then break end
+    if is_error(error_level) then break end
   end
   return error_level
 end

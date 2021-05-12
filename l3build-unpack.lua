@@ -24,17 +24,14 @@ for those people who are interested.
 
 local popen = io.popen
 
----@type l3b_aux_t
-local l3b_aux       = require("l3build-aux")
-local deps_install  = l3b_aux.deps_install
+---@type pathlib_t
+local pathlib           = require("l3b-pathlib")
+local dir_base          = pathlib.dir_base
 
 ---@type utlib_t
-local utlib   = require("l3b-utillib")
-local entries = utlib.entries
-
----@type pathlib_t
-local pathlib             = require("l3b-pathlib")
-local dir_base          = pathlib.dir_base
+local utlib     = require("l3b-utillib")
+local entries   = utlib.entries
+local is_error  = utlib.is_error
 
 ---@type oslib_t
 local oslib             = require("l3b-oslib")
@@ -48,6 +45,10 @@ local make_directory        = fslib.make_directory
 local make_clean_directory  = fslib.make_clean_directory
 local tree                  = fslib.tree
 local quoted_absolute_path  = fslib.quoted_absolute_path
+
+---@type l3b_aux_t
+local l3b_aux       = require("l3build-aux")
+local deps_install  = l3b_aux.deps_install
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -79,17 +80,17 @@ local function bundleunpack(source_dirs, sources)
   sources = sources or { Files.source }
   local options = l3build.options
   local error_level = make_directory(Dir[l3b_globals.LOCAL])
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   error_level = make_clean_directory(Dir.unpack)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   for src_dir in entries(source_dirs) do
     for globs in entries(sources) do
       error_level = copy_tree(globs, src_dir, Dir.unpack)
-      if error_level ~= 0 then
+      if is_error(error_level) then
         return error_level
       end
     end
@@ -99,7 +100,7 @@ local function bundleunpack(source_dirs, sources)
     Dir.support,
     Dir[l3b_globals.LOCAL]
   )
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   for glob in entries(Files.unpack) do
@@ -137,11 +138,11 @@ end
 ---@return error_level_n
 local function unpack(sources, source_dirs)
   local error_level = deps_install(Deps.unpack)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   error_level = G.bundleunpack(source_dirs, sources)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   return copy_tree(
@@ -155,7 +156,7 @@ end
 ---@return error_level_n
 local function module_unpack()
   local error_level = deps_install(Deps.unpack)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   return G.bundleunpack()

@@ -27,6 +27,7 @@ local exit    = os.exit
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
+local is_error      = utlib.is_error
 local entries       = utlib.entries
 local unique_items  = utlib.unique_items
 
@@ -118,7 +119,7 @@ local function tag(tag_names)
       for p in tree(dir, glob) do
         local file = p.wrk
         error_level = update_file_tag(file, tag_name, tag_date)
-        if error_level ~= 0 then
+        if is_error(error_level) then
           return error_level
         end
       end

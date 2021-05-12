@@ -27,6 +27,7 @@ local push   = table.insert
 
 ---@type utlib_t
 local utlib         = require("l3b-utillib")
+local is_error          = utlib.is_error
 local entries       = utlib.entries
 local keys          = utlib.keys
 local unique_items  = utlib.unique_items
@@ -65,7 +66,7 @@ local function clean()
                     + make_clean_directory(Dir.test)
                     + make_clean_directory(Dir.typeset)
                     + make_clean_directory(Dir.unpack)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   if l3build.options.debug then
@@ -94,7 +95,7 @@ local function clean()
     for p_src in entries(clean_list, true) do
       if not exclude[p_src] then
         error_level = remove_tree(dir, p_src)
-        if error_level ~= 0 then
+        if is_error(error_level) then
           return error_level
         end
       end

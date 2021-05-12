@@ -47,16 +47,20 @@ local exit            = os.exit
 local execute         = os.execute
 local remove          = os.remove
 
----@type utlib_t
-local utlib           = require("l3b-utillib")
-local deep_copy       = utlib.deep_copy
-local entries         = utlib.entries
-local first_of        = utlib.first_of
-
 ---@type pathlib_t
 local pathlib       = require("l3b-pathlib")
 local job_name      = pathlib.job_name
 local path_matcher  = pathlib.path_matcher
+
+---@type corelib_t
+local corelib         = require("l3b-corelib")
+local deep_copy       = corelib.deep_copy
+
+---@type utlib_t
+local utlib           = require("l3b-utillib")
+local is_error          = utlib.is_error
+local entries         = utlib.entries
+local first_of        = utlib.first_of
 
 ---@type oslib_t
 local oslib         = require("l3b-oslib")
@@ -110,7 +114,7 @@ local Deps      = l3b_globals.Deps
 ---@type Opts_t
 local Opts      = l3b_globals.Opts
 
--- Variables
+-- Module implementation
 
 ---dvi2pdf, used while checking
 ---@param name string
@@ -120,7 +124,8 @@ local Opts      = l3b_globals.Opts
 ---@return error_level_n
 local function dvi2pdf(name, dir, engine, hide)
   return run(
-    dir, cmd_concat(
+    dir,
+    cmd_concat(
       set_epoch_cmd(G.epoch, G.forcecheckepoch),
       "dvips " .. name .. Xtn.dvi
         .. (hide and (" > " .. OS.null) or ""),
@@ -166,9 +171,9 @@ end
 
 ---Apply the `translator` to the content at `path_in`
 ---and save the result to `path_out`.
----@param path_in string
----@param path_out string
----@param translator fun(content: string, ...): string
+---@param path_in     string
+---@param path_out    string
+---@param translator  fun(content: string, ...): string
 ---@vararg any
 local function rewrite(path_in, path_out, translator, ...)
   local content = read_content(path_in, true)
@@ -1153,7 +1158,7 @@ local function check(test_names)
         end
       end
     end    
-    if error_level ~= 0 then
+    if is_error(error_level) then
       check_diff()
     else
       print("\n  All checks passed\n")
@@ -1230,7 +1235,7 @@ local function check_high(options)
     for config in entries(check_configs) do
       opts.config = { config }
       error_level = call({ "." }, "check", opts)
-      if error_level ~= 0 then
+      if is_error(error_level) then
         if halt_on_error then
           return error_level
         else
@@ -1277,9 +1282,12 @@ local function configure_check(options)
 end
 
 ---@class l3b_check_t
----@field public check_impl        target_impl_t
----@field public module_check_impl target_impl_t
----@field public save_impl         target_impl_t
+---@field public rewrite_pdf        function
+---@field public rewrite_log        function
+---@field public compare_tlg        function
+---@field public check_impl         target_impl_t
+---@field public module_check_impl  target_impl_t
+---@field public save_impl          target_impl_t
 
 return {
   rewrite_pdf = rewrite_pdf,

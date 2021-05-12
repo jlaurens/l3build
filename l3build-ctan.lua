@@ -25,27 +25,28 @@ for those people who are interested.
 local print = print
 
 ---@type utlib_t
-local utlib   = require("l3b-utillib")
-local entries = utlib.entries
-local items   = utlib.items
-local to_quoted_string = utlib.to_quoted_string
+local utlib = require("l3b-utillib")
+local is_error          = utlib.is_error
+local entries           = utlib.entries
+local items             = utlib.items
+local to_quoted_string  = utlib.to_quoted_string
 
 ---@type pathlib_t
-local pathlib    = require("l3b-pathlib")
-local dir_name = pathlib.dir_name
+local pathlib   = require("l3b-pathlib")
+local dir_name  = pathlib.dir_name
 
 ---@type oslib_t
 local oslib = require("l3b-oslib")
 local run   = oslib.run
 
 ---@type fslib_t
-local fslib           = require("l3b-fslib")
-local make_directory  = fslib.make_directory
-local file_exists     = fslib.file_exists
-local tree            = fslib.tree
-local remove_tree     = fslib.remove_tree
-local copy_tree       = fslib.copy_tree
-local rename          = fslib.rename
+local fslib             = require("l3b-fslib")
+local make_directory    = fslib.make_directory
+local file_exists       = fslib.file_exists
+local tree              = fslib.tree
+local remove_tree       = fslib.remove_tree
+local copy_tree         = fslib.copy_tree
+local rename            = fslib.rename
 local remove_directory  = fslib.remove_directory
 
 ---@type l3build_t
@@ -105,7 +106,7 @@ end
 ---@return error_level_n
 local function module_ctan()
   local error_level = install_files(Dir.tds, true)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   copy_ctan()
@@ -124,7 +125,7 @@ local function ctan()
   else
     error_level = call({ "." }, "check")
   end
-  if error_level ~= 0 then
+  if is_error(error_level) then
     print("\n====================")
     print("Tests failed, zip stage skipped!")
     print("====================\n")
@@ -136,13 +137,13 @@ local function ctan()
   make_directory(Dir.tds)
   if is_embedded then
     error_level = install_files(Dir.tds, true)
-    if error_level ~= 0 then
+    if is_error(error_level) then
       return error_level
     end
     copy_ctan()
   else
     error_level = call(G.modules, "module_ctan")
-    if error_level ~= 0 then
+    if is_error(error_level) then
       print("\n====================")
       print("Typesetting failed, zip stage skipped!")
       print("====================\n")

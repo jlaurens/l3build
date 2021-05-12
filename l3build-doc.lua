@@ -32,6 +32,7 @@ local not_empty = next
 
 ---@type utlib_t
 local utlib       = require("l3b-utillib")
+local is_error    = utlib.is_error
 local entries     = utlib.entries
 local items       = utlib.items
 
@@ -93,7 +94,7 @@ local function typesetpdf(file, dir)
     cmd  = special.cmd  or cmd
   end
   local error_level = func(file, dir, cmd)
-  if error_level ~= 0 then
+  if is_error(error_level) then
     print(" ! Compilation failed")
     return error_level
   end
@@ -118,7 +119,7 @@ local function docinit()
   unpack({ Files.source, Files.typesetsource }, { Dir.sourcefile, Dir.docfile })
   -- Main loop for doc creation
   local error_level = G.typeset_demo_tasks()
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   return G.docinit_hook()
@@ -130,7 +131,7 @@ end
 ---@return error_level_n
 local function doc(files)
   local error_level = docinit()
-  if error_level ~= 0 then
+  if is_error(error_level) then
     return error_level
   end
   ---@type flags_t
@@ -156,7 +157,7 @@ local function doc(files)
             -- Now know if we should typeset this source
             if should_typeset then
               error_level = typesetpdf(src_name, src_dir)
-              if error_level ~= 0 then
+              if is_error(error_level) then
                 return error_level
               end
               done[name] = true

@@ -46,8 +46,8 @@ local set_tree_excluder = fslib.set_tree_excluder
 
 --[==[ DEBUG flags ]==]
 ---@type oslib_t
-local oslib = require("l3b-oslib")
-oslib.Vars.debug.run = true
+-- local oslib = require("l3b-oslib")
+-- oslib.Vars.debug.run = true
 --[==[ DEBUG flags end ]==]
 
 ---@type l3b_aux_t
