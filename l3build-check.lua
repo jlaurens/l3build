@@ -92,8 +92,11 @@ local l3build = require("l3build")
 local l3b_aux       = require("l3build-aux")
 local call          = l3b_aux.call
 local set_epoch_cmd = l3b_aux.set_epoch_cmd
-local deps_install  = l3b_aux.deps_install
 local load_unique_config = l3b_aux.load_unique_config
+
+--@type l3b_unpk_t
+local l3b_unpk      = require("l3build-unpack")
+local deps_install  = l3b_unpk.deps_install
 
 ---@type l3b_help_t
 local l3b_help  = require("l3build-help")

@@ -25,12 +25,13 @@ for those people who are interested.
 --]]
 
 --@module l3build
+local banner = {
+  "DEVELOPMENT: REFACTOR BRANCH",
+}
 
 local assert  = assert
 
 assert(not _G.options, "No self call")
-
-print("DEVELOPMENT: REFACTOR BRANCH")
 
 -- Version information
 release_date = "2020-06-04"
@@ -38,6 +39,8 @@ release_date = "2020-06-04"
 -- Local access to functions
 
 local ipairs    = ipairs
+
+local push = table.insert
 
 local kpse = require("kpse")
 kpse.set_program_name("kpsewhich")
@@ -92,6 +95,7 @@ local the_debug = {}
 ---@field public options      options_t
 ---@field public flags        flags_t
 ---@field public main         Main
+---@field public banner       string[]
 
 local l3build = { -- global data available as package.
   debug         = the_debug, -- storage for special debug flags (private UI)
@@ -99,9 +103,13 @@ local l3build = { -- global data available as package.
   -- these are reserved directory names
   TEST_DIR      = "l3b-test",
   TEST_ALT_DIR  = "l3b-test-alt",
+  banner = banner,
 }
 
-print(in_document and "Document mode" or "Bundle mode")
+push(
+  banner,
+  in_document and "Document mode" or "Bundle mode"
+)
 
 do
   -- the directory containing "l3build.lua" by kpse, absolute
@@ -152,7 +160,7 @@ do
     end
     -- loop over path components
     chdir(old)
-    print(result)
+    -- print(result)
     return result
   end
 

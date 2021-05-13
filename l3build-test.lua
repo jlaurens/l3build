@@ -353,6 +353,22 @@ from all test files run only test containing either "foo" or "bar".
 ]])
     os.exit(0)
   end
+  -- test shortcut:
+  -- when a `l3b_test_diagnostic` file exists
+  -- execute it and return its result
+  local l3b_test_diagnostic_path = l3build.work_dir .. "l3b_test_diagnostic.lua"
+  --l3b_test_diagnostic_path = "/Users/jlaurens/Desktop/l3b_test_diagnostic.lua"
+  if lfs.attributes(l3b_test_diagnostic_path, "mode") then
+    local f, msg = loadfile(l3b_test_diagnostic_path)
+    if not f then
+      error(msg)
+    end
+    print("DIAGNOSTIC", l3b_test_diagnostic_path)
+    local result = f()
+    print("DEBUGGG DID IT WORK????")
+    return result
+  end
+  print("NO DIAGNOSTIC", l3b_test_diagnostic_path)
   ---@type table<string,boolean>
   local done = {}
   -- arg[2] is a comma separated list of names
@@ -391,13 +407,59 @@ from all test files run only test containing either "foo" or "bar".
   local temporary_file_name = os.tmpname()
   os.remove(temporary_file_name)
   local temporary_dir = temporary_file_name:match("^.*/")
-    .. '/l3build'
+    .. 'l3build'
     .. ENV.random_string()
   lfs.mkdir(temporary_dir)
 
   function ENV.make_temporary_dir(name)
-    local result = temporary_dir .. '/' .. name
+    local result = temporary_dir .. '/' .. (name or ENV.random_string())
     return lfs.mkdir(result) and result or nil
+  end
+
+  ---comment
+  ---@param dir string    @ directory must exist
+  ---@param name string   @ name of the module
+  ---@param build_content string  @ content of `build.lua`
+  ---@return string|nil   @ path of the module, nil on error
+  ---@return nil|error_level_n @ positive number on error, nil otherwise
+  function ENV.create_test_module(dir, name, build_content, test_content)
+    local result = dir .."/".. name
+    if not lfs.mkdir(result) then
+      return nil, 1
+    end
+    local file_path = result .."/build.lua"
+    local fh = assert(io.open(file_path, "w"))
+    if not fh then
+      return nil, 1
+    end
+    build_content = "#!/usr/bin/env texlua\n".. build_content
+    if os["type"] == "windows" then
+      build_content = build_content:gsub("\n", "\r\n")
+    end
+    local error_level
+    if not fh:write(build_content) then
+      result = nil
+      error_level = 1
+    end
+    fh:close()
+    if test_content then
+      -- test_content = "#!/usr/bin/env texlua\n".. test_content
+      if os["type"] == "windows" then
+        test_content = test_content:gsub("\n", "\r\n")
+      end
+      file_path = result .."/l3b_test_diagnostic.lua"
+      print("diagnostic file_path", file_path, test_content)
+      fh = assert(io.open(file_path, "w"))
+      if not fh then
+        return nil, 1
+      end
+      if not fh:write(test_content) then
+        result = nil
+        error_level = 1
+      end
+      fh:close()
+    end
+    return result, error_level
   end
 
   ---@type fun(): string|nil @ string iterator
@@ -468,7 +530,34 @@ from all test files run only test containing either "foo" or "bar".
   end
   arg[#arg + 1] = "-v"
   local result = LU["LuaUnit"].run(table.unpack(arg, i))
-  lfs.rmdir(temporary_dir)
+  print("Removing", temporary_dir)
+  -- os.exit( result )
+  -- no recursive call
+  do
+    local dirs = { temporary_dir }
+    local j = 0
+    local files = {}
+    while j < #dirs do
+      j = j + 1
+      local dir = dirs[j]
+      for entry in lfs.dir(dir) do
+        if entry ~= "." and entry ~= ".." then
+          local path = dir .."/".. entry
+          if lfs.attributes(path, "mode") == "directory" then
+            push(dirs, path)
+          else
+            push(files, path)
+          end
+        end
+      end
+    end
+    for jj = #files, 1, -1 do
+      os.remove(files[jj])
+    end
+    for jj = #dirs, 1, -1 do
+      lfs.rmdir(dirs[jj])
+    end
+  end
   os.exit( result )
   return
 end

@@ -304,11 +304,6 @@ local tbl_unpack  = table.unpack
 
 --[=[ Package implementation ]=]
 
-local MT = getmetatable("")
-function MT.__div(a, b)
-  return a .."/".. b
-end
-
 --[==[ Readonly business
 A readonly table is not immutable because we can always use `rawset`.
 The purpose is to prevent spurious higher changes like `foo.bar = baz`.

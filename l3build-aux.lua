@@ -128,24 +128,6 @@ local function call(modules, target, opts)
   return 0
 end
 
----Unpack the given dependencies.
----A dependency is the path of a directory relative to the main one.
----@param deps table @regular array of dependencies. See `Deps`fields.
----@return number @0 on proper termination, a non 0 error code otherwise.
----@see stdmain, check, unpack, typesetting
----@usage Private?
-local function deps_install(deps)
-  local error_level
-  for dep in entries(deps) do
-    print("Installing dependency: " .. dep)
-    error_level = run(dep, "texlua " .. quoted_path(l3build.script_path) .. " unpack -q")
-    if is_error(error_level) then
-      return error_level
-    end
-  end
-  return 0
-end
-
 ---Load the config file, when unique and not "build".
 ---The return value is used to setup the global `G.config_suffix`.
 ---@param options options_t
@@ -176,13 +158,11 @@ local function load_unique_config(options, configs)
 end
 
 ---@class l3b_aux_t
----@field public deps_install  fun(deps: table): number
 ---@field public call          fun(modules: string[], target: string, opts: table): number
 ---@field public set_epoch_cmd fun(epoch: string, force: boolean): string
 ---@field public load_unique_config  fun(options: options_t): error_level_n
 
 return {
-  deps_install        = deps_install,
   call                = call,
   set_epoch_cmd       = set_epoch_cmd,
   load_unique_config  = load_unique_config,

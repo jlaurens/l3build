@@ -106,6 +106,52 @@ local function help()
   print("Copyright (C) 2014-2020 The LaTeX Project")
 end
 
+local function pretty_print(tt, dflt, indent, done)
+  dflt = dflt or {}
+  done = done or {}
+  indent = indent or 0
+  if type(tt) == "table" then
+    local w = 0
+    local has_custom = false
+    for k in keys(tt) do
+      local l = #tostring(k)
+      if l > w then
+        w = l
+      end
+      has_custom = has_custom or tt[k] ~= dflt[k]
+    end
+    for k, v in sorted_pairs(tt) do
+      local after_equals
+      if has_custom then
+        after_equals = v == dflt[k] and "    " or "(*) "
+      else
+        after_equals = ""
+      end
+      local filler = (" "):rep(w - #tostring(k))
+      write((" "):rep(indent)) -- indent it
+      if type(v) == "table" and not done[v] then
+        done[v] = true
+        if next(v) then
+          write(('["%s"]%s = %s{\n'):format(tostring(k), filler, after_equals))
+          pretty_print(v, dflt[k], indent + w + 7, done)
+          write((" "):rep( indent + w + 5)) -- indent it
+          write("}\n")
+        else
+          write(('["%s"]%s = %s{}\n'):format(tostring(k), filler, after_equals))
+        end
+      elseif type(v) == "string" then
+        write(('["%s"]%s = %s"%s"\n'):format(
+            tostring(k), filler, after_equals, tostring(v)))
+      else
+        write(('["%s"]%s = %s%s\n'):format(
+            tostring(k), filler, after_equals, tostring(v)))
+      end
+    end
+  else
+    write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
+  end
+end
+
 ---Print status for global function and hooks,
 ---for global variables as well.
 local function print_status()
@@ -181,51 +227,6 @@ local function print_status()
   print("")
   print(("Global variables (%d), (*) for custom ones"):format(variables_n))
 -- Print anything - including nested tables
-  local function pretty_print(tt, dflt, indent, done)
-    dflt = dflt or {}
-    done = done or {}
-    indent = indent or 0
-    if type(tt) == "table" then
-      local w = 0
-      local has_custom = false
-      for k in keys(tt) do
-        local l = #tostring(k)
-        if l > w then
-          w = l
-        end
-        has_custom = has_custom or tt[k] ~= dflt[k]
-      end
-      for k, v in sorted_pairs(tt) do
-        local after_equals
-        if has_custom then
-          after_equals = v == dflt[k] and "    " or "(*) "
-        else
-          after_equals = ""
-        end
-        local filler = (" "):rep(w - #tostring(k))
-        write((" "):rep(indent)) -- indent it
-        if type(v) == "table" and not done[v] then
-          done[v] = true
-          if next(v) then
-            write(('["%s"]%s = %s{\n'):format(tostring(k), filler, after_equals))
-            pretty_print(v, dflt[k], indent + w + 7, done)
-            write((" "):rep( indent + w + 5)) -- indent it
-            write("}\n")
-          else
-            write(('["%s"]%s = %s{}\n'):format(tostring(k), filler, after_equals))
-          end
-        elseif type(v) == "string" then
-          write(('["%s"]%s = %s"%s"\n'):format(
-              tostring(k), filler, after_equals, tostring(v)))
-        else
-          write(('["%s"]%s = %s%s\n'):format(
-              tostring(k), filler, after_equals, tostring(v)))
-        end
-      end
-    else
-      write(tostring(tt) .. (tt ~= dflt and "(*)" or '') .."\n")
-    end
-  end
   pretty_print(variables, get_vanilla_globals())
 end
 
@@ -298,4 +299,5 @@ return {
     run         = status_run,
     run_bundle  = status_run,
   },
+  pretty_print  = pretty_print,
 }

@@ -34,9 +34,11 @@ local entries   = utlib.entries
 local is_error  = utlib.is_error
 
 ---@type oslib_t
-local oslib             = require("l3b-oslib")
-local cmd_concat        = oslib.cmd_concat
-local OS                = oslib.OS
+local oslib       = require("l3b-oslib")
+local cmd_concat  = oslib.cmd_concat
+local OS          = oslib.OS
+local run         = oslib.run
+local quoted_path = oslib.quoted_path
 
 ---@type fslib_t
 local fslib                 = require("l3b-fslib")
@@ -45,10 +47,6 @@ local make_directory        = fslib.make_directory
 local make_clean_directory  = fslib.make_clean_directory
 local tree                  = fslib.tree
 local quoted_absolute_path  = fslib.quoted_absolute_path
-
----@type l3b_aux_t
-local l3b_aux       = require("l3build-aux")
-local deps_install  = l3b_aux.deps_install
 
 ---@type l3build_t
 local l3build = require("l3build")
@@ -68,25 +66,55 @@ local Exe         = l3b_globals.Exe
 ---@type Opts_t
 local Opts        = l3b_globals.Opts
 
----Split off from the main unpack so it can be used on a bundle and not
----leave only one modules files.
----Files are unpacked in `Dir.unpack` but this file is cleaned up
----at each run such that there is no memory between runs of uncpack.
----@param source_dirs string[]|nil @defaults to the source directory
----@param sources     string[]|nil @defaults to the source files glob
+---Unpack the given dependencies.
+---A dependency is the path of a directory, possibly relative to the main one.
+---The concept of dependency implies some shared domain.
+---The dependent object must now where to put the shared information
+---needed by the client.
+---@param deps string[] @ regular array of dependencies. See `Deps` fields.
+---@return error_level_n @ 0 on proper termination, a non 0 error code otherwise.
+---@see stdmain, check, unpack, typesetting
+---@usage Private?
+local function deps_install(deps)
+  local error_level
+  local cmd = "texlua " .. quoted_path(l3build.script_path) .. " unpack"
+  if not l3build.options.debug then
+    cmd = cmd .." -q"
+  end
+  for dep in entries(deps) do
+    print("Installing dependency: " .. dep)
+    error_level = run(dep, cmd)
+    if is_error(error_level) then
+      return error_level
+    end
+  end
+  return 0
+end
+
+---Copy the support files to the appropriate build area
 ---@return error_level_n
-local function bundleunpack(source_dirs, sources)
-  source_dirs = source_dirs or { Dir.sourcefile }
-  sources = sources or { Files.source }
-  local options = l3build.options
+local function prepare_support()
   local error_level = make_directory(Dir[l3b_globals.LOCAL])
   if is_error(error_level) then
     return error_level
   end
-  error_level = make_clean_directory(Dir.unpack)
+  return copy_tree(
+    Files.unpacksupp,
+    Dir.support,
+    Dir[l3b_globals.LOCAL]
+  )
+end
+
+---Copy the source files to the appropriate build area
+---@param source_dirs string[]|nil @defaults to the source directory
+---@param sources     string[]|nil @defaults to the source files glob
+---@return error_level_n
+local function prepare_source(source_dirs, sources)
+  local error_level = make_clean_directory(Dir.unpack)
   if is_error(error_level) then
     return error_level
   end
+  -- copy the source files into the unpacked build area
   for src_dir in entries(source_dirs) do
     for globs in entries(sources) do
       error_level = copy_tree(globs, src_dir, Dir.unpack)
@@ -95,27 +123,72 @@ local function bundleunpack(source_dirs, sources)
       end
     end
   end
-  error_level = copy_tree(
-    Files.unpacksupp,
-    Dir.support,
-    Dir[l3b_globals.LOCAL]
+  return error_level
+end
+
+---bundleunpackcmd
+---@param name string @ path relative to the `Dir.unpack` directory
+---@return string|nil
+---@return nil|error_level_n
+local function bundleunpackcmd(name)
+  local options = l3build.options
+  local local_dir = quoted_absolute_path(Dir[l3b_globals.LOCAL])
+  local dir_path, base_name = dir_base(name)
+  dir_path = Dir.unpack / dir_path
+  local error_level = make_directory(dir_path)
+  if is_error(error_level) then
+    return nil, error_level
+  end
+  local cmd_cd = "cd " .. dir_path
+  local search_system = G.unpacksearch and OS.pathsep or ""
+  -- next means that unpack is pdftex or so
+  -- a better design would be to have a
+  -- preliminary configure step
+  local cmd_prepare_1 = OS.setenv
+    .. " TEXINPUTS=."
+    .. OS.pathsep
+    .. local_dir
+    .. search_system
+  local cmd_prepare_2 = OS.setenv
+    .. " LUAINPUTS=."
+    .. OS.pathsep
+    .. local_dir
+    .. search_system
+  local cmd_unpack = Exe.unpack .. " "
+    .. Opts.unpack .. " "
+    .. base_name
+    .. (options.quiet and (" > " .. OS.null) or "")
+  return cmd_concat(
+    cmd_cd,
+    cmd_prepare_1,
+    cmd_prepare_2,
+    cmd_unpack
   )
+end
+
+---Split off from the main unpack so it can be used on a bundle and not
+---leave only one modules files.
+---Files are unpacked in `Dir.unpack` but this file is cleaned up
+---at each run such that there is no memory between runs of uncpack.
+---This was an undocumented global overriden by latex2e.
+---@param source_dirs string[]|nil @defaults to the source directory
+---@param sources     string[]|nil @defaults to the source files glob
+---@return error_level_n
+local function bundleunpack(source_dirs, sources)
+  source_dirs = source_dirs or { Dir.sourcefile }
+  sources = sources or { Files.source }
+  local options = l3build.options
+  local error_level = prepare_source(source_dirs, sources)
+  if is_error(error_level) then
+    return error_level
+  end
+  error_level = prepare_support()
   if is_error(error_level) then
     return error_level
   end
   for glob in entries(Files.unpack) do
     for p in tree(Dir.unpack, glob) do
-      local dir_path, base_name = dir_base(p.src)
-      local local_dir = quoted_absolute_path(Dir[l3b_globals.LOCAL])
-      local cmd = cmd_concat(
-        "cd " .. Dir.unpack / dir_path,
-        OS.setenv .. " TEXINPUTS=." .. OS.pathsep
-          .. local_dir .. (G.unpacksearch and OS.pathsep or ""),
-        OS.setenv .. " LUAINPUTS=." .. OS.pathsep
-          .. local_dir .. (G.unpacksearch and OS.pathsep or ""),
-        Exe.unpack .. " " .. Opts.unpack .. " " .. base_name
-          .. (options.quiet and (" > " .. OS.null) or "")
-      )
+      local cmd = G.bundleunpackcmd(p.src)
       if options.debug then
         print("DEBUG: ".. cmd)
       end
@@ -163,17 +236,29 @@ local function module_unpack()
 end
 
 ---@class l3b_unpk_t
----@field public unpack        unpack_f
----@field public unpack_impl   target_impl_t
+---@field public deps_install     fun(deps: table): number
+---@field public unpack           unpack_f
+---@field public bundleunpack     fun(source_dirs: string[]|nil, sources: string[]|nil): error_level_n
+---@field public bundleunpackcmd  fun(name: string): string
+---@field public unpack_impl      target_impl_t
 ---@field public module_unpack_impl target_impl_t
 
 return {
-  unpack        = unpack,
-  bundleunpack  = bundleunpack,
-  unpack_impl   = {
+  deps_install    = deps_install,
+  unpack          = unpack,
+  bundleunpack    = bundleunpack,
+  bundleunpackcmd = bundleunpackcmd,
+  unpack_impl     = {
     run = unpack,
   },
   module_unpack_impl = {
     run = module_unpack,
   },
-}
+},
+---@class __l3b_unpk_t
+---@field private prepare_support fun(): error_level_n
+---@field private prepare_source  fun(source_dirs: string[]|nil, sources: string[]|nil): error_level_n
+_ENV.during_unit_testing and {
+  prepare_support = prepare_support,
+  prepare_source  = prepare_source,
+} or nil

@@ -241,7 +241,7 @@ end
 ---@field public OS             OS_t
 ---@field public Vars           oslib_vars_t
 ---@field public cmd_concat     fun(...): string
----@field public run            fun(dir: string, cmd: string): boolean?, exitcode?, integer?
+---@field public run            fun(dir: string, cmd: string): error_level_n
 ---@field public quoted_path    fun(path: string): string
 ---@field public read_content   fun(file_path: string, is_binary: boolean): string|nil
 ---@field public write_content  fun(file_path: string, content: string): error_level_n

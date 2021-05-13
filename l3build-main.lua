@@ -28,7 +28,8 @@ Main controller
 ---@module main
 
 local pairs   = pairs
-local exit = os.exit
+local exit    = os.exit
+local concat  = table.concat
 
 require("l3b-pathlib") -- string div
 
@@ -465,6 +466,10 @@ function Main:run()
       return true
     end
   end)
+  if not options.quiet and not options.debug then
+    print("BANNER", concat(l3build.banner, "\n"))
+  end
+  l3build.banner = {}
 
   ---@type l3b_globals_t
   local l3b_globals = require("l3build-globals")
@@ -494,7 +499,9 @@ function Main:run()
 
   self:load_build(l3build.work_dir)
 
-  -- bundle and module names recovery
+  if _G.main then
+    return _G.main(options.target)
+  end
 
   ---@type G_t
   local G   = l3b_globals.G

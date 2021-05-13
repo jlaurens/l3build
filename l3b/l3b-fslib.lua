@@ -206,7 +206,10 @@ local function push_pop_current_directory(dir, f, ...)
   push_current_directory(dir)
   local packed = { pcall(f, ...) }
   pop_current_directory()
-  return tbl_unpack(packed)
+  if packed[1] then
+    return true, { tbl_unpack(packed, 2) }
+  end
+  return false, packed[2]
 end
 
 ---Set the working directory. As soon as possible
@@ -304,6 +307,10 @@ local function file_list(dir_path, glob)
   if directory_exists(dir_path) then
     local matcher = path_matcher(glob)
     if matcher then
+      local ok, msg = pcall(function () get_directory_content(dir_path) end)
+      if not ok then
+        print(debug.traceback())
+      end
       for entry in get_directory_content(dir_path) do
         if matcher(entry) then
           push(files, entry)
@@ -358,10 +365,11 @@ end
 ---@field private is_directory boolean
 
 ---Tree entry enumerator.
----@param dir_path string
----@param glob string
+---@param dir_path  string
+---@param glob      string
+---@param kv        iterator_kv_t
 ---@return fun(): tree_entry_t|nil
-local function tree(dir_path, glob)
+local function tree(dir_path, glob, kv)
   if Vars.debug.tree then
     print("DEBUG tree", "<"..dir_path..">", "<"..glob..">")
   end
@@ -442,7 +450,7 @@ local function tree(dir_path, glob)
     end
     result = new_result
   end
-  return entries(result)
+  return entries(result, kv)
 end
 
 ---Rename. Whether paths are properly escaped is another story...
@@ -527,10 +535,9 @@ local function copy_file(name, source, dest)
 end
 
 ---Copy files 'quietly'.
----@function copy_tree
----@param glob string_iterator_f|string[]|string
----@param source string
----@param dest string
+---@param glob    string_iterator_f|string[]|string
+---@param source  string
+---@param dest    string
 ---@return error_level_n
 local function copy_tree(glob, source, dest)
   if Vars.debug.copy_tree then
@@ -545,8 +552,8 @@ local function copy_tree(glob, source, dest)
       end
     end
   end
-  ---@type string[]
   if type(glob) == "function" then
+    -- @type string[]
     if Vars.debug.copy_tree then
       print("DEBUG copy_tree function iterator")
     end
@@ -560,6 +567,7 @@ local function copy_tree(glob, source, dest)
       end
     end
   elseif type(glob) == "table" then
+  -- @type string[]
     for g in entries(glob) do
       helper(g)
       if is_error(error_level) then
@@ -634,7 +642,7 @@ end
 ---@field public file_list                  fun(dir_path: string, glob: string|nil): string[]
 ---@field public all_names                  fun(path: string, glob: string): fun(): string
 ---@field public set_tree_excluder          fun(f: string_exclude_f)
----@field public tree                       fun(dir_path: string, glob: string): table<string,string>)
+---@field public tree                       fun(dir_path: string, glob: string): tree_entry_t
 ---@field public rename                     fun(dir_path: string, source: string, dest: string): integer
 ---@field public copy_file                  fun(file: string, source: string, dest: string): integer
 ---@field public copy_tree                  fun(glob: string, source: string, dest: string): integer

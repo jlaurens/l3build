@@ -8,6 +8,12 @@ local pop   = table.remove
 
 local expect = _ENV.expect
 
+---@type oslib_t
+local oslib = require("l3b-oslib")
+
+---@type l3build_t
+local l3build = require("l3build")
+
 ---@type l3b_globals_t
 local l3b_globals
 ---@type __l3b_globals_t
@@ -101,35 +107,71 @@ local test_VariableEntry = {
   end,
 }
 
-local test_Dir = function ()
-  local Dir = l3b_globals.Dir
-  local function test(key)
-    local path = Dir[key]
-    expect(path:match("/$")).is("/")
-    local expected = _ENV.random_string()
-    _G[key .."dir"] = expected
-    expect(Dir[key]).is("./"..expected.."/")
-    _G[key .."dir"] = nil
-  end
-  test("work")
-  test("main")
-  test("docfile")
-  test("sourcefile")
-  test("support")
-  test("testfile")
-  test("testsupp")
-  test("texmf")
-  test("textfile")
-  test("build")
-  test("distrib")
-  test("local")
-  test("result")
-  test("test")
-  test("typeset")
-  test("unpack")
-  test("ctan")
-  test("tds")
-end
+local test_Dir = {
+  test_separator = function (self)
+    local Dir = l3b_globals.Dir
+    local function test(key)
+      local path = Dir[key]
+      print(key, path)
+      expect(path:match("/$")).is("/")
+      local expected = _ENV.random_string()
+      _G[key .."dir"] = expected
+      expect(Dir[key]).is("./"..expected.."/")
+      _G[key .."dir"] = nil
+    end
+    test("work")
+    test("main")
+    test("docfile")
+    test("sourcefile")
+    test("support")
+    test("testfile")
+    test("testsupp")
+    test("texmf")
+    test("textfile")
+    test("build")
+    test("distrib")
+    test("local")
+    test("result")
+    test("test")
+    test("typeset")
+    test("unpack")
+    test("ctan")
+    test("tds")
+  end,
+  test_main = function (self)
+    print("DEBBBUG", "/private/tmp/l3build_794703/_874247/module/submodule/.."/".")
+    local maindir = _ENV.make_temporary_dir()
+    local module_path = _ENV.create_test_module(maindir, "module", [[
+module = "module"
+]], [[
+print("maindir = ".. require("l3build-globals").Dir.main)
+]])
+    expect(module_path).NOT(nil)
+    local submodule_path = _ENV.create_test_module(module_path, "submodule", [[
+module = "submodule"
+]], [[
+print("maindir = ".. require("l3build-globals").Dir.main)
+]])
+    expect(submodule_path).NOT(nil)
+    local subsubmodule_path = _ENV.create_test_module(submodule_path, "subsubmodule", [[
+module = "subsubmodule"
+]], [[
+print("DEBUGGGG maindir")
+local l3b_globals = require("l3build-globals")
+local Dir = l3b_globals.Dir
+print("A/B/.." / ".")
+print("/private/tmp/l3build_859326/_936724/module/submodule/.."/".")
+print("maindir = ".. Dir.main)
+]])
+    expect(subsubmodule_path).NOT(nil)
+    print("subsubmodule_path", subsubmodule_path)
+    os.execute("cd "..subsubmodule_path..";texlua ".. l3build.script_path .. " test --debug;echo 'DONE'")
+    -- oslib.run(
+    --   subsubmodule_path,
+    --   "texlua ".. l3build.script_path .. " test"
+    -- )
+  end,
+}
 
 local test_Files = function ()
   local Files = l3b_globals.Files

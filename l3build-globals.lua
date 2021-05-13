@@ -233,6 +233,7 @@ local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
 ---@field public ps2pdfopt       string  @Options for `ps2pdf`
 ---@field public unpacksearch    boolean  @Switch to search the system `texmf` for during unpacking
 ---@field public bundleunpack    bundleunpack_f  @bundle unpack overwrite
+---@field public bundleunpackcmd string  @bundle unpack command overwrite
 ---@field public flatten         boolean @Switch to flatten any source structure when sending to CTAN
 ---@field public packtdszip      boolean @Switch to build a TDS-style zip file for CTAN
 ---@field public manifestfile    string @File name to use for the manifest file
@@ -389,15 +390,10 @@ local function get_main_variable(name)
     l3build.main_dir,
     function (cmd)
       local result = read_command(cmd)
-      print("t", result)
       return result
     end,
     command
   )
-  print("t", packed[1])
-  print("l3build.main_dir", l3build.main_dir)
-  print("Dir.main" , Dir.main)
-  print("build.lua", read_content(l3build.main_dir / "build.lua"))
   if ok then
     local k, v = packed[1]:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
     return name == k and v or nil
@@ -645,11 +641,30 @@ declare({
         -- retrieve the maindir from the main build.lua
         local s = get_main_variable(k)
         if s then
-          return s
+          print("DEBBBUG maindir:", s, s/".")
+          return s / "."
         end
       end
       return l3build.main_dir:sub(1, -2)
     end,
+  },
+  supportdir = {
+    description = "Directory containing general support files",
+    index = function (env, k)
+      return env.maindir / "support"
+    end,
+  },
+  texmfdir = {
+    description = "Directory containing support files in tree form",
+    index = function (env, k)
+      return env.maindir / "texmf"
+    end
+  },
+  builddir = {
+    description = "Directory for building and testing",
+    index = function (env, k)
+      return env.maindir / "build"
+    end
   },
   docfiledir = {
     description = "Directory containing documentation files",
@@ -658,12 +673,6 @@ declare({
   sourcefiledir = {
     description = "Directory containing source files",
     value       = dot_dir,
-  },
-  supportdir = {
-    description = "Directory containing general support files",
-    index = function (env, k)
-      return env.maindir / "support"
-    end,
   },
   testfiledir = {
     description = "Directory containing test files",
@@ -677,22 +686,10 @@ declare({
       return env.testfiledir / "support"
     end
   },
-  texmfdir = {
-    description = "Directory containing support files in tree form",
-    index = function (env, k)
-      return env.maindir / "texmf"
-    end
-  },
   -- Structure within a development area
   textfiledir = {
     description = "Directory containing plain text files",
     value       = dot_dir,
-  },
-  builddir = {
-    description = "Directory for building and testing",
-    index = function (env, k)
-      return env.maindir / "build"
-    end
   },
   distribdir = {
     description = "Directory for generating distribution structure",
@@ -718,12 +715,6 @@ declare({
     index = function (env, k)
       return env.builddir / "test" .. env.config_suffix
     end
-  },
-  config_suffix = {
-    -- overwritten after load_unique_config call
-    index = function (env, k)
-      return ""
-    end,
   },
   typesetdir = {
     description = "Directory for building documentation",
@@ -754,6 +745,12 @@ declare({
     index = function (env, k)
       return l3build.work_dir:sub(1, -2) -- no trailing "/"
     end
+  },
+  config_suffix = {
+    -- overwritten after load_unique_config call
+    index = function (env, k)
+      return ""
+    end,
   },
 })
 declare({
@@ -1864,6 +1861,9 @@ local G_index = function (env, k)
   if k == "bundleunpack" then
     return require("l3build-unpack").bundleunpack
   end
+  if k == "bundleunpackcmd" then
+    return require("l3build-unpack").bundleunpackcmd
+  end
   if k == "tds_main" then
     return env.is_standalone
       and env.tdsroot / env.module
@@ -1909,6 +1909,9 @@ Dir = bridge({
         error("No result for key ".. k)
       end
       result = result / "."
+      if result == "." then
+        result = "./" -- bad smell
+      end
       return quoted_path(result) -- any return result will be quoted_path
     end
     return result

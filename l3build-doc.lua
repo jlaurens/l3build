@@ -69,13 +69,10 @@ local Files     = l3b_globals.Files
 ---@type Deps_t
 local Deps      = l3b_globals.Deps
 
---@type l3b_aux_t
-local l3b_aux       = require("l3build-aux")
-local deps_install  = l3b_aux.deps_install
-
 --@type l3b_unpk_t
-local l3b_unpk  = require("l3build-unpack")
-local unpack      = l3b_unpk.unpack
+local l3b_unpk      = require("l3build-unpack")
+local deps_install  = l3b_unpk.deps_install
+local unpack        = l3b_unpk.unpack
 
 ---Local helper
 ---@param file string

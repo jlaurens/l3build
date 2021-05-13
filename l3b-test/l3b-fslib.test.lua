@@ -82,7 +82,7 @@ end
 
 local test_directory = {
   setup = function (self)
-    self.name = os.tmpname()
+    self.name = _ENV.make_temporary_dir("TEST".._ENV.random_string())
     self.base_name = self.name:match("[^/]+$")
     self.dir_name = self.name:sub(1, #self.name - #self.base_name - 1)
     self.to_remove = {
@@ -127,7 +127,12 @@ local test_directory = {
     expect(directory_exists(path_deep)).is(false)
   end,
   test_file_exists = function (self)
-    expect(file_exists(self.name)).is(true)
+    expect(file_exists(self.name)).is(false)
+    expect(directory_exists(self.name)).is(true)
+    local path = self.name .."/".. _ENV.random_string()
+    expect(file_exists(path)).is(false)
+    write_content(path, "something")
+    expect(file_exists(path)).is(true)
     expect(file_exists(self.name.."???")).is(false)
   end,
   make_random_directory = function (self)
@@ -157,7 +162,8 @@ local test_directory = {
       done = directory_exists(name)
       return 1, 2, 3
     end
-    local succ, a, b, c = push_pop_current_directory("A", f, "B")
+    local succ, packed = push_pop_current_directory("A", f, "B")
+    local a, b, c = table.unpack(packed)
     expect(done).is(true)
     expect(succ).is(true)
     expect(a).is(1)
@@ -258,6 +264,7 @@ local test_directory = {
     expect(file_list("A", "x-[b-c]")).items.equals({ "x-b", "x-c" })
   end,
   iterate = function (self, dir, glob)
+    ---@type tree_entry_t[]
     local result = {}
     for leaf in tree(dir, glob) do
       push(result, leaf)

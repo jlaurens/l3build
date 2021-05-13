@@ -136,19 +136,24 @@ local Path = Object:make_subclass("Path")
 ---@param self Path
 ---@param component string
 function Path:append_component(component)
+  while self.down[#self.down] == "" do
+    pop(self.down)
+  end
   if component == ".." then
     if not pop(self.down) then
       push(self.up, component)
     end
   else
-    if self.down[#self.down] == "" then
-      pop(self.down)
-    end
     push(self.down, component)
+    if component == "a" and self.down[1] == "a" then
+      print("AYAYAYA", debug.traceback())
+      error("STOOOP")
+    end
   end
 end
 
-local path_p = P({
+local function get_file_path_gmr()
+  return {
     V("is_absolute")
   * ( V("component")
     * ( V("separator")
@@ -156,14 +161,29 @@ local path_p = P({
     )^0
     + P(0)
   )
-  * V("suffix"),
+  * V("suffix")^-1,
   is_absolute =
-      P("/")^1  * Cc(true)    -- leading '/', true means absolute
-    + P("./")^0 * Cc(false),  -- leading './'
-  component = C( ( P(1) - "/" )^1 ) - dot_p * P(-1), -- a non void string with no "/" but the last "." component if any
-  separator = ( P("/") * P("./")^0 )^1,
-  suffix = ( P("/")^1 * Cc("") + dot_p )^-1,
-})
+      V("/")  * Cc(true)    -- leading '/', true means absolute
+    + V("./")^0 * Cc(false),  -- leading './'
+  ["/"]  = P("/") * P("./")^0,
+  ["./"] = P(".") * V("/"),
+  component =
+      P(".") * P(-1)    -- an uncatched terminating "."
+    + C( V("[^/]")^1 ), -- a catched non void string with no "/"
+  ["[^/]"] = P(1) - P("/"),
+  separator = V("component/..")^0 * V("/")^1,
+  ["component/.."] =
+    - V("..")
+    * V("[^/]")^1
+    * V("/")^1
+    * V("separator")^0
+    * V(".."),
+  [".."] = P("..") * ( #P("/") + P(-1) ),
+  suffix = V("/")^1 * Cc(""),
+}
+end
+
+local path_p = Ct(P(get_file_path_gmr()))
 
 ---Initialize a newly created Path object with a given string.
 ---@param str any
@@ -211,7 +231,12 @@ function Path.__instance_table:as_string()
     move(self.down, 1, #self.down, #t + 1, t)
     result = concat(t, '/')
   end
-  self.as_string = result -- now this is a property of self
+  if result == "./a/a" then
+    print(debug.traceback())
+    require("l3build-help").pretty_print(self)
+    error("STOOOP")
+  end
+  rawset(self, "as_string", result) -- now this is a property of self
   return result
 end
 
@@ -272,7 +297,7 @@ function Path:__div(r)
   if self.is_void then
     ---@type Path
     local result = r:copy()
-    if self.is_absolute or r.is_void then
+    if self.is_absolute then
       result.is_absolute = true
     end
     return result
@@ -1130,6 +1155,7 @@ return {
 ---@field private path_comp_no_dotglob_p  lpeg_t
 ---@field private end_p                   lpeg_t
 ---@field private get_glob_to_pattern_gmr fun(): table<string|integer,lpeg_t>
+---@field private get_file_path_gmr       fun(): table<string|integer,lpeg_t>
 _ENV.during_unit_testing and {
   -- next are implementation details
   -- these are exported for testing purposes only
@@ -1145,4 +1171,5 @@ _ENV.during_unit_testing and {
   path_comp_no_dotglob_p  = path_comp_no_dotglob_p,
   end_p                   = end_p,
   get_glob_to_pattern_gmr = get_glob_to_pattern_gmr,
+  get_file_path_gmr       = get_file_path_gmr,
 }
