@@ -73,8 +73,9 @@ local Ct    = lpeg.Ct
 local Object = require("l3b-object")
 
 ---@type corelib_t
-local corelib = require("l3b-corelib")
-local bridge  = corelib.bridge
+local corelib       = require("l3b-corelib")
+local bridge        = corelib.bridge
+local shallow_copy  = corelib.shallow_copy
 
 ---@type lpeglib_t
 local lpeglib = require("l3b-lpeglib")
@@ -145,10 +146,6 @@ function Path:append_component(component)
     end
   else
     push(self.down, component)
-    if component == "a" and self.down[1] == "a" then
-      print("AYAYAYA", debug.traceback())
-      error("STOOOP")
-    end
   end
 end
 
@@ -163,23 +160,31 @@ local function get_file_path_gmr()
   )
   * V("suffix")^-1,
   is_absolute =
-      V("/")  * Cc(true)    -- leading '/', true means absolute
-    + V("./")^0 * Cc(false),  -- leading './'
+      V("separator")  -- leading '/'
+    * Cc(true)        -- true means absolute
+    + V("1st part")
+    * Cc(false)       -- false means relative
+    * V("separator")^0,
+  separator = V("/")^1 * V("component/../")^0,
   ["/"]  = P("/") * P("./")^0,
-  ["./"] = P(".") * V("/"),
-  component =
-      P(".") * P(-1)    -- an uncatched terminating "."
-    + C( V("[^/]")^1 ), -- a catched non void string with no "/"
-  ["[^/]"] = P(1) - P("/"),
-  separator = V("component/..")^0 * V("/")^1,
+  ["component/../"] =
+      V("component/..")
+    * ( V("/")^1 + P(-1) ),
   ["component/.."] =
     - V("..")
     * V("[^/]")^1
-    * V("/")^1
-    * V("separator")^0
+    * V("separator")^1
     * V(".."),
   [".."] = P("..") * ( #P("/") + P(-1) ),
-  suffix = V("/")^1 * Cc(""),
+  ["[^/]"] = P(1) - P("/"),
+  ["1st part"] =
+      P(".") * ( #P("/") + P(-1) )
+    + V("component/..")
+    + P(0),
+  component =
+      P(".") * P(-1)    -- an uncatched terminating "."
+    + C( V("[^/]")^1 ), -- a catched non void string with no "/"
+  suffix = V("separator")^1 * Cc(""),
 }
 end
 
@@ -189,12 +194,12 @@ local path_p = Ct(P(get_file_path_gmr()))
 ---@param str any
 function Path:__initialize(str)
   self.is_absolute  = self.is_absolute or false
-  self.up           = self.up or {}   -- ".." path components
-  self.down         = self.down or {} -- down components
+  self.up           = shallow_copy(self.up)   -- ".." path components
+  self.down         = shallow_copy(self.down) -- down components
   if not str then
     return
   end
-  local m = Ct(path_p):match(str)
+  local m = path_p:match(str)
   if not m then
     return
   end
@@ -231,12 +236,7 @@ function Path.__instance_table:as_string()
     move(self.down, 1, #self.down, #t + 1, t)
     result = concat(t, '/')
   end
-  if result == "./a/a" then
-    print(debug.traceback())
-    require("l3build-help").pretty_print(self)
-    error("STOOOP")
-  end
-  rawset(self, "as_string", result) -- now this is a property of self
+  self:cache_set("as_string", result) -- now this is a property of self
   return result
 end
 
@@ -264,7 +264,7 @@ function Path.__instance_table:dir_name()
   local up = down and self.up or no_tail(self.up)
   local result
   if self.is_absolute then
-    result = '/' .. concat(down, '/')
+    result = '/' .. concat(down or {}, '/')
   elseif down then
     local t = { unpack(up or {}) }
     move(down, 1, #down, #t + 1, t)
@@ -312,6 +312,7 @@ function Path:__div(r)
   end
   ---@type Path
   local result = self:copy()
+  result:unlock()
   for i = 1, #r.up do
     result:append_component(r.up[i])
   end
@@ -319,6 +320,7 @@ function Path:__div(r)
     result:append_component(r.down[i])
   end
   assert(not result.is_absolute or #result.up == 0)
+  result:lock()
   return result
 end
 

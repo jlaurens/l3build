@@ -24,8 +24,9 @@ local Path = __.Path
 expect(Path).NOT(nil)
 
 local lpeg = require("lpeg")
-local Ct  = lpeg.Ct
 local C   = lpeg.C
+local Cc  = lpeg.Cc
+local Ct  = lpeg.Ct
 local Cs  = lpeg.Cs
 local P   = lpeg.P
 local V   = lpeg.V
@@ -114,15 +115,34 @@ local test_file_path_gmr = {
     expect(__.get_file_path_gmr).NOT(nil)
     expect(__.get_file_path_gmr()).NOT(nil)
   end,
+  test_1st_part = function (self)
+    local gmr = __.get_file_path_gmr()
+    gmr[1] = V("1st part")
+    local p = P(gmr)
+    local function test(s, length)
+      local m = p:match(s)
+      if length ~= nil then
+        expect(m).is(length)
+      else
+        expect(m).is(nil)
+      end
+    end
+    test("/", 1)
+    test("/./", 1)
+    test("/././", 1)
+    test("", 1)
+    test("./", 2)
+    test("1/..", 5)
+    test("1/3/../..", 10)
+  end,
   test_is_absolute = function (self)
     local gmr = __.get_file_path_gmr()
     gmr[1] = V("is_absolute")
-    local p = Ct( P(gmr) * C(1) )
+    local p = P(gmr)
     local function test(s, flag)
-      local m = p:match(s .. "$")
+      local m = p:match(s)
       if flag ~= nil then
-        expect(m[1]).is(flag)
-        expect(m[2]).is("$")
+        expect(m).is(flag)
       else
         expect(m).is(nil)
       end
@@ -134,6 +154,8 @@ local test_file_path_gmr = {
     test("./", false)
     test("././", false)
     test("./././", false)
+    test("a/..", false)
+    test("a/b/../..", false)
   end,
   test_component = function (self)
     local gmr = __.get_file_path_gmr()
@@ -155,6 +177,7 @@ local test_file_path_gmr = {
     expect(p:match("a/...")).is(nil)
     expect(p:match("/..")).is(nil)
     expect(p:match("a/..")).is(5)
+    expect(p:match(".../..")).is(7)
     expect(p:match("a/../")).is(5)
     expect(p:match("a/b/../..")).is(10)
     expect(p:match("a/b/../../")).is(10)
@@ -165,17 +188,30 @@ local test_file_path_gmr = {
     local p = P(gmr)
     expect(p:match("a")).is(nil)
     expect(p:match("/")).is(2)
+    expect(p:match("//")).is(3)
     expect(p:match("/./")).is(4)
+    expect(p:match("/23/../")).is(8)
   end,
   test_full = function (self)
     local gmr = __.get_file_path_gmr()
-    local p = Ct( P(gmr) )
+    local p = P(gmr)
+    expect(p:match("a")).is(false)
+    gmr = __.get_file_path_gmr()
+    p = Ct( P(gmr) )
     local function test(s, ...)
       local m = p:match(s)
       expect(m).equals( {...} )
     end
     test("", false)
     test("a", false, "a")
+    test("a/", false, "a", "")
+    test("a/b", false, "a", "b")
+    test("a/b/", false, "a", "b", "")
+    test("/", true)
+    test("/a", true, "a")
+    test("/a/", true, "a", "")
+    test("/a/b", true, "a", "b")
+    test("/a/b/", true, "a", "b", "")
   end,
 }
 
@@ -213,10 +249,10 @@ local function test_Path()
   test("a/..b", { "a", "..b" }, "./a/..b")
   test("a/../b", { "b" }, "./b")
   test("a/b/../../c", { "c" }, "./c")
-  test("a/b/c/../..", { "a" }, "./a")
+  test("a/b/c/../..", { "a", "" }, "./a/")
   test("a/b/c/../../d", { "a", "d" }, "./a/d")
 
-  test("/a/b/c/..", { "a", "b" }, "/a/b", true)
+  test("/a/b/c/..", { "a", "b", "" }, "/a/b/", true)
 
   p = Path("/")
   expect(p).equals(Path({
@@ -253,9 +289,9 @@ local function test_Path()
   expect(p.as_string).is(".")
   p = Path("a/b/..")
   expect(p).equals(Path({
-    down = { "a" },
+    down = { "a", "" },
   }))
-  expect(p.as_string).is("./a")
+  expect(p.as_string).is("./a/")
   local p_1 = Path("a/b")
   local p_2 = Path("..")
   expect(p_2).equals(Path({
@@ -285,17 +321,8 @@ local function test_Path_forward_slash()
   test("", "a", "./a")
   test("/", "a", "/a")
   test("a", "b", "a/b")
-  local p_1 = Path("a/b")
-  local p_2 = Path("..")
-  local p = p_1 / p_2
-  print("DEBUGGG 1", p_1 / p_2)
-  print("DEBUGGG 2", Path("./a"))
-  _ENV.pretty_print(p)
-  _ENV.pretty_print(Path("./a"))
-  expect(p).equals(Path("./a"))
-  print("DEBBBUG", p.as_string, "a/b" / "..")
-  test("a/b" / "..", "./a")
-  test("a/.." / "b", "./a/b")
+  test("a/b", "..", "./a")
+  test("a/..", "b", "./b")
 end
 
 local function test_POC_parts()

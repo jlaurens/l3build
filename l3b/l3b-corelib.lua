@@ -28,32 +28,6 @@ for those people who are interested.
 
 -- Safeguard and shortcuts
 
-local unpack  = table.unpack
-local push    = table.insert
-local concat  = table.concat
-local max     = math.max
-
-local lpeg    = require("lpeg")
-local locale  = lpeg.locale()
-local P       = lpeg.P
-local R       = lpeg.R
-local S       = lpeg.S
-local C       = lpeg.C
-local V       = lpeg.V
-local B       = lpeg.B
-local Cb      = lpeg.Cb
-local Cc      = lpeg.Cc
-local Cg      = lpeg.Cg
-local Cmt     = lpeg.Cmt
-local Cp      = lpeg.Cp
-local Ct      = lpeg.Ct
-local Cf      = lpeg.Cf
-
---[[ lpeg patterns
-All forthcoming variables with suffix "_p" are
-lpeg patterns or functions that return a lpeg pattern.
---]]
-
 ---Get the line number for the given string
 ---Should cache intermediate results.
 ---@param str   string
@@ -72,14 +46,17 @@ end
 ---Make a shallow copy of the given object,
 ---taking the metatable into account.
 ---@generic T
----@param original T
----@return T
+---@param original T|nil
+---@return T|table @ Return a void table when no original is provided
 local function shallow_copy(original)
-  local res = {}
-  for k, v in next, original do
-    res[k] = v
+  if original then
+    local res = {}
+    for k, v in next, original do
+      res[k] = v
+    end
+    return setmetatable(res, getmetatable(original))
   end
-  return setmetatable(res, getmetatable(original))
+  return {}
 end
 
 --https://gist.github.com/tylerneylon/81333721109155b2d244#gistcomment-3262222

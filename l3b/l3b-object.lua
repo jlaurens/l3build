@@ -139,6 +139,7 @@ end
 ---@param self Object
 ---@vararg any
 function Object:__initialize(...)
+  self:lock()
 end
 
 local function make_class__index(class)
@@ -146,8 +147,18 @@ local function make_class__index(class)
     if k == "__Class" then
       return class
     end
-    -- first: dynamic instance properties
-    local result
+    if k == "cache_get" then
+      return class == self and class.__Super[k] or class[k]
+    end
+    -- first cached properties
+    local result = self and self:cache_get(k)
+    if result ~= nil then
+      if result == Object.NIL then
+        return nil
+      end
+      return result
+    end
+    -- second: dynamic instance properties
     local computed_k
     if self and self ~= self.__Class then
       computed_k = class.__instance_table[k]
@@ -301,6 +312,57 @@ function Object:is_descendant_of(Class)
     until not what
   end
   return false
+end
+
+local cache_by_object = setmetatable({}, {
+  __mode = "k",
+})
+local function cache_clean(self)
+  local result = {}
+  cache_by_object[self] = {}
+  return result
+end
+
+local function get_cache_for_object(self)
+  return cache_by_object[self] or cache_clean(self)
+end
+
+---Get the cache value for the given key
+---@param key any
+---@return any
+function Object:cache_get(key)
+  local cache = cache_by_object[self]
+  if cache then
+    local result = cache[key]
+    if result ~= nil then
+      return result
+    end
+  end
+end
+
+---Set the cache value for the given key.
+---@param key any
+---@param value any
+---@return boolean @ true when cached, false otherwise
+function Object:cache_set(key, value)
+  local cache = cache_by_object[self]
+  if cache then
+    cache[key] = value
+    return true
+  end
+  return false
+end
+
+---Locked object can have a cache
+function Object:lock()
+  if not cache_by_object[self] then
+    cache_by_object[self] = {}
+  end
+end
+
+---Delete the cache as side effect
+function Object:unlock()
+  cache_by_object[self] = nil
 end
 
 return Object
