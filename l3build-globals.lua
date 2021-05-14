@@ -641,11 +641,10 @@ declare({
         -- retrieve the maindir from the main build.lua
         local s = get_main_variable(k)
         if s then
-          print("DEBBBUG maindir:", s, s/".")
           return s / "."
         end
       end
-      return l3build.main_dir:sub(1, -2)
+      return l3build.main_dir / "."
     end,
   },
   supportdir = {

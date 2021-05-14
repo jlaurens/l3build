@@ -187,6 +187,10 @@ function Expect:__index(k)
     self.op = ">"
     return self
   end
+  if k == "match" then
+    self.op = k
+    return self
+  end
   if k == "less" then
     self.op = "<"
     return self
@@ -292,6 +296,10 @@ function Expect.__call(self, expected, options)
     (self.__NOT and LU.assertFalse or LU.assertTrue)
     (self.actual:is_instance_of(expected))
   end
+  if self.op == "match" then
+    (self.__NOT and LU.assertFalse or LU.assertTrue)
+    (self.actual:match(expected) ~= nil)
+  end
   self.op = ""
   return self
 end
@@ -363,12 +371,9 @@ from all test files run only test containing either "foo" or "bar".
     if not f then
       error(msg)
     end
-    print("DIAGNOSTIC", l3b_test_diagnostic_path)
-    local result = f()
-    print("DEBUGGG DID IT WORK????")
-    return result
+    print("DEBUGGG")
+    return f()
   end
-  print("NO DIAGNOSTIC", l3b_test_diagnostic_path)
   ---@type table<string,boolean>
   local done = {}
   -- arg[2] is a comma separated list of names

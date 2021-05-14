@@ -316,7 +316,9 @@ end
 --[==[ end of booting process ]==]
 
 if arg[1] == "test" then
-  return require("l3build-test").run()
+  local result = require("l3build-test").run()
+  print("All tests done")
+  return result
 end
 
 require("l3b-fslib").set_working_directory(work_dir)

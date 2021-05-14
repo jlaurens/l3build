@@ -156,20 +156,17 @@ print("maindir = ".. require("l3build-globals").Dir.main)
     local subsubmodule_path = _ENV.create_test_module(submodule_path, "subsubmodule", [[
 module = "subsubmodule"
 ]], [[
-print("DEBUGGGG maindir")
 local l3b_globals = require("l3build-globals")
 local Dir = l3b_globals.Dir
-print("A/B/.." / ".")
-print("/private/tmp/l3build_859326/_936724/module/submodule/.."/".")
 print("maindir = ".. Dir.main)
 ]])
     expect(subsubmodule_path).NOT(nil)
-    print("subsubmodule_path", subsubmodule_path)
-    os.execute("cd "..subsubmodule_path..";texlua ".. l3build.script_path .. " test --debug;echo 'DONE'")
-    -- oslib.run(
-    --   subsubmodule_path,
-    --   "texlua ".. l3build.script_path .. " test"
-    -- )
+    print("DEBBUG RUNNING THE TEST")
+    oslib.run(
+      subsubmodule_path,
+      "texlua ".. l3build.script_path .. " test"
+    )
+    print("DEBBUG RUNNING THE TEST DONE")
   end,
 }
 

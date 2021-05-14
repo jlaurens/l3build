@@ -94,15 +94,54 @@ local function test_content()
 end
 
 local function test_read_command()
-  local name = os.tmpname()
-  local base_name = name:match("[^/]+$")
-  local dir_name = name:sub(1, #name - #base_name - 1)
-  local special_name = "TEST".. tostring(math.random(100000000))
+  local dir_name = _ENV.make_temporary_dir()
+  local special_name = "TEST".. _ENV.random_string()
   local special_path = dir_name .."/".. special_name
   require("lfs").mkdir(special_path)
   local ans = oslib.read_command("ls ".. utlib.to_quoted_string(dir_name))
   expect(ans:match(special_name)).NOT(nil)
-  os.remove(name)
+end
+
+local function test_os_execute()
+  -- Next contradicts lua 5.3 and 5.4 documentation
+  -- "When called without a command, os.execute returns a boolean that is true if a shell is available."
+  expect(os.execute()).is(1)
+  local dir_name = _ENV.make_temporary_dir()
+  local script_name = _ENV.random_string() ..".lua"
+  local script_path = dir_name .. "/" .. script_name
+  oslib.write_content(script_path, [[
+#!/usr/bin/env texlua
+-- do nothing
+]])
+  local cmd = "texlua ".. oslib.quoted_path(script_path)
+  local result = os.execute(cmd)
+  -- texlua returns 0 where lua would return true
+  expect(result).is(0)
+  local msg
+  print("\nNext line expectedly reads: Script file ... not found")
+  local cmd_not_found = "texlua ".. oslib.quoted_path(script_path.."NOT FOUND")
+  result, msg = os.execute(cmd_not_found)
+  expect(result).is(256)
+  if require("status").luatex_version <= 112 then
+    expect(msg).is(nil)
+  else
+    expect(msg).is(nil) -- change this test or the above version number
+  end
+  -- next is the same but catches the output:
+  -- no polution printed
+  local whatever = _ENV.random_string()
+  oslib.write_content(script_path, ([[
+#!/usr/bin/env texlua
+print("%s")
+]]):format(whatever))
+  local fh = io.popen(cmd)
+  local output = fh:read('a')
+  fh:close()
+  expect(output).match(whatever)
+  fh = io.popen(cmd_not_found)
+  output = fh:read('a')
+  fh:close()
+  expect(output).match("NOT FOUND")
 end
 
 return {
@@ -112,4 +151,5 @@ return {
   test_run          = test_run,
   test_content      = test_content,
   test_read_command = test_read_command,
+  test_os_execute   = test_os_execute,
 }
