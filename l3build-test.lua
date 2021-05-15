@@ -371,7 +371,6 @@ from all test files run only test containing either "foo" or "bar".
     if not f then
       error(msg)
     end
-    print("DEBUGGG")
     return f()
   end
   ---@type table<string,boolean>
@@ -409,6 +408,18 @@ from all test files run only test containing either "foo" or "bar".
     return "_".. tostring(ENV.random_number())
   end
 
+  function ENV.random_text(length)
+    length = length or 1
+    local result = {}
+    for _ = 1, math.max(1, math.min(length,256))  do
+      local try = math.random(26, 127)
+      if try < 32 then
+        try = string.byte("\n") -- insert a "\n" with probability near 10%
+      end
+      push(result, try)
+    end
+    return string.char(table.unpack(result))
+  end
   local temporary_file_name = os.tmpname()
   os.remove(temporary_file_name)
   local temporary_dir = temporary_file_name:match("^.*/")
@@ -453,7 +464,6 @@ from all test files run only test containing either "foo" or "bar".
         test_content = test_content:gsub("\n", "\r\n")
       end
       file_path = result .."/l3b_test_diagnostic.lua"
-      print("diagnostic file_path", file_path, test_content)
       fh = assert(io.open(file_path, "w"))
       if not fh then
         return nil, 1

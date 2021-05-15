@@ -43,20 +43,22 @@ end
 
 local function test_run()
   -- create a temporary file
-  -- retrive the base and directory names
+  -- retrieve the base and directory names
   -- remove it with a command from the terminal
-  local name = os.tmpname()
-  local base_name = name:match("[^/]+$")
-  local dir_name = name:sub(1, #name - #base_name - 1)
-  expect(dir_name .."/".. base_name).is(name)
+  -- NB: the remove commands are also used in fslib
+  local dir_name = _ENV.make_temporary_dir()
+  local name = _ENV.random_string()
   local lfs = require("lfs")
-  local before = false
-  for file_name in lfs.dir(dir_name) do
-    if file_name == base_name then
-      before = true
+  local function find_name()
+    for file_name in lfs.dir(dir_name) do
+      if file_name == name then
+        return true
+      end
     end
   end
-  expect(before).is(true)
+  expect(find_name()).is(false)
+  lfs.mkdir(dir_name .."/".. name)
+  expect(find_name()).is(true)
   local cmd
   if os["type"] == "windows" then
     cmd = "del"
@@ -64,14 +66,26 @@ local function test_run()
     cmd = "rm"
   end
   oslib.run(dir_name, cmd .." ".. name)
-  before = false
-  for file_name in lfs.dir(dir_name) do
-    if file_name == base_name then
-      before = true
-    end
+  expect(find_name()).is(false)
+end
+
+local function test_run_process()
+  -- make a temporary folder
+  -- create a folder inside with a random name
+  -- `dir` or `ls` the contents of the temporary folder
+  -- test if the output contains the random name
+  local dir_name = _ENV.make_temporary_dir()
+  local name = _ENV.random_string()
+  local lfs = require("lfs")
+  lfs.mkdir(dir_name .."/".. name)
+  local cmd
+  if os["type"] == "windows" then
+    cmd = "dir"
+  else
+    cmd = "ls"
   end
-  -- THIS DOES NOT WORK ON WINDOWS
-  expect(before).is(false)
+  local output = oslib.run_process(dir_name, cmd)
+  expect(output).match(name)
 end
 
 local function test_content()
@@ -149,6 +163,7 @@ return {
   test_OS           = test_OS,
   test_cmd_concat   = test_cmd_concat,
   test_run          = test_run,
+  test_run_process  = test_run_process,
   test_content      = test_content,
   test_read_command = test_read_command,
   test_os_execute   = test_os_execute,

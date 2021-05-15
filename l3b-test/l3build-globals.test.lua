@@ -8,6 +8,13 @@ local pop   = table.remove
 
 local expect = _ENV.expect
 
+local lpeg = require("lpeg")
+local P = lpeg.P
+local V = lpeg.V
+
+---@type pathlib_t
+require("l3b-pathlib")
+
 ---@type oslib_t
 local oslib = require("l3b-oslib")
 
@@ -112,7 +119,6 @@ local test_Dir = {
     local Dir = l3b_globals.Dir
     local function test(key)
       local path = Dir[key]
-      print(key, path)
       expect(path:match("/$")).is("/")
       local expected = _ENV.random_string()
       _G[key .."dir"] = expected
@@ -139,34 +145,36 @@ local test_Dir = {
     test("tds")
   end,
   test_main = function (self)
-    print("DEBBBUG", "/private/tmp/l3build_794703/_874247/module/submodule/.."/".")
+    local b = _ENV.random_string()
+    local diagnostic = ([[
+local l3b_globals = require("l3build-globals")
+local Dir = l3b_globals.Dir
+print(("%s%%s%s"):format(Dir.main))
+]]):format(b,b)
     local maindir = _ENV.make_temporary_dir()
     local module_path = _ENV.create_test_module(maindir, "module", [[
 module = "module"
-]], [[
-print("maindir = ".. require("l3build-globals").Dir.main)
-]])
-    expect(module_path).NOT(nil)
+]], diagnostic)
+    local expected = module_path / "."
+    local function test(path)
+      expect(path).NOT(nil)
+      local output = oslib.run_process(
+        path,
+        "texlua ".. l3build.script_path .. " test"
+      )
+      print("DEBBUUGGG", path, output)
+      output = output:match(("%s(.-)%s"):format(b, b)) / "."
+      expect(output).match(expected)
+    end
+    test(module_path)
     local submodule_path = _ENV.create_test_module(module_path, "submodule", [[
 module = "submodule"
-]], [[
-print("maindir = ".. require("l3build-globals").Dir.main)
-]])
-    expect(submodule_path).NOT(nil)
+]], diagnostic)
+    test(submodule_path)
     local subsubmodule_path = _ENV.create_test_module(submodule_path, "subsubmodule", [[
 module = "subsubmodule"
-]], [[
-local l3b_globals = require("l3build-globals")
-local Dir = l3b_globals.Dir
-print("maindir = ".. Dir.main)
-]])
-    expect(subsubmodule_path).NOT(nil)
-    print("DEBBUG RUNNING THE TEST")
-    oslib.run(
-      subsubmodule_path,
-      "texlua ".. l3build.script_path .. " test"
-    )
-    print("DEBBUG RUNNING THE TEST DONE")
+]], diagnostic)
+    -- test(subsubmodule_path)
   end,
 }
 
@@ -460,6 +468,66 @@ local test__G = {
   end,
 }
 
+local test_main_variable = {
+  setup = function (self)
+    self.anchor = __.get_main_variable_anchor
+    local name = _ENV.random_string():sub(1, 10)
+    local filler = ("X"):rep(10 - #name)
+    self.name = filler .. name
+    self.name_wrap = self:wrap("NAME",  self.name ) -- 30 bytes
+    self.value = self.name .. _ENV.random_text(30)  -- 40 bytes
+    self.value_wrap = self:wrap("VALUE", self.value)-- 60 bytes
+    local content = ("%s%s%s%s%s"):format(
+      _ENV.random_text(30),
+      self.name_wrap, -- 30 bytes
+      _ENV.random_text(30),
+      self.value_wrap, -- 60 bytes
+      _ENV.random_text(30)
+    ) -- 180 bytes
+    self.variable_wrap = ("%s%s%s"):format(
+      _ENV.random_text(30),
+      self:wrap("VARIABLE", content),
+      _ENV.random_text(30)
+    ) -- 240 bytes
+  end,
+  wrap = function (self, TAG, content)
+    return ("%s%s%s"):format(
+      self.anchor["B_"..TAG],
+      content,
+      self.anchor["E_"..TAG]
+    )
+  end,
+  test_gmr_name = function (self)
+    local gmr = __.get_main_variable_gmr(self.anchor)
+    gmr[1] = V("name")
+    local p = P(gmr)
+    expect(p:match(self.name_wrap)).is(self.name)
+    expect(p:match(self.variable_wrap)).is(nil)
+    gmr[1] = V(".*name")
+    p = P(gmr)
+    expect(p:match(self.name_wrap)).is(self.name)
+    expect(p:match(self.variable_wrap)).is(self.name)
+  end,
+  test_gmr_value = function (self)
+    local gmr = __.get_main_variable_gmr(self.anchor)
+    gmr[1] = V("value")
+    local p = P(gmr)
+    expect(p:match(self.value_wrap)).is(self.value)
+    expect(p:match(self.variable_wrap)).is(nil)
+    gmr[1] = V(".*value")
+    p = P(gmr)
+    expect(p:match(self.value_wrap)).is(self.value)
+    expect(p:match(self.variable_wrap)).is(self.value)
+  end,
+  test_gmr_full = function (self)
+    local gmr = __.get_main_variable_gmr(self.anchor)
+    local p = P(gmr)
+    local k, v = p:match(self.variable_wrap)
+    expect(k).is(self.name)
+    expect(v).is(self.value)
+  end,
+}
+
 return {
   test_basic          = test_basic,
   test_VariableEntry  = test_VariableEntry,
@@ -472,4 +540,5 @@ return {
   test__uploadconfig  = test__uploadconfig,
   test_G              = test_G,
   test__G             = test__G,
+  test_main_variable  = test_main_variable
 }

@@ -78,6 +78,10 @@ whereas `__instance_table` is for instance computed properties.
 
 --]===]
 
+local insert  = table.insert
+local push    = insert
+local remove  = table.remove
+
 ---@class Object @ Root class, metatable of other tables
 ---@field public  make_subclass     fun(type: string, t: table): Object
 ---@field public  is_instance       boolean
@@ -93,7 +97,9 @@ Object.__Class = Object
 ---comment
 ---@param self Object
 ---@param k any
-function Object.__index(self, k) end
+function Object.__index(self, k)
+  return Object[k]
+end
 
 Object.__class_table = {
   is_instance = function (self)
@@ -119,7 +125,9 @@ Object.NIL = setmetatable({}, {
 })
 
 function Object:Constructor(d, ...)
-  return d or {}
+  d = setmetatable(d or {}, Object)
+  d:lock()
+  return d
 end
 
 setmetatable(Object, {
@@ -218,6 +226,7 @@ local function make_constructor(class)
         initialize(d, ...)
       end
     end
+    d:lock()
     return d
   end
 end
@@ -283,6 +292,7 @@ function Object.make_subclass(Super, TYPE, static)
   if finalize then
     finalize(class)
   end
+  class:lock()
   return class
 end
 
@@ -317,15 +327,6 @@ end
 local cache_by_object = setmetatable({}, {
   __mode = "k",
 })
-local function cache_clean(self)
-  local result = {}
-  cache_by_object[self] = {}
-  return result
-end
-
-local function get_cache_for_object(self)
-  return cache_by_object[self] or cache_clean(self)
-end
 
 ---Get the cache value for the given key
 ---@param key any
@@ -365,4 +366,98 @@ function Object:unlock()
   cache_by_object[self] = nil
 end
 
+-- hook mechanism
+
+local hooks_by_object = setmetatable({}, {
+  __mode = "k",
+})
+
+---@alias hook_handler_f fun(self: Object,...):any,...
+
+---@alias hook_registration_t any @ private structure
+
+function Object:_hooks_for_name(name)
+  local hooks_by_name = hooks_by_object[self]
+  if not hooks_by_name then
+    hooks_by_name = {}
+    hooks_by_object[self] = hooks_by_name
+  end
+  local named_hooks = hooks_by_name[name]
+  if not named_hooks then
+    named_hooks = {
+      ordered = {},
+      by_key = {},
+    }
+    hooks_by_name[name] = named_hooks
+  end
+  return named_hooks
+end
+
+---Insert a hook handler for a given name
+---When `pos` is not provided it defaults to the end of the list
+---This is similar to lua's `table.insert`.
+---@param name string
+---@param pos? integer
+---@param handler hook_handler_f
+---@return hook_registration_t
+function Object:hook_handler_insert(name, pos, handler)
+  local named_hooks = self:_hooks_for_name(name)
+  if handler == nil then
+    pos, handler = #named_hooks + 1, pos
+  end
+  local key = { name }
+  insert(named_hooks, pos, {
+    handler = handler,
+    key = key,
+  })
+  return key
+end
+
+---Remove a previously inserted hook handler
+---@param key hook_registration_t
+---@return hook_handler_f|nil
+function Object:hook_handler_remove(key)
+  local named_hooks = self:_hooks_for_name(key[1])
+  for i = 1, #named_hooks do
+    local t = named_hooks[i]
+    if t.key == key then
+      remove(named_hooks, i)
+      return t.handler
+    end
+  end
+end
+
+---Iterator over all the handlers for the given name
+---It takes care of inheritance
+---@param name string
+---@vararg any
+function Object:call_hook_handlers_for_name(name, ...)
+  local o = self
+  local hierarchy = { o }
+  if o == o.__Class then
+    o = o.__Super
+  else
+    o = o.__Class
+  end
+  while o do
+    push(hierarchy, o)
+    assert(o ~= o.__Super)
+    o = o.__Super
+  end
+  for i = #hierarchy, 1, -1 do
+    o = hierarchy[i]
+    local named_hooks = o:_hooks_for_name(name)
+    for j = 1, #named_hooks do
+      named_hooks[j].handler(self, ...)
+    end
+  end
+end
+
 return Object
+---@class __object_t
+---@field private cache_by_object table
+---@field private hooks_by_object table
+, _ENV.during_unit_testing and {
+  cache_by_object = cache_by_object,
+  hooks_by_object = hooks_by_object,
+}

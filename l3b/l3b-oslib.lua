@@ -153,19 +153,42 @@ local function run(dir, cmd)
     print("DEBUG run: ".. cmd)
     start_time = time()
   end
-  local succ, msg, code = execute(cmd)
+  local error_code = execute(cmd) -- texlua specific
   if Vars.debug.run then
     local diff = difftime(time(), start_time)
     print_diff_time("Done run in: %s", diff)
   end
-  if succ then
-    return 0
+  return error_code
+end
+
+---Execute the given command and returns the output
+---@param command string
+---@return string
+local function read_command(command)
+  ---Return the result.
+    local fh = assert(popen(command, "r"))
+    local t  = assert(fh:read("a"))
+    fh:close()
+    return t
   end
-  if msg == "signal" then
-    print("\nSignal sent ".. tostring(code))
-    exit(code)
+  
+  ---Run a command in a given directory, but catches the output
+---@param dir string
+---@param cmd string
+---@return string @ nil on error, the command output otherwise
+local function run_process(dir, cmd)
+  cmd = cmd_concat("cd " .. to_quoted_string(dir), cmd)
+  local start_time
+  if Vars.debug.run then
+    print("DEBUG run: ".. cmd)
+    start_time = time()
   end
-  return code > 0 and code or 1
+  local output = read_command(cmd)
+  if Vars.debug.run then
+    local diff = difftime(time(), start_time)
+    print_diff_time("Done run in: %s", diff)
+  end
+  return output
 end
 
 ---Return a quoted version or properly escaped
@@ -226,22 +249,12 @@ local function write_content(file_path, content)
   end
 end
 
----Execute the given command and returns the output
----@param command string
----@return string
-local function read_command(command)
----Return the result.
-  local fh = assert(popen(command, "r"))
-  local t  = assert(fh:read("a"))
-  fh:close()
-  return t
-end
-
 ---@class oslib_t
 ---@field public OS             OS_t
 ---@field public Vars           oslib_vars_t
 ---@field public cmd_concat     fun(...): string
 ---@field public run            fun(dir: string, cmd: string): error_level_n
+---@field public run_process    fun(dir: string, cmd: string): string
 ---@field public quoted_path    fun(path: string): string
 ---@field public read_content   fun(file_path: string, is_binary: boolean): string|nil
 ---@field public write_content  fun(file_path: string, content: string): error_level_n
@@ -252,6 +265,7 @@ return {
   OS            = OS,
   cmd_concat    = cmd_concat,
   run           = run,
+  run_process   = run_process,
   quoted_path   = quoted_path,
   read_content  = read_content,
   write_content = write_content,

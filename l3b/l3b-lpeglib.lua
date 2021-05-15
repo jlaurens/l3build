@@ -44,6 +44,7 @@ local Cc      = lpeg.Cc
 local Cf      = lpeg.Cf
 
 ---@class lpeg_t @ convenient type for lpeg patterns
+---@alias lpeg_grammar_t table<string|number,lpeg_t> @ convenient type for lpeg grammar
 
 ---@type lpeg_t
 local white_p = S(" \t")          -- exclude "\n", no unicode space neither.

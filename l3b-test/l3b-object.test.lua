@@ -5,7 +5,14 @@
   For help, run `texlua l3build.lua test -h`
 --]]
 
-local Object = require("l3b-object")
+local push = table.insert
+
+---@type Object
+local Object
+---@type __object_t
+local __
+
+Object, __ = _ENV.loadlib("l3b-object")
 
 local expect  = _ENV.expect
 
@@ -607,20 +614,126 @@ local test_init_data = {
   end,
 }
 
+local test_cache = {
+  do_test = function (self, o)
+    expect(o).NOT(nil)
+    expect(o:cache_get("foo")).is(nil)
+    expect(o:cache_set("foo", 421)).is(true)
+    expect(o:cache_get("foo")).is(421)
+    o:unlock()
+    expect(o:cache_get("foo")).is(nil)
+    expect(o:cache_set("foo", 421)).is(false)
+    expect(o:cache_get("foo")).is(nil)
+    o:lock()
+    expect(o:cache_get("foo")).is(nil)
+    expect(o:cache_set("foo", 421)).is(true)
+    expect(o:cache_get("foo")).is(421)
+  end,
+  test_basic = function (self)
+    self:do_test(Object())
+  end,
+  test_subclass = function (self)
+    local Subclass = Object:make_subclass("Subclass")
+    self:do_test(Subclass)
+    self:do_test(Subclass())
+  end,
+}
+
+local test_hook = {
+  test_basic = function (self)
+    local o = Object()
+    local track = {}
+    local handler_1 = function (this, x)
+      push(track, "handler_1")
+      push(track, x)
+    end
+    local handler_2 = function (this, x)
+      push(track, "handler_2")
+      push(track, x)
+    end
+    local registration_1 = o:hook_handler_insert("foo", handler_1)
+    o:call_hook_handlers_for_name("foo", 1)
+    expect(track).equals({ "handler_1", 1 })
+    track = {}
+    local registration_2 = o:hook_handler_insert("foo", handler_2)
+    o:call_hook_handlers_for_name("foo", 2)
+    expect(track).equals({ "handler_1", 2, "handler_2", 2 })
+    track = {}
+    expect(o:hook_handler_remove(registration_2)).is(handler_2)
+    o:call_hook_handlers_for_name("foo", 3)
+    expect(track).equals({ "handler_1", 3 })
+    track = {}
+    expect(o:hook_handler_remove(registration_1)).is(handler_1)
+    o:call_hook_handlers_for_name("foo", 4)
+    expect(track).equals({})
+    track = {}
+    registration_2 = o:hook_handler_insert("foo", 1, handler_2)
+    o:call_hook_handlers_for_name("foo", 5)
+    expect(track).equals({ "handler_2", 5 })
+    track = {}
+    registration_1 = o:hook_handler_insert("foo", 1, handler_1)
+    o:call_hook_handlers_for_name("foo", 6)
+    expect(track).equals({ "handler_1", 6, "handler_2", 6 })
+  end,
+  test_no_handlers = function (self)
+    Object:call_hook_handlers_for_name("foo", 1, 2, 3)
+  end,
+  test_hierarchy = function (self)
+    local track = {}
+    local handler = function (x, tracker)
+      x[tracker] = tracker
+      return function (this)
+        push(track, this[tracker])
+      end
+    end
+    Object:hook_handler_insert("foo", handler(Object, "O1"))
+    Object:hook_handler_insert("foo", handler(Object, "O2"))
+    local A = Object:make_subclass("A")
+    A:hook_handler_insert("foo", handler(A, "A1"))
+    A:hook_handler_insert("foo", handler(A, "A2"))
+    local AA = A:make_subclass("AA")
+    AA:hook_handler_insert("foo", handler(AA, "AA:1"))
+    AA:hook_handler_insert("foo", handler(AA, "AA:2"))
+    local o = Object()
+    o:hook_handler_insert("foo", handler(o, "o1"))
+    o:hook_handler_insert("foo", handler(o, "o2"))
+    local a = A()
+    a:hook_handler_insert("foo", handler(a, "a1"))
+    a:hook_handler_insert("foo", handler(a, "a2"))
+    local aa = AA()
+    aa:hook_handler_insert("foo", handler(aa, "aa:1"))
+    aa:hook_handler_insert("foo", handler(aa, "aa:2"))
+    local function test(x, expected)
+      track = {}
+      x:call_hook_handlers_for_name("foo")
+      expect(track).equals(expected)
+    end
+    test(Object, { "O1", "O2" })
+    test(o, { "O1", "O2", "o1", "o2" })
+    test(A, { "O1", "O2", "A1", "A2" })
+    test(a, { "O1", "O2", "A1", "A2", "a1", "a2" })
+    test(AA, { "O1", "O2", "A1", "A2", "AA:1", "AA:2" })
+    test(aa, { "O1", "O2", "A1", "A2", "AA:1", "AA:2", "aa:1", "aa:2" })
+    A:hook_handler_insert("foo", handler(A, "A3"))
+    test(aa, { "O1", "O2", "A1", "A2", "A3", "AA:1", "AA:2", "aa:1", "aa:2" })
+  end,
+}
+
 return {
-  test_Object                = test_Object,
-  test_make_subclass         = test_make_subclass,
-  test_constructor           = test_constructor,
-  test_is_instance           = test_is_instance,
-  test_is_instance_of        = test_is_instance_of,
-  test_is_descendant_of      = test_is_descendant_of,
-  test_finalize              = test_finalize,
-  test_initialize            = test_initialize,
-  test_make_another_subclass = test_make_another_subclass,
-  test_computed_index        = test_computed_index,
-  test_instance_table        = test_instance_table,
-  test_class_table           = test_class_table,
-  test_key                   = test_key,
-  test_init_data             = test_init_data,
-  
+  test_Object                 = test_Object,
+  test_make_subclass          = test_make_subclass,
+  test_constructor            = test_constructor,
+  test_is_instance            = test_is_instance,
+  test_is_instance_of         = test_is_instance_of,
+  test_is_descendant_of       = test_is_descendant_of,
+  test_finalize               = test_finalize,
+  test_initialize             = test_initialize,
+  test_make_another_subclass  = test_make_another_subclass,
+  test_computed_index         = test_computed_index,
+  test_instance_table         = test_instance_table,
+  test_class_table            = test_class_table,
+  test_key                    = test_key,
+  test_init_data              = test_init_data,
+  test_cache                  = test_cache,
+  test_hook                   = test_hook,
 }

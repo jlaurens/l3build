@@ -24,6 +24,24 @@ for those people who are interested.
 
 --]]
 
+--[===[
+## The booting process
+
+In the booting process, we setup some foundation data.
+We start with some paths, to identify locations where modules are stored.
+
+### The paths
+
+Important paths are
+
+1) the `start_dir` which is the current directory at start time
+2) the `cmd_dir` contains the commanad currently run (related to `arg[0]`).
+3) the `launch_dir` contains the currently active `l3build.lua`.
+4) the `work_dir` is 
+
+All these are strings ending with a "/".
+
+--]===]
 --@module l3build
 local banner = {
   "DEVELOPMENT: REFACTOR BRANCH",
@@ -50,10 +68,16 @@ local currentdir  = lfs.currentdir
 local chdir       = lfs.chdir
 local attributes  = lfs.attributes
 
--- # Start of the booting process
-
 -- Whether in a tex document or in a package folder:
-local in_document = require("status").cs_count > 0 -- tex.print ~= nil is undocumented
+-- This must be performed very early
+local in_document
+do
+  local cs_count = require("status").cs_count
+  in_document = cs_count ~= nil and cs_count > 0
+      or _G.tex ~= nil and _G.tex.print ~= nil
+end
+
+-- # Start of the booting process
 
 --[=[
 Bundle and modules are directories containing a `build.lua` file.
@@ -96,6 +120,7 @@ local the_debug = {}
 ---@field public flags        flags_t
 ---@field public main         Main
 ---@field public banner       string[]
+---@field public find_container_up fun(dir: string, base: string): dir_path_s|nil
 
 local l3build = { -- global data available as package.
   debug         = the_debug, -- storage for special debug flags (private UI)
@@ -124,13 +149,17 @@ do
   if not cmd_dir then
     cmd_dir, cmd_base = "./", cmd_path
   end
-  -- TODO: what about the windows stuff?
-  if not cmd_dir:match("^%/") and not cmd_dir:match("^%w:") then
-    cmd_dir = start_dir .. cmd_dir
+  -- cmd_dir as absolute path
+  do
+    local old = currentdir()
+    chdir(cmd_dir)
+    cmd_dir = currentdir() .."/"
+    chdir(old)
   end
   -- start_dir and cmd_dir are absolute
   is_l3build = cmd_base == "l3build" or cmd_base == "l3build.lua"
 
+  ---Find the parent directory containing some file.
   ---Central function to allow launching l3build from a subdirectory
   ---of a local repository.
   ---Find `base` in `dir` or one of its parents, returns the container.
@@ -141,10 +170,10 @@ do
   ---of the absolute path of `dir`, which majorated in the for loop
   ---Intermediate directories must exist.
   ---For testing reasons, we do not cross the `l3b-test-alt` component and alike.
-  ---@param dir   string @must end with '/'
+  ---@param dir   string
   ---@param base  string @relative file or directory name
   ---@return string? @dir ends with '/' when non nil
-  local function container(dir, base)
+  local function find_container_up(dir, base)
     local old = currentdir()
     local result
     while chdir(dir) do
@@ -172,7 +201,7 @@ do
   elseif cmd_base == "l3build" then
     launch_dir = kpse_dir
   else
-    launch_dir = container(currentdir(), "l3build.lua") or kpse_dir
+    launch_dir = find_container_up(currentdir(), "l3build.lua") or kpse_dir
   end
   -- launch_dir is absolute as well
   ---Calls f when one CLI option starts with "--debug"
@@ -188,41 +217,6 @@ do
     end
   end
 
-  -- work_dir:
-  if in_document then
-    work_dir = nil
-  elseif cmd_base == "build.lua" then
-    work_dir = cmd_dir
-  else
-    work_dir = container(start_dir,  "build.lua")
-            or container(launch_dir, "build.lua")
-    if not work_dir then
-      on_debug(function ()
-        print(arg[0])
-        print("  start: ".. start_dir)
-        -- print("  work:  ".. work_dir)
-        print("  kpse:  ".. kpse_dir)
-        print("  launch: ".. launch_dir)
-        local dir, base = start_dir, "build.lua"
-        for _ in dir .. currentdir():gmatch("[^/]+") do
-          local p = dir .. base
-          print(p)
-          if attributes(p, "mode") then -- true iff file or dir at the given path
-            return dir
-          end
-          dir = dir .. "../"
-        end
-      end)
-    end
-  end
-  if work_dir then -- package mode: bundle or module?
-    main_dir = work_dir .."../"
-    if not attributes(main_dir .."build.lua", "mode") then
-      main_dir = work_dir -- answer: module
-    end
-  end
-  -- work_dir and main_dir are absolute as well, if any
-  
   ---@function register
   ---Register the given pakage in `package.loaded`.
   ---Lua's require function return either true or a table.
@@ -241,15 +235,14 @@ do
     return pkg
   end
 
-  l3build.is_l3build       = is_l3build
-  l3build.in_document   = in_document
-  l3build.start_dir     = start_dir -- all these are expected to end with a "/"
-  l3build.launch_dir    = launch_dir
-  l3build.script_path   = launch_dir .."l3build.lua"
-  l3build.work_dir      = work_dir  -- may be nil
-  l3build.main_dir      = main_dir  -- may be nil as well
+  local script_path   = launch_dir .."l3build.lua"
+  register(l3build, "l3build", "l3build", script_path)
 
-  register(l3build, "l3build", "l3build", launch_dir .. "l3build.lua")
+  l3build.is_l3build    = is_l3build
+  l3build.in_document   = in_document
+  l3build.start_dir     = start_dir
+  l3build.launch_dir    = launch_dir
+  l3build.script_path   = script_path
 
   local require_orig = require
 
@@ -261,10 +254,12 @@ do
     end
   end
   
-  ---@function require
   ---Overwrites global `require`.
+  ---When `pkg_name` is "l3b-<name>",
+  ---looks for "<l3b_dir>/<pkg_name>.lua".
   ---When `pkg_name` is "l3build-<name>",
-  ---looks for "<l3b_dir>l3build-<name>.lua".
+  ---looks for "<launch_dir>/<pkg_name>.lua".
+  ---Otherwise, fallback to the original behaviour.
   ---@param pkg_name string
   ---@return table|boolean
   function require(pkg_name)
@@ -284,7 +279,7 @@ do
       package.loaded[pkg_name] = true
       local path
       if pkg_name:match("/") then
-        path = launch_dir .. name
+        path = launch_dir .. name -- a relative name was given
       else
         path = launch_dir .."l3b/".. name
       end
@@ -311,6 +306,18 @@ do
     return result
   end
 
+  if cmd_base == "build.lua" then
+    l3build.work_dir = cmd_dir
+  else
+    l3build.work_dir = find_container_up(
+      l3build.start_dir,
+      "build.lua"
+    ) or find_container_up(
+      l3build.launch_dir,
+      "build.lua"
+    )
+  end
+
 end
 
 --[==[ end of booting process ]==]
@@ -321,12 +328,18 @@ if arg[1] == "test" then
   return result
 end
 
-require("l3b-fslib").set_working_directory(work_dir)
-
 -- Terminate here if in document mode
 if in_document then
   return l3build
 end
+
+-- We are in module mode
+---@type Module
+local Module = require("l3b-module")
+
+l3build.module = Module(l3build.work_dir)
+
+require("l3b-fslib").set_working_directory(work_dir)
 
 ---@type l3b_main_t
 local l3b_main = require("l3build-main")

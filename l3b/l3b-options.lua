@@ -90,14 +90,12 @@ function OptionInfo.load_value(self, options, key, value)
   return 0
 end
 
-OptionInfo.__instance_table = {
-  expect_value = function (self)
-    if flags.debug then
-      print("DEBUG options parse expect_value:", self.type)
-    end
-    return self.type ~= "boolean"
-  end,
-}
+function OptionInfo.__instance_table.expect_value(self)
+  if flags.debug then
+    print("DEBUG options parse expect_value:", self.type)
+  end
+  return self.type ~= "boolean"
+end
 
 ---@class OptionManager
 ---@field private __by_key  table<string, OptionInfo>

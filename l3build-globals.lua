@@ -92,6 +92,11 @@ local kpse        = require("kpse")
 local set_program = kpse.set_program_name
 local var_value   = kpse.var_value
 
+local lpeg = require("lpeg")
+local C = lpeg.C
+local P = lpeg.P
+local V = lpeg.V
+
 ---@type Object
 local Object    = require("l3b-object")
 
@@ -119,7 +124,6 @@ local quoted_path   = oslib.quoted_path
 local OS            = oslib.OS
 local cmd_concat    = oslib.cmd_concat
 local run           = oslib.run
-local read_content  = oslib.read_content
 local read_command  = oslib.read_command
 
 ---@type fslib_t
@@ -375,6 +379,52 @@ Used for "l3build --get-global-variable bundle"
 and      "l3build --get-global-variable maindir"
 ]==]
 
+---@class main_variable_gmr_anchor_t
+---@field public B_VARIABLE string
+---@field public E_VARIABLE string
+---@field public B_NAME     string
+---@field public E_NAME     string
+---@field public B_VALUE    string
+---@field public E_VALUE    string
+
+---comment
+---@param anchor main_variable_gmr_anchor_t
+---@return lpeg_grammar_t
+local function get_main_variable_gmr(anchor)
+  return {
+    V(".*main"),
+    [".*main"] = V("main") + P(1) * V(".*main"),
+    main =
+        P(anchor.B_VARIABLE)
+      * V(".*name" )
+      * V(".*value")
+      * ( - P(anchor.E_VARIABLE) * P(1) )^0
+      * P(anchor.E_VARIABLE),
+    [".*name"] = V("name") + P(1) * V(".*name"),
+    name =
+        P(anchor.B_NAME)
+      * C( ( - P(anchor.E_NAME) * P(1) )^1 )
+      * P(anchor.E_NAME),
+    [".*value"] = V("value") + P(1) * V(".*value"),
+    value =
+      P(anchor.B_VALUE)
+      * C( ( - P(anchor.E_VALUE) * P(1) )^0 )
+      * P(anchor.E_VALUE),
+  }
+end
+
+---@type main_variable_gmr_anchor_t
+local anchor = {
+  B_VARIABLE  = "≪VARI≪", -- all are 10 bytes long
+  E_VARIABLE  = "≫IRAV≫",
+  B_NAME      = "≪NAME≪",
+  E_NAME      = "≫EMAN≫",
+  B_VALUE     = "≪VALU≪",
+  E_VALUE     = "≫ULAV≫",
+}
+
+local main_variable_p = P(get_main_variable_gmr(anchor))
+
 ---Get the main variable with the given name,
 ---@param name string
 ---@return string|nil
@@ -395,7 +445,7 @@ local function get_main_variable(name)
     command
   )
   if ok then
-    local k, v = packed[1]:match("GLOBAL VARIABLE: name = (.-), value = (.*)")
+    local k, v = main_variable_p:match(packed[1])
     return name == k and v or nil
   else
     error(packed)
@@ -414,8 +464,17 @@ local function handle_get_main_variable(name, config)
     error(msg)
   end
   f() -- ignore any output
-  print(("GLOBAL VARIABLE: name = %s, value = %s")
-    :format(name, tostring(G[name])))
+  local value = tostring(G[name])
+  print(("%s\n%s%s%s\n%s%s%s\n%s"):format(
+    anchor.B_VARIABLE,
+    anchor.B_NAME,
+    name,
+    anchor.E_NAME,
+    anchor.B_VALUE,
+    value,
+    anchor.E_VALUE,
+    anchor.E_VARIABLE
+  ))
   return 0
 end
 
@@ -644,6 +703,7 @@ declare({
           return s / "."
         end
       end
+
       return l3build.main_dir / "."
     end,
   },
@@ -2030,18 +2090,16 @@ local function get_vanilla()
   return vanilla
 end
 
-VariableEntry.__instance_table = {
-  type = function (self)
-    local result = type(self.vanilla_value)
-    rawset(self, "type", result)
-    return result
-  end,
-  vanilla_value = function (self)
-    local result = get_vanilla()[self.name]
-    rawset(self, "vanilla_value", result)
-    return result
-  end,
-}
+function VariableEntry.__instance_table.type(self)
+  local result = type(self.vanilla_value)
+  rawset(self, "type", result)
+  return result
+end
+function VariableEntry.__instance_table.vanilla_value(self)
+  local result = get_vanilla()[self.name]
+  rawset(self, "vanilla_value", result)
+  return result
+end
 
 local level_by_type = {
   ["nil"] = 5,
@@ -2131,11 +2189,15 @@ return {
 ---@field private entry_by_name   table<string,VariableEntry>
 ---@field private entry_by_index  VariableEntry[]
 ---@field private declare         fun(by_name: table<string,pre_variable_entry_t>)
----@field private get_entry       fun(name: string), ValiableEntry
+---@field private get_entry       fun(name: string): VariableEntry
+---@field private get_main_variable_gmr    fun(anchor: table):lpeg_grammar_t>
+---@field private get_main_variable_anchor table<string,string>
 _ENV.during_unit_testing and {
   VariableEntry   = VariableEntry,
   entry_by_name   = entry_by_name,
   entry_by_index  = entry_by_index,
   declare         = declare,
   get_entry       = get_entry,
+  get_main_variable_gmr = get_main_variable_gmr,
+  get_main_variable_anchor = anchor,
 }

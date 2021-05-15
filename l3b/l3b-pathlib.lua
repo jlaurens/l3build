@@ -1146,7 +1146,7 @@ return {
 },
 ---@class __pathlib_t
 ---@field private Path                    Path
----@field private get_path_gmr            fun(opts: path_matcher_opts_t): table<string|integer,lpeg_t>
+---@field private get_path_gmr            fun(opts: path_matcher_opts_t): lpeg_grammar_t
 ---@field private path_sep_p              lpeg_t
 ---@field private path_char_p             lpeg_t
 ---@field private path_comp_p             lpeg_t
@@ -1156,8 +1156,8 @@ return {
 ---@field private path_char_no_dotglob_p  lpeg_t
 ---@field private path_comp_no_dotglob_p  lpeg_t
 ---@field private end_p                   lpeg_t
----@field private get_glob_to_pattern_gmr fun(): table<string|integer,lpeg_t>
----@field private get_file_path_gmr       fun(): table<string|integer,lpeg_t>
+---@field private get_glob_to_pattern_gmr fun(): lpeg_grammar_t
+---@field private get_file_path_gmr       fun(): lpeg_grammar_t
 _ENV.during_unit_testing and {
   -- next are implementation details
   -- these are exported for testing purposes only
