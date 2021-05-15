@@ -1756,7 +1756,7 @@ function AD.Module:__get_instance(name, Class, store)
     if  info:is_instance_of(Class.__AtClass)
     and info.name == name
     then
-      result = Class(nil, self, info)
+      result = Class(self, info)
       assert(result.__at == info, "INIT PROBLEM")
       store[name] = result
       return result
@@ -1777,7 +1777,7 @@ function AD.Module:get_global(name)
     or  at:is_instance_of(AD.At.Type) and at.is_global
     then
       if at.name == name then
-        result = AD.Global(nil, self, at)
+        result = AD.Global(self, at)
         self.__globals[name] = result
         return result
       end

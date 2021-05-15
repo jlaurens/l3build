@@ -33,9 +33,6 @@ local concat  = table.concat
 
 require("l3b-pathlib") -- string div
 
----@type Object
-local Object = require("l3b-object")
-
 ---@type corelib_t
 local corelib = require("l3b-corelib")
 local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
@@ -44,6 +41,16 @@ local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
 local fslib = require("l3b-fslib")
 local file_exists = fslib.file_exists
 local set_tree_excluder = fslib.set_tree_excluder
+local set_working_directory_provider = fslib.set_working_directory_provider
+
+---@type Object
+local Object = require("l3b-object")
+
+-- We are in module mode
+---@type Module
+local Module = require("l3b-module")
+
+local l3build = require("l3build")
 
 --[==[ DEBUG flags ]==]
 ---@type oslib_t
@@ -197,12 +204,17 @@ local option_list = {
   }
 }
 
+
 ---@class Main: Object
 local Main = Object:make_subclass("Main")
 
 function Main:__initialize()
   self.option_manager = OptionManager()
   self.target_manager = TargetManager()
+  self.module = Module(l3build.work_dir)
+  set_working_directory_provider(function()
+    return self.module.path
+  end)
 end
 
 ---comment
@@ -219,24 +231,6 @@ function Main.register_builtin_options(self)
   for k, v in pairs(option_list) do
     v.long = k
     assert(self:register_option(v, true))
-  end
-end
-
----Register the custom options by loading and executing
----the `options.lua` located at `work_dir`.
----@param dir string
-function Main:register_custom_options(dir)
-  local path = dir / "options.lua"
-  if file_exists(path) then
-    local f, msg = loadfile(path, "t", _G)
-    if not f then
-      error(msg)
-    end
-    _G.register_option = function (info)
-      return self:register_option(info)
-    end
-    f()
-    _G.register_option = nil
   end
 end
 
@@ -430,10 +424,31 @@ function Main:process(options, kvargs)
   return self.target_manager:process(options, kvargs)
 end
 
-function Main:configure_cli(dir)
+function Main:configure_module_cli()
+  ---@type handler_registration_t
+  local registration_1 = self.module:register_handler(
+    "will_register_custom_options",
+    function (module)
+      function module._ENV.register_option(info)
+        return self:register_option(info)
+      end
+    end
+  )
+  local registration_2 =  self.module:register_handler(
+    "did_register_custom_options",
+    function (module)
+      module._ENV.register_option = nil
+    end
+  )
+  self.module:register_custom_options()
+  self.module:unregister_handler(registration_1)
+  self.module:unregister_handler(registration_2)
+end
+
+function Main:configure_cli()
   self:register_builtin_options()
-  self:register_custom_options(dir)
   self:register_targets()
+  self:configure_module_cli()
 end
 
 function Main:load_build(dir)
@@ -456,7 +471,8 @@ end
 
 function Main:run()
 
-  self:configure_cli(l3build.work_dir)
+
+  self:configure_cli()
 
   local options = self:parse(arg, function (arg_i)
     -- Private special debugging options "--debug-<key>"

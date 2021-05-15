@@ -651,32 +651,32 @@ local test_hook = {
       push(track, "handler_2")
       push(track, x)
     end
-    local registration_1 = o:hook_handler_insert("foo", handler_1)
-    o:call_hook_handlers_for_name("foo", 1)
+    local registration_1 = o:register_handler("foo", handler_1)
+    o:call_handlers_for_name("foo", 1)
     expect(track).equals({ "handler_1", 1 })
     track = {}
-    local registration_2 = o:hook_handler_insert("foo", handler_2)
-    o:call_hook_handlers_for_name("foo", 2)
+    local registration_2 = o:register_handler("foo", handler_2)
+    o:call_handlers_for_name("foo", 2)
     expect(track).equals({ "handler_1", 2, "handler_2", 2 })
     track = {}
-    expect(o:hook_handler_remove(registration_2)).is(handler_2)
-    o:call_hook_handlers_for_name("foo", 3)
+    expect(o:unregister_handler(registration_2)).is(handler_2)
+    o:call_handlers_for_name("foo", 3)
     expect(track).equals({ "handler_1", 3 })
     track = {}
-    expect(o:hook_handler_remove(registration_1)).is(handler_1)
-    o:call_hook_handlers_for_name("foo", 4)
+    expect(o:unregister_handler(registration_1)).is(handler_1)
+    o:call_handlers_for_name("foo", 4)
     expect(track).equals({})
     track = {}
-    registration_2 = o:hook_handler_insert("foo", 1, handler_2)
-    o:call_hook_handlers_for_name("foo", 5)
+    registration_2 = o:register_handler("foo", 1, handler_2)
+    o:call_handlers_for_name("foo", 5)
     expect(track).equals({ "handler_2", 5 })
     track = {}
-    registration_1 = o:hook_handler_insert("foo", 1, handler_1)
-    o:call_hook_handlers_for_name("foo", 6)
+    registration_1 = o:register_handler("foo", 1, handler_1)
+    o:call_handlers_for_name("foo", 6)
     expect(track).equals({ "handler_1", 6, "handler_2", 6 })
   end,
   test_no_handlers = function (self)
-    Object:call_hook_handlers_for_name("foo", 1, 2, 3)
+    Object:call_handlers_for_name("foo", 1, 2, 3)
   end,
   test_hierarchy = function (self)
     local track = {}
@@ -686,26 +686,26 @@ local test_hook = {
         push(track, this[tracker])
       end
     end
-    Object:hook_handler_insert("foo", handler(Object, "O1"))
-    Object:hook_handler_insert("foo", handler(Object, "O2"))
+    Object:register_handler("foo", handler(Object, "O1"))
+    Object:register_handler("foo", handler(Object, "O2"))
     local A = Object:make_subclass("A")
-    A:hook_handler_insert("foo", handler(A, "A1"))
-    A:hook_handler_insert("foo", handler(A, "A2"))
+    A:register_handler("foo", handler(A, "A1"))
+    A:register_handler("foo", handler(A, "A2"))
     local AA = A:make_subclass("AA")
-    AA:hook_handler_insert("foo", handler(AA, "AA:1"))
-    AA:hook_handler_insert("foo", handler(AA, "AA:2"))
+    AA:register_handler("foo", handler(AA, "AA:1"))
+    AA:register_handler("foo", handler(AA, "AA:2"))
     local o = Object()
-    o:hook_handler_insert("foo", handler(o, "o1"))
-    o:hook_handler_insert("foo", handler(o, "o2"))
+    o:register_handler("foo", handler(o, "o1"))
+    o:register_handler("foo", handler(o, "o2"))
     local a = A()
-    a:hook_handler_insert("foo", handler(a, "a1"))
-    a:hook_handler_insert("foo", handler(a, "a2"))
+    a:register_handler("foo", handler(a, "a1"))
+    a:register_handler("foo", handler(a, "a2"))
     local aa = AA()
-    aa:hook_handler_insert("foo", handler(aa, "aa:1"))
-    aa:hook_handler_insert("foo", handler(aa, "aa:2"))
+    aa:register_handler("foo", handler(aa, "aa:1"))
+    aa:register_handler("foo", handler(aa, "aa:2"))
     local function test(x, expected)
       track = {}
-      x:call_hook_handlers_for_name("foo")
+      x:call_handlers_for_name("foo")
       expect(track).equals(expected)
     end
     test(Object, { "O1", "O2" })
@@ -714,8 +714,46 @@ local test_hook = {
     test(a, { "O1", "O2", "A1", "A2", "a1", "a2" })
     test(AA, { "O1", "O2", "A1", "A2", "AA:1", "AA:2" })
     test(aa, { "O1", "O2", "A1", "A2", "AA:1", "AA:2", "aa:1", "aa:2" })
-    A:hook_handler_insert("foo", handler(A, "A3"))
+    A:register_handler("foo", handler(A, "A3"))
     test(aa, { "O1", "O2", "A1", "A2", "A3", "AA:1", "AA:2", "aa:1", "aa:2" })
+  end,
+}
+local test_private = {
+  setup = function (self)
+    self.key = _ENV.random_string()
+    self.value = _ENV.random_number()
+  end,
+  test_Object = function (self)
+    expect(Object:get_private_property(self.key)).is(nil)
+    expect(Object:set_private_property(self.key, self.value)).is(Object)
+    expect(Object:get_private_property(self.key)).is(self.value)
+    expect(Object:set_private_property(self.key)).is(Object)
+    expect(Object:get_private_property(self.key)).is(nil)
+  end,
+  test_o = function (self)
+    local o = Object()
+    expect(o:get_private_property(self.key)).is(nil)
+    expect(o:set_private_property(self.key, self.value)).is(o)
+    expect(o:get_private_property(self.key)).is(self.value)
+    expect(o:set_private_property(self.key)).is(o)
+    expect(o:get_private_property(self.key)).is(nil)
+  end,
+  test_OO = function (self)
+    local OO = Object:make_subclass("Subclass")
+    expect(OO:get_private_property(self.key)).is(nil)
+    expect(OO:set_private_property(self.key, self.value)).is(OO)
+    expect(OO:get_private_property(self.key)).is(self.value)
+    expect(OO:set_private_property(self.key)).is(OO)
+    expect(OO:get_private_property(self.key)).is(nil)
+  end,
+  test_oo = function (self)
+    local OO = Object:make_subclass("OO")
+    local oo = OO()
+    expect(oo:get_private_property(self.key)).is(nil)
+    expect(oo:set_private_property(self.key, self.value)).is(oo)
+    expect(oo:get_private_property(self.key)).is(self.value)
+    expect(oo:set_private_property(self.key)).is(oo)
+    expect(oo:get_private_property(self.key)).is(nil)
   end,
 }
 
@@ -736,4 +774,5 @@ return {
   test_init_data              = test_init_data,
   test_cache                  = test_cache,
   test_hook                   = test_hook,
+  test_private                = test_private,
 }

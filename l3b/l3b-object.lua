@@ -22,7 +22,6 @@ for those people who are interested.
 
 --]]
 
----@module object
 --[===[
   This module implements some object oriented paradigm.
   It does not require any other module.
@@ -77,6 +76,7 @@ Basically, `__computed_index` is for class computed properties
 whereas `__instance_table` is for instance computed properties.
 
 --]===]
+---@module object
 
 local insert  = table.insert
 local push    = insert
@@ -85,6 +85,7 @@ local remove  = table.remove
 ---@class Object @ Root class, metatable of other tables
 ---@field public  make_subclass     fun(type: string, t: table): Object
 ---@field public  is_instance       boolean
+---@field public  is_class          boolean
 ---@field private __computed_index  fun(self: Object, key: string): any
 ---@field private __instance_table  table<string,fun(self: Object): any>
 
@@ -104,7 +105,10 @@ end
 Object.__class_table = {
   is_instance = function (self)
     return self.__Class ~= self
-  end
+  end,
+  is_class = function (self)
+    return self.__Class == self
+  end,
 }
 
 ---For computed properties
@@ -124,10 +128,24 @@ Object.NIL = setmetatable({}, {
   end
 })
 
+---Constructor
+--[===[
+when a table with a falsy `is_instance` field,
+used as a template to build the instance.
+n that case, it won't be passed to the initializer.
+]===]
+---@param d table
+---@vararg any
+---@return Object
 function Object:Constructor(d, ...)
-  d = setmetatable(d or {}, Object)
-  d:lock()
-  return d
+  local instance = type(d) == "table"
+    and not d.is_class
+    and not d.is_instance
+    and d
+    or {}
+  instance = setmetatable(instance, Object)
+  instance:lock()
+  return instance
 end
 
 setmetatable(Object, {
@@ -158,7 +176,7 @@ local function make_class__index(class)
     if k == "cache_get" then
       return class == self and class.__Super[k] or class[k]
     end
-    -- first cached properties
+    -- first: cached properties
     local result = self and self:cache_get(k)
     if result ~= nil then
       if result == Object.NIL then
@@ -208,26 +226,21 @@ local function make_constructor(class)
   -- @vararg any      @ parameters to the `initialize` function
   return function (self, d, ...)
     -- call Super constructor
-    -- `first` recors if the `d` param was given
-    local first = type(d) ~= "table" and d or nil
-    if first then
-      d = class.__Super(nil, first, ...)
-    else
-      d = class.__Super(d, ...)
-    end
-    setmetatable(d, class)   -- d is an instance of self
-    d.__TYPE = class.__TYPE
+    -- `first` records if the `d` param was given
+    local instance = class.__Super(d, ...)
+    setmetatable(instance, class)   -- d is an instance of self
+    instance.__TYPE = class.__TYPE
     -- initialize without inheritance, it was made in the Super contructor
     local initialize = rawget(class, "__initialize")
     if initialize then
-      if first then
-        initialize(d, first, ...)
+      if instance == d then
+        initialize(instance, ...)
       else
-        initialize(d, ...)
+        initialize(instance, d, ...)
       end
     end
-    d:lock()
-    return d
+    instance:lock()
+    return instance
   end
 end
 
@@ -368,29 +381,29 @@ end
 
 -- hook mechanism
 
-local hooks_by_object = setmetatable({}, {
+local handlers_by_object = setmetatable({}, {
   __mode = "k",
 })
 
----@alias hook_handler_f fun(self: Object,...):any,...
+---@alias handler_f fun(self: Object,...):any,...
 
----@alias hook_registration_t any @ private structure
+---@alias handler_registration_t any @ private structure
 
-function Object:_hooks_for_name(name)
-  local hooks_by_name = hooks_by_object[self]
+function Object:_handlers_for_name(name)
+  local hooks_by_name = handlers_by_object[self]
   if not hooks_by_name then
     hooks_by_name = {}
-    hooks_by_object[self] = hooks_by_name
+    handlers_by_object[self] = hooks_by_name
   end
-  local named_hooks = hooks_by_name[name]
-  if not named_hooks then
-    named_hooks = {
+  local named_handlers = hooks_by_name[name]
+  if not named_handlers then
+    named_handlers = {
       ordered = {},
       by_key = {},
     }
-    hooks_by_name[name] = named_hooks
+    hooks_by_name[name] = named_handlers
   end
-  return named_hooks
+  return named_handlers
 end
 
 ---Insert a hook handler for a given name
@@ -398,15 +411,15 @@ end
 ---This is similar to lua's `table.insert`.
 ---@param name string
 ---@param pos? integer
----@param handler hook_handler_f
----@return hook_registration_t
-function Object:hook_handler_insert(name, pos, handler)
-  local named_hooks = self:_hooks_for_name(name)
+---@param handler handler_f
+---@return handler_registration_t
+function Object:register_handler(name, pos, handler)
+  local named_handlers = self:_handlers_for_name(name)
   if handler == nil then
-    pos, handler = #named_hooks + 1, pos
+    pos, handler = #named_handlers + 1, pos
   end
   local key = { name }
-  insert(named_hooks, pos, {
+  insert(named_handlers, pos, {
     handler = handler,
     key = key,
   })
@@ -414,14 +427,14 @@ function Object:hook_handler_insert(name, pos, handler)
 end
 
 ---Remove a previously inserted hook handler
----@param key hook_registration_t
----@return hook_handler_f|nil
-function Object:hook_handler_remove(key)
-  local named_hooks = self:_hooks_for_name(key[1])
-  for i = 1, #named_hooks do
-    local t = named_hooks[i]
-    if t.key == key then
-      remove(named_hooks, i)
+---@param registration handler_registration_t
+---@return handler_f|nil
+function Object:unregister_handler(registration)
+  local named_handlers = self:_handlers_for_name(registration[1])
+  for i = 1, #named_handlers do
+    local t = named_handlers[i]
+    if t.key == registration then
+      remove(named_handlers, i)
       return t.handler
     end
   end
@@ -431,7 +444,7 @@ end
 ---It takes care of inheritance
 ---@param name string
 ---@vararg any
-function Object:call_hook_handlers_for_name(name, ...)
+function Object:call_handlers_for_name(name, ...)
   local o = self
   local hierarchy = { o }
   if o == o.__Class then
@@ -446,18 +459,49 @@ function Object:call_hook_handlers_for_name(name, ...)
   end
   for i = #hierarchy, 1, -1 do
     o = hierarchy[i]
-    local named_hooks = o:_hooks_for_name(name)
-    for j = 1, #named_hooks do
-      named_hooks[j].handler(self, ...)
+    local named_handlers = o:_handlers_for_name(name)
+    for j = 1, #named_handlers do
+      named_handlers[j].handler(self, ...)
     end
   end
+end
+
+-- hidden private properties
+-- stored in an association table
+
+local private_properties = setmetatable({}, {
+  __mode = "k",
+})
+
+---Get the named private property, if any
+---@param key any
+---@return any
+function Object:get_private_property(key)
+  local properties = private_properties[self]
+  return properties and properties[key]
+end
+
+---Set the private property for the given key
+---@generic T: Object
+---@param self any
+---@param key any
+---@param value any
+---@return T @ the receiver
+function Object.set_private_property(self, key, value)
+  local properties = private_properties[self]
+  if not properties then
+    properties = {}
+    private_properties[self] = properties
+  end
+  properties[key] = value
+  return self
 end
 
 return Object
 ---@class __object_t
 ---@field private cache_by_object table
----@field private hooks_by_object table
+---@field private handlers_by_object table
 , _ENV.during_unit_testing and {
   cache_by_object = cache_by_object,
-  hooks_by_object = hooks_by_object,
+  handlers_by_object = handlers_by_object,
 }

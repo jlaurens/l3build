@@ -58,7 +58,7 @@ local test_status = {
     expect(value).is(v)
   end,
   test_status_run = function (self)
-    fslib.set_working_directory(l3build.work_dir)
+    fslib.set_working_directory_provider(function () return l3build.work_dir end)
     _G.bundle = ""
     _G.module = _ENV.random_string()
     local track = {}

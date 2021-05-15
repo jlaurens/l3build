@@ -178,6 +178,10 @@ local test_directory = {
     expect(a:match(b)).NOT(nil)
   end,
   test_quoted_absolute_path = function (self)
+    self:make_random_directory()
+    fslib.set_working_directory_provider(function ()
+      return self.dir_name / self.random_name
+    end)
     if os["type"] == "windows" then
       expect(quoted_absolute_path("A B C"):match('A B C')).NOT(nil)
     else
@@ -186,7 +190,9 @@ local test_directory = {
   end,
   test_absolute_path = function (self)
     self:make_random_directory()
-    fslib.set_working_directory(self.dir_name / self.random_name)
+    fslib.set_working_directory_provider(function ()
+      return self.dir_name / self.random_name
+    end)
     expect(#__.cwd_list).is(0)
     -- on OSX the absolute path may have a "/private" prefix
     -- fslib.Vars.debug.absolute_path = true

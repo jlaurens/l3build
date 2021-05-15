@@ -89,8 +89,6 @@ local is_l3build     -- Whether the script is called first
 ---@alias dir_path_s string -- path ending with a '/'
 ---@type dir_path_s
 local work_dir    -- the directory containing the closest "build.lua" and friends
----@type dir_path_s
-local main_dir    -- the directory containing the topmost "build.lua" and friends
 
 ---@class l3build_debug_t
 ---@field public run              boolean
@@ -112,7 +110,6 @@ local the_debug = {}
 ---@field public is_l3build   boolean          @True means "l3build" is the main controller.
 ---@field public in_document  boolean          @True means no "build.lua"
 ---@field public work_dir     dir_path_s|nil   @where the closest "build.lua" lives, nil means not in_document
----@field public main_dir     dir_path_s|nil   @where the topmost "build.lua" lives, nil means not in_document
 ---@field public launch_dir   dir_path_s       @where "l3build.lua" and friends live
 ---@field public start_dir    dir_path_s       @the current directory at load time
 ---@field public script_path  string           @the path of the `l3build.lua` in action.
@@ -143,7 +140,6 @@ do
   -- Setup dirs where require will look for modules.
 
   local start_dir = currentdir() .. "/" -- this is the current dir at launch time, absolute
-  -- is_l3build: whether required by someone else, or not
   local cmd_path = arg[0]
   local cmd_dir, cmd_base = cmd_path:match("(.*/)(.*)")
   if not cmd_dir then
@@ -157,6 +153,7 @@ do
     chdir(old)
   end
   -- start_dir and cmd_dir are absolute
+  -- is_l3build: whether required by someone else, or not
   is_l3build = cmd_base == "l3build" or cmd_base == "l3build.lua"
 
   ---Find the parent directory containing some file.
@@ -208,15 +205,6 @@ do
   ---@param f fun()
   local function on_debug(f) end -- do nothing by default
 
-  for _, o in ipairs(arg) do
-    if o:match("^%-%-debug") then
-      function on_debug(f) -- calls f
-        f()
-      end
-      break
-    end
-  end
-
   ---@function register
   ---Register the given pakage in `package.loaded`.
   ---Lua's require function return either true or a table.
@@ -246,14 +234,6 @@ do
 
   local require_orig = require
 
-  local debug_require
-  for _, o in ipairs(arg) do
-    if o:match("^%-%-debug%-require") then
-      debug_require = true
-      break
-    end
-  end
-  
   ---Overwrites global `require`.
   ---When `pkg_name` is "l3b-<name>",
   ---looks for "<l3b_dir>/<pkg_name>.lua".
@@ -271,9 +251,6 @@ do
     if result then
       return result -- recursive calls will end here
     end
-    if debug_require then
-      print("DEBUG Info: package required ".. pkg_name)
-    end
     local name = pkg_name:match("^l3b%-.*")
     if name then -- an l3b library package
       package.loaded[pkg_name] = true
@@ -283,10 +260,7 @@ do
       else
         path = launch_dir .."l3b/".. name
       end
-      if debug_require then
-        print("path ".. path)
-      end
-        result = require_orig(path) -- error here if no such module exists
+      result = require_orig(path) -- error here if no such module exists
       result = register(result, pkg_name, name, path .. ".lua")
     else
       name = pkg_name:match("^l3build%-.*")
@@ -300,23 +274,16 @@ do
         result = require_orig(pkg_name)
       end
     end
-    if debug_require then
-      print("DEBUG Info: package loaded ".. pkg_name, result.PATH)
-    end
     return result
   end
 
-  if cmd_base == "build.lua" then
-    l3build.work_dir = cmd_dir
-  else
-    l3build.work_dir = find_container_up(
-      l3build.start_dir,
-      "build.lua"
-    ) or find_container_up(
-      l3build.launch_dir,
-      "build.lua"
-    )
-  end
+  l3build.work_dir = find_container_up(
+    l3build.start_dir,
+    "build.lua"
+  ) or find_container_up(
+    l3build.launch_dir,
+    "build.lua"
+  )
 
 end
 
@@ -333,14 +300,6 @@ if in_document then
   return l3build
 end
 
--- We are in module mode
----@type Module
-local Module = require("l3b-module")
-
-l3build.module = Module(l3build.work_dir)
-
-require("l3b-fslib").set_working_directory(work_dir)
-
 ---@type l3b_main_t
 local l3b_main = require("l3build-main")
 
@@ -348,4 +307,4 @@ local main = l3b_main.Main()
 
 l3build.main = main
 
-return main:run(work_dir, is_l3build)
+return main:run()

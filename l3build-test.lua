@@ -22,9 +22,10 @@ for those people who are interested.
 
 --]]
 
-local write = io.write
-local push  = table.insert
-local pop   = table.remove
+local write   = io.write
+local push    = table.insert
+local pop     = table.remove
+local concat  = table.concat
 
 local lpeg  = require("lpeg")
 local lfs   = require("lfs")
@@ -401,11 +402,30 @@ from all test files run only test containing either "foo" or "bar".
   end
 
   function ENV.random_number()
-    return math.random(100000, 999999)
+    return math.random(10000000, 99999999)
   end
 
-  function ENV.random_string()
-    return "_".. tostring(ENV.random_number())
+  function ENV.random_string(length)
+    length = length or 8
+    local result = { "_" }
+    local function dice()
+      return string.char(
+        math.random(
+          string.byte('0'),
+          string.byte('z')
+        )
+      )
+    end
+    for _ = 1, length do
+      repeat
+        local c = dice()
+        if c:match("[%w_]") then
+          push(result, c)
+          break
+        end
+      until false
+    end
+    return concat(result)
   end
 
   function ENV.random_text(length)
@@ -475,6 +495,13 @@ from all test files run only test containing either "foo" or "bar".
       fh:close()
     end
     return result, error_level
+  end
+
+  function ENV.wrap_function(f, g)
+    return function (...)
+      g(...)
+      return f(...)
+    end
   end
 
   ---@type fun(): string|nil @ string iterator

@@ -273,7 +273,7 @@ function TargetManager:register(info, builtin)
       .. tostring(self.__DB[info.alias].name)
     )
   end
-  local result = TargetInfo(nil, info, self, builtin)
+  local result = TargetInfo(info, self, builtin)
   self.__DB[info.name] = result
   if info.alias then
     self.__DB[info.alias] = result -- latex2e

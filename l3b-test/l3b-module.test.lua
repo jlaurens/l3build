@@ -24,7 +24,7 @@ end
 local function test_POC()
   local maindir = _ENV.make_temporary_dir()
   expect(maindir).NOT(nil)
-  fslib.set_working_directory(maindir)
+  fslib.set_working_directory_provider(function () return maindir end)
   local script_path = maindir / "unpack.lua"
   write_content(script_path, [[
 #!/usr/bin/env texlua

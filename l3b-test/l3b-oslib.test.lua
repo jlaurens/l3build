@@ -56,17 +56,12 @@ local function test_run()
       end
     end
   end
-  expect(find_name()).is(false)
+  expect(find_name()).NOT(true)
   lfs.mkdir(dir_name .."/".. name)
   expect(find_name()).is(true)
-  local cmd
-  if os["type"] == "windows" then
-    cmd = "del"
-  else
-    cmd = "rm"
-  end
-  oslib.run(dir_name, cmd .." ".. name)
-  expect(find_name()).is(false)
+  local cmd = "rmdir ".. name
+  oslib.run(dir_name, cmd)
+  expect(find_name()).NOT(true)
 end
 
 local function test_run_process()

@@ -67,7 +67,7 @@ local Vars = setmetatable({
   __index = function (t, k)
     if k == "working_directory" then
       print(debug.traceback())
-      error("Missing set_working_directory.", 2)
+      error("Missing set_working_directory_provider.", 2)
     end
   end
 })
@@ -212,14 +212,16 @@ local function push_pop_current_directory(dir, f, ...)
   return false, packed[2]
 end
 
----Set the working directory. As soon as possible
----@param dir string
-local function set_working_directory(dir)
-  assert(not dir:match("^%."),
-    "Absolute path required in set_working_directory, got "
-    .. tostring(dir)
+---Set the working directory provider. As soon as possible
+---@param provider directory_provider_f
+---@see fslib.absolute_path
+local function set_working_directory_provider(provider)
+  local provided = provider()
+  assert(not provided:match("^%."),
+    "Absolute path required in set_working_directory_provider, got "
+    .. tostring(provided)
   )
-  Vars.working_directory = dir
+  Vars.working_directory_provider = provider
 end
 
 ---Return an absolute path from a relative one.
@@ -228,7 +230,7 @@ end
 ---to the current directory when not already absolute.
 ---If `is_current` is false, the given path is relative
 ---to the working directory when not already absolute.
----@see `set_working_directory`.
+---@see `set_working_directory_provider`.
 ---@param path string
 ---@param is_current boolean @whether `path` is relative to the current directory
 ---@return string
@@ -241,7 +243,7 @@ local function absolute_path(path, is_current)
     print("DEBUG absolute_path dir, base", dir, base)
   end
   if not is_current then
-    push_current_directory(Vars.working_directory)
+    push_current_directory(Vars.working_directory_provider())
   end
   local result
   local ok, msg = push_current_directory(dir)
@@ -630,6 +632,8 @@ local function remove_directory(path)
   end
 end
 
+---@alias directory_provider_f fun():string
+
 ---@class fslib_t
 ---@field public Vars                       fslib_vars_t
 ---@field public to_host                    fun(cmd: string):  string
@@ -650,12 +654,12 @@ end
 ---@field public remove_name                fun(dir_path: string, name: string): integer
 ---@field public remove_tree                fun(source: string, glob: string): integer
 ---@field public remove_directory           fun(path: string): boolean?, exitcode?, integer?
----@field public set_working_directory      fun(path: string)
 ---@field public get_current_directory      fun(): string
 ---@field public change_current_directory   fun(dir: string) raises if dir does not exist
 ---@field public push_current_directory     fun(dir: string): string
 ---@field public pop_current_directory      fun(): string
 ---@field public push_pop_current_directory fun(dir:string, f: function, ...): boolean, any
+---@field public set_working_directory_provider fun(provider: directory_provider_f)
 
 return {
   Vars                  = Vars,
@@ -678,12 +682,12 @@ return {
   remove_name           = remove_name,
   remove_tree           = remove_tree,
   remove_directory      = remove_directory,
-  set_working_directory       = set_working_directory,
   get_current_directory       = get_current_directory,
   change_current_directory    = change_current_directory,
   push_current_directory      = push_current_directory,
   pop_current_directory       = pop_current_directory,
   push_pop_current_directory  = push_pop_current_directory,
+  set_working_directory_provider  = set_working_directory_provider,
 },
 ---@class __fslib_t
 ---@field private unix_to_win fun(s: string): string

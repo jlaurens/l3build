@@ -24,12 +24,17 @@ for those people who are interested.
 
 ---@module module
 
-----@type Object
-local Object = require("l3b-object")
+require("l3b-pathlib")
 
 ---@type fslib_t
 local fslib = require("l3b-fslib")
 local file_exists = fslib.file_exists
+
+----@type Object
+local Object = require("l3b-object")
+
+----@type Env
+local Env = require("l3b-env")
 
 --@type l3build_t
 local l3build = require("l3build")
@@ -37,12 +42,20 @@ local find_container_up = l3build.find_container_up
 
 -- Module implemenation
 
+local module_of_Env = setmetatable({}, {
+  __mode = "k"
+})
+
+---@type ModEnv
+local ModEnv = require("l3b-modenv")
+
 ---@class Module: Object
----@field public path           string  @ the root path of the module
----@field public _ENV           table   @ the _ENV of the receiver
+---@field public path           string    @ the root path of the module
+---@field public env            ModEnv @ the env of the receiver
 ---@field public is_main        boolean
 ---@field public parent_module  Module|nil
----@field public main_module    Module
+---@field public main_module    Module    @ may be self is the module is main
+---@field public Dir            Module.Dir
 ---@field public dir            Module.Dir
 
 ---@type Module
@@ -50,9 +63,7 @@ local Module = Object:make_subclass("Module")
 
 function Module:__initialize(path)
   self.path = path
-  self._ENV = setmetatable({}, {
-    __index = _G,
-  })
+  self.env = ModEnv(self)
   self.dir = Module.Dir(self)
 end
 
@@ -84,20 +95,64 @@ function Module.__instance_table:main_module()
   return main
 end
 
-function Module:load_build()
-  local path = self.path / "build.lua"
+---Load and run the `build.lua` file
+---Static method when `dir` is provided,
+---and instance method otherwise.
+---`dir` defaults to the receiver's `path`.
+---ENV is ignored when dir is not provided,
+---and defaults to `_G` otherwise.
+---@param dir? string
+---@param ENV? table @ used as env, defaults to _G
+function Module:load_build(dir, ENV)
+  local path = ( dir or self.path ) / "build.lua"
   assert(file_exists(path), "Inconsistent module: no build.lua")
-  local f, msg = loadfile(path, "t", self._ENV)
+  if not dir then
+    self:call_handlers_for_name("will load build.lua")
+  end
+  local f, msg = loadfile(path, "t", dir and ( ENV or _G ) or self.env)
   if not f then
     error(msg)
   end
-  self:call_hook_handlers_for_name("will load build.lua", module)
   f() -- ignore any output, make a protected call?
-  self:call_hook_handlers_for_name("did load build.lua")
+  if not dir then
+    self:call_handlers_for_name("did load build.lua")
+    -- one shot
+    self.load_build = function () end
+  end
 end
 
+---Register the custom options.
+---Load and execute an `options.lua`.
+---Static method when `dir` is provided,
+---and instance method otherwise.
+---`dir` defaults to the receiver's `path`
+---such that `options.lua`, if any, is near `build.lua`.
+---ENV is ignored when dir is not provided.
+---In that case, ENV defaults to `_G`.
+---Otherwise, the receiver's `env` is used.
+---@param dir? string
+---@param ENV? table @ used as env, defaults to _G
+function Module:register_custom_options(dir, ENV)
+  local path = ( dir or self.path ) / "options.lua"
+  if file_exists(path) then
+    local f, msg = loadfile(path, "t", dir and ( ENV or _G ) or self.env)
+    if not f then
+      error(msg)
+    end
+    self:call_handlers_for_name("will_register_custom_options")
+    f()
+    self:call_handlers_for_name("did_register_custom_options")
+  end
+end
+
+-- Populate Env
+--[[
+The environment of a module is an object with a dedicated class
+
+--]]
+
 ---@class Module.Dir
----@field public Module       Module @ Owner
+---@field public module       Module @ Owner
 ---@field public work         string @Directory with the `build.lua` file.
 ---@field public main         string @Top level directory for the module|bundle
 ---@field public docfile      string @Directory containing documentation files
@@ -127,7 +182,7 @@ end
 function Module.Dir.__instance_table:main()
   local main = self.module.main_module
 
-  return 
+  return
 end
 
 local declare = function (x) end
