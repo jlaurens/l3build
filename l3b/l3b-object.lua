@@ -99,6 +99,9 @@ Object.__Class = Object
 ---@param self Object
 ---@param k any
 function Object.__index(self, k)
+  if Object.__do_not_inherit(k) then
+    return nil
+  end
   return Object[k]
 end
 
@@ -119,6 +122,15 @@ Object.__class_table = {
 ---@return any
 ---@see #make_subclass
 function Object.__computed_index(self, k)
+end
+
+
+---Stop inheritance
+---Default implementation returns false.
+---@param k any
+---@return boolean
+function Object.__do_not_inherit(k)
+  return false
 end
 
 ---@see __computed_index
@@ -215,6 +227,10 @@ local function make_class__index(class)
       end
       return result
     end
+    local do_not_inherit = rawget(self, "__do_not_inherit")
+    if do_not_inherit and do_not_inherit(k) then
+      return nil
+    end
     return class[k]
   end
 end
@@ -285,14 +301,23 @@ function Object.make_subclass(Super, TYPE, static)
   class.__computed_index
     =  class.__computed_index
     or Super.__computed_index
-  ---comment
+  class.__do_not_inherit
+    =  class.__do_not_inherit
+    or Super.__do_not_inherit
+---comment
   ---@param self Object
   ---@param k any
   ---@return any
   class.__index = make_class__index(class)
   class.Constructor = make_constructor(class)
+  -- Super is not the metatable of class
+  -- because we want class to be callable
+  -- to create an instance.
   setmetatable(class, {
     __index = function (self, k)
+      if class.__do_not_inherit(k) then
+        return nil
+      end
       local result = rawget(Super, k)
       if result ~= nil then
         return result

@@ -48,8 +48,11 @@ local Env00 = Object:make_subclass("Env00")
 local INACTIVE = {}
 
 function Env00:__computed_index(k)
-  if Object.get_private_property(Env00, INACTIVE) then
-    Object.set_private_property(Env00, INACTIVE)
+  local kk = rawget(Env00, INACTIVE)
+  if kk then
+    if k == kk then
+      rawset(Env00, INACTIVE, nil)
+    end
     return Object.NIL
   end
   local result = Env00[k]
@@ -67,7 +70,7 @@ local Env0 = Env00:make_subclass("Env0")
 function Env0:__computed_index(k)
   local inactive = Object.get_private_property(self, INACTIVE)
   if inactive then
-    Object.set_private_property(Env00, INACTIVE, true)
+    rawset(Env00, INACTIVE, k)
   end
   return nil
 end

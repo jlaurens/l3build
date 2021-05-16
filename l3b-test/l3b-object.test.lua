@@ -757,6 +757,43 @@ local test_private = {
   end,
 }
 
+local function test_do_not_inherit()
+  -- add a new property to `Object`
+  -- create a hierarchy
+  -- inherit or not this key
+  local key = _ENV.random_string()
+  local value = _ENV.random_string()
+  local O = Object:make_subclass("O")
+  local OO = O:make_subclass("OO")
+  local oo = OO()
+  Object[key] = value
+  expect(O[key]).is(value)
+  expect(OO[key]).is(value)
+  expect(oo[key]).is(value)
+  function O.__do_not_inherit(k)
+    return k == key
+  end
+  expect(O[key]).is(nil)
+  expect(OO[key]).is(nil)
+  expect(oo[key]).is(nil)
+  O.__do_not_inherit = Object.__do_not_inherit
+  function OO.__do_not_inherit(k)
+    return k == key
+  end
+  expect(O[key]).is(value)
+  expect(OO[key]).is(nil)
+  expect(oo[key]).is(nil)
+  OO.__do_not_inherit = Object.__do_not_inherit
+  O.__do_not_inherit = Object.__do_not_inherit
+  function oo.__do_not_inherit(k)
+    return k == key
+  end
+  expect(O[key]).is(value)
+  expect(OO[key]).is(value)
+  expect(oo[key]).is(nil)
+  Object[key] = nil
+end
+
 return {
   test_Object                 = test_Object,
   test_make_subclass          = test_make_subclass,
@@ -768,6 +805,7 @@ return {
   test_initialize             = test_initialize,
   test_make_another_subclass  = test_make_another_subclass,
   test_computed_index         = test_computed_index,
+  test_do_not_inherit         = test_do_not_inherit,
   test_instance_table         = test_instance_table,
   test_class_table            = test_class_table,
   test_key                    = test_key,
