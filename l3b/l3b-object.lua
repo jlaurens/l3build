@@ -133,6 +133,16 @@ function Object.__do_not_inherit(k)
   return false
 end
 
+---Last filter before return
+---Default implementation returns false.
+---@generic T: any
+---@param k any
+---@param v T
+---@return T
+function Object.__index_will_return(k, v)
+  return v
+end
+
 ---@see __computed_index
 Object.NIL = setmetatable({}, {
   __tostring = function (self)
@@ -231,7 +241,7 @@ local function make_class__index(class)
     if do_not_inherit and do_not_inherit(k) then
       return nil
     end
-    return class[k]
+    return class.__index_will_return(k, class[k])
   end
 end
 
@@ -304,6 +314,9 @@ function Object.make_subclass(Super, TYPE, static)
   class.__do_not_inherit
     =  class.__do_not_inherit
     or Super.__do_not_inherit
+  class.__index_will_return
+    =  class.__index_will_return
+    or Super.__index_will_return
 ---comment
   ---@param self Object
   ---@param k any
@@ -319,10 +332,10 @@ function Object.make_subclass(Super, TYPE, static)
         return nil
       end
       local result = rawget(Super, k)
-      if result ~= nil then
-        return result
+      if result == nil then
+        result = Super.__index(self, k)
       end
-      return Super.__index(self, k)
+      return Super.__index_will_return(k, result)
     end,
     __call  = class.Constructor,
   })

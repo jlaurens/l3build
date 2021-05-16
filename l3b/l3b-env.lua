@@ -50,9 +50,6 @@ local INACTIVE = {}
 function Env00:__computed_index(k)
   local kk = rawget(Env00, INACTIVE)
   if kk then
-    if k == kk then
-      rawset(Env00, INACTIVE, nil)
-    end
     return Object.NIL
   end
   local result = Env00[k]
@@ -73,6 +70,22 @@ function Env0:__computed_index(k)
     rawset(Env00, INACTIVE, k)
   end
   return nil
+end
+
+---Last filter before return
+---Subclassers must call this filter when overriding.
+---@generic T: any
+---@param k any
+---@param v T
+---@return T
+function Env0.__index_will_return(k, v)
+  local kk = rawget(Env00, INACTIVE)
+  if kk then
+    if k == kk then
+      rawset(Env00, INACTIVE, nil)
+    end
+  end
+  return v
 end
 
 ---@class Env: Object
