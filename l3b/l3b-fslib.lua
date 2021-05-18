@@ -64,10 +64,13 @@ local Vars = setmetatable({
   debug = {},
   poor_man_rename = false,
 }, {
-  __index = function (t, k)
+  __index = function (self, k)
     if k == "working_directory" then
+      return self.working_directory_provider()
+    end
+    if k == "working_directory_provider" then
       print(debug.traceback())
-      error("Missing set_working_directory_provider.", 2)
+      error("Missing set_working_directory_provider.", 3)
     end
   end
 })
@@ -222,6 +225,19 @@ local function set_working_directory_provider(provider)
     .. tostring(provided)
   )
   Vars.working_directory_provider = provider
+end
+
+---Set the working directory provider. As soon as possible
+---@param path string
+---@see fslib.absolute_path
+local function set_working_directory(path)
+  assert(path:match("^/"),
+    "Absolute path required in set_working_directory, got "
+    .. tostring(path)
+  )
+  Vars.working_directory_provider = function ()
+    return path
+  end
 end
 
 ---Return an absolute path from a relative one.
@@ -659,6 +675,7 @@ end
 ---@field public push_current_directory     fun(dir: string): string
 ---@field public pop_current_directory      fun(): string
 ---@field public push_pop_current_directory fun(dir:string, f: function, ...): boolean, any
+---@field public set_working_directory      fun(path: string)
 ---@field public set_working_directory_provider fun(provider: directory_provider_f)
 
 return {
@@ -687,6 +704,7 @@ return {
   push_current_directory      = push_current_directory,
   pop_current_directory       = pop_current_directory,
   push_pop_current_directory  = push_pop_current_directory,
+  set_working_directory       = set_working_directory,
   set_working_directory_provider  = set_working_directory_provider,
 },
 ---@class __fslib_t

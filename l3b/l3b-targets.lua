@@ -112,32 +112,41 @@ as from a standalone module.
 ---@field public run_bundle target_done_run_f
 ---@field public run_module target_done_run_f
 
-local TargetInfo = Object:make_subclass("TargetInfo", {
-  __instance_table = {
-    impl = function (self)
-      -- retrieve the target implementation from a required module
-      local pkg = require(self.package)
-      local impl = pkg[self.name .."_impl"] or {
-        run = pkg[self.name]
-      }
-      rawset(self, "impl", impl)
-      return impl
-    end,
-  },
-  __initialize = function (self, info, manager, builtin)
-    for k in items(
-      "description",
-      "package",
-      "name",
-      "alias",
-      "impl"
-    ) do
-      self[k] = info[k]
-    end
-    self.manager = manager
-    self.builtin = not not ( info.builtin or builtin )
+local TargetInfo = Object:make_subclass("TargetInfo")
+
+function TargetInfo.__instance_table:impl()
+  -- retrieve the target implementation from a required module
+  local pkg = require(self.package)
+  local impl = pkg[self.name .."_impl"] or {
+    run = pkg[self.name]
+  }
+  rawset(self, "impl", impl)
+  return impl
+end
+
+---@class target_info_kv: object_kv
+---@field public manager  any
+---@field public info     table
+---@field public builtin  any
+
+
+-- info must be second unless it has already become self
+---Initialize the receiver.
+---@param kv target_info_kv
+function TargetInfo:__initialize(kv)
+  self.manager = kv.manager
+  for k in items(
+    "description",
+    "package",
+    "name",
+    "alias",
+    "impl"
+  ) do
+    self[k] = kv.info[k]
   end
-})
+  self.builtin = not not ( kv.info.builtin or kv.builtin )
+end
+
 
 ---Configure the receiver
 ---@param self TargetInfo
@@ -232,8 +241,7 @@ end
 local TargetManager = Object:make_subclass("TargetManager")
 
 ---Initialize the receiver
----@param self TargetManager
-function TargetManager.__initialize(self)
+function TargetManager:__initialize()
   self.__DB = {}
 end
 
@@ -256,10 +264,6 @@ end
 ---@param info target_info_t
 ---@param builtin boolean|nil
 function TargetManager:register(info, builtin)
-  assert(
-    info.name,
-    "l3b-targets.register_info: Missing info.name"
-  )
   if self.__DB[info.name] then
     error(
       "l3b-targets.register_info: Target name is already used: "
@@ -273,7 +277,7 @@ function TargetManager:register(info, builtin)
       .. tostring(self.__DB[info.alias].name)
     )
   end
-  local result = TargetInfo(info, self, builtin)
+  local result = TargetInfo(self, info, builtin)
   self.__DB[info.name] = result
   if info.alias then
     self.__DB[info.alias] = result -- latex2e

@@ -216,20 +216,20 @@ local test_file_path_gmr = {
 }
 
 local function test_Path()
-  local p = Path("")
+  local p = Path({ str = "" })
   expect(p).equals(Path())
-  expect(p).equals(Path({
+  expect(p).equals(Path({ data = {
     is_absolute = false,
     down        = {},
     up          = {},
-  }))
+  } }))
   expect(p.as_string).is(".")
   local function test(str, down, normalized, is_absolute)
-    local pp = Path(str)
-    expect(pp).equals(Path({
+    local pp = Path({ str = str, })
+    expect(pp).equals(Path({ data = {
       down = down,
       is_absolute = is_absolute or false,
-    }))
+    }, }))
     expect(pp.as_string).is(normalized or str)
     return
   end
@@ -254,60 +254,60 @@ local function test_Path()
 
   test("/a/b/c/..", { "a", "b", "" }, "/a/b/", true)
 
-  p = Path("/")
-  expect(p).equals(Path({
+  p = Path({ str = "/" })
+  expect(p).equals(Path({ data = {
     is_absolute = true,
-  }))
+  } }))
   expect(p.as_string).is("/")
-  p = Path("/a")
-  expect(p).equals(Path({
+  p = Path({ str = "/a" })
+  expect(p).equals(Path({ data = {
     is_absolute = true,
     down = { "a" },
-  }))
+  } }))
   expect(p.as_string).is("/a")
-  p = Path("/a/b")
-  expect(p).equals(Path({
+  p = Path({ str = "/a/b" })
+  expect(p).equals(Path({ data = {
     is_absolute = true,
     down = { "a", "b" },
-  }))
+  }, }))
   expect(p.as_string).is("/a/b")
   expect(function ()
-    Path("/..")
+    Path({ str = "/..", })
   end).error()
-  p = Path("..")
-  expect(p).equals(Path({
+  p = Path({ str = "..", })
+  expect(p).equals(Path({ data = {
     up = { ".." },
-  }))
+  }, }))
   expect(p.as_string).is("..")
-  p = Path("../..")
-  expect(p).equals(Path({
+  p = Path({ str = "../..", })
+  expect(p).equals(Path({ data = {
     up = { "..", ".." },
-  }))
+  }, }))
   expect(p.as_string).is("../..")
-  p = Path("a/..")
+  p = Path({ str = "a/..", })
   expect(p).equals(Path())
   expect(p.as_string).is(".")
-  p = Path("a/b/..")
-  expect(p).equals(Path({
+  p = Path({ str = "a/b/..", })
+  expect(p).equals(Path({ data = {
     down = { "a", "" },
-  }))
+  }, }))
   expect(p.as_string).is("./a/")
-  local p_1 = Path("a/b")
-  local p_2 = Path("..")
-  expect(p_2).equals(Path({
+  local p_1 = Path({ str = "a/b", })
+  local p_2 = Path({ str = "..", })
+  expect(p_2).equals(Path({ data = {
     up = { ".." },
-  }))
+  }, }))
   p = p_1 / p_2
-  expect(p).equals(Path({
+  expect(p).equals(Path({ data = {
     down = { "a" },
-  }))
+  }, }))
 
 end
 
 local function test_copy()
   expect(Path(""):copy().as_string).is(".")
-  expect(Path("/"):copy().as_string).is("/")
-  expect(Path("/"):copy().is_absolute).is(true)
+  expect(Path({ str = "/", }):copy().as_string).is("/")
+  expect(Path({ str = "/", }):copy().is_absolute).is(true)
 end
 
 local function test_Path_forward_slash()

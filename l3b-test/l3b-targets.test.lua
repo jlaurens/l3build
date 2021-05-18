@@ -21,6 +21,8 @@ local TargetManager = targets.TargetManager
 
 local function test_base()
   expect(targets).NOT(nil)
+  expect(TargetManager()).NOT(nil)
+  expect(TargetManager().__DB).NOT(nil)
 end
 
 local test_info = {
@@ -54,7 +56,7 @@ local test_info = {
     self.manager:register(self.info_1)
     ---@type TargetInfo
     local info_1 = self.manager:get_info(self.info_1.name)
-    expect(info_1).contains(__.TargetInfo(nil, {
+    expect(info_1).contains(__.TargetInfo({}, nil, {
       description = "DESCRIPTION_1",
       package = self.info_1.package,
       name    = "NAME_1",

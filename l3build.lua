@@ -284,7 +284,8 @@ do
     l3build.launch_dir,
     "build.lua"
   )
-
+  l3build.find_container_up = find_container_up
+  
 end
 
 --[==[ end of booting process ]==]

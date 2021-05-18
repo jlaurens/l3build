@@ -87,18 +87,65 @@ local remove  = table.remove
 ---@field public  is_instance       boolean
 ---@field public  is_class          boolean
 ---@field private __computed_index  fun(self: Object, key: string): any
----@field private __instance_table  table<string,fun(self: Object): any>
+---@field private __instance_table  table<string,fun(self: Object, key: string): any>
+---@field private __class_table     table<string,fun(self: Object, key: string): any>
 
-Object = {
+local Object = {
   __TYPE      = "Object",
   is_instance = false,
 }
 Object.__Class = Object
 
+Object.__instance_table = {}
+Object.__class_table = {}
+
+---Return the computed property
+---@param class table
+---@param self table
+---@param k any
+---@return any
+local function computed_property(class, self, k)
+  local result
+  local computed_k
+  if self and self ~= self.__Class then
+    computed_k = class.__instance_table[k]
+    if computed_k ~= nil then
+      result = computed_k(self, k)
+      if result ~= nil then
+        return result
+      end
+    end
+  end
+  -- dynamic properties for classes and instances
+  local class_table = self and rawget(self, "__class_table")
+    or class.__class_table
+  computed_k = class_table[k]
+  if computed_k ~= nil then
+    result = computed_k(self, k)
+    if result ~= nil then
+      return result
+    end
+  end
+  result = class.__computed_index(self, k)
+  return result
+end
+
 ---comment
----@param self Object
+---@param self Object @ either an Object instance of a direct subclass of Object
 ---@param k any
 function Object.__index(self, k)
+  -- Instances do not know statically about their own class
+  -- they rely on their class.
+  if k == "__Class" then
+    return Object
+  end
+  local result = computed_property(Object, self, k)
+  if result ~= nil then
+    if result == Object.NIL then
+      return nil
+    end
+    return result
+  end
   if Object.__do_not_inherit(k) then
     return nil
   end
@@ -150,24 +197,38 @@ Object.NIL = setmetatable({}, {
   end
 })
 
+---@class object_kv
+---@field public data table|nil @ starting table
+
 ---Constructor
 --[===[
-when a table with a falsy `is_instance` field,
-used as a template to build the instance.
-n that case, it won't be passed to the initializer.
+  All the constructors have a unique key/value argument.
+Here `kv.data` is used as a template to build the instance.
+The return value is the newly created instance or nil and
+a message on error.
+
+Each derived constructor key/value argument table is
+also derived from the ancestor's constructor key/value argument table.
 ]===]
----@param d table
----@vararg any
----@return Object
-function Object:Constructor(d, ...)
-  local instance = type(d) == "table"
-    and not d.is_class
-    and not d.is_instance
-    and d
-    or {}
+---@param kv object_kv|nil
+---@return Object|nil
+---@return nil|string
+function Object:Constructor(kv)
+  local instance = kv and kv.data or {}
   instance = setmetatable(instance, Object)
   instance:lock()
   return instance
+end
+
+---Get the unique instance for the given parameters.
+---The default implementation returns `nil`.
+---@param kv object_kv
+function Object.__unique_instance(kv)
+end
+
+---Make the receiver a unique instance for the given parameters.
+---The default implementation does nothing.
+function Object:__make_unique_instance(self)
 end
 
 setmetatable(Object, {
@@ -196,7 +257,7 @@ local function make_class__index(class)
       return class
     end
     if k == "cache_get" then
-      return class == self and class.__Super[k] or class[k]
+      return class == self and assert(class.__Super[k]) or class[k]
     end
     -- first: cached properties
     local result = self and self:cache_get(k)
@@ -207,30 +268,7 @@ local function make_class__index(class)
       return result
     end
     -- second: dynamic instance properties
-    local computed_k
-    if self and self ~= self.__Class then
-      computed_k = class.__instance_table[k]
-      if computed_k ~= nil then
-        result = computed_k(self, k)
-        if result ~= nil then
-          if result == Object.NIL then
-            return nil
-          end
-          return result
-        end
-      end
-    end
-    computed_k = class.__class_table[k]
-    if computed_k ~= nil then
-      result = computed_k(self, k)
-      if result ~= nil then
-        if result == Object.NIL then
-          return nil
-        end
-        return result
-      end
-    end
-    result = class.__computed_index(self, k)
+    result = computed_property(class, self, k)
     if result ~= nil then
       if result == Object.NIL then
         return nil
@@ -247,24 +285,29 @@ end
 
 local function make_constructor(class)
   -- Define the constructor with a direct call syntax
+  -- @generic T: Object
   -- @param class any
-  -- @param d?    any @ initial data of the construction, will be the instance result
-  -- @vararg any      @ parameters to the `initialize` function
-  return function (self, d, ...)
+  -- @param kv ..._kv @ parameters to the `initialize` function
+  -- @return T|nil    @ nil on error
+  -- @return nil|string @ the error message if any
+  return function (self, kv)
     -- call Super constructor
-    -- `first` records if the `d` param was given
-    local instance = class.__Super(d, ...)
+    local instance = class.__unique_instance(kv)
+    if instance then
+      return instance
+    end
+    instance = class.__Super(kv)
     setmetatable(instance, class)   -- d is an instance of self
     instance.__TYPE = class.__TYPE
     -- initialize without inheritance, it was made in the Super contructor
     local initialize = rawget(class, "__initialize")
     if initialize then
-      if instance == d then
-        initialize(instance, ...)
-      else
-        initialize(instance, d, ...)
+      local msg = initialize(instance, kv)
+      if msg then
+        return nil, msg
       end
     end
+    class.__make_unique_instance(instance)
     instance:lock()
     return instance
   end
@@ -317,6 +360,12 @@ function Object.make_subclass(Super, TYPE, static)
   class.__index_will_return
     =  class.__index_will_return
     or Super.__index_will_return
+  class.__unique_instance
+    =  class.__unique_instance
+    or Object.__unique_instance -- not Super
+  class.__make_unique_instance
+    =  class.__make_unique_instance
+    or Object.__make_unique_instance -- not Super
 ---comment
   ---@param self Object
   ---@param k any
@@ -514,7 +563,7 @@ local private_properties = setmetatable({}, {
 ---Get the named private property, if any
 ---@param key any
 ---@return any
-function Object:get_private_property(key)
+function Object:__get_private_property(key)
   local properties = private_properties[self]
   return properties and properties[key]
 end
@@ -525,7 +574,7 @@ end
 ---@param key any
 ---@param value any
 ---@return T @ the receiver
-function Object.set_private_property(self, key, value)
+function Object.__set_private_property(self, key, value)
   local properties = private_properties[self]
   if not properties then
     properties = {}

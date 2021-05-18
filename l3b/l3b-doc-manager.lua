@@ -57,9 +57,12 @@ local AD = require("l3b-autodoc")
 ---@class DocManager: Object
 ---@field private __modules AD.Module[]
 
+---@class doc_manager_kv: object_kv
+---@field public work_path string
+
 local DocManager = Object:make_subclass("DM", {
-  __initialize = function(self, work_path)
-    self.work_path = work_path
+  __initialize = function(self, kv --[[: doc_manager_kv]])
+    self.work_path = kv and kv.work_path
     self.__modules = {}
   end,
   __instance_table = {

@@ -190,16 +190,19 @@ end
 
 local path_p = Ct(P(get_file_path_gmr()))
 
+---@class path_kv: object_kv
+---@field public str string|nil
+
 ---Initialize a newly created Path object with a given string.
----@param str any
-function Path:__initialize(str)
+---@param kv path_kv|nil
+function Path:__initialize(kv)
   self.is_absolute  = self.is_absolute or false
   self.up           = shallow_copy(self.up)   -- ".." path components
   self.down         = shallow_copy(self.down) -- down components
-  if not str then
+  if not kv or not kv.str then
     return
   end
-  local m = path_p:match(str)
+  local m = path_p:match(kv.str)
   if not m then
     return
   end
@@ -207,7 +210,7 @@ function Path:__initialize(str)
   for i = 2, #m do
     self:append_component(m[i])
   end
-  assert(not self.is_absolute or #self.up == 0, "Unexpected path ".. str )
+  assert(not self.is_absolute or #self.up == 0, "Unexpected path ".. kv.str )
 end
 
 function Path:__tostring()
@@ -282,7 +285,7 @@ function Path.__instance_table:dir_name()
 end
 
 function Path:copy()
-  return Path(self.as_string)
+  return Path({ str = self.as_string })
 end
 
 ---Concatenate paths.
@@ -334,7 +337,7 @@ local path_properties = setmetatable({}, {
     if result then
       return result
     end
-    result = Path(k)
+    result = Path({ str = k })
     self[k] = result
     local normalized = result.as_string
     if k ~= normalized then

@@ -65,7 +65,7 @@ end
 local Env0 = Env00:make_subclass("Env0")
 
 function Env0:__computed_index(k)
-  local inactive = Object.get_private_property(self, INACTIVE)
+  local inactive = Object.__get_private_property(self, INACTIVE)
   if inactive then
     rawset(Env00, INACTIVE, k)
   end
@@ -96,7 +96,7 @@ local Env = Env0:make_subclass("Env")
 ---and methods from `Object` and `_G`.
 ---@param env Env
 function Object.activate_env(env)
-  Object.set_private_property(env, INACTIVE, nil)
+  Object.__set_private_property(env, INACTIVE, nil)
 end
 
 ---Deactivate the environment
@@ -104,7 +104,7 @@ end
 ---and methods from `Object` nor `_G`.
 ---@param env Env
 function Object.deactivate_env(env)
-  Object.set_private_property(env, INACTIVE, true)
+  Object.__set_private_property(env, INACTIVE, true)
 end
 
 return Env

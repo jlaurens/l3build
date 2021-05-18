@@ -200,6 +200,14 @@ function Expect:__index(k)
     self.op = "⊇"
     return self
   end
+  if k == "starts_with" then
+    self.op = "^"
+    return self
+  end
+  if k == "ends_with" then
+    self.op = "$"
+    return self
+  end
   if k == "to" then
     return self
   end
@@ -300,6 +308,14 @@ function Expect.__call(self, expected, options)
   if self.op == "match" then
     (self.__NOT and LU.assertFalse or LU.assertTrue)
     (self.actual:match(expected) ~= nil)
+  end
+  if self.op == "^" then
+    (self.__NOT and LU.assertFalse or LU.assertTrue)
+    (self.actual:sub(1, #expected) == expected)
+  end
+  if self.op == "$" then
+    (self.__NOT and LU.assertFalse or LU.assertTrue)
+    (self.actual:sub(-#expected, -1) == expected)
   end
   self.op = ""
   return self
@@ -447,19 +463,28 @@ from all test files run only test containing either "foo" or "bar".
     .. ENV.random_string()
   lfs.mkdir(temporary_dir)
 
-  function ENV.make_temporary_dir(name)
-    local result = temporary_dir .. '/' .. (name or ENV.random_string())
+  function ENV.make_temporary_dir(dir, base)
+    local result = temporary_dir .. '/' .. (dir or ENV.random_string())
+    if base then
+      result = result .. '/' .. base
+    end
     return lfs.mkdir(result) and result or nil
   end
 
+  ---@class create_test_module_kv
   ---comment
-  ---@param dir string    @ directory must exist
-  ---@param name string   @ name of the module
-  ---@param build_content string  @ content of `build.lua`
+  ---@field public dir string    @ directory must exist
+  ---@field public name string   @ name of the module
+  ---@field public build_content string  @ content of `build.lua`
+  ---@field public test_content string  @ content of `l3b_test_diagnostic.lua`
+  
+  ---@param kv|nil create_test_module_kv
   ---@return string|nil   @ path of the module, nil on error
   ---@return nil|error_level_n @ positive number on error, nil otherwise
-  function ENV.create_test_module(dir, name, build_content, test_content)
-    local result = dir .."/".. name
+  function ENV.create_test_module(kv)
+    kv = kv or {}
+    local result = (kv.dir or ENV.make_temporary_dir())
+      .."/".. (kv.name or ENV.random_string())
     if not lfs.mkdir(result) then
       return nil, 1
     end
@@ -468,27 +493,27 @@ from all test files run only test containing either "foo" or "bar".
     if not fh then
       return nil, 1
     end
-    build_content = "#!/usr/bin/env texlua\n".. build_content
+    kv.build_content = "#!/usr/bin/env texlua\n".. (kv.build_content or "")
     if os["type"] == "windows" then
-      build_content = build_content:gsub("\n", "\r\n")
+      kv.build_content = kv.build_content:gsub("\n", "\r\n")
     end
     local error_level
-    if not fh:write(build_content) then
+    if not fh:write(kv.build_content) then
       result = nil
       error_level = 1
     end
     fh:close()
-    if test_content then
+    if kv.test_content then
       -- test_content = "#!/usr/bin/env texlua\n".. test_content
       if os["type"] == "windows" then
-        test_content = test_content:gsub("\n", "\r\n")
+        kv.test_content = kv.test_content:gsub("\n", "\r\n")
       end
       file_path = result .."/l3b_test_diagnostic.lua"
       fh = assert(io.open(file_path, "w"))
       if not fh then
         return nil, 1
       end
-      if not fh:write(test_content) then
+      if not fh:write(kv.test_content) then
         result = nil
         error_level = 1
       end
@@ -504,6 +529,8 @@ from all test files run only test containing either "foo" or "bar".
     end
   end
 
+  ENV.mkdir = lfs.mkdir
+  
   ---@type fun(): string|nil @ string iterator
   local all_names
   do

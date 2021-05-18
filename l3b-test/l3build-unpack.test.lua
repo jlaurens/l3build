@@ -242,7 +242,7 @@ local function test_deps_install_2()
   _G.maindir = maindir
   print("DEBBBBBBUG", Dir.sourcefile, Dir.docfile)
   expect(make_directory(Dir.unpack)).is(0)
-  fslib.set_working_directory_provider(maindir)
+  fslib.set_working_directory_provider(function () return maindir end)
   fslib.change_current_directory(maindir)
   local script_path = "unpack.lua"
   write_content(script_path, [[

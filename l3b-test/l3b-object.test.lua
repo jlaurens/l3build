@@ -98,11 +98,11 @@ end
 local function test_initialize()
   local done
   local Foo = Object:make_subclass("Foo", {
-    __initialize = function (self, x)
-      done = x
+    __initialize = function (self, kv)
+      done = kv.x
     end,
   })
-  Foo({}, 421)
+  Foo({ x = 421})
   expect(done).is(421)
 end
 
@@ -251,11 +251,11 @@ local test_make_another_subclass = {
 
   test_initialize_param = function (_self)
     local Class  = Object:make_subclass("Class", {
-      __initialize = function (self, x)
-        self.foo = x
+      __initialize = function (self, kv)
+        self.foo = kv.x
       end
     })
-    local instance = Class({}, "bar")
+    local instance = Class({ x = "bar" })
     expect(instance.foo).is("bar")
   end,
 }
@@ -521,7 +521,7 @@ local test_class_table = {
     end
     expect(A.p_1).is(nil)
     expect(a.p_1).is("A/1")
-    expect(AA.p_1).is("A/1")
+    expect(AA.p_1).is("AA/1")
     expect(aa.p_1).is("AA/1")
     -- override instance property to nil
     AA.__class_table.p_1 = function (self)
@@ -529,7 +529,7 @@ local test_class_table = {
     end
     expect(A.p_1).is(nil)
     expect(a.p_1).is("A/1")
-    expect(AA.p_1).is("A/1")
+    expect(AA.p_1).is(nil)
     expect(aa.p_1).is(nil)
     -- Revert to the initial setting
     AA.__class_table.p_1 = nil
@@ -559,8 +559,8 @@ local test_class_table = {
     AA.__class_table.p_1 = function (self)
       return "AA/1"
     end
-    expect(AA.p_1).is("A/1")
-    expect(AA.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("AA/1")
+    expect(AA.p_2).is("AA/1/A/2")
     expect(aa.p_1).is("AA/1")
     expect(aa.p_2).is("AA/1/A/2")
     -- override the subclass instance property
@@ -724,36 +724,36 @@ local test_private = {
     self.value = _ENV.random_number()
   end,
   test_Object = function (self)
-    expect(Object:get_private_property(self.key)).is(nil)
-    expect(Object:set_private_property(self.key, self.value)).is(Object)
-    expect(Object:get_private_property(self.key)).is(self.value)
-    expect(Object:set_private_property(self.key)).is(Object)
-    expect(Object:get_private_property(self.key)).is(nil)
+    expect(Object:__get_private_property(self.key)).is(nil)
+    expect(Object:__set_private_property(self.key, self.value)).is(Object)
+    expect(Object:__get_private_property(self.key)).is(self.value)
+    expect(Object:__set_private_property(self.key)).is(Object)
+    expect(Object:__get_private_property(self.key)).is(nil)
   end,
   test_o = function (self)
     local o = Object()
-    expect(o:get_private_property(self.key)).is(nil)
-    expect(o:set_private_property(self.key, self.value)).is(o)
-    expect(o:get_private_property(self.key)).is(self.value)
-    expect(o:set_private_property(self.key)).is(o)
-    expect(o:get_private_property(self.key)).is(nil)
+    expect(o:__get_private_property(self.key)).is(nil)
+    expect(o:__set_private_property(self.key, self.value)).is(o)
+    expect(o:__get_private_property(self.key)).is(self.value)
+    expect(o:__set_private_property(self.key)).is(o)
+    expect(o:__get_private_property(self.key)).is(nil)
   end,
   test_OO = function (self)
     local OO = Object:make_subclass("Subclass")
-    expect(OO:get_private_property(self.key)).is(nil)
-    expect(OO:set_private_property(self.key, self.value)).is(OO)
-    expect(OO:get_private_property(self.key)).is(self.value)
-    expect(OO:set_private_property(self.key)).is(OO)
-    expect(OO:get_private_property(self.key)).is(nil)
+    expect(OO:__get_private_property(self.key)).is(nil)
+    expect(OO:__set_private_property(self.key, self.value)).is(OO)
+    expect(OO:__get_private_property(self.key)).is(self.value)
+    expect(OO:__set_private_property(self.key)).is(OO)
+    expect(OO:__get_private_property(self.key)).is(nil)
   end,
   test_oo = function (self)
     local OO = Object:make_subclass("OO")
     local oo = OO()
-    expect(oo:get_private_property(self.key)).is(nil)
-    expect(oo:set_private_property(self.key, self.value)).is(oo)
-    expect(oo:get_private_property(self.key)).is(self.value)
-    expect(oo:set_private_property(self.key)).is(oo)
-    expect(oo:get_private_property(self.key)).is(nil)
+    expect(oo:__get_private_property(self.key)).is(nil)
+    expect(oo:__set_private_property(self.key, self.value)).is(oo)
+    expect(oo:__get_private_property(self.key)).is(self.value)
+    expect(oo:__set_private_property(self.key)).is(oo)
+    expect(oo:__get_private_property(self.key)).is(nil)
   end,
 }
 
@@ -794,6 +794,35 @@ local function test_do_not_inherit()
   Object[key] = nil
 end
 
+local test_unique = {
+  setup = function (self)
+    local A = Object:make_subclass("A")
+    local unique = {}
+    function A:initialize(kv)
+      self.foo = kv.foo
+    end
+    function A.__unique_instance(kv)
+      return unique[kv.foo]
+    end
+    function A:__make_unique_instance()
+      unique[self.foo] = self
+    end
+    self.A = A
+    local AA = A:make_subclass("AA")
+    self.AA = AA
+  end,
+  test_basic = function (self)
+    local a_1 = self.A({ foo = "bar" })
+    local a_2 = self.A({ foo = "bar" })
+    expect(a_1).is(a_2)
+  end,
+  test_subclass = function (self)
+    local aa_1 = self.AA({ foo = "bar" })
+    local aa_2 = self.AA({ foo = "bar" })
+    expect(aa_1).is(aa_2)
+  end
+}
+
 return {
   test_Object                 = test_Object,
   test_make_subclass          = test_make_subclass,
@@ -813,4 +842,5 @@ return {
   test_cache                  = test_cache,
   test_hook                   = test_hook,
   test_private                = test_private,
+  test_unique                 = test_unique,
 }

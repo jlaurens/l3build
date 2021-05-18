@@ -1027,13 +1027,18 @@ end
 ---@field public depth integer        @ the depth of this scope
 ---@field private _scopes AD.Range[]  @ inner scopes
 
+---@class ad_scope_kv: object_kv
+---@field public depth integer
+---@field public min integer
+---@field public max integer
+
 AD.Scope = Object:make_subclass("AD.Scope", {
   depth = 0,
   _scopes = {},
-  __initialize = function (self, depth, min, max)
-    self.depth  = depth or self.depth or 0
-    self.min    = min   or self.min   or 1
-    self.max    = max   or self.max   or self.min - 1
+  __initialize = function (self, kv --[[: ad_scope_kv]])
+    self.depth  = kv and kv.depth or self.depth or 0
+    self.min    = kv and kv.min   or self.min   or 1
+    self.max    = kv and kv.max   or self.max   or self.min - 1
   end
 })
 
@@ -1091,11 +1096,15 @@ end
 ---@field private   __at AD.At @ "@" annotation info
 ---@field protected _module AD.Module
 
+---@class ad_at_proxy_kv: object_kv
+---@field public module string
+---@field public at     string
+
 AD.AtProxy = Object:make_subclass("AD.AtProxy", {
-  __initialize = function (self, module, at)
+  __initialize = function (self, kv --[[: ad_at_proxy_kv]])
     assert(self.is_instance, "self must be an instance")
-    self._module = module
-    self.__at = at
+    self._module = kv and kv.module or nil
+    self.__at = kv and kv.at or nil
   end,
   __instance_table = {
     source = function (self)
@@ -1212,7 +1221,7 @@ AD.Author = AD.AtProxy:make_subclass("AD.Author", {
 
 AD.Function = AD.AtProxy:make_subclass("AD.Function", {
   __AtClass = AD.At.Function,
-  __initialize = function (self, ...)
+  __initialize = function (self)
     ---@type AD.Param[]
     self.__params = {}
     ---@type AD.Return[]
@@ -1372,7 +1381,7 @@ AD.Method = AD.Function:make_subclass("AD.Method", {
 
 AD.Class = AD.AtProxy:make_subclass("AD.Class", {
   __AtClass = AD.At.Class,
-  __initialize = function (self, ...)
+  __initialize = function (self)
     ---@type AD.Field[]
     self.__fields = {}
     ---@type table<string, AD.Method>
