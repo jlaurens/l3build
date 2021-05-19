@@ -404,10 +404,10 @@ local test_instance_table = {
     local a = A()
     expect(a.p_1).is(nil)
     A.__instance_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
     expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(a.p_1).is("A.p_1")
     A.__instance_table.p_1 = function (self)
       return nil
     end
@@ -415,74 +415,76 @@ local test_instance_table = {
     expect(a.p_1).is(nil)
   end,
   test_two_levels = function (_self)
+    ---@class test_two_levels_A
+    ---@field public p_1 any
     local A = Object:make_subclass("A")
     local a = A()
     local AA = A:make_subclass("AA")
     local aa = AA()
     A.__instance_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
     expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(a.p_1).is("A.p_1")
     expect(AA.p_1).is(nil)
-    expect(aa.p_1).is("A/1")
+    expect(aa.p_1).is("A.p_1")
     -- override instance property to some value
     AA.__instance_table.p_1 = function (self)
-      return "AA/1"
+      return "AA.p_1"
     end
     expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(a.p_1).is("A.p_1")
     expect(AA.p_1).is(nil)
-    expect(aa.p_1).is("AA/1")
+    expect(aa.p_1).is("AA.p_1")
     -- override instance property to nil
     AA.__instance_table.p_1 = function (self)
       return Object.NIL
     end
     expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(a.p_1).is("A.p_1")
     expect(AA.p_1).is(nil)
     expect(aa.p_1).is(nil)
     -- Revert to the initial setting
     AA.__instance_table.p_1 = nil
     expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(a.p_1).is("A.p_1")
     expect(AA.p_1).is(nil)
-    expect(aa.p_1).is("A/1")
+    expect(aa.p_1).is("A.p_1")
   end,
-  test_dynamic = function (_self)
+  test_dynamic_property = function (_self)
     local A = Object:make_subclass("A")
     local a = A()
     local AA = A:make_subclass("AA")
     local aa = AA()
     A.__instance_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
     A.__instance_table.p_2 = function (self)
-      return self.p_1 .."/A/2"
+      return self.p_1 .."/A.p_2"
     end
-    expect(a.p_1).is("A/1")
-    expect(a.p_2).is("A/1/A/2")
+    expect(a.p_1).is("A.p_1")
+    expect(a.p_2).is("A.p_1/A.p_2")
     expect(AA.p_1).is(nil)
     expect(AA.p_2).is(nil)
-    expect(aa.p_1).is("A/1")
-    expect(aa.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A.p_1")
+    expect(aa.p_2).is("A.p_1/A.p_2")
     -- override the class property in the subclass:
     AA.__instance_table.p_1 = function (self)
-      return "AA/1"
+      return "AA.p_1"
     end
     expect(AA.p_1).is(nil)
     expect(AA.p_2).is(nil)
-    expect(aa.p_1).is("AA/1")
-    expect(aa.p_2).is("AA/1/A/2")
+    expect(aa.p_1).is("AA.p_1")
+    expect(aa.p_2).is("AA.p_1/A.p_2")
     -- override the subclass instance property
-    aa.p_1 = "aa/1"
-    expect(aa.p_1).is("aa/1")
-    expect(aa.p_2).is("aa/1/A/2") -- now the computed property refers to the instance
+    aa.p_1 = "aa.p_1"
+    expect(aa.p_1).is("aa.p_1")
+    expect(aa.p_2).is("aa.p_1/A.p_2") -- now the computed property refers to the instance
     -- revert to the initial state
     aa.p_1 = nil
     AA.__instance_table.p_1 = nil
-    expect(aa.p_1).is("A/1")
-    expect(aa.p_2).is("A/1/A/2")
+    expect(aa.p_1).is("A.p_1")
+    expect(aa.p_2).is("A.p_1/A.p_2")
   end
 }
 
@@ -492,11 +494,12 @@ local test_class_table = {
     local A = Object:make_subclass("A")
     local a = A()
     expect(a.p_1).is(nil)
+    -- create a class level computed property
     A.__class_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
-    expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(A.p_1).is(A.p_1)
+    expect(a.p_1).is("A.p_1")
     A.__class_table.p_1 = function (self)
       return nil
     end
@@ -509,34 +512,34 @@ local test_class_table = {
     local AA = A:make_subclass("AA")
     local aa = AA()
     A.__class_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
-    expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
-    expect(AA.p_1).is("A/1")
-    expect(aa.p_1).is("A/1")
+    expect(A.p_1).is("A.p_1")
+    expect(a.p_1).is("A.p_1")
+    expect(AA.p_1).is("A.p_1")
+    expect(aa.p_1).is("A.p_1")
     -- override instance property to some value
     AA.__class_table.p_1 = function (self)
-      return "AA/1"
+      return "AA.p_1"
     end
-    expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
-    expect(AA.p_1).is("AA/1")
-    expect(aa.p_1).is("AA/1")
+    expect(A.p_1).is("A.p_1")
+    expect(a.p_1).is("A.p_1")
+    expect(AA.p_1).is("AA.p_1")
+    expect(aa.p_1).is("AA.p_1")
     -- override instance property to nil
     AA.__class_table.p_1 = function (self)
       return Object.NIL
     end
-    expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
+    expect(A.p_1).is("A.p_1")
+    expect(a.p_1).is("A.p_1")
     expect(AA.p_1).is(nil)
     expect(aa.p_1).is(nil)
     -- Revert to the initial setting
     AA.__class_table.p_1 = nil
-    expect(A.p_1).is(nil)
-    expect(a.p_1).is("A/1")
-    expect(AA.p_1).is("A/1")
-    expect(aa.p_1).is("A/1")
+    expect(A.p_1).is("A.p_1")
+    expect(a.p_1).is("A.p_1")
+    expect(AA.p_1).is("A.p_1")
+    expect(aa.p_1).is("A.p_1")
   end,
   test_dynamic = function (_self)
     local A = Object:make_subclass("A")
@@ -544,36 +547,36 @@ local test_class_table = {
     local AA = A:make_subclass("AA")
     local aa = AA()
     A.__class_table.p_1 = function (self)
-      return "A/1"
+      return "A.p_1"
     end
     A.__class_table.p_2 = function (self)
-      return self.p_1 .."/A/2"
+      return self.p_1 .."/A.p_2"
     end
-    expect(a.p_1).is("A/1")
-    expect(a.p_2).is("A/1/A/2")
-    expect(AA.p_1).is("A/1")
-    expect(AA.p_2).is("A/1/A/2")
-    expect(aa.p_1).is("A/1")
-    expect(aa.p_2).is("A/1/A/2")
+    expect(a.p_1).is("A.p_1")
+    expect(a.p_2).is("A.p_1/A.p_2")
+    expect(AA.p_1).is("A.p_1")
+    expect(AA.p_2).is("A.p_1/A.p_2")
+    expect(aa.p_1).is("A.p_1")
+    expect(aa.p_2).is("A.p_1/A.p_2")
     -- override the class property in the subclass:
     AA.__class_table.p_1 = function (self)
-      return "AA/1"
+      return "AA.p_1"
     end
-    expect(AA.p_1).is("AA/1")
-    expect(AA.p_2).is("AA/1/A/2")
-    expect(aa.p_1).is("AA/1")
-    expect(aa.p_2).is("AA/1/A/2")
+    expect(AA.p_1).is("AA.p_1")
+    expect(AA.p_2).is("AA.p_1/A.p_2")
+    expect(aa.p_1).is("AA.p_1")
+    expect(aa.p_2).is("AA.p_1/A.p_2")
     -- override the subclass instance property
-    aa.p_1 = "aa/1"
-    expect(aa.p_1).is("aa/1")
-    expect(aa.p_2).is("aa/1/A/2") -- now the computed property refers to the instance
+    aa.p_1 = "aa.p_1"
+    expect(aa.p_1).is("aa.p_1")
+    expect(aa.p_2).is("aa.p_1/A.p_2") -- now the computed property refers to the instance
     -- revert to the initial state
     aa.p_1 = nil
     AA.__class_table.p_1 = nil
-    expect(AA.p_1).is("A/1")
-    expect(AA.p_2).is("A/1/A/2")
-    expect(aa.p_1).is("A/1")
-    expect(aa.p_2).is("A/1/A/2")
+    expect(AA.p_1).is("A.p_1")
+    expect(AA.p_2).is("A.p_1/A.p_2")
+    expect(aa.p_1).is("A.p_1")
+    expect(aa.p_2).is("A.p_1/A.p_2")
   end
 }
 
@@ -796,22 +799,26 @@ end
 
 local test_unique = {
   setup = function (self)
+    -- NB: next type is declared but used only for testing purposes
+    -- as type names are managed globally, we must take care of unique names
+    ---@class test_unique_object_A: Object
+    ---@field public foo string
     local A = Object:make_subclass("A")
     local unique = {}
-    function A:initialize(kv)
+    function A:__initialize(kv)
       self.foo = kv.foo
     end
     function A.__unique_instance(kv)
       return unique[kv.foo]
     end
-    function A:__make_unique_instance()
-      unique[self.foo] = self
+    function A:__make_unique()
+      unique[assert(self.foo, "Missing foo property")] = self
     end
     self.A = A
     local AA = A:make_subclass("AA")
     self.AA = AA
   end,
-  test_basic = function (self)
+  test_instance = function (self)
     local a_1 = self.A({ foo = "bar" })
     local a_2 = self.A({ foo = "bar" })
     expect(a_1).is(a_2)

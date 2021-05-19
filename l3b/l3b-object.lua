@@ -82,6 +82,8 @@ local insert  = table.insert
 local push    = insert
 local remove  = table.remove
 
+--[=[ Package implementation ]=]
+
 ---@class Object @ Root class, metatable of other tables
 ---@field public  make_subclass     fun(type: string, t: table): Object
 ---@field public  is_instance       boolean
@@ -228,7 +230,7 @@ end
 
 ---Make the receiver a unique instance for the given parameters.
 ---The default implementation does nothing.
-function Object:__make_unique_instance(self)
+function Object:__make_unique(self)
 end
 
 setmetatable(Object, {
@@ -307,7 +309,7 @@ local function make_constructor(class)
         return nil, msg
       end
     end
-    class.__make_unique_instance(instance)
+    class.__make_unique(instance)
     instance:lock()
     return instance
   end
@@ -363,9 +365,9 @@ function Object.make_subclass(Super, TYPE, static)
   class.__unique_instance
     =  class.__unique_instance
     or Object.__unique_instance -- not Super
-  class.__make_unique_instance
-    =  class.__make_unique_instance
-    or Object.__make_unique_instance -- not Super
+  class.__make_unique
+    =  class.__make_unique
+    or Object.__make_unique -- not Super
 ---comment
   ---@param self Object
   ---@param k any

@@ -53,7 +53,7 @@ local path_matcher  = pathlib.path_matcher
 local oslib       = require("l3b-oslib")
 local quoted_path = oslib.quoted_path
 
--- implementation
+--[=[ Package implementation ]=]
 
 ---@class fslib_vars_t
 ---@field public debug          flags_t

@@ -24,7 +24,6 @@ for those people who are interested.
 
 local execute = os.execute
 local getenv  = os.getenv
-local exit    = os.exit
 local os_type = os["type"]
 local open    = io.open
 local popen   = io.popen
@@ -45,6 +44,9 @@ local to_quoted_string  = utlib.to_quoted_string
 local items             = utlib.items
 local first_of          = utlib.first_of
 local print_diff_time   = utlib.print_diff_time
+
+
+--[=[ Package implementation ]=]
 
 ---@class oslib_vars_t
 ---@field public debug flags_t

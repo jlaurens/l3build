@@ -44,14 +44,14 @@ Here "should work" means that a reasonable testing is possible.
 ----@type Object
 local Object = require("l3b-object")
 
-----@type Env
+---@type Env
 local Env = require("l3b-env")
 
---@type l3build_t
+---@type l3build_t
 local l3build = require("l3build")
 local find_container_up = l3build.find_container_up
 
--- Package implementation
+--[=[ Package implementation ]=]
 
 ---@type Module
 local Module = Object:make_subclass("Module")
@@ -71,9 +71,9 @@ function Module.__unique_instance(kv)
   return unique[kv.path / "."]
 end
 
----Store the revceiver as unique `Module`
-function Module:__make_unique_instance()
-  unique[self.path] = self
+---Store the receiver as unique `Module` instance
+function Module:__make_unique()
+  unique[assert(self.path, "Missing path property")] = self
 end
 
 ---Initialize the receiver.

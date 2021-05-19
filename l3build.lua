@@ -175,7 +175,7 @@ do
     local result
     while chdir(dir) do
       local cwd = currentdir()
-      if cwd:match("/l3b-test-alt$") then
+      if cwd:match("/l3b%-test%-alt$") then
         break
       end
       if attributes(base, "mode") then -- true iff something at the given path
@@ -187,7 +187,7 @@ do
     -- loop over path components
     chdir(old)
     -- print(result)
-    return result
+  return result
   end
 
   local launch_dir -- the directory containing "l3build.lua"
