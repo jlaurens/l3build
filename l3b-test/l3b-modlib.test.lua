@@ -43,27 +43,29 @@ local function test_static()
   local dir = _ENV.create_test_module()
   local module = Module({ path = dir })
   expect(function ()
-    module:__get_module_of_env()
+    module.__:get_module_of_env()
   end).error()
   expect(function ()
-    module:__set_module_of_env()
+    module.__:set_module_of_env()
   end).error()
 end
 
 local test_main_parent_module = {
   test_Class = function (self)
-    expect(Module.main_module).is(Module)
+    expect( function ()
+              print(Module.main_module)
+            end
+    ).error()
     expect(Module.__get_module_of_env(ModEnv)).is(Module)
   end,
   test_instance = function (self)
     -- create a bundle A at path_A
     -- with embedded modules A/AA, A/AA/AAA
-    
     local path_A = _ENV.create_test_module({
       name = "A",
     })
-    print("DEBUGG", path_A)
     local module_A = Module({ path = path_A })
+    expect(module_A.path).contains(path_A)
     local path_AA = _ENV.create_test_module({
       dir = path_A,
       name = "AA",
