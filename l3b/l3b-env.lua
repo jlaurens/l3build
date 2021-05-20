@@ -42,30 +42,29 @@ local Object = require("l3b-object")
 
 ---@visibility private
 ---@class Env00: Object
-
 local Env00 = Object:make_subclass("Env00")
 
 local INACTIVE = {}
 
-function Env00:__computed_index(k)
+function Env00.__:get(k)
   local kk = rawget(Env00, INACTIVE)
   if kk then
     return Object.NIL
   end
-  local result = Env00[k]
+  local result = Object[k]
   if result ~= nil then
     return result
   end
   return _G[k]
 end
 
----@visibility private
 ---@class Env0: Env00
----@type Env0
+---@visibility private
+---@field public foo string
 local Env0 = Env00:make_subclass("Env0")
 
-function Env0:__computed_index(k)
-  local inactive = Object.__get_private_property(self, INACTIVE)
+function Env0.__:get(k)
+  local inactive = Object.private_get(self, INACTIVE)
   if inactive then
     rawset(Env00, INACTIVE, k)
   end
@@ -78,7 +77,7 @@ end
 ---@param k any
 ---@param v T
 ---@return T
-function Env0.__index_will_return(k, v)
+function Env0.__:index_will_return(k, v)
   local kk = rawget(Env00, INACTIVE)
   if kk then
     if k == kk then
@@ -96,7 +95,7 @@ local Env = Env0:make_subclass("Env")
 ---and methods from `Object` and `_G`.
 ---@param env Env
 function Object.activate_env(env)
-  Object.__set_private_property(env, INACTIVE, nil)
+  Object.private_set(env, INACTIVE, nil)
 end
 
 ---Deactivate the environment
@@ -104,7 +103,7 @@ end
 ---and methods from `Object` nor `_G`.
 ---@param env Env
 function Object.deactivate_env(env)
-  Object.__set_private_property(env, INACTIVE, true)
+  Object.private_set(env, INACTIVE, true)
 end
 
 return Env
