@@ -67,19 +67,19 @@ local unique = {}
 ---Retrieve the unique `Module` instance
 ---@param kv module_kv
 ---@return Module|nil
-function Module.__unique_instance(kv)
+function Module.__.unique_get(kv)
   return unique[kv.path / "."]
 end
 
 ---Store the receiver as unique `Module` instance
-function Module:__make_unique()
+function Module.__:unique_set()
   unique[assert(self.path, "Missing path property")] = self
 end
 
 ---Initialize the receiver.
 ---@param kv module_kv
 ---@return nil|string @ nil on success, an error message on failure.
-function Module:__initialize(kv)
+function Module.__:initialize(kv)
   local up = find_container_up(kv.path,  "build.lua")
   if not up then
     return "No module at ".. kv.path
@@ -88,19 +88,21 @@ function Module:__initialize(kv)
   self.env = ModEnv({ module = self })
 end
 
-function Module.__class_table:path()
-  return "path of virtual module"
+local GTR = Module.__.getter
+
+function GTR:path()
+  error("Only on instances: path")
 end
 
-function Module.__class_table:env()
+function GTR:env()
   local result = ModEnv({ module = self })
   self:cache_set("env", result)
   return result
 end
 
-function Module.__instance_table:parent_module()
+function GTR:parent_module()
   if self.is_main then
-    return nil
+    return Object.NIL
   end
   local up = find_container_up(self.path / "..",  "build.lua")
   if up then
@@ -109,19 +111,31 @@ function Module.__instance_table:parent_module()
     rawset(self, "parent_module", parent)
     return parent
   end
+  self.is_main = true
+  return Object.NIL
 end
 
-function Module.__class_table:main_module()
+function GTR:main_module()
   if not self.is_main then
     local parent = self.parent_module
     if parent then
-      local main = parent.main_module or parent
+      local main = parent.main_module
       rawset(self, "main_module", main)
       return assert(main)
     end
   end
   rawset(self, "main_module", self)
   return assert(self)
+end
+
+local CONFIGURATION = {}
+
+function GTR:configuration()
+  return rawget(self, CONFIGURATION)
+end
+
+function Module.__.setter:configuration(value)
+  return rawset(self, CONFIGURATION, value)
 end
 
 
@@ -131,8 +145,8 @@ local MODULE = {} -- unique tag for an unexposed private property
 ---@param env ModEnv
 ---@return any
 function Module.__get_module_of_env(env)
-  assert(env:is_descendant_of(ModEnv)) -- to prevent foo:__get_module_of_env
-  return env:__get_private_property(MODULE)
+  assert(env:is_descendant_of(ModEnv)) -- to prevent foo.__:get_module_of_env
+  return env:private_get(MODULE)
 end
 
 ---Static method to set the module of a module environment
@@ -141,8 +155,8 @@ end
 ---@param module  Module
 ---@return T @ self
 function Module.__set_module_of_env(env, module)
-  assert(env:is_descendant_of(ModEnv)) -- to prevent foo:__set_module_of_env
-  return env:__set_private_property(MODULE, module)
+  assert(env:is_descendant_of(ModEnv)) -- to prevent foo.__:set_module_of_env
+  return env:private_set(MODULE, module)
 end
 
 
@@ -155,7 +169,7 @@ Module.__set_module_of_env(ModEnv, Module)
 
 ---Intialize the receiver
 ---@param kv mod_env_kv
-function ModEnv:__initialize(kv)
+function ModEnv.__:initialize(kv)
   assert(rawget(kv.module, "env") == nil)
   Module.__set_module_of_env(self, kv.module)
   assert(Module.__get_module_of_env(self) == kv.module)
@@ -164,7 +178,7 @@ function ModEnv:__initialize(kv)
   -- NB loadfile/dofile are ignored within code chunks
 end
 
-function ModEnv.__class_table:maindir()
+function ModEnv.__.getter:maindir()
   local module = Module.__get_module_of_env(self)
   local main_module = assert(module.main_module)
   return main_module.path
