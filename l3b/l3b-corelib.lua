@@ -169,7 +169,7 @@ local GET_MAIN_VARIABLE = "get_main_variable"
 ---@field public GET_MAIN_VARIABLE  string
 ---@field public get_line_number    fun(s: string, i: integer): integer
 ---@field public bridge             fun(kv: bridge_kv_t): table
----@field public shallow_copy       fun(original: any): any
+---@field public shallow_copy       fun(original: any|nil): any
 
 return {
   GET_MAIN_VARIABLE   = GET_MAIN_VARIABLE,

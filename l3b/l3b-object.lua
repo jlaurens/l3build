@@ -295,6 +295,7 @@ end
 ---@field public get            fun(self: Object, key: string): any
 ---@field public set            fun(self: Object, key: string, value: string): error_level_n, error_message_s
 ---@field public index_will_return fun(self: Object, key: string, value: string)
+---@field public MT             table
 
 local Object__ = {
   getter = {},
@@ -407,6 +408,14 @@ local function __newindex(class, self, k, v)
   set(self, k, v)
 end
 
+Object.__.MT = {
+  __index     = function (this, k)
+                  return __index(Object, this, k)
+                end,
+  __newindex  = function (this, k, v)
+                  __newindex(Object, this, k, v)
+                end,
+}
 ---Constructor
 --[===[
   All the constructors have a unique key/value argument.
@@ -422,14 +431,7 @@ also derived from the ancestor's constructor key/value argument table.
 ---@return nil|string
 function Object:Constructor(kv)
   local instance = kv and kv.data or {}
-  instance = setmetatable(instance, {
-    __index     = function (this, k)
-                    return __index(Object, this, k)
-                  end,
-    __newindex  = function (this, k, v)
-                    __newindex(Object, this, k, v)
-                  end,
-  })
+  instance = setmetatable(instance, self.__.MT)
   instance:lock()
   return instance
 end
@@ -446,10 +448,7 @@ local function constructor (self, kv)
     return instance
   end
   instance = __.Super(kv)
-  setmetatable(instance, {
-    __index     = __.index, -- `__index = class` is basic inheritance, but we are not basic
-    __newindex  = __.newindex,
-  })
+  setmetatable(instance, __.MT)
   instance.__TYPE = self.__TYPE
   -- initialize without inheritance, it was made in the Super contructor
   local initialize = rawget(__, "initialize")
@@ -489,12 +488,14 @@ function Object.make_subclass(Super, TYPE, static)
   class.__  = setmetatable({
     Super = Super, -- class hierarchy
     Class = class, -- class.__.Class == class
-    index = function(me, k)
-      return __index(class, me, k)
-    end,
-    newindex = function (me, k, v)
-      return __newindex(class, me, k, v)
-    end,
+    MT = {
+      __index = function(me, k)
+                  return __index(class, me, k)
+                end,
+      __newindex =  function (me, k, v)
+                      return __newindex(class, me, k, v)
+                    end,
+    }
   }, {
     -- other fields are static and created on the fly
     __index = function (self, k)
@@ -521,8 +522,8 @@ function Object.make_subclass(Super, TYPE, static)
   })
   class.Constructor = constructor
   setmetatable(class, {
-    __index = class.__.index,
-    __newindex = class.__.newindex,
+    __index = class.__.MT.__index,
+    __newindex = class.__.MT.__newindex,
     __call  = constructor,
   })
   local finalize = rawget(class, "__finalize")

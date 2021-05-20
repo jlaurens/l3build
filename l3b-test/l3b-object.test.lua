@@ -16,6 +16,65 @@ Object, __ = _ENV.loadlib("l3b-object")
 
 local expect  = _ENV.expect
 
+local test_POC = {
+  test_metatable_metatable = function (self)
+    -- can we define a metatable by a metatable?
+    -- No because the __... methods in the metatable
+    -- are accessed via rawget()
+    local MT = {
+      __len = function ()
+                return 666
+              end
+    }
+    local a = setmetatable({}, MT)
+    expect(#a).is(666)
+    local unm = function ()
+      return 421
+    end
+    MT.__unm = unm
+    expect(MT.__unm).is(unm)
+    expect(-a).is(421)
+    -- new if we define the property indirectly
+    MT.__unm = nil
+    setmetatable(MT, {
+      __index = {
+        __unm = unm,
+      }
+    })
+    -- we still have
+    expect(MT.__unm).is(unm)
+    -- but no unm for a
+    expect(function () print(-a) end).error()
+  end,
+  test_when_newindex = function (self)
+    local track = {}
+    local a = setmetatable({}, {
+      __index = function(this, k)
+        if k == "bar" then
+          return 666
+        end
+      end,
+      __newindex = function (this, k, v)
+        push(track, k)
+        push(track, v)
+      end,
+    })
+    a.foo = 421
+    expect(a.foo).is(nil)
+    expect(track).equals({ "foo", 421 })
+    track = {}
+    a.foo = 421
+    expect(a.foo).is(nil)
+    expect(track).equals({ "foo", 421 })
+    track = {}
+    expect(a.bar).is(666)
+    a.bar = 123
+    expect(track).equals({ "bar", 123 })
+    expect(a.bar).is(666)
+  end,
+
+}
+
 local function test_Object()
   expect(Object).NOT(nil)
   expect(Object.__.Super).is(Object)
@@ -120,7 +179,7 @@ local test_make_another_subclass = {
       end
     end
     local o = Object()
-    expect(Class_1.__.index(o, "foo_1")).is("bar_1")
+    expect(Class_1.__.MT.__index(o, "foo_1")).is("bar_1")
     expect(Class_1.__.get(o, "foo_1")).is("bar_1")
     local instance_1 = Class_1()
     expect(instance_1.foo_1).is("bar_1")
@@ -131,7 +190,7 @@ local test_make_another_subclass = {
         return "bar_2a"
       end
     end
-    expect(Class_2a.__.index(o, "foo_2a")).is("bar_2a")
+    expect(Class_2a.__.MT.__index(o, "foo_2a")).is("bar_2a")
     expect(Class_2a.__.get(o, "foo_2a")).is("bar_2a")
     local instance_2a = Class_2a()
     expect(instance_2a.foo_2a).is("bar_2a")
@@ -745,32 +804,6 @@ local test_newindex = {
   setup = function (self)
     self.A = 1
   end,
-  test_POC = function (self)
-    local track = {}
-    local a = setmetatable({}, {
-      __index = function(self, k)
-        if k == "bar" then
-          return 666
-        end
-      end,
-      __newindex = function (self, k, v)
-        push(track, k)
-        push(track, v)
-      end,
-    })
-    a.foo = 421
-    expect(a.foo).is(nil)
-    expect(track).equals({ "foo", 421 })
-    track = {}
-    a.foo = 421
-    expect(a.foo).is(nil)
-    expect(track).equals({ "foo", 421 })
-    track = {}
-    expect(a.bar).is(666)
-    a.bar = 123
-    expect(track).equals({ "bar", 123 })
-    expect(a.bar).is(666)
-  end,
   test_standard = function (_self)
     ---@class test_newindex_A: Object
     ---@field public foo any
@@ -882,6 +915,7 @@ local test_newindex = {
 }
 
 return {
+  test_POC                    = test_POC,
   test_Object                 = test_Object,
   test_cache                  = test_cache,
   test_getter                 = test_getter,

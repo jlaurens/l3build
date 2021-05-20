@@ -24,8 +24,6 @@ local Path = __.Path
 expect(Path).NOT(nil)
 
 local lpeg = require("lpeg")
-local C   = lpeg.C
-local Cc  = lpeg.Cc
 local Ct  = lpeg.Ct
 local Cs  = lpeg.Cs
 local P   = lpeg.P

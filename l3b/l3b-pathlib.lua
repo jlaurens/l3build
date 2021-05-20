@@ -68,7 +68,7 @@ local Cmt     = lpeg.Cmt
 local B       = lpeg.B
 local C       = lpeg.C
 local S       = lpeg.S
-local Ct    = lpeg.Ct
+local Ct      = lpeg.Ct
 
 local Object = require("l3b-object")
 
@@ -194,8 +194,9 @@ local path_p = Ct(P(get_file_path_gmr()))
 ---@field public str string|nil
 
 ---Initialize a newly created Path object with a given string.
+---@param self Path
 ---@param kv path_kv|nil
-function Path:__initialize(kv)
+function Path.__:initialize(kv)
   self.is_absolute  = self.is_absolute or false
   self.up           = shallow_copy(self.up)   -- ".." path components
   self.down         = shallow_copy(self.down) -- down components
@@ -213,19 +214,19 @@ function Path:__initialize(kv)
   assert(not self.is_absolute or #self.up == 0, "Unexpected path ".. kv.str )
 end
 
-function Path:__tostring()
+function Path.__:tostring()
   return self.as_string
 end
 
-function Path.__instance_table:is_void()
+function Path.__.getter:is_void()
   return #self.up + #self.down == 0
 end
 
-function Path.__instance_table:extension()
-  return self.base_name:match("%.([^%.])$")
+function Path.__.getter:extension()
+  return self.base_name:match("%.([^%.])$") or Object.NIL
 end
 
-function Path.__instance_table:as_string()
+function Path.__.getter:as_string()
   local result
   if self.is_absolute then
     result = '/' .. concat(self.down, '/')
@@ -243,7 +244,7 @@ function Path.__instance_table:as_string()
   return result
 end
 
-function Path.__instance_table:base_name()
+function Path.__.getter:base_name()
   local result =
         self.down[#self.down]
     or  self.up[#self.up]
@@ -252,14 +253,14 @@ function Path.__instance_table:base_name()
   return result
 end
 
-function Path.__instance_table:core_name()
+function Path.__.getter:core_name()
   local result = self.base_name
   result = result:match("^(.*)%.") or result
   self.core_name = result
   return result
 end
 
-function Path.__instance_table:dir_name()
+function Path.__.getter:dir_name()
   local function no_tail(t)
     return #t>0 and { unpack(t, 1, #t - 1) } or nil
   end
@@ -292,7 +293,7 @@ end
 ---@param self Path
 ---@param r Path
 ---@return Path
-function Path:__div(r)
+function Path.__.MT:__div(r)
   assert(
     not r.is_absolute or self.is_void,
     "Unable to merge with an absolute path ".. r.as_string
