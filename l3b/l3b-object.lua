@@ -25,33 +25,60 @@ for those people who are interested.
 --[===[
   This module implements some object oriented paradigm.
   It does not require any other module.
+  It is based on pure `lua`.
 
   A class is a table that will be used as metatable of another table.
 
-  An instance of a class is a table which metatable is the class.
-  Some indirection may be required but that is not the case here.
-
+  An instance of a class is a table which metatable is built after the class.
+  
   We will make the difference between properties and methods,
   either static or computed.
+
+# The `Object` table
+
+The module return a unique table considered as both the root class
+and a namespace for static utilities.
+
+For example, with `Object.private_get` and `Object.private_set`
+we can assign private properties to lua objects,
+which is extremely handy to hide some implementation details.
+With lua, completely hiding everything is not possible,
+but hiding some part makes life a bit easier.
 
 # Instances
 
   Creating instances follows a simple syntax, the class also
 playing the role of a constructor. Classes are callable such that
-creating an instance of class `Foo` is made with `Foo(...)`
-with appropriate parameters.
+creating an instance of class `Foo` is made with `Foo(...)`.
+
+The constructor accepts only one parameter which is a table.
+It is the standard way of using named arguments.
+Named arguments make sense here to avoid some extra management while subclassing.
+
+# The classes
+
+The `Object` class is the common ancestor of all classes.
+The classes are used as metatable for their instances
+and implement special '__' prefixed methods.
+
+There is some need to other special methods and properties,
+in particular for computed properties.
+All these are collected in a table associated to the field `__`.
+For example, this table points to the parent class from the field `Super`.
+
+## the instances
 
 # The class hierarchy
 
 ## The hierarchy chain
 
 There are 2 fields dedicated to the class hierarchy.
-Each instance's `__Class` field points to its class.
-The class object also has a `__Class` field that points to itself.
+Each instance's `__.Class` field points to its class.
+The class object also has a `__.Class` field that points to itself.
 The `is_instance` computed property allows to make the difference
 between a class and an instance.
 
-For each class, the `__Super` field points to the parent class,
+For each class, the `__.Super` field points to the parent class,
 if any. The `is_descendant_of` property tells if an object or a class
 is a descendant of another class.
 
@@ -67,13 +94,17 @@ A class will inherit properties and methods from all the classes above.
 
 There are two inheritance mechanisms: one for static properties and methods,
 and one for computed properties and methods.
-In fact the distinction between both is not as clear
-because of the versatility of the language.
+For static methods or properties, inheritance is ensured once each class
+is the metatable of its derived class.
+It works well as long as self is not needed along the whole chain.
+For computed properties and methods, an accessor is collected like
+other static methods, but it is must be run against the original self.
 
 The most efficient manner to understand how things fit together
 is by reading the tests in `l3b-object.test.lua`.
-Basically, `__computed_index` is for class computed properties
-whereas `__instance_table` is for instance computed properties.
+
+Basically, `__.get` is for class computed properties
+whereas `__getter` is for instance computed properties.
 
 --]===]
 ---@module object
@@ -84,346 +115,37 @@ local remove  = table.remove
 
 --[=[ Package implementation ]=]
 
----@class Object @ Root class, metatable of other tables
----@field public  make_subclass     fun(type: string, t: table): Object
----@field public  is_instance       boolean
----@field public  is_class          boolean
----@field private __computed_index  fun(self: Object, key: string): any
----@field private __instance_table  table<string,fun(self: Object, key: string): any>
----@field private __class_table     table<string,fun(self: Object, key: string): any>
+local Object  = {}
 
-local Object = {
-  __TYPE      = "Object",
-  is_instance = false,
-}
-Object.__Class = Object
+-- hidden private properties
+-- stored in an association table
 
-Object.__instance_table = {}
-Object.__class_table = {}
-
----Return the computed property
----@param class table
----@param self table
----@param k any
----@return any
-local function computed_property(class, self, k)
-  local result
-  local computed_k
-  if self and self ~= self.__Class then
-    computed_k = class.__instance_table[k]
-    if computed_k ~= nil then
-      result = computed_k(self, k)
-      if result ~= nil then
-        return result
-      end
-    end
-  end
-  -- dynamic properties for classes and instances
-  local class_table = self and rawget(self, "__class_table")
-    or class.__class_table
-  computed_k = class_table[k]
-  if computed_k ~= nil then
-    result = computed_k(self, k)
-    if result ~= nil then
-      return result
-    end
-  end
-  result = class.__computed_index(self, k)
-  return result
-end
-
----comment
----@param self Object @ either an Object instance of a direct subclass of Object
----@param k any
-function Object.__index(self, k)
-  -- Instances do not know statically about their own class
-  -- they rely on their class.
-  if k == "__Class" then
-    return Object
-  end
-  local result = computed_property(Object, self, k)
-  if result ~= nil then
-    if result == Object.NIL then
-      return nil
-    end
-    return result
-  end
-  if Object.__do_not_inherit(k) then
-    return nil
-  end
-  return Object[k]
-end
-
-Object.__class_table = {
-  is_instance = function (self)
-    return self.__Class ~= self
-  end,
-  is_class = function (self)
-    return self.__Class == self
-  end,
-}
-
----For computed properties
----The default implementation does nothing.
----Used by subclassers.
----@param self Object
----@param k string
----@return any
----@see #make_subclass
-function Object.__computed_index(self, k)
-end
-
-
----Stop inheritance
----Default implementation returns false.
----@param k any
----@return boolean
-function Object.__do_not_inherit(k)
-  return false
-end
-
----Last filter before return
----Default implementation returns false.
----@generic T: any
----@param k any
----@param v T
----@return T
-function Object.__index_will_return(k, v)
-  return v
-end
-
----@see __computed_index
-Object.NIL = setmetatable({}, {
-  __tostring = function (self)
-    return "Object.NIL"
-  end
+local privacy = setmetatable({}, {
+  __mode = "k",
 })
 
----@class object_kv
----@field public data table|nil @ starting table
-
----Constructor
---[===[
-  All the constructors have a unique key/value argument.
-Here `kv.data` is used as a template to build the instance.
-The return value is the newly created instance or nil and
-a message on error.
-
-Each derived constructor key/value argument table is
-also derived from the ancestor's constructor key/value argument table.
-]===]
----@param kv object_kv|nil
----@return Object|nil
----@return nil|string
-function Object:Constructor(kv)
-  local instance = kv and kv.data or {}
-  instance = setmetatable(instance, Object)
-  instance:lock()
-  return instance
+---Get the named private property, if any
+---@param key any
+---@return any
+function Object.private_get(object, key)
+  local properties = privacy[object]
+  return properties and properties[key]
 end
 
----Get the unique instance for the given parameters.
----The default implementation returns `nil`.
----@param kv object_kv
-function Object.__unique_instance(kv)
-end
-
----Make the receiver a unique instance for the given parameters.
----The default implementation does nothing.
-function Object:__make_unique(self)
-end
-
-setmetatable(Object, {
-  __call = Object.Constructor,
-})
-
----Finalize the class object
----Used when subclassing.
----The default implementation does nothing.
----@param self Object
-function Object:__finalize()
-end
-
----Initialize instances
----Used by the constructor.
----The default implementation does nothing.
----@param self Object
----@vararg any
-function Object:__initialize(...)
-  self:lock()
-end
-
-local function make_class__index(class)
-  return function (self, k)
-    if k == "__Class" then
-      return class
-    end
-    if k == "cache_get" then
-      return class == self and assert(class.__Super[k]) or class[k]
-    end
-    -- first: cached properties
-    local result = self and self:cache_get(k)
-    if result ~= nil then
-      if result == Object.NIL then
-        return nil
-      end
-      return result
-    end
-    -- second: dynamic instance properties
-    result = computed_property(class, self, k)
-    if result ~= nil then
-      if result == Object.NIL then
-        return nil
-      end
-      return result
-    end
-    local do_not_inherit = rawget(self, "__do_not_inherit")
-    if do_not_inherit and do_not_inherit(k) then
-      return nil
-    end
-    return class.__index_will_return(k, class[k])
-  end
-end
-
-local function make_constructor(class)
-  -- Define the constructor with a direct call syntax
-  -- @generic T: Object
-  -- @param class any
-  -- @param kv ..._kv @ parameters to the `initialize` function
-  -- @return T|nil    @ nil on error
-  -- @return nil|string @ the error message if any
-  return function (self, kv)
-    -- call Super constructor
-    local instance = class.__unique_instance(kv)
-    if instance then
-      return instance
-    end
-    instance = class.__Super(kv)
-    setmetatable(instance, class)   -- d is an instance of self
-    instance.__TYPE = class.__TYPE
-    -- initialize without inheritance, it was made in the Super contructor
-    local initialize = rawget(class, "__initialize")
-    if initialize then
-      local msg = initialize(instance, kv)
-      if msg then
-        return nil, msg
-      end
-    end
-    class.__make_unique(instance)
-    instance:lock()
-    return instance
-  end
-end
-
----Class making method
---[===[
-  All classes are descendants of `Object`
-@ Usage
-```
-Foo = Object:make_subclass()
-Bar = Foo:make_subclass({...})
-```
---]===]
+---Set the private property for the given key
 ---@generic T: Object
----@param Super Object
----@param TYPE string @ unique identifier, used with `type`
----The "static" data of the class
----@param static? T @ Will become the newly created class table
----@return T
-function Object.make_subclass(Super, TYPE, static)
-  ---@type Object
-  local class = static or {}
-  assert(not getmetatable(class))
-  assert(not class.__Class)
-  assert(Super ~= nil)
-  class.__TYPE = TYPE
-  class.__Super = Super -- class hierarchy
-  class.__Class = class -- more readable than __index
-
-  -- computed properties are inherited by default
-  -- either defined directly or by key
-  class.__instance_table = rawget(class, "__instance_table")
-      or {}
-  setmetatable(class.__instance_table, {
-      __index = Super.__instance_table
-  })
-  class.__class_table = rawget(class, "__class_table")
-      or {}
-  setmetatable(class.__class_table, {
-      __index = Super.__class_table
-  })
-
-  class.__computed_index
-    =  class.__computed_index
-    or Super.__computed_index
-  class.__do_not_inherit
-    =  class.__do_not_inherit
-    or Super.__do_not_inherit
-  class.__index_will_return
-    =  class.__index_will_return
-    or Super.__index_will_return
-  class.__unique_instance
-    =  class.__unique_instance
-    or Object.__unique_instance -- not Super
-  class.__make_unique
-    =  class.__make_unique
-    or Object.__make_unique -- not Super
----comment
-  ---@param self Object
-  ---@param k any
-  ---@return any
-  class.__index = make_class__index(class)
-  class.Constructor = make_constructor(class)
-  -- Super is not the metatable of class
-  -- because we want class to be callable
-  -- to create an instance.
-  setmetatable(class, {
-    __index = function (self, k)
-      if class.__do_not_inherit(k) then
-        return nil
-      end
-      local result = rawget(Super, k)
-      if result == nil then
-        result = Super.__index(self, k)
-      end
-      return Super.__index_will_return(k, result)
-    end,
-    __call  = class.Constructor,
-  })
-  local finalize = rawget(class, "__finalize")
-  if finalize then
-    finalize(class)
+---@param object T
+---@param key any
+---@param value any
+---@return T @ the receiver
+function Object.private_set(object, key, value)
+  local properties = privacy[object]
+  if not properties then
+    properties = {}
+    privacy[object] = properties
   end
-  class:lock()
-  return class
-end
-
----Whether the receiver is an instance of the given class
----@param Class table | nil
----@return boolean
-function Object:is_instance_of(Class)
-  return Class and self.__Class == Class and self.__Class ~= self or false
-end
-
----Whether the receiver inherits the given class
----Returns true iff Class is in the class hierarchy
----@param Class any
----@return boolean
-function Object:is_descendant_of(Class)
-  if Class then
-    local what = self
-    if what:is_instance_of(Class) then
-      return true
-    end
-    what = what.__Class
-    repeat
-      if what == Class then
-        return true
-      end
-      what = what.__Super
-    until not what
-  end
-  return false
+  properties[key] = value
+  return object
 end
 
 local cache_by_object = setmetatable({}, {
@@ -534,17 +256,23 @@ end
 ---@param name string
 ---@vararg any
 function Object:call_handlers_for_name(name, ...)
+  ---@type Object
   local o = self
-  local hierarchy = { o }
-  if o == o.__Class then
-    o = o.__Super
+  local hierarchy
+  if o == o.__.Class then
+    hierarchy = { }
   else
-    o = o.__Class
+    hierarchy = { o }
+    o = o.__.Class
   end
   while o do
     push(hierarchy, o)
-    assert(o ~= o.__Super)
-    o = o.__Super
+    local super = o.__.Super
+    if o ~= super then
+      o = super
+    else
+      break
+    end
   end
   for i = #hierarchy, 1, -1 do
     o = hierarchy[i]
@@ -555,35 +283,289 @@ function Object:call_handlers_for_name(name, ...)
   end
 end
 
--- hidden private properties
--- stored in an association table
+-- Object__ gathers the information that makes a class
+-- It is the type of the `__`. field.
+-- 
+---@class Object__
+---@field public Class          Object
+---@field public Super          Object
+---@field public initialize     fun(self: Object, kv: any)
+---@field public getter         table<string,fun(self: Object, key: string): any>
+---@field public setter         table<string,fun(self: Object, key: string, value: string): error_level_n, error_message_s>
+---@field public get            fun(self: Object, key: string): any
+---@field public set            fun(self: Object, key: string, value: string): error_level_n, error_message_s
+---@field public index_will_return fun(self: Object, key: string, value: string)
 
-local private_properties = setmetatable({}, {
-  __mode = "k",
-})
+local Object__ = {
+  getter = {},
+  setter = {},
+  get = rawget,
+  set = rawset,
+}
 
----Get the named private property, if any
----@param key any
----@return any
-function Object:__get_private_property(key)
-  local properties = private_properties[self]
-  return properties and properties[key]
+---@class Object @ Root class, metatable of other tables
+---@field public  __TYPE            string
+---@field public  make_subclass     fun(type: string, t: table): Object
+---@field public  is_instance       boolean
+---@field public  is_class          boolean
+---@field private __                Object__ @ collect here methods similar to __index, __newindex...
+
+Object__.Class = Object
+Object__.Super = Object
+
+Object.__TYPE   = "Object"
+Object.__ = Object__
+Object.is_instance = false
+
+Object.__.getter = {
+  is_instance = function (self)
+    return rawget(self, "__") == nil
+  end,
+  is_class = function (self)
+    return rawget(self, "__") ~= nil
+  end,
+}
+
+---Last filter before return
+---Default implementation returns false.
+---@generic T: any
+---@param k any
+---@param v T
+---@return T
+function Object.__.index_will_return(self, k, v)
+  return v
 end
 
----Set the private property for the given key
----@generic T: Object
----@param self any
----@param key any
----@param value any
----@return T @ the receiver
-function Object.__set_private_property(self, key, value)
-  local properties = private_properties[self]
-  if not properties then
-    properties = {}
-    private_properties[self] = properties
+---@see __.get
+Object.NIL = setmetatable({}, {
+  __tostring = function (self)
+    return "Object.NIL"
   end
-  properties[key] = value
-  return self
+})
+
+---@class object_kv
+---@field public data table|nil @ starting table
+
+---Get the unique instance for the given parameters.
+---The default implementation returns `nil`.
+---@param kv object_kv
+function Object.__.unique_get(kv)
+end
+
+---Make the receiver a unique instance for the given parameters.
+---The default implementation does nothing.
+function Object.__:unique_set()
+end
+
+---Finalize the class object
+---Used when subclassing.
+---The default implementation does nothing.
+---@param self Object
+function Object.__:finalize()
+end
+
+---Initialize instances
+---Used by the constructor.
+---The default implementation does nothing.
+---@param self Object
+---@param kv any
+function Object.__:initialize(kv)
+  self:lock()
+end
+
+local function __index(class, self, k)
+  local __ = class.__
+  if k == "__" then
+    return __
+  end
+  if k == "cache_get" then
+    return (self == class and __.Super or class)[k]
+  end
+  local result = self:cache_get(k)
+  if result == nil then
+    local get = __.getter[k] or __.get
+    result = get(self, k)
+    if result == nil then
+      result = (self == class and __.Super or class)[k]
+    end
+  end
+  if result == Object.NIL then
+    result = nil
+  end
+  return __.index_will_return(class, k, result)
+end
+
+---Make the __newindex function for the given class
+---Setters for computed properties.
+---You have instance level setters versus class level setters
+---The formers only apply to instances and are not inherited by subclassers.
+---The latters apply to instances when there is no instance setter
+---and are inherited by subclassers.
+---@param class Object
+local function __newindex(class, self, k, v)
+  local set = class.__.setter[k] or class.__.set or rawset
+  set(self, k, v)
+end
+
+---Constructor
+--[===[
+  All the constructors have a unique key/value argument.
+Here `kv.data` is used as a template to build the instance.
+The return value is the newly created instance or nil and
+a message on error.
+
+Each derived constructor key/value argument table is
+also derived from the ancestor's constructor key/value argument table.
+]===]
+---@param kv object_kv|nil
+---@return Object|nil
+---@return nil|string
+function Object:Constructor(kv)
+  local instance = kv and kv.data or {}
+  instance = setmetatable(instance, {
+    __index     = function (this, k)
+                    return __index(Object, this, k)
+                  end,
+    __newindex  = function (this, k, v)
+                    __newindex(Object, this, k, v)
+                  end,
+  })
+  instance:lock()
+  return instance
+end
+
+setmetatable(Object, {
+  __call = Object.Constructor,
+})
+
+local function constructor (self, kv)
+  local __ = self.__
+  -- call Super constructor
+  local instance = __.unique_get(kv)
+  if instance then
+    return instance
+  end
+  instance = __.Super(kv)
+  setmetatable(instance, {
+    __index     = __.index, -- `__index = class` is basic inheritance, but we are not basic
+    __newindex  = __.newindex,
+  })
+  instance.__TYPE = self.__TYPE
+  -- initialize without inheritance, it was made in the Super contructor
+  local initialize = rawget(__, "initialize")
+  if initialize then
+    local msg = initialize(instance, kv)
+    if msg then
+      return nil, msg
+    end
+  end
+  __.unique_set(instance)
+  instance:lock()
+  return instance
+end
+
+---Class making method
+--[===[
+  All classes are descendants of `Object`
+@ Usage
+```
+Foo = Object:make_subclass()
+Bar = Foo:make_subclass({...})
+```
+--]===]
+---@generic T: Object
+---@param Super Object
+---@param TYPE string @ unique identifier, used with `type`
+---The "static" data of the class
+---@param static? T @ Will become the newly created class table
+---@return T
+function Object.make_subclass(Super, TYPE, static)
+  assert(Super ~= nil)
+  ---@type Object
+  local class = static or {}
+  assert(not getmetatable(class))
+  assert(not class.__)
+  class.__TYPE = TYPE
+  class.__  = setmetatable({
+    Super = Super, -- class hierarchy
+    Class = class, -- class.__.Class == class
+    index = function(me, k)
+      return __index(class, me, k)
+    end,
+    newindex = function (me, k, v)
+      return __newindex(class, me, k, v)
+    end,
+  }, {
+    -- other fields are static and created on the fly
+    __index = function (self, k)
+      local result
+      if k == "getter" or k == "setter" then
+        -- Query: Class.__.getter
+        result = static and rawget(static, "__".. k) or {}
+        result = setmetatable(result, {
+          __index = Super.__[k],
+        })
+      else
+        result = Super.__[k]
+        if type(result) == "table" then
+          -- Query Class.__.<other>_table
+          local base = static and static["__".. k] or {}
+          base = setmetatable(base, {
+            __index = result,
+          })
+        end
+      end
+      rawset(self, k, result)
+      return result
+    end
+  })
+  class.Constructor = constructor
+  setmetatable(class, {
+    __index = class.__.index,
+    __newindex = class.__.newindex,
+    __call  = constructor,
+  })
+  local finalize = rawget(class, "__finalize")
+  if finalize then
+    finalize(class)
+  end
+  class:lock()
+  return class
+end
+
+---Whether the receiver is an instance of the given class
+---false when no Class is given
+---@param Class table|nil
+---@return boolean
+function Object:is_instance_of(Class)
+  if Class and self.is_instance then
+    return self.__.Class == Class or false
+  end
+  return false
+end
+
+---Whether the receiver inherits the given class
+---Returns true iff Class is in the class hierarchy
+---@param Class any
+---@return boolean
+function Object:is_descendant_of(Class)
+  if Class then
+    local what = self
+    if what:is_instance_of(Class) then
+      return true
+    end
+    what = what.__.Class
+    repeat -- forever
+      if what == Class then
+        return true
+      end
+      if not what or what.__.Super == what then
+        break
+      end
+      what = what.__.Super
+    until false
+  end
+  return false
 end
 
 return Object

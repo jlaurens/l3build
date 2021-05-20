@@ -177,10 +177,10 @@ function Expect:__index(k)
     local modifier = self.modifier
     self.modifier = modifier
       and function (before)
-        return modifier(before).__Class
+        return modifier(before).__.Class
       end
       or function (before)
-        return before.__Class
+        return before.__.Class
       end
     return self
   end
@@ -456,6 +456,9 @@ from all test files run only test containing either "foo" or "bar".
     end
     return string.char(table.unpack(result))
   end
+  function ENV.random_k_v()
+    return ENV.random_string(), ENV.random_number()
+  end
   local temporary_file_name = os.tmpname()
   os.remove(temporary_file_name)
   local temporary_dir = temporary_file_name:match("^.*/")
@@ -530,7 +533,7 @@ from all test files run only test containing either "foo" or "bar".
   end
 
   ENV.mkdir = lfs.mkdir
-  
+
   ---@type fun(): string|nil @ string iterator
   local all_names
   do
@@ -585,7 +588,8 @@ from all test files run only test containing either "foo" or "bar".
       local key  = name:match("(%w+)%.test$")
       local path = name .. ".lua"
       print("Register tests for ".. path:match("[^/]+$"))
-      local f = loadfile(path, "t", ENV)
+      local f, msg = loadfile(path, "t", ENV)
+      assert(f, msg)
       local tests = f()
       for k, v in pairs(tests) do
         _G[get_key(k, key)] = v

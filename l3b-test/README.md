@@ -7,20 +7,25 @@ Other files are testing utilities imported by the testing files.
 
 ## Running tests
 
+From the `l3build` directory we launch `texlua` with apropriate arguments.
+
+We can also launch the unit testing process from
+a directory below. In that case, we must provide the relative path of the `l3build.lua` file.
+
 ### Running all the tests:
 
-```texlua ../l3build.lua test```
+```texlua l3build.lua test```
 
 ### Running specific tests by core file name:
 
-```texlua ../l3build.lua test os,fs,path```
+```texlua l3build.lua test os,fs,path```
 
 It will run all the tests which file names contains one of
 "os", "fs" or "path"
 
 ### Running specific tests by test name
 
-```texlua ../l3build.lua test -p basic -p level```
+```texlua l3build.lua test -p basic -p level```
 
 It will run all the tests which names contains one of
 "basic" or "level"
@@ -71,7 +76,7 @@ Only the core part of the name is mentioned.
 
 Running these tests:
 
-```texlua ../l3build.lua test core,obj,path,os,fs,lpeg,^env$```
+```texlua l3build.lua test core,obj,path,os,fs,lpeg,^env$```
 
 ### l3build models
 
@@ -88,7 +93,7 @@ Model for the LaTeX "module"
 
 Running these tests:
 
-```texlua ../l3build.lua test ^mod,options,targets```
+```texlua l3build.lua test ^mod,options,targets```
 
 ### l3build actions
 
@@ -99,7 +104,7 @@ Running these tests:
 
 Running these tests:
 
-```texlua ../l3build.lua test core,obj,path,os,fs,lpeg,^env$```
+```texlua l3build.lua test core,obj,path,os,fs,lpeg,^env$```
 
 ### Extra
 
