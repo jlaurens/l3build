@@ -96,6 +96,7 @@ local Vars = {
 }
 
 ---@alias error_level_n integer|nil
+---@alias error_message_s nil|string
 
 ---Whether the argument is an error
 ---@param error_level error_level_n
@@ -417,7 +418,7 @@ local flags = {}
 ---@field public is_readonly        fun(t: table): boolean
 ---@field public to_ymd_hms         fun(diff: integer): string
 ---@field public print_diff_time    fun(format: string, diff: integer)
----@field public is_error           fun(error_level: error_level_n|nil): boolean
+---@field public is_error           fun(error_level: error_level_n): boolean
 
 return {
   Vars                = Vars,
