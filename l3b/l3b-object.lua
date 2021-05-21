@@ -292,16 +292,18 @@ end
 ---@field public initialize     fun(self: Object, kv: any)
 ---@field public getter         table<string,fun(self: Object, key: string): any>
 ---@field public setter         table<string,fun(self: Object, key: string, value: string): error_level_n, error_message_s>
+---@field public complete       table<string,fun(self: Object, key: string, value: any): any>
 ---@field public get            fun(self: Object, key: string): any
 ---@field public set            fun(self: Object, key: string, value: string): error_level_n, error_message_s
 ---@field public index_will_return fun(self: Object, key: string, value: string)
 ---@field public MT             table
 
 local Object__ = {
-  getter = {},
-  setter = {},
-  get = rawget,
-  set = rawset,
+  getter    = {},
+  setter    = {},
+  complete  = {},
+  get       = rawget,
+  set       = rawset,
 }
 
 ---@class Object @ Root class, metatable of other tables
@@ -392,6 +394,10 @@ local function __index(class, self, k)
   end
   if result == Object.NIL then
     result = nil
+  end
+  local complete = __.complete[k]
+  if complete then
+    result = complete(self, k, result)
   end
   return __.index_will_return(class, k, result)
 end

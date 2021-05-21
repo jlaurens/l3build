@@ -114,7 +114,7 @@ as from a standalone module.
 
 local TargetInfo = Object:make_subclass("TargetInfo")
 
-function TargetInfo.__instance_table:impl()
+function TargetInfo.__.getter:impl()
   -- retrieve the target implementation from a required module
   local pkg = require(self.package)
   local impl = pkg[self.name .."_impl"] or {
@@ -133,7 +133,7 @@ end
 -- info must be second unless it has already become self
 ---Initialize the receiver.
 ---@param kv target_info_kv
-function TargetInfo:__initialize(kv)
+function TargetInfo.__:initialize(kv)
   self.manager = kv.manager
   for k in items(
     "description",
@@ -241,7 +241,7 @@ end
 local TargetManager = Object:make_subclass("TargetManager")
 
 ---Initialize the receiver
-function TargetManager:__initialize()
+function TargetManager.__:initialize()
   self.__DB = {}
 end
 

@@ -11,6 +11,10 @@ local expect = _ENV.expect
 
 require("l3b-pathlib")
 
+---@type fslib_t
+local fslib = require("l3b-fslib")
+local tree = fslib.tree
+
 ---@type modlib_t
 local modlib = require("l3b-modlib")
 
@@ -95,9 +99,91 @@ local test_main_parent_module = {
   end,
 }
 
+local test_child_modules = {
+  test_no_children = function (self)
+    local path_A = _ENV.create_test_module({
+      name = "A",
+    })
+    local module_A = Module({ path = path_A })
+    expect(#module_A.child_modules).is(0)
+  end,
+  test_children_just_below = function (self)
+    local path_A = _ENV.create_test_module({
+      name = "A",
+    })
+    local module_A = Module({ path = path_A })
+    local path_AA = _ENV.create_test_module({
+      dir = path_A,
+      name = "AA",
+    })
+    local module_AA = Module({ path = path_AA })
+    local path_AB = _ENV.create_test_module({
+      dir = path_A,
+      name = "AB",
+    })
+    local module_AB = Module({ path = path_AB })
+    expect(module_A.child_modules).items({ module_AA, module_AB})
+  end,
+  test_deep_children = function (self)
+    local path_A = _ENV.create_test_module({
+      name = "A",
+    })
+    local module_A = Module({ path = path_A })
+    local path_AA = _ENV.create_test_module({
+      dir = path_A / _ENV.random_string(),
+      name = "A_A",
+    })
+    expect(path_AA).NOT(nil)
+    local module_AA = Module({ path = path_AA })
+    local path_AB = _ENV.create_test_module({
+      dir = path_A / _ENV.random_string(),
+      name = "A_B",
+    })
+    expect(path_AB).NOT(nil)
+    local module_AB = Module({ path = path_AB })
+    expect(module_A.child_modules).items({ module_AA, module_AB})
+    -- local found = {}
+    -- find all the "build.lua" files inside the receiver's directory
+    -- We assume that tree goes from top to bottom
+    -- for entry in tree(path_A, "*/**/build.lua", {
+    --   excludeX = function (e)
+    --     for already in entries(found) do
+    --       if not relative(e.src, already):match("^..") then
+    --         return true -- do not dig inside modules
+    --       end
+    --     end
+    --   end
+    -- }) do
+    --   print(entry.src)
+    -- end
+
+  end,
+  test_grand_children = function (self)
+    -- grand children are not children
+    -- but are children of children
+    local path_A = _ENV.create_test_module({
+      name = "A",
+    })
+    local module_A = Module({ path = path_A })
+    local path_AA = _ENV.create_test_module({
+      dir = path_A,
+      name = "AA",
+    })
+    local module_AA = Module({ path = path_AA })
+    local path_AAA = _ENV.create_test_module({
+      dir = path_AA,
+      name = "AAA",
+    })
+    local module_AAA = Module({ path = path_AAA })
+    expect(module_A.child_modules).items({ module_AA })
+    expect(module_AA.child_modules).items({ module_AAA })
+  end,
+}
+
 return {
-  test_basic        = test_basic,
-  test_instance     = test_instance,
-  test_static       = test_static,
-  test_main_module  = test_main_parent_module,
+  test_basic              = test_basic,
+  test_instance           = test_instance,
+  test_static             = test_static,
+  test_main_parent_module = test_main_parent_module,
+  test_child_modules      = test_child_modules,
 }

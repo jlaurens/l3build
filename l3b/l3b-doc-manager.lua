@@ -65,7 +65,7 @@ local DocManager = Object:make_subclass("DM", {
     self.work_path = kv and kv.work_path
     self.__modules = {}
   end,
-  __instance_table = {
+  __getter = {
     all_modules = function (self)
       local i = 0
       return function ()

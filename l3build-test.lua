@@ -474,6 +474,36 @@ from all test files run only test containing either "foo" or "bar".
     return lfs.mkdir(result) and result or nil
   end
 
+  function ENV.make_directory(path)
+    local old
+    local components = {}
+    for c in path:gmatch("[^/]*") do
+      push(components, c)
+    end
+    local i, v = next(components)
+    if v == "" then
+      old = lfs.currentdir()
+      lfs.chdir("/")
+      i, v = next(components, i)
+    end
+    while v do
+      if lfs.attributes(v, "mode") == nil then
+        local ok, msg = lfs.mkdir(v)
+        if not ok then
+          return nil, msg
+        end
+      end
+      local ok, msg = lfs.chdir(v)
+      if not ok then
+        return nil, msg
+      end
+      i, v = next(components, i)
+    end
+    if old then
+      lfs.chdir(old)
+    end
+    return true
+  end
   ---@class create_test_module_kv
   ---comment
   ---@field public dir string    @ directory must exist
@@ -488,7 +518,7 @@ from all test files run only test containing either "foo" or "bar".
     kv = kv or {}
     local result = (kv.dir or ENV.make_temporary_dir())
       .."/".. (kv.name or ENV.random_string())
-    if not lfs.mkdir(result) then
+    if not ENV.make_directory(result) then
       return nil, 1
     end
     local file_path = result .."/build.lua"

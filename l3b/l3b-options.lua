@@ -90,7 +90,7 @@ function OptionInfo.load_value(self, options, key, value)
   return 0
 end
 
-function OptionInfo.__instance_table.expect_value(self)
+function OptionInfo.__.getter.expect_value(self)
   if flags.debug then
     print("DEBUG options parse expect_value:", self.type)
   end
@@ -107,7 +107,7 @@ local OptionManager = Object:make_subclass("OptionManager")
 ---Return the option info for the given key.
 ---An option info is meant read only.
 ---`key` is "version", "v"...
-function OptionManager:__initialize()
+function OptionManager.__:initialize()
   self.__by_key = {}
   self.__by_long = {}
   self.__by_name = {}

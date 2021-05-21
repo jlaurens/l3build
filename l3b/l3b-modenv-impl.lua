@@ -29,20 +29,88 @@ Define the `ModEnv` class as model to a module environment.
 
 local _G = _G
 
-local status = require("status")
+-- module was a known function in lua <= 5.3
+-- but we need it as a "module" name
+if type(_G.module) == "function" then
+  _G.module = nil
+end
+-- the tex name is for the "tex" command
+if type(_G.tex) == "table" then
+  _G.tex = nil
+end
 
-require("l3b-pathlib")
+local tostring  = tostring
+local print     = print
+local push      = table.insert
+local exit      = os.exit
+local os_time   = os.time
+local os_type   = os["type"]
+
+local status  = require("status")
+
+local kpse        = require("kpse")
+local set_program = kpse.set_program_name
+local var_value   = kpse.var_value
+
+local lpeg = require("lpeg")
+local C = lpeg.C
+local P = lpeg.P
+local V = lpeg.V
+
+---@type Object
+local Object    = require("l3b-object")
+
+---@type pathlib_t
+local pathlib   = require("l3b-pathlib")
+local dir_name  = pathlib.dir_name
+local base_name = pathlib.base_name
+local job_name  = pathlib.job_name
+
+---@type corelib_t
+local corelib           = require("l3b-corelib")
+local bridge            = corelib.bridge
+
+---@type utlib_t
+local utlib             = require("l3b-utillib")
+local is_error          = utlib.is_error
+local entries           = utlib.entries
+local compare_ascending = utlib.compare_ascending
+local first_of          = utlib.first_of
+local to_quoted_string  = utlib.to_quoted_string
+
+---@type oslib_t
+local oslib         = require("l3b-oslib")
+local quoted_path   = oslib.quoted_path
+local OS            = oslib.OS
+local cmd_concat    = oslib.cmd_concat
+local run           = oslib.run
+local read_command  = oslib.read_command
+
+---@type fslib_t
+local fslib                 = require("l3b-fslib")
+local directory_exists      = fslib.directory_exists
+local file_exists           = fslib.file_exists
+local all_names             = fslib.all_names
+local quoted_absolute_path  = fslib.quoted_absolute_path
+local push_pop_current_directory = fslib.push_pop_current_directory
+
+---@type l3b_aux_t
+local l3b_aux = require("l3build-aux")
+local set_epoch_cmd = l3b_aux.set_epoch_cmd
+
+---@type l3build_t
+local l3build = require("l3build")
 
 ---@type modlib_t
 local modlib = require("l3b-modlib")
+
+-- Package implementation
 
 ---@type Module
 local Module = modlib.Module
 ---@type Module
 local ModEnv = modlib.ModEnv
 
-
--- Package implemenation
 
 ---@alias biber_f     fun(name: string, dir: string): error_level_n
 ---@alias bibtex_f    fun(name: string, dir: string): error_level_n
@@ -66,7 +134,7 @@ local ModEnv = modlib.ModEnv
 ---@field public ctanPath      string        @CTAN path
 ---@field public email         string        @Email address of uploader
 ---@field public license       string|string[] @Package license(s) See https://ctan.org/license
----@field public pkg           string        @Name of the CTAN package (defaults to G.ctanpkg)
+---@field public pkg           string        @Name of the CTAN package (defaults to env.ctanpkg)
 ---@field public summary       string        @One-line summary
 ---@field public uploader      string        @Name of uploader
 ---@field public version       string        @Package version
@@ -89,61 +157,61 @@ local ModEnv = modlib.ModEnv
 ---In general the path of the topmost module including the receiver.
 ---This is meant to be shared by all the modules in the same bundle.
 ---@field public maindir string
----Directory containing general support files
+---_ENV.ctorydir containing general support files
 ---Defaults to the `support` directory in the main one.
 ---@field public supportdir string
----Directory containing support files in tree form
+---_ENV.ctorydir containing support files in tree form
 ---Defaults to the `texmf` directory in the main one.
 ---@field public texmfdir string
----Directory for building and testing
+---_ENV.ctorydir for building and testing
 ---Defaults to the `build` directory in the main one.
 ---@field public builddir string
----Directory containing documentation files
+---_ENV.ctorydir containing documentation files
 ---Defaults to the directory of the module.
 ---@field public docfiledir string
----Directory containing source files
+---_ENV.ctorydir containing source files
 ---Defaults to the directory of the module.
 ---@field public sourcefiledir string
----Directory containing test files
+---_ENV.ctorydir containing test files
 ---Defaults to the "testfiles" subdirectory of the module.
 ---@field public testfiledir string
----Directory containing test-specific support files
+---_ENV.ctorydir containing test-specific support files
 ---Defaults to the "support" subdirectory of the module.
 ---The contents of this folder will be copied to the testing folder
 ---in the build area.
 ---@field public testsuppdir string
----Directory containing plain text files
+---_ENV.ctorydir containing plain text files
 ---Defaults to the directory of the module.
 ---@field public textfiledir string
----Directory for generating distribution structure
+---_ENV.ctorydir for generating distribution structure
 ---Defaults to the "distrib" directory in the build folder.
 ---@field public distribdir string
 -- Substructure for CTAN release material
----Directory for extracted files in 'sandboxed' TeX runs
+---_ENV.ctorydir for extracted files in 'sandboxed' TeX runs
 ---Defaults to the "local" directory in the build folder.
 ---@field public localdir string
----Directory for PDF files when using PDF-based tests
+---_ENV.ctorydir for PDF files when using PDF-based tests
 ---Defaults to the "result" directory in the build folder.
 ---@field public resultdir string
----Directory for running tests
+---_ENV.ctorydir for running tests
 ---Defaults to the directory in the build folder named "test"
 ---with an eventual confiuration suffix.
 ---@field public testdir string
----Directory for building documentation
+---_ENV.ctorydir for building documentation
 ---Defaults to the "doc" directory in the build folder
 ---@field public typesetdir string
----Directory for unpacking sources
+---_ENV.ctorydir for unpacking sources
 ---Defaults to the "unpacked" directory in the build folder.
 ---@field public unpackdir string
----Directory for organising files for CTAN
+---_ENV.ctorydir for organising files for CTAN
 ---Defaults to the "ctan" directory in the distribution folder.
 ---@field public ctandir string
----Directory for organised files into TDS structure
+---_ENV.ctorydir for organised files into TDS structure
 ---Defaults to the "tds" directory in the distribution folder.
 ---@field public tdsdir string
 ---Module directory
 ---@field public workdir string
----Directory for organised files into TDS structure
+---_ENV.ctorydir for organised files into TDS structure
 ---Defaults to the "tds" directory in the distribution folder.
 ---@field public config_suffix string
 -- File types for various operations
@@ -191,7 +259,7 @@ local ModEnv = modlib.ModEnv
 ---@field public bundle        string @The name of the bundle in which the module belongs (where relevant)
 ---@field public ctanpkg       string @Name of the CTAN package matching this module
 ---@field public modules       string[] @The list of all modules in a bundle (when not auto-detecting)
----@field public exclmodules   string[] @Directories to be excluded from automatic module detection
+---@field public exclmodules   string[] @_ENV.ctoriesdir to be excluded from automatic module detection
 ---@field public tdsroot       string   @Root directory of the TDS structure for the bundle/module to be installed into
 ---@field public ctanupload    boolean  @Only validation is attempted
 ---@field public ctanzip       string  @Name of the zip file (without extension) created for upload to CTAN
@@ -250,6 +318,38 @@ local ModEnv = modlib.ModEnv
 -- tag
 ---@field public tag_hook        tag_hook_f
 ---@field public update_tag      update_tag_f
+-- OS related
+---@field public os_ascii                           string @ nil,
+---@field public os_cmpexe                          string @ nil,
+---@field public os_cmpext                          string @ nil,
+---@field public os_concat                          string @ The concatenation operation for using multiple commands in one system call,
+---@field public os_diffexe                         string @ nil,
+---@field public os_diffext                         string @ nil,
+---@field public os_grepexe                         string @ nil,
+---@field public os_null                            string @ The location to redirect commands which should produce no output at the terminal: almost always used preceded by `>`,
+---@field public os_pathsep                         string @ The separator used when setting an environment variable to multiple paths.,
+---@field public os_setenv                          string @ The command to set an environmental variable.,
+---@field public os_yes                             string @ DEPRECATED.,
+-- function tools
+---@field public abspath                            function  @ The absolute path
+---@field public basename                           function  @ The base name of a path
+---@field public call                               function  @ Call targets on modules with options.
+---@field public cleandir                           string    @ Clean directory
+---@field public cp                                 function  @ copy files matching a glob
+---@field public direxists                          function  @ Whether a directory exists at the given path
+---@field public dirname                            function @ The directory name of a path
+---@field public fileexists                         function @ Whether a file exists at the given path
+---@field public filelist                           function @ The list of file rooted at some directory matching some glob
+---@field public glob_to_pattern                    function @ Turn a glob to lua pattern for find
+---@field public jobname                            function @ Base name without its extension
+---@field public mkdir                              string @ Make a (deep) directory at the given path
+---@field public normalize_path                     fun(path:string):string @ When called on Windows, returns a properly escaped string
+---@field public path_matcher                       fun(glob:string):fun(name:string):boolean  @ To obtain a glob matcher
+---@field public ren                                function @ Move a file
+---@field public rm                                 function @ Remove all files matching some glob
+---@field public run                                function @ Execute a shell command from a directory.
+---@field public splitpath                          function @ Returns two strings split at the last `/`
+
 
 -- We populate the ModEnv class table.
 -- This will define computed properties that
@@ -262,93 +362,90 @@ local ModEnv = modlib.ModEnv
 -- Alternate design: one can have a phantom module
 -- associate to the class
 
-local CT = ModEnv.__class_table
+local GTR = ModEnv.__.getter
 
 local short_module_dir = "." -- shortcut to the module directory
 
-function CT.supportdir(self, k)
+function GTR:supportdir()
   return self.maindir / "support"
 end
 
-function CT.texmfdir(self, k)
+function GTR:texmfdir()
   return self.maindir / "texmf"
 end
 
-function CT.builddir(self, k)
+function GTR:builddir()
   return self.maindir / "build"
 end
 
-function CT.docfiledir()
+function GTR.docfiledir()
   return short_module_dir
 end
 
-function CT.sourcefiledir()
+function GTR.sourcefiledir()
   return short_module_dir
 end
 
-function CT.testfiledir(self, k)
+function GTR:testfiledir()
   return short_module_dir / "testfiles"
 end
 
-function CT.testsuppdir(self, k)
+function GTR:testsuppdir()
   return self.testfiledir / "support"
 end
 
-function CT.textfiledir()
+function GTR.textfiledir()
   return short_module_dir
 end
 
-function CT.distribdir(self, k)
+function GTR:distribdir()
   return self.builddir / "distrib"
 end
 
-function CT.localdir(self, k)
+function GTR:localdir()
   return self.builddir / "local"
 end
 
-function CT.resultdir(self, k)
+function GTR:resultdir()
   return self.builddir / "result"
 end
 
-function CT.testdir(self, k)
+function GTR:testdir()
   return self.builddir / "test" .. self.config_suffix
 end
 
-function CT.typesetdir(self, k)
+function GTR:typesetdir()
   return self.builddir / "doc"
 end
 
-function CT.unpackdir(self, k)
+function GTR:unpackdir()
   return self.builddir / "unpacked"
 end
 
-function CT.ctandir(self, k)
+function GTR:ctandir()
   return self.distribdir / "ctan"
 end
 
-function CT.tdsdir(self, k)
+function GTR:tdsdir()
   return self.distribdir / "tds"
 end
 
-function CT.workdir(self, k)
+function GTR:workdir()
   local module = Module.__get_module_of_env(self)
-  if not module then
-    require("l3build-help").pretty_print(self)
-  end
   return module.path
 end
 
 -- overwritten after load_unique_config call
-function CT.config_suffix(self, k)
+function GTR:config_suffix()
   local module = Module.__get_module_of_env(self)
   return module.config_suffix
 end
 
-function CT.tdsroot(self, k)
+function GTR:tdsroot()
   return "latex"
 end
 
-function CT.ctanupload(self, k)
+function GTR:ctanupload()
   return false
 end
 
@@ -380,96 +477,114 @@ end
 
 -- file globs
 
-function CT.auxfiles(self, k)
+function GTR:auxfiles()
   return { "*.aux", "*.lof", "*.lot", "*.toc" }
 end
-function CT.bibfiles(self, k)
+function GTR:bibfiles()
   return { "*.bib" }
 end
-function CT.binaryfiles(self, k)
+function GTR:binaryfiles()
   return { "*.pdf", "*.zip" }
 end
-function CT.bstfiles(self, k)
+function GTR:bstfiles()
   return { "*.bst" }
 end
-function CT.checkfiles(self, k)
-  return {}
+
+function GTR:checkfiles(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
 end
-function CT.checksuppfiles(self, k)
-  return {}
+
+function GTR:checksuppfiles(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
 end
-function CT.cleanfiles(self, k)
+function GTR:cleanfiles()
   return { "*.log", "*.pdf", "*.zip" }
 end
-function CT.demofiles(self, k)
-  return {}
+function GTR:demofiles(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
 end
-function CT.docfiles(self, k)
-  return {}
+function GTR:docfiles(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
 end
-function CT.dynamicfiles(self, k)
-  return {}
+function GTR:dynamicfiles(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
 end
-function CT.excludefiles(self, k)
-  return { "*~" }
+function GTR:excludefiles(k)
+  local result = { "*~" }
+  rawset(self, k, result)
+  return result
 end
-function CT.installfiles(self, k)
-  return { "*.sty", "*.cls" }
+
+function GTR:installfiles(k)
+  local result = { "*.sty", "*.cls" }
+  rawset(self, k, result)
+  return result
 end
-function CT.makeindexfiles(self, k)
+
+function GTR:makeindexfiles()
   return { "*.ist" }
 end
-function CT.scriptfiles(self, k)
+function GTR:scriptfiles()
   return {}
 end
-function CT.scriptmanfiles(self, k)
+function GTR:scriptmanfiles()
   return {}
 end
-function CT.sourcefiles(self, k)
+function GTR:sourcefiles()
   return { "*.dtx", "*.ins", "*-????-??-??.sty" }
 end
-function CT.tagfiles(self, k)
+function GTR:tagfiles()
   return { "*.dtx" }
 end
-function CT.textfiles(self, k)
+function GTR:textfiles()
   return { "*.md", "*.txt" }
 end
-function CT.typesetdemofiles(self, k)
+function GTR:typesetdemofiles()
   return {}
 end
-function CT.typesetfiles(self, k)
+function GTR:typesetfiles()
   return { "*.dtx" }
 end
-function CT.typesetsuppfiles(self, k)
+function GTR:typesetsuppfiles()
   return {}
 end
-function CT.typesetsourcefiles(self, k)
+function GTR:typesetsourcefiles()
   return {}
 end
-function CT.unpackfiles(self, k)
+function GTR:unpackfiles()
   return { "*.ins" }
 end
-function CT.unpacksuppfiles(self, k)
+function GTR:unpacksuppfiles()
   return {}
 end
 
 -- check
-function CT.includetests(self, k)
+function GTR:includetests()
   return { "*" }
 end
-function CT.excludetests(self, k)
+function GTR:excludetests()
   return {}
 end
-function CT.checkdeps(self, k)
+function GTR:checkdeps()
   return {}
 end
-function CT.typesetdeps(self, k)
+function GTR:typesetdeps()
   return {}
 end
-function CT.unpackdeps(self, k)
+function GTR:unpackdeps()
   return {}
 end
-function CT.checkengines(self, k)
+function GTR:checkengines()
   return { "pdftex", "xetex", "luatex" }
 end
 print("ERROR, NEXT should go to module")
@@ -503,41 +618,41 @@ print("ERROR, NEXT should go to module")
   end
 
 ]]
-function CT.stdengine(self, k)
+function GTR:stdengine()
   return "pdftex"
 end
-function CT.checkformat(self, k)
+function GTR:checkformat()
   return "latex"
 end
-function CT.specialformats(self, k)
+function GTR:specialformats()
   return specialformats
 end
-function CT.test_types(self, k)
+function GTR:test_types()
   ---@type l3b_check_t
   local l3b_check = require("l3build-check")
   return {
     log = {
-      test        = Xtn.lvt,
-      generated   = Xtn.log,
-      reference   = Xtn.tlg,
-      expectation = Xtn.lve,
+      test        = self.lvtext,
+      generated   = self.logext,
+      reference   = self.tlgext,
+      expectation = self.lveext,
       compare     = l3b_check.compare_tlg,
       rewrite     = l3b_check.rewrite_log,
     },
     pdf = {
-      test      = Xtn.pvt,
-      generated = Xtn.pdf,
-      reference = Xtn.tpf,
+      test      = self.pvtext,
+      generated = self.pdfext,
+      reference = self.tpfext,
       rewrite   = l3b_check.rewrite_pdf,
     }
   }
 end
 
-function CT.test_order(self, k)
+function GTR:test_order()
   return { "log", "pdf" }
 end
 
-function CT.checkconfigs(self, k)
+function GTR:checkconfigs()
   return {  "build"  }
 end
 
@@ -555,89 +670,1411 @@ print("ERROR: Next should go to module")
   end
 ]]
 -- Executable names
-function CT.typesetexe(self, k)
+function GTR:typesetexe()
   return "pdflatex"
 end
-function CT.unpackexe(self, k)
+function GTR:unpackexe()
   return "pdftex"
 end
-function CT.zipexe(self, k)
+function GTR:zipexe()
   return "zip"
 end
-function CT.biberexe(self, k)
+function GTR:biberexe()
   return "biber"
 end
-function CT.bibtexexe(self, k)
+function GTR:bibtexexe()
   return "bibtex8"
 end
-function CT.makeindexexe(self, k)
+function GTR:makeindexexe()
   return "makeindex"
 end
-function CT.curlexe(self, k)
+function GTR:curlexe()
   return "curl"
 end
 -- CLI Options
-function CT.checkopts(self, k)
+function GTR:checkopts()
   return "-interaction=nonstopmode"
 end
-function CT.typesetopts(self, k)
+function GTR:typesetopts()
   return "-interaction=nonstopmode"
 end
-function CT.unpackopts(self, k)
+function GTR:unpackopts()
   return ""
 end
-function CT.zipopts(self, k)
+function GTR:zipopts()
   return "-v -r -X"
 end
-function CT.biberopts(self, k)
+function GTR:biberopts()
   return ""
 end
-function CT.bibtexopts(self, k)
+function GTR:bibtexopts()
   return "-W"
 end
-function CT.makeindexopts(self, k)
+function GTR:makeindexopts()
   return ""
 end
-function CT.ps2pdfopt(self, k) -- beware of the ending s (long term error)
+function GTR:ps2pdfopt() -- beware of the ending s (long term error)
+  return ""
+end
+function GTR:ps2pdfopts()
+  return self.ps2pdfopt
+end
+--TODO what is the description
+function GTR:config()
   return ""
 end
 --TODO what is the description
-function CT.config(self, k)
-  return ""
-end
---TODO what is the description
-function CT.curl_debug(self, k)
+function GTR:curl_debug()
   return false
 end
 
+-- file extensions
+function GTR:bakext()
+  return ".bak"
+end
+function GTR:dviext()
+  return ".dvi"
+end
+function GTR:lvtext()
+  return ".lvt"
+end
+function GTR:tlgext()
+  return ".tlg"
+end
+function GTR:tpfext()
+  return ".tpf"
+end
+function GTR:lveext()
+  return ".lve"
+end
+function GTR:logext()
+  return ".log"
+end
+function GTR:pvtext()
+  return ".pvt"
+end
+function GTR:pdfext()
+  return ".pdf"
+end
+function GTR:psext()
+  return ".ps"
+end
+
+-- OS related
+
+function GTR:os_ascii()
+  return OS.ascii
+end
+
+function GTR:os_cmpexe()
+  return OS.cmpexe
+end
+
+function GTR:os_cmpext()
+  return OS.cmpext
+end
+
+function GTR:os_concat()
+  return OS.concat
+end
+
+function GTR:os_diffexe()
+  return OS.diffexe
+end
+
+function GTR:os_diffext()
+  return OS.diffext
+end
+
+function GTR:os_grepexe()
+  return OS.grepexe
+end
+
+function GTR:os_null()
+  return OS.null
+end
+
+function GTR:os_pathsep()
+  return OS.pathsep
+end
+
+function GTR:os_setenv()
+  return OS.setenv
+end
+
+function GTR:os_yes()
+  return OS.yes
+end
+
+-- function tools
+
+function GTR:abspath()
+  return fslib.absolute_path
+end
+
+function GTR:dirname()
+  return pathlib.dir_name
+end
+
+function GTR:basename()
+  return pathlib.base_name
+end
+
+function GTR:cleandir()
+  return fslib.make_clean_directory
+end
+
+function GTR:cp()
+  return fslib.copy_tree
+end
+
+function GTR:direxists()
+  return fslib.directory_exists
+end
+
+function GTR:fileexists()
+  return fslib.file_exists
+end
+
+function GTR:filelist()
+  return fslib.file_list
+end
+
+function GTR:glob_to_pattern()
+  return pathlib.glob_to_pattern
+end
+
+function GTR:jobname()
+  return pathlib.job_name
+end
+
+function GTR:mkdir()
+  return fslib.make_directory
+end
+
+function GTR:path_matcher()
+  return pathlib.path_matcher
+end
+
+function GTR:ren()
+  return fslib.rename
+end
+
+function GTR:rm()
+  return fslib.remove_tree
+end
+
+function GTR:run()
+  return oslib.run
+end
+
+function GTR:splitpath()
+  return pathlib.dir_base
+end
+
+function GTR:normalize_path()
+  return fslib.to_host
+end
+
+function GTR:call()
+  return l3b_aux.call
+end
+
 ---@class BAR
----@field public module        string @The name of the module
----@field public bundle        string @The name of the bundle in which the module belongs (where relevant)
----@field public ctanpkg       string @Name of the CTAN package matching this module
----@field public modules       string[] @The list of all modules in a bundle (when not auto-detecting)
----@field public exclmodules   string[] @Directories to be excluded from automatic module detection
----@field public tdsroot       string
----@field public ctanzip       string  @Name of the zip file (without extension) created for upload to CTAN
----@field public epoch         integer @Epoch (Unix date) to set for test runs
----@field public flattentds    boolean @Switch to flatten any source structure when creating a TDS structure
----@field public flattenscript boolean @Switch to flatten any script structure when creating a TDS structure
----@field public ctanreadme    string  @Name of the file to send to CTAN as `README.`md
----@field public ctanupload    boolean @Undocumented
----@field public tdslocations  string[] @For non-standard file installations
--- doc related
+---@field public asciiengines                       table @ Engines which should log as pure ASCII,
+---@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
+---@field public checkruns                          number @ Number of runs to complete for a test before comparing the log,
+---@field public checksearch                        boolean @ Switch to search the system `texmf` for during checking,
+---@field public ctanpkg                            string @ Name of the CTAN package matching this module,
+---@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
+---@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
+---@field public epoch                              number @ Epoch (Unix date) to set for test runs,
+---@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
+---@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
+---@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
+---@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
+---@field public forcecheckepoch                    boolean @ Force epoch when running tests,
+---@field public forcedocepoch                      string @ Force epoch when typesetting,
+---@field public glossarystyle                      string @ MakeIndex style file for glossary/changes creation,
+---@field public indexstyle                         string @ MakeIndex style for index creation,
+---@field public install_files                      string @ ,
+---@field public manifest_extract_filedesc          string @ ,
+---@field public manifest_setup                     string @ ,
+---@field public manifest_sort_within_group         string @ ,
+---@field public manifest_sort_within_match         string @ ,
+---@field public manifest_write_group_file          string @ ,
+---@field public manifest_write_group_file_descr    string @ ,
+---@field public manifest_write_group_heading       string @ ,
+---@field public manifest_write_opening             string @ ,
+---@field public manifest_write_subheading          string @ ,
+---@field public manifestfile                       string @ File name to use for the manifest file,
+---@field public maxprintline                       number @ Length of line to use in log files,
+---@field public module                             string @ The name of the module,
+---@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
+---@field public options                            table @ nil,
+---@field public packtdszip                         boolean @ Switch to build a TDS-style zip file for CTAN,
+---@field public ps2pdfopts                         string @ Options for `ps2pdf`,
+---@field public recordstatus                       boolean @ Switch to include error level from test runs in `.tlg` files,
+---@field public specialtypesetting                 table @ Non-standard typesetting combinations,
+---@field public tdslocations                       table @ For non-standard file installations,
+---@field public typesetcmds                        string @ Instructions to be passed to TeX when doing typesetting,
+---@field public typesetruns                        number @ Number of cycles of typesetting to carry out,
+---@field public typesetsearch                      boolean @ Switch to search the system `texmf` for during typesetting,
+---@field public unpacksearch                       boolean @ Switch to search the system `texmf` for during unpacking,
+---@field public uploadconfig                       table @ Metadata to describe the package for CTAN,
+
+--ANCHOR Commands
+
+-- An auxiliary used to set up the environmental variables
+---comment
+---@param cmd   string
+---@param dir?  string
+---@param vars? string[]
+---@return boolean?  @suc
+---@return exitcode? @exitcode
+---@return integer?  @code
+local function runcmd(cmd, dir, vars)
+  dir = quoted_absolute_path(dir or ".")
+  vars = vars or {}
+  local local_texmf = ""
+  local texmfdir = _ENV.texmfdir
+  if texmfdir and texmfdir ~= "" and directory_exists(texmfdir) then
+    local_texmf = OS.pathsep .. quoted_absolute_path(texmfdir) .. "/"
+  end
+  local localdir = _ENV.localdir
+  local typesetsearch = _ENV.typesetsearch
+  local env_paths = "."
+    .. local_texmf .. OS.pathsep
+    .. quoted_absolute_path(localdir) .. OS.pathsep
+    .. dir .. (typesetsearch and OS.pathsep or "")
+  -- Deal with spaces in paths
+  if os_type == "windows" and env_paths:match(" ") then
+    env_paths = first_of(env_paths:gsub('"', '')) -- no '"' in windows!!!
+  end
+  -- Allow for local texmf files
+  local setenv_cmd = OS.setenv .. " TEXMFCNF=." .. OS.pathsep
+  for var in entries(vars) do
+    setenv_cmd = cmd_concat(setenv_cmd, OS.setenv .. " " .. var .. "=" .. env_paths)
+  end
+  local epoch = _ENV.epoch
+  local forcedocepoch = _ENV.forcedocepoch
+  local epoch_cmd = set_epoch_cmd(epoch, forcedocepoch)
+  print("set_epoch_cmd(epoch, forcedocepoch)", set_epoch_cmd(epoch, forcedocepoch))
+  print(setenv_cmd)
+  print(cmd)
+  return run(dir, cmd_concat(epoch_cmd, setenv_cmd, cmd))
+end
+
+---biber
+---@param name string
+---@param dir string
+---@return error_level_n
+local function biber(name, dir)
+  if file_exists(dir / name .. ".bcf") then
+    return _ENV.runcmd(
+      _ENV.biberexe + _ENV.biberopts + name,
+      dir,
+      { "BIBINPUTS" }
+    )
+  end
+  return 0
+end
+
+---bibtex
+---@param name string
+---@param dir string
+---@return error_level_n
+local function bibtex(name, dir)
+  if file_exists(dir / name .. ".aux") then
+    -- LaTeX always generates an .aux file, so there is a need to
+    -- look inside it for a \citation line
+    local grep = os_type == "windows"
+      and [[\\]]
+      or  [[\\\\]]
+    if not is_error(
+      run(
+        dir,
+        OS.grepexe
+        + "\"^" .. grep .. "citation{\""
+        + name .. ".aux"
+        + ">" .. OS.null
+      )
+    + run(
+        dir,
+        OS.grepexe
+        + "\"^" .. grep .. "bibdata{\""
+        + name .. ".aux"
+        + ">"  .. OS.null
+      )
+    )
+    then
+      return _ENV.runcmd(
+        _ENV.bibtexexe + _ENV.bibtexopts + name,
+        dir,
+        { "BIBINPUTS", "BSTINPUTS" }
+      )
+    end
+  end
+  return 0
+end
+
+---makeindex
+---@param name string
+---@param dir string
+---@param in_ext string
+---@param out_ext string
+---@param log_ext string
+---@param style string
+---@return error_level_n
+local function makeindex(name, dir, in_ext, out_ext, log_ext, style)
+  dir = dir or "." -- Why is it optional ?
+  if file_exists(dir / name .. in_ext) then
+    return _ENV.runcmd(
+      _ENV.makeindexexe
+        + _ENV.makeindexopts
+        + "-o" + name .. out_ext
+        .. (style == "" and "" or ("-s" + style))
+        + "-t" + name .. log_ext
+        + name .. in_ext,
+      dir,
+      { "INDEXSTYLE" }
+    ) and 0 or 1
+  end
+  return 0
+end
+
+---TeX
+---@param file string
+---@param dir string
+---@param cmd string|nil
+---@return error_level_n
+local function tex(file, dir, cmd)
+  cmd = cmd or _ENV.typesetexe + _ENV.typesetopts
+  return _ENV.runcmd(
+    cmd
+      + '"' .. _ENV.typesetcmd .. [[\input]] + file .. '"',
+    dir,
+    { "TEXINPUTS", "LUAINPUTS" }
+  )
+end
+
+---typeset. Default command is the same as for `tex`.
+---@param file string
+---@param dir string
+---@param cmd string|nil
+---@return error_level_n
+local function typeset(file, dir, cmd)
+  local error_level = _ENV.tex(file, dir, cmd)
+  if is_error(error_level) then
+    return error_level
+  end
+  local name = job_name(file)
+  error_level = _ENV.biber(name, dir) + _ENV.bibtex(name, dir)
+  if is_error(error_level) then
+    return error_level
+  end
+  for i = 2, _ENV.typesetruns do
+    error_level = _ENV.makeindex(name, dir, ".glo", ".gls", ".glg", _ENV.glossarystyle)
+                + _ENV.makeindex(name, dir, ".idx", ".ind", ".ilg", _ENV.indexstyle)
+                + _ENV.tex(file, dir, cmd)
+    if is_error(error_level) then
+      break
+    end
+  end
+  return error_level
+end
+
+---Do nothing function
+---@return error_level_n
+local function typeset_demo_tasks()
+  return 0
+end
+
+---Do nothing function
+---@return error_level_n
+local function docinit_hook()
+  return 0
+end
+
+---Default function that can be overwritten
+---@return error_level_n
+local function checkinit_hook()
+  return 0
+end
+
+---comment
+---@param test_name string
+---@param run_number integer
+---@return string
+local function runtest_tasks(test_name, run_number)
+  return ""
+end
+
+-- typesetting functions
+
+function GTR:biber()
+  return biber
+end
+
+function GTR:bibtex()
+  return bibtex
+end
+
+function GTR:tex()
+  return tex
+end
+
+function GTR:makeindex()
+  return makeindex
+end
+
+function GTR:runcmd()
+  return runcmd
+end
+
+function GTR:typeset()
+  return typeset
+end
+
+function GTR:typeset_demo_tasks()
+  return typeset_demo_tasks
+end
+
+function GTR:docinit_hook()
+  return docinit_hook
+end
+
+function GTR:checkinit_hook()
+  return checkinit_hook
+end
+
+function GTR:tag_hook()
+  return require("l3build-tag").tag_hook
+end
+
+function GTR:update_tag()
+  return require("l3build-tag").update_tag
+end
+
+function GTR:runtest_tasks()
+  return runtest_tasks
+end
+
+-- Other
+---@class DONE
+---@field public asciiengines                       string[] @ Engines which should log as pure ASCII,
+---@field public checkruns                          number @ Number of runs to complete for a test before comparing the log,
+---@field public checksearch                        boolean @ Switch to search the system `texmf` for during checking,
+
+function GTR:asciiengines()
+  return { "pdftex" }
+end
+
+function GTR:checkruns()
+  return 3
+end
+
+function GTR:checksearch()
+  return true
+end
+
+---@class DONE1
+---@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
+---@field public module                             string @ The name of the module,
+---@field public ctanpkg                            string @ Name of the CTAN package matching this module,
+---@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
+---@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
+
+function GTR:module()
+  local module = Module.__get_module_of_env(self)
+  return job_name(module.path)
+end
+
+function GTR:bundle()
+  local module = Module.__get_module_of_env(self)
+  return module.bundle
+end
+
+function GTR:ctanpkg()
+  return  self.is_standalone
+      and self.module
+      or (self.bundle / self.module)
+end
+
+function GTR:ctanreadme()
+  return "README.md"
+end
+
+function GTR:ctanzip()
+  return self.ctanpkg .. "-ctan"
+end
+
+---@class DONE2
+---@field public epoch                              number @ Epoch (Unix date) to set for test runs,
+---@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
+---@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
+---@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
+---@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
+
+---Convert the given `epoch` to a number.
+---@param epoch string
+---@return number
+---@see l3build.lua
+---@usage private?
+local function normalise_epoch(epoch)
+  assert(epoch, 'normalize_epoch argument must not be nil')
+  -- If given as an ISO date, turn into an epoch number
+  if type(epoch) == "number" then
+    return epoch
+  end
+  local y, m, d = epoch:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  if y then
+    return os_time({
+        year = y, month = m, day   = d,
+        hour = 0, sec = 0, isdst = nil
+      }) - os_time({
+        year = 1970, month = 1, day = 1,
+        hour = 0, sec = 0, isdst = nil
+      })
+  elseif epoch:match("^%d+$") then
+    return tonumber(epoch)
+  else
+    return 0
+  end
+end
+
+function GTR:epoch()
+  local options = l3build.options
+  return options.epoch or 1463734800
+end
+
+function ModEnv.__.complete:epoch(k, v)
+  if k == "epoch" then
+    return normalise_epoch(v)
+  end
+end
+
+function GTR:exclmodules()
+  return {}
+end
+
+function GTR:flatten()
+  return true
+end
+
+function GTR:flattenscript()
+  return self.flattentds
+end
+
+function GTR:flattentds()
+  return true
+end
+
+function ModEnv.__.complete:flatten(k, v)
+  return v ~= nil and v ~= false and v ~= "false"
+end
+
+function ModEnv.__.complete:flattenscript(k, v)
+  return v ~= nil and v ~= false and v ~= "false"
+end
+
+function ModEnv.__.complete:flattentds(k, v)
+  return v ~= nil and v ~= false and v ~= "false"
+end
+
+---@class DONE4
+---@field public forcecheckepoch                    boolean @ Force epoch when running tests,
+---@field public forcedocepoch                      string @ Force epoch when typesetting,
+---@field public glossarystyle                      string @ MakeIndex style file for glossary/changes creation,
+---@field public indexstyle                         string @ MakeIndex style for index creation,
+
+function GTR:forcecheckepoch()
+  return true
+end
+
+function ModEnv.__.complete:forcecheckepoch(k, v)
+  local options = l3build.options
+  if options.epoch then
+    return true
+  end
+  return v ~= nil and v ~= false and v ~= "false"
+end
+
+function GTR:forcedocepoch()
+  return false
+end
+
+function ModEnv.__.complete:forcedocepoch(k, v)
+  v = v ~= nil and v ~= false and v ~= "false"
+  local options = l3build.options
+  return (options.epoch or v) and true or false
+end
+
+function GTR:glossarystyle()
+  return "gglo.ist"
+end
+
+function GTR:indexstyle()
+  return "gind.ist"
+end
+
+---@class DONE5
+---@field public install_files                      string @ ,
+---@field public maxprintline                       number @ Length of line to use in log files,
+---@field public packtdszip                         boolean @ Switch to build a TDS-style zip file for CTAN,
+---@field public ps2pdfopts                         string @ Options for `ps2pdf`,
+---@field public recordstatus                       boolean @ Switch to include error level from test runs in `.tlg` files,
+
+function GTR:install_files()
+  local module = Module.__get_module_of_env(self)
+  return module.install_files
+end
+
+function GTR:maxprintline()
+  return 79
+end
+
+function GTR:packtdszip()
+  return false
+end
+
+function GTR:recordstatus()
+  return false
+end
+
+---@class DONE6
+---@field public manifest_extract_filedesc          any @ ,
+---@field public manifest_setup                     fun():table[] @ ,
+---@field public manifest_sort_within_group         fun(files: string[]):string[] @ ,
+---@field public manifest_sort_within_match         fun(files: string[]):string[] @ ,
+---@field public manifest_write_group_file          string @ ,
+---@field public manifest_write_group_file_descr    string @ ,
+---@field public manifest_write_group_heading       string @ ,
+---@field public manifest_write_opening             string @ ,
+---@field public manifest_write_subheading          string @ ,
+---@field public manifestfile                       string @ File name to use for the manifest file,
+
+function GTR:manifest_extract_filedesc()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifest_setup()
+  return function ()
+    error("Missing manifest_setup")
+  end
+end
+
+function GTR:manifest_sort_within_group()
+  return function (files)
+    return files
+  end
+end
+
+function GTR:manifest_sort_within_match()
+  return function (files)
+    return files
+  end
+end
+
+function GTR:manifest_write_group_file()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifest_write_group_file_descr()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifest_write_group_heading()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifest_write_opening()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifest_write_subheading()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+function GTR:manifestfile()
+  return function ()
+    error("DEPRECATED")
+  end
+end
+
+---@class DONE7
+---@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
+---@field public options                            table @ nil,
+---@field public tdslocations                       string[] @ For non-standard file installations,
+---@field public typesetcmds                        string @ Instructions to be passed to TeX when doing typesetting,
+---@field public typesetruns                        number @ Number of cycles of typesetting to carry out,
+---@field public typesetsearch                      boolean @ Switch to search the system `texmf` for during typesetting,
+---@field public unpacksearch                       boolean @ Switch to search the system `texmf` for during unpacking,
+---@field public uploadconfig                       table @ Metadata to describe the package for CTAN,
+---@field public specialtypesetting                 table @ Non-standard typesetting combinations,
+
+function GTR:modules()
+  local module = Module.__get_module_of_env(self)
+  return module.modules
+end
+
+function GTR:options()
+  local module = Module.__get_module_of_env(self)
+  return module.options
+end
+
+function GTR:tdslocations()
+  local result = {}
+  rawset(self, k, result)
+  return result
+end
+
+function GTR:typesetcmds()
+  return ""
+end
+
+function GTR:typesetruns()
+  return 3
+end
+
+function GTR:typesetsearch()
+  return true
+end
+
+function GTR:unpacksearch()
+  return true
+end
+
+function GTR:uploadconfig(k)
+  local result = setmetatable({}, {
+    __index = {
+      pkg = self.ctanpkg,
+    }
+  })
+  rawset(self, k, result)
+  return result
+end
+
+function GTR:specialtypesetting(k)
+  local result = {}
+  rawset(self, k, result)
+  return result
+end
+
+--ANCHOR ---@field
+
+--[=====[
+---@field public asciiengines                       table @ Engines which should log as pure ASCII,
+---@field public biber                              function @ Runs Biber on file `name` (i.e a jobname lacking any extension)
+inside the dir` folder. If there is no `.bcf` file then
+no action is taken with a return value of `0`.
+,
+---@field public bibtex                             function @ Runs BibTeX on file `name` (i.e a jobname lacking any extension)
+inside the `dir` folder. If there are no `\citation` lines in
+the `.aux` file then no action is taken with a return value of `0`.
+,
+---@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
+---@field public checkinit_hook                     function @ A hook to initialize check process,
+---@field public checkruns                          number @ Number of runs to complete for a test before comparing the log,
+---@field public checksearch                        boolean @ Switch to search the system `texmf` for during checking,
+---@field public ctanpkg                            string @ Name of the CTAN package matching this module,
+---@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
+---@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
+---@field public docinit_hook                       function @ A hook to initialize doc process,
+---@field public epoch                              number @ Epoch (Unix date) to set for test runs,
+---@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
+---@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
+---@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
+---@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
+---@field public forcecheckepoch                    boolean @ Force epoch when running tests,
+---@field public forcedocepoch                      string @ Force epoch when typesetting,
+---@field public glossarystyle                      string @ MakeIndex style file for glossary/changes creation,
+---@field public indexstyle                         string @ MakeIndex style for index creation,
+---@field public install_files                      string @ ,
+---@field public makeindex                          function @ Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
+inside the `dir` folder. The various extensions and the `style`
+should normally be given as standard for MakeIndex.
+,
+---@field public manifest_extract_filedesc          string @ ,
+---@field public manifest_setup                     string @ ,
+---@field public manifest_sort_within_group         string @ ,
+---@field public manifest_sort_within_match         string @ ,
+---@field public manifest_write_group_file          string @ ,
+---@field public manifest_write_group_file_descr    string @ ,
+---@field public manifest_write_group_heading       string @ ,
+---@field public manifest_write_opening             string @ ,
+---@field public manifest_write_subheading          string @ ,
+---@field public manifestfile                       string @ File name to use for the manifest file,
+---@field public maxprintline                       number @ Length of line to use in log files,
+---@field public module                             string @ The name of the module,
+---@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
+---@field public options                            table @ nil,
+---@field public packtdszip                         boolean @ Switch to build a TDS-style zip file for CTAN,
+---@field public ps2pdfopts                         string @ Options for `ps2pdf`,
+---@field public recordstatus                       boolean @ Switch to include error level from test runs in `.tlg` files,
+---@field public runcmd                             function @ A generic function which runs the `cmd` in the `dir`, first
+setting up all of the environmental variables specified to
+point to the `local` and `working` directories. This function is useful
+when creating non-standard typesetting steps.
+,
+---@field public runtest_tasks                      function @ A hook to allow additional tasks to run for the tests,
+---@field public specialtypesetting                 table @ Non-standard typesetting combinations,
+---@field public tag_hook                           function @ Usage: `function tag_hook(tag_name, date)
+  ...
+end`
+  To allow more complex tasks to take place, a hook `tag_hook()` is also
+available. It will receive the tag name and date as arguments, and
+may be used to carry out arbitrary tasks after all files have been updated.
+For example, this can be used to set a version control tag for an entire repository.
+,
+---@field public tdslocations                       table @ For non-standard file installations,
+---@field public tex                                function @ Runs `cmd` (by default `typesetexe` `typesetopts`) on the
+`name` inside the `dir` folder.
+,
+---@field public typeset                            function @ ,
+---@field public typeset_demo_tasks                 function @ runs after copying files to the typesetting location but before the main typesetting run.,
+---@field public typesetcmds                        string @ Instructions to be passed to TeX when doing typesetting,
+---@field public typesetruns                        number @ Number of cycles of typesetting to carry out,
+---@field public typesetsearch                      boolean @ Switch to search the system `texmf` for during typesetting,
+---@field public unpacksearch                       boolean @ Switch to search the system `texmf` for during unpacking,
+---@field public update_tag                         function @ Usage: function update_tag(file, content, tag_name, tag_date)
+  ...
+  return content
+end
+The `tag` target can automatically edit source files to
+modify date and release tag name. As standard, no automatic
+replacement takes place, but setting up a `update_tag` function
+will allow this to happen.
+,
+---@field public uploadconfig                       table @ Metadata to describe the package for CTAN,
+--]=====]
+---@class BARN
+
+--ANCHOR Variable entries
+
+---@class pre_variable_entry_tX
+---@field public description string
+---@field public value       any
+---@field public index       fun(self: VariableEntryX, env: table, k: string): any @ takes precedence over the value
+---@field public complete    fun(self: VariableEntryX, env: table, k: string, v: any): any
+
+---@class VariableEntryX: pre_variable_entry_tX
+---@field public name           string
+---@field public level          integer
+---@field public type           string
+---@field public vanilla_value  any
+
+local VariableEntryX = Object:make_subclass("VariableEntryX")
+
+---@class variable_entry_kvX: object_kv
+---@field public name string
+
+---@type table<string,VariableEntryX>
+local entry_by_name = {}
+---@type VariableEntryX[]
+local entry_by_index = {}
+
+---Declare the given variable
+---@param by_name table<string,pre_variable_entry_tX>
+local function declare(by_name)
+  for name, entry in pairs(by_name) do
+    assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
+    entry.name = name
+    entry = VariableEntryX({
+      data = entry,
+    })
+    entry_by_name[name] = entry
+    push(entry_by_index, entry)
+  end
+end
+
+---Get the variable entry for the given name.
+---@param name string
+---@return VariableEntryX
+local function get_entry(name)
+  return entry_by_name[name]
+end
+
+--ANCHOR Variable declarations
+
+declare({
+  modules = {
+    description = "The list of all modules in a bundle (when not auto-detecting)",
+    value_type = "string[]",
+    index = function (env, k)
+      local result = {}
+      local excl_modules = env.exclmodules
+      for name in all_names(_ENV.workdir) do
+        if directory_exists(name) and not excl_modules[name] then
+          if file_exists(name / "build.lua") then
+            push(result, name)
+          end
+        end
+      end
+      rawset(env, k, result)
+      return result
+    end,
+  },
+  exclmodules = {
+    description = "directories to be excluded from automatic module detection",
+    value_type = "string[]",
+    value       = {},
+  },
+  options = {
+    value_type = "table",
+    index = function (env, k)
+      return l3build.options
+    end,
+  },
+  module = {
+    description = "The name of the module",
+    value_type = "string",
+    index = function (env, k)
+      env:guess_bundle_module()
+      return rawget(env, k)
+    end,
+  },
+  bundle = {
+    description = "The name of the bundle in which the module belongs (where relevant)",
+    value_type = "string",
+    index = function (env, k)
+      env:guess_bundle_module()
+      return rawget(env, k)
+    end,
+  },
+  ctanpkg = {
+    description = "Name of the CTAN package matching this module",
+    value_type = "string",
+    index = function (env, k)
+      return  env.is_standalone
+          and env.module
+          or (env.bundle / env.module)
+    end,
+  },
+})
+-- directory structure
+declare({
+  maindir = {
+    description = "Top level directory for the module/bundle",
+    index = function (env, k)
+      error("THIS IS DEPRECATED")
+    end,
+  },
+  supportdir = {
+    description = "_ENV.ctorydir containing general support files",
+    index = function (env, k)
+      return env.maindir / "support"
+    end,
+  },
+  texmfdir = {
+    description = "_ENV.ctorydir containing support files in tree form",
+    index = function (env, k)
+      return env.maindir / "texmf"
+    end
+  },
+  builddir = {
+    description = "_ENV.ctorydir for building and testing",
+    index = function (env, k)
+      return env.maindir / "build"
+    end
+  },
+  docfiledir = {
+    description = "_ENV.ctorydir containing documentation files",
+    value       = short_module_dir,
+  },
+  sourcefiledir = {
+    description = "_ENV.ctorydir containing source files",
+    value       = short_module_dir,
+  },
+  testfiledir = {
+    description = "_ENV.ctorydir containing test files",
+    index = function (env, k)
+      return short_module_dir / "testfiles"
+    end,
+  },
+  testsuppdir = {
+    description = "_ENV.ctorydir containing test-specific support files",
+    index = function (env, k)
+      return env.testfiledir / "support"
+    end
+  },
+  -- Structure within a development area
+  textfiledir = {
+    description = "_ENV.ctorydir containing plain text files",
+    value       = short_module_dir,
+  },
+  distribdir = {
+    description = "_ENV.ctorydir for generating distribution structure",
+    index = function (env, k)
+      return env.builddir / "distrib"
+    end
+  },
+  -- Substructure for CTAN release material
+  localdir = {
+    description = "_ENV.ctorydir for extracted files in 'sandboxed' TeX runs",
+    index = function (env, k)
+      return env.builddir / "local"
+    end
+  },
+  resultdir = {
+    description = "_ENV.ctorydir for PDF files when using PDF-based tests",
+    index = function (env, k)
+      return env.builddir / "result"
+    end
+  },
+  testdir = {
+    description = "_ENV.ctorydir for running tests",
+    index = function (env, k)
+      return env.builddir / "test" .. env.config_suffix
+    end
+  },
+  typesetdir = {
+    description = "_ENV.ctorydir for building documentation",
+    index = function (env, k)
+      return env.builddir / "doc"
+    end
+  },
+  unpackdir = {
+    description = "_ENV.ctorydir for unpacking sources",
+    index = function (env, k)
+      return env.builddir / "unpacked"
+    end
+  },
+  ctandir = {
+    description = "_ENV.ctorydir for organising files for CTAN",
+    index = function (env, k)
+      return env.distribdir / "ctan"
+    end
+  },
+  tdsdir = {
+    description = "_ENV.ctorydir for organised files into TDS structure",
+    index = function (env, k)
+      return env.distribdir / "tds"
+    end
+  },
+  workdir = {
+    description = "Working directory",
+    index = function (env, k)
+      return l3build.work_dir:sub(1, -2) -- no trailing "/"
+    end
+  },
+  config_suffix = {
+    -- overwritten after load_unique_config call
+    value_type = "string[]",
+    index = function (env, k)
+      return ""
+    end,
+  },
+})
+declare({
+  tdsroot = {
+    description = "Root directory of the TDS structure for the bundle/module to be installed into",
+    value       = "latex",
+  },
+  ctanupload = {
+    description = "Only validation is attempted",
+    value       = false,
+  },
+})
+-- file globs
+declare({
+  auxfiles = {
+    description = "Secondary files to be saved as part of running tests",
+    value       = { "*.aux", "*.lof", "*.lot", "*.toc" },
+  },
+  bibfiles = {
+    description = "BibTeX database files",
+    value       = { "*.bib" },
+  },
+  binaryfiles = {
+    description = "Files to be added in binary mode to zip files",
+    value       = { "*.pdf", "*.zip" },
+  },
+  bstfiles = {
+    description = "BibTeX style files to install",
+    value       = { "*.bst" },
+  },
+  checkfiles = {
+    description = "Extra files unpacked purely for tests",
+    value       = {},
+  },
+  checksuppfiles = {
+    description = "Files in the support directory needed for regression tests",
+    value       = {},
+  },
+  cleanfiles = {
+    description = "Files to delete when cleaning",
+    value       = { "*.log", "*.pdf", "*.zip" },
+  },
+  demofiles = {
+    description = "Demonstration files to use a module",
+    value       = {},
+  },
+  docfiles = {
+    description = "Files which are part of the documentation but should not be typeset",
+    value       = {},
+  },
+  dynamicfiles = {
+    description = "Secondary files to be cleared before each test is run",
+    value       = {},
+  },
+  excludefiles = {
+    description = "Files to ignore entirely (default for Emacs backup files)",
+    value       = { "*~" },
+  },
+  installfiles = {
+    description = "Files to install under the `tex` area of the `texmf` tree",
+    value       = { "*.sty", "*.cls" },
+  },
+  makeindexfiles = {
+    description = "MakeIndex files to be included in a TDS-style zip",
+    value       = { "*.ist" },
+  },
+  scriptfiles = {
+    description = "Files to install to the `scripts` area of the `texmf` tree",
+    value       = {},
+  },
+  scriptmanfiles = {
+    description = "Files to install to the `doc/man` area of the `texmf` tree",
+    value       = {},
+  },
+  sourcefiles = {
+    description = "Files to copy for unpacking",
+    value       = { "*.dtx", "*.ins", "*-????-??-??.sty" },
+  },
+  tagfiles = {
+    description = "Files for automatic tagging",
+    value       = { "*.dtx" },
+  },
+  textfiles = {
+    description = "Plain text files to send to CTAN as-is",
+    value       = { "*.md", "*.txt" },
+  },
+  typesetdemofiles = {
+    description = "Files to typeset before the documentation for inclusion in main documentation files",
+    value       = {},
+  },
+  typesetfiles = {
+    description = "Files to typeset for documentation",
+    value       = { "*.dtx" },
+  },
+  typesetsuppfiles = {
+    description = "Files needed to support typesetting when sandboxed",
+    value       = {},
+  },
+  typesetsourcefiles = {
+    description = "Files to copy to unpacking when typesetting",
+    value       = {},
+  },
+  unpackfiles = {
+    description = "Files to run to perform unpacking",
+    value       = { "*.ins" },
+  },
+  unpacksuppfiles = {
+    description = "Files needed to support unpacking when 'sandboxed'",
+    value       = {},
+  },
+})
+-- check
+declare({
+  includetests = {
+    description = "Test names to include when checking",
+    value       = { "*" },
+  },
+  excludetests = {
+    description = "Test names to exclude when checking",
+    value       = {},
+  },
+  checkdeps = {
+    description = "List of dependencies for running checks",
+    value       = {},
+  },
+  typesetdeps = {
+    description = "List of dependencies for typesetting docs",
+    value       = {},
+  },
+  unpackdeps = {
+    description = "List of dependencies for unpacking",
+    value       = {},
+  },
+  checkengines = {
+    description = "Engines to check with `check` by default",
+    value       = { "pdftex", "xetex", "luatex" },
+    complete = function (env, k, result)
+      local options = l3build.options
+      if options.engine then
+        if not options.force then
+          ---@type flags_t
+          local tt = {}
+          for engine in entries(result) do
+            tt[engine] = true
+          end
+          for opt_engine in entries(options.engine) do
+            if not tt[opt_engine] then
+              print("\n! Error: Engine \"" .. opt_engine .. "\" not set up for testing!")
+              print("\n  Valid values are:")
+              for engine in entries(result) do
+                print("  - " .. engine)
+              end
+              print("")
+              exit(1)
+            end
+          end
+        end
+        result = options.engine
+      end
+      rawset(env, k, result) -- cached here
+      return result
+    end,
+  },
+  stdengine = {
+    description = "Engine to generate `.tlg` files",
+    value       = "pdftex",
+  },
+  checkformat = {
+    description = "Format to use for tests",
+    value       = "latex",
+  },
+  specialformats = {
+    description = "Non-standard engine/format combinations",
+    value       = specialformats,
+  },
+  test_types = {
+    description = "Custom test variants",
+    value_type = "table",
+    index = function (env, k)
+      ---@type l3b_check_t
+      local l3b_check = require("l3build-check")
+      return {
+        log = {
+          test        = env.lvtext,
+          generated   = env.logext,
+          reference   = env.tlgext,
+          expectation = env.lveext,
+          compare     = l3b_check.compare_tlg,
+          rewrite     = l3b_check.rewrite_log,
+        },
+        pdf = {
+          test      = env.pvtext,
+          generated = env.pdfext,
+          reference = env.tpfext,
+          rewrite   = l3b_check.rewrite_pdf,
+        }
+      }
+    end,
+  },
+  test_order = {
+    description = "Which kinds of tests to perform, keys of `test_types`",
+    value_type  = "string[]",
+    value       = { "log", "pdf" },
+  },
+  checkconfigs = {
+    description = "Configurations to use for tests",
+    value_type  = "string[]",
+    value       = {  "build"  },
+    complete = function (env, k, result)
+      local options = l3build.options
+      -- When we have specific files to deal with, only use explicit configs
+      -- (or just the std one)
+      -- TODO: Justify this...
+      if options.names then
+        return options.config or { _G["stdconfig"] }
+      else
+        return options.config or result
+      end
+    end
+  },
+})
+-- Executable names
+declare({
+  typesetexe = {
+    description = "Executable for running `doc`",
+    value       = "pdflatex",
+  },
+  unpackexe = {
+    description = "Executable for running `unpack`",
+    value       = "pdftex",
+  },
+  zipexe = {
+    description = "Executable for creating archive with `ctan`",
+    value       = "zip",
+  },
+  biberexe = {
+    description = "Biber executable",
+    value       = "biber",
+  },
+  bibtexexe = {
+    description = "BibTeX executable",
+    value       = "bibtex8",
+  },
+  makeindexexe = {
+    description = "MakeIndex executable",
+    value       = "makeindex",
+  },
+  curlexe = {
+    description = "Curl executable for `upload`",
+    value       = "curl",
+  },
+})
+-- CLI Options
+declare({
+  checkopts = {
+    description = "Options passed to engine when running checks",
+    value       = "-interaction=nonstopmode",
+  },
+  typesetopts = {
+    description = "Options passed to engine when typesetting",
+    value       = "-interaction=nonstopmode",
+  },
+  unpackopts = {
+    description = "Options passed to engine when unpacking",
+    value       = "",
+  },
+  zipopts = {
+    description = "Options passed to zip program",
+    value       = "-v -r -X",
+  },
+  biberopts = {
+    description = "Biber options",
+    value       = "",
+  },
+  bibtexopts = {
+    description = "BibTeX options",
+    value       = "-W",
+  },
+  makeindexopts = {
+    description = "MakeIndex options",
+    value       = "",
+  },
+  ps2pdfopt = { -- beware of the ending s (long term error)
+    description = "ps2pdf options",
+    value       = "",
+  },
+})
+declare({
+  config = {
+    value       = "",
+  },
+  curl_debug  = {
+    value       = false,
+  },
+})
+
+declare({
   -- Enable access to trees outside of the repo
   -- As these may be set false, a more elaborate test than normal is needed
----@field public typesetsearch boolean @Switch to search the system `texmf` for during typesetting
-  -- Additional settings to fine-tune typesetting
----@field public glossarystyle string  @MakeIndex style file for glossary/changes creation
----@field public indexstyle    string  @MakeIndex style for index creation
----@field public specialtypesetting table<string,special_typesetting_t>  @Non-standard typesetting combinations
----@field public forcedocepoch string  @Force epoch when typesetting
----@field public typesetcmds   string  @Instructions to be passed to TeX when doing typesetting
----@field public typesetruns   integer @Number of cycles of typesetting to carry out
-
-local function declare() end
-declare({
   typesetsearch = {
     description = "Switch to search the system `texmf` for during typesetting",
     value       = true,
@@ -696,15 +2133,17 @@ declare({
   },
   ctanzip = {
     description = "Name of the zip file (without extension) created for upload to CTAN",
+    value_type  = "string",
     index = function (env, k)
       return env.ctanpkg .. "-ctan"
     end,
   },
   epoch = {
     description = "Epoch (Unix date) to set for test runs",
+    value_type  = "number",
     index = function (env, k)
       local options = l3build.options
-      return options.epoch or rawget(_G, "epoch") or 1463734800
+      return options.epoch or env.epoch or 1463734800
     end,
     complete = function (env, k, result)
       return normalise_epoch(result)
@@ -720,8 +2159,9 @@ declare({
   },
   flattenscript = {
     description = "Switch to flatten any script structure when creating a TDS structure",
+    value_type  = "boolean",
     index = function (env, k)
-      return G.flattentds -- by defaut flattentds and flattenscript are synonyms
+      return env.flattentds -- by defaut flattentds and flattenscript are synonyms
     end,
   },
   maxprintline = {
@@ -759,60 +2199,59 @@ declare({
   uploadconfig = {
     value       = {},
     description = "Metadata to describe the package for CTAN",
+    value_type  = "table",
     index =  function (env, k)
       return setmetatable({}, {
-        __index = function (tt, kk)
-          if kk == "pkg" then
-            return env.ctanpkg
-          end
-        end
+        __index = {
+          pkg = env.ctanpkg,
+        }
       })
     end,
   }
 })
 -- file extensions
-function CT.bakext(self, k)
-  return ".bak"
-end
-function CT.dviext(self, k)
-  return ".dvi"
-end
-function CT.lvtext(self, k)
-  return ".lvt"
-end
-function CT.tlgext(self, k)
-  return ".tlg"
-end
-function CT.tpfext(self, k)
-  return ".tpf"
-end
-function CT.lveext(self, k)
-  return ".lve"
-end
-function CT.logext(self, k)
-  return ".log"
-end
-function CT.pvtext(self, k)
-  return ".pvt"
-end
-function CT.pdfext(self, k)
-  return ".pdf"
-end
-function CT.psext(self, k)
-  return ".ps"
-end
-
----@class BARN
-
----@type pathlib_t
-local pathlib = require("l3b-pathlib")
----@type oslib_t
-local oslib = require("l3b-oslib")
----@type fslib_t
-local fslib = require("l3b-fslib")
----@type l3b_aux_t
-local l3b_aux = require("l3build-aux")
-local OS = {}
+declare({
+  bakext = {
+    description = "Extension of backup files",
+    value       = ".bak",
+  },
+  dviext = {
+    description = "Extension of DVI files",
+    value       = ".dvi",
+  },
+  lvtext = {
+    description = "Extension of log-based test files",
+    value       = ".lvt",
+  },
+  tlgext = {
+    description = "Extension of test file output",
+    value       = ".tlg",
+  },
+  tpfext = {
+    description = "Extension of PDF-based test output",
+    value       = ".tpf",
+  },
+  lveext = {
+    description = "Extension of auto-generating test file output",
+    value       = ".lve",
+  },
+  logext = {
+    description = "Extension of checking output, before processing it into a `.tlg`",
+    value       = ".log",
+  },
+  pvtext = {
+    description = "Extension of PDF-based test files",
+    value       = ".pvt",
+  },
+  pdfext = {
+    description = "Extension of PDF file for checking and saving",
+    value       = ".pdf",
+  },
+  psext = {
+    description = "Extension of PostScript files",
+    value       = ".ps",
+  }
+})
 
 declare({
   abspath = {
@@ -964,43 +2403,43 @@ Note that the `target` field in this table is ignored.
   },
   install_files = {
     description = "",
-    value       = NYI, -- l3b_inst.install_files,
+    value       = "NYI", -- l3b_inst.install_files,
   },
   manifest_setup = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_extract_filedesc = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_write_subheading = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_sort_within_match = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_sort_within_group = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_write_opening = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_write_group_heading = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_write_group_file_descr = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
   manifest_write_group_file = {
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 })
 
@@ -1050,6 +2489,166 @@ declare({
     value       = OS.grepexe,
   },
 })
+-- global fields
+declare({
+  ["uploadconfig.announcement"] = {
+    description = "Announcement text",
+  },
+  ["uploadconfig.author"] = {
+    description = "Author name (semicolon-separated for multiple)",
+  },
+  ["uploadconfig.ctanPath"] = {
+    description = "CTAN path",
+  },
+  ["uploadconfig.email"] = {
+    description = "Email address of uploader",
+  },
+  ["uploadconfig.license"] = {
+    description = "Package license(s). See https://ctan.org/license",
+  },
+  ["uploadconfig.pkg"] = {
+    description = "Name of the CTAN package (defaults to env.ctanpkg)",
+  },
+  ["uploadconfig.summary"] = {
+    description = "One-line summary",
+  },
+  ["uploadconfig.uploader"] = {
+    description = "Name of uploader",
+  },
+  ["uploadconfig.version"] = {
+    description = "Package version",
+  },
+  ["uploadconfig.bugtracker"] = {
+    description = "URL(s) of bug tracker",
+  },
+  ["uploadconfig.description"] = {
+    description = "Short description/abstract",
+  },
+  ["uploadconfig.development"] = {
+    description = "URL(s) of development channels",
+  },
+  ["uploadconfig.home"] = {
+    description = "URL(s) of home page",
+  },
+  ["uploadconfig.note"] = {
+    description = "Internal note to CTAN",
+  },
+  ["uploadconfig.repository"] = {
+    description = "URL(s) of source repositories",
+  },
+  ["uploadconfig.support"] = {
+    description = "URL(s) of support channels",
+  },
+  ["uploadconfig.topic"] = {
+    description = "Topic(s), see https://ctan.org/topics/highscore",
+  },
+  ["uploadconfig.update"] = {
+    description = "Boolean `true` for an update, `false` for a new package",
+  },
+  ["uploadconfig.announcement_file"] = {
+    description = "Announcement text file",
+  },
+  ["uploadconfig.note_file"] = {
+    description = "Note text file",
+  },
+  ["uploadconfig.curlopt_file"] = {
+    description = "The filename containing the options passed to curl",
+  },
+})
+declare({
+  biber = {
+    description = [[
+Runs Biber on file `name` (i.e a jobname lacking any extension)
+inside the dir` folder. If there is no `.bcf` file then
+no action is taken with a return value of `0`.
+]],
+    value       = biber,
+  },
+  bibtex = {
+    description = [[
+Runs BibTeX on file `name` (i.e a jobname lacking any extension)
+inside the `dir` folder. If there are no `\citation` lines in
+the `.aux` file then no action is taken with a return value of `0`.
+]],
+    value       = bibtex,
+  },
+  tex = {
+    description = [[
+Runs `cmd` (by default `typesetexe` `typesetopts`) on the
+`name` inside the `dir` folder.
+]],
+    value       = tex,
+  },
+  makeindex = {
+    description = [[
+Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
+inside the `dir` folder. The various extensions and the `style`
+should normally be given as standard for MakeIndex.
+]],
+    value       = makeindex,
+  },
+  runcmd = {
+    description = [[
+A generic function which runs the `cmd` in the `dir`, first
+setting up all of the environmental variables specified to
+point to the `local` and `working` directories. This function is useful
+when creating non-standard typesetting steps.
+]],
+    value       = runcmd,
+  },
+  typeset = {
+    description = "",
+    value       = typeset,
+  },
+  typeset_demo_tasks = {
+    description = "runs after copying files to the typesetting location but before the main typesetting run.",
+    value       = typeset_demo_tasks,
+  },
+  docinit_hook = {
+    description = "A hook to initialize doc process",
+    value       = docinit_hook,
+  },
+  checkinit_hook = {
+    description = "A hook to initialize check process",
+    value       = checkinit_hook,
+  },
+  tag_hook = {
+    description = [[
+Usage: `function tag_hook(tag_name, date)
+  ...
+end`
+  To allow more complex tasks to take place, a hook `tag_hook()` is also
+available. It will receive the tag name and date as arguments, and
+may be used to carry out arbitrary tasks after all files have been updated.
+For example, this can be used to set a version control tag for an entire repository.
+]],
+    value_type  = "function",
+    index = function (env, k)
+      return require("l3build-tag").tag_hook
+    end,
+  },
+  update_tag = {
+    description = [[
+Usage: function update_tag(file, content, tag_name, tag_date)
+  ...
+  return content
+end
+The `tag` target can automatically edit source files to
+modify date and release tag name. As standard, no automatic
+replacement takes place, but setting up a `update_tag` function
+will allow this to happen.
+]],
+    index = function (env, k)
+      return require("l3build-tag").update_tag
+    end,
+    value_type  = "function",
+  },
+  runtest_tasks = {
+    description = "A hook to allow additional tasks to run for the tests",
+    value       = runtest_tasks,
+  },
+})
+
 
 --[==[ Package implementation ]==]
 
@@ -1106,7 +2705,7 @@ declare({
 ---@field public at_bundle_top boolean @true means we are at the top of the bundle
 ---@field public config        string
 ---@field public tds_module    string
----@field public tds_main      string  @G.tdsroot / G.bundle or G.module
+---@field public tds_main      string  @env.tdsroot / env.bundle or env.module
 
 ---@type G_t
 local G
@@ -1186,39 +2785,39 @@ local short_module_dir = "."
 
 -- default static values for variables
 
-local function NYI()
+local function "NYI"()
   error("Missing implementation")
 end
 
----@class pre_variable_entry_t
+---@class pre_variable_entry_tX
 ---@field public description string
 ---@field public value       any
----@field public index       fun(self: VariableEntry, env: table, k: string): any @ takes precedence over the value
----@field public complete    fun(self: VariableEntry, env: table, k: string, v: any): any
+---@field public index       fun(self: VariableEntryX, env: table, k: string): any @ takes precedence over the value
+---@field public complete    fun(self: VariableEntryX, env: table, k: string, v: any): any
 
----@class VariableEntry: pre_variable_entry_t
+---@class VariableEntryX: pre_variable_entry_tX
 ---@field public name           string
 ---@field public level          integer
 ---@field public type           string
 ---@field public vanilla_value  any
 
-local VariableEntry = Object:make_subclass("VariableEntry")
+local VariableEntryX = Object:make_subclass("VariableEntryX")
 
-function VariableEntry:__initialize(kv)
+function VariableEntryX.__:initialize(kv)
   self.name = name
 end
 
----@type table<string,VariableEntry>
+---@type table<string,VariableEntryX>
 local entry_by_name = {}
----@type VariableEntry[]
+---@type VariableEntryX[]
 local entry_by_index = {}
 
 ---Declare the given variable
----@param by_name table<string,pre_variable_entry_t>
+---@param by_name table<string,pre_variable_entry_tX>
 local function declare(by_name)
   for name, entry in pairs(by_name) do
     assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
-    entry = VariableEntry(entry, name)
+    entry = VariableEntryX(entry, name)
     entry_by_name[name] = entry
     push(entry_by_index, entry)
   end
@@ -1226,7 +2825,7 @@ end
 
 ---Get the variable entry for the given name.
 ---@param name string
----@return VariableEntry
+---@return VariableEntryX
 local function get_entry(name)
   return entry_by_name[name]
 end
@@ -1275,7 +2874,7 @@ local function guess_bundle_module(env)
             :format(bundle, s))
     end
     -- embedded module names are the base name
-    s = base_name(dir_name(Dir.work)):lower()
+    s = base_name(dir_name(_ENV.work)):lower()dir
     if not module then
       module = s
     elseif module ~= s then
@@ -1324,15 +2923,15 @@ end
 
 declare({
 function CT.exclmodules
-    description = "Directories to be excluded from automatic module detection",
+    description = "_ENV.ctoriesdir to be excluded from automatic module detection",
     value       = {},
   },
 function CT.modules
     description = "The list of all modules in a bundle (when not auto-detecting)",
-    index function CT.=(self, k)
+    index function CT:=(k)
       local result = {}
       local excl_modules = self.exclmodules
-      for name in all_names(Dir.work) do
+      for name in all_names(_ENV.work)dir do
         if directory_exists(name) and not excl_modules[name] then
           if file_exists(name / "build.lua") then
             push(result, name)
@@ -1344,27 +2943,27 @@ function CT.modules
     end,
   },
 function CT.options
-    index function CT.=(self, k)
+    index function CT:=(k)
       return l3build.options
     end,
   },
 function CT.module
     description = "The name of the module",
-    index function CT.=(self, k)
+    index function CT:=(k)
       guess_bundle_module(env)
       return rawget(self, k)
     end,
   },
 function CT.bundle
     description = "The name of the bundle in which the module belongs (where relevant)",
-    index function CT.=(self, k)
+    index function CT:=(k)
       guess_bundle_module(env)
       return rawget(self, k)
     end,
   },
 function CT.ctanpkg
     description = "Name of the CTAN package matching this module",
-    index function CT.=(self, k)
+    index function CT:=(k)
       return  self.is_standalone
           and self.module
           or (self.bundle / self.module)
@@ -1547,7 +3146,7 @@ function CT.specialformats
   },
 function CT.test_types
     description = "Custom test variants",
-    index function CT.=(self, k)
+    index function CT:=(k)
       ---@type l3b_check_t
       local l3b_check = require("l3build-check")
       return {
@@ -1664,32 +3263,6 @@ function CT.config
   },
 })
 
----Convert the given `epoch` to a number.
----@param epoch string
----@return number
----@see l3build.lua
----@usage private?
-local function normalise_epoch(epoch)
-  assert(epoch, 'normalize_epoch argument must not be nil')
-  -- If given as an ISO date, turn into an epoch number
-  if type(epoch) == "number" then
-    return epoch
-  end
-  local y, m, d = epoch:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
-  if y then
-    return os_time({
-        year = y, month = m, day   = d,
-        hour = 0, sec = 0, isdst = nil
-      }) - os_time({
-        year = 1970, month = 1, day = 1,
-        hour = 0, sec = 0, isdst = nil
-      })
-  elseif epoch:match("^%d+$") then
-    return tonumber(epoch)
-  else
-    return 0
-  end
-end
 
 declare({
   -- Enable access to trees outside of the repo
@@ -1752,13 +3325,13 @@ function CT.ctanreadme
   },
 function CT.ctanzip
     description = "Name of the zip file (without extension) created for upload to CTAN",
-    index function CT.=(self, k)
+    index function CT:=(k)
       return self.ctanpkg .. "-ctan"
     end,
   },
 function CT.epoch
     description = "Epoch (Unix date) to set for test runs",
-    index function CT.=(self, k)
+    index function CT:=(k)
       local options = l3build.options
       return options.epoch or rawget(_G, "epoch") or 1463734800
     end,
@@ -1776,8 +3349,8 @@ function CT.flattentds
   },
 function CT.flattenscript
     description = "Switch to flatten any script structure when creating a TDS structure",
-    index function CT.=(self, k)
-      return G.flattentds -- by defaut flattentds and flattenscript are synonyms
+    index function CT:=(k)
+      return env.flattentds -- by defaut flattentds and flattenscript are synonyms
     end,
   },
 function CT.maxprintline
@@ -1980,43 +3553,43 @@ Note that the `target` field in this table is ignored.
   },
 function CT.install_files
     description = "",
-    value       = NYI, -- l3b_inst.install_files,
+    value       = "NYI", -- l3b_inst.install_files,
   },
 function CT.manifest_setup
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_extract_filedesc
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_write_subheading
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_sort_within_match
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_sort_within_group
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_write_opening
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_write_group_heading
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_write_group_file_descr
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 function CT.manifest_write_group_file
     description = "",
-    value       = NYI,
+    value       = "NYI",
   },
 })
 
@@ -2049,7 +3622,7 @@ function CT.os_cmpexe
     -- description = "",
     value       = OS.cmpexe,
   },
-function CT.os_cmpext(self, k)
+function CT:os_cmpext(k)
     -- description = "",
     value       = OS.cmpext,
   },
@@ -2057,7 +3630,7 @@ function CT.os_diffexe
     -- description = "",
     value       = OS.diffexe,
   },
-function CT.os_diffext(self, k)
+function CT:os_diffext(k)
     -- description = "",
     value       = OS.diffext,
   },
@@ -2084,7 +3657,7 @@ function CT.["uploadconfig.license"]
     description = "Package license(s). See https://ctan.org/license",
   },
 function CT.["uploadconfig.pkg"]
-    description = "Name of the CTAN package (defaults to G.ctanpkg)",
+    description = "Name of the CTAN package (defaults to env.ctanpkg)",
   },
 function CT.["uploadconfig.summary"]
     description = "One-line summary",
@@ -2147,13 +3720,13 @@ local function runcmd(cmd, dir, vars)
   dir = quoted_absolute_path(dir or ".")
   vars = vars or {}
   local local_texmf = ""
-  if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
-    local_texmf = OS.pathsep .. quoted_absolute_path(Dir.texmf) .. "//"
+  if _ENV.texmfdir and _ENV.texmfdir ~= "" and directory_exists(_ENV.texmf)dir then
+    local_texmf = OS.pathsep .. quoted_absolute_path(_ENV.texmf)dir .. "//"
   end
   local env_paths = "."
     .. local_texmf .. OS.pathsep
-    .. quoted_absolute_path(Dir[LOCAL]) .. OS.pathsep
-    .. dir .. (G.typesetsearch and OS.pathsep or "")
+    .. quoted_absolute_path(_ENV.LOCAL])dir .. OS.pathsep
+    .. dir .. (env.typesetsearch and OS.pathsep or "")
   -- Deal with spaces in paths
   if os_type == "windows" and env_paths:match(" ") then
     env_paths = first_of(env_paths:gsub('"', '')) -- no '"' in windows!!!
@@ -2163,10 +3736,10 @@ local function runcmd(cmd, dir, vars)
   for var in entries(vars) do
     setenv_cmd = cmd_concat(setenv_cmd, OS.setenv .. " " .. var .. "=" .. env_paths)
   end
-  print("set_epoch_cmd(G.epoch, G.forcedocepoch)", set_epoch_cmd(G.epoch, G.forcedocepoch))
+  print("set_epoch_cmd(env.epoch, env.forcedocepoch)", set_epoch_cmd(env.epoch, env.forcedocepoch))
   print(setenv_cmd)
   print(cmd)
-  return run(dir, cmd_concat(set_epoch_cmd(G.epoch, G.forcedocepoch), setenv_cmd, cmd))
+  return run(dir, cmd_concat(set_epoch_cmd(env.epoch, env.forcedocepoch), setenv_cmd, cmd))
 end
 
 ---biber
@@ -2175,7 +3748,7 @@ end
 ---@return error_level_n
 local function biber(name, dir)
   if file_exists(dir / name .. ".bcf") then
-    return G.runcmd(
+    return env.runcmd(
       Exe.biber .. " " .. Opts.biber .. " " .. name,
       dir,
       { "BIBINPUTS" }
@@ -2205,7 +3778,7 @@ local function bibtex(name, dir)
         OS.grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
           .. OS.null
       ) == 0 then
-      return G.runcmd(
+      return env.runcmd(
         Exe.bibtex .. " " .. Opts.bibtex .. " " .. name,
         dir,
         { "BIBINPUTS", "BSTINPUTS" }
@@ -2227,7 +3800,7 @@ local function makeindex(name, dir, in_ext, out_ext, log_ext, style)
   dir = dir or "." -- Why is it optional ?
   if file_exists(dir / name .. in_ext) then
     if style == "" then style = nil end
-    return G.runcmd(
+    return env.runcmd(
       Exe.makeindex .. " " .. Opts.makeindex
         .. " -o " .. name .. out_ext
         .. (style and (" -s " .. style) or "")
@@ -2246,7 +3819,7 @@ end
 ---@return error_level_n
 local function tex(file, dir, cmd)
   cmd = cmd or Exe.typeset .." ".. Opts.typeset
-  return G.runcmd(cmd .. " \"" .. G.typesetcmds
+  return env.runcmd(cmd .. " \"" .. env.typesetcmds
     .. "\\input " .. file .. "\"",
     dir, { "TEXINPUTS", "LUAINPUTS" }) and 0 or 1
 end
@@ -2257,19 +3830,19 @@ end
 ---@param cmd string|nil
 ---@return error_level_n
 local function typeset(file, dir, cmd)
-  local error_level = G.tex(file, dir, cmd)
+  local error_level = env.tex(file, dir, cmd)
   if is_error(error_level) then
     return error_level
   end
   local name = job_name(file)
-  error_level = G.biber(name, dir) + G.bibtex(name, dir)
+  error_level = env.biber(name, dir) + env.bibtex(name, dir)
   if is_error(error_level) then
     return error_level
   end
-  for i = 2, G.typesetruns do
-    error_level = G.makeindex(name, dir, ".glo", ".gls", ".glg", G.glossarystyle)
-                + G.makeindex(name, dir, ".idx", ".ind", ".ilg", G.indexstyle)
-                + G.tex(file, dir, cmd)
+  for i = 2, env.typesetruns do
+    error_level = env.makeindex(name, dir, ".glo", ".gls", ".glg", env.glossarystyle)
+                + env.makeindex(name, dir, ".idx", ".ind", ".ilg", env.indexstyle)
+                + env.tex(file, dir, cmd)
     if is_error(error_level) then break end
   end
   return error_level
@@ -2368,7 +3941,7 @@ available. It will receive the tag name and date as arguments, and
 may be used to carry out arbitrary tasks after all files have been updated.
 For example, this can be used to set a version control tag for an entire repository.
 ]],
-    index function CT.=(self, k)
+    index function CT:=(k)
       return require("l3build-tag").tag_hook
     end,
   },
@@ -2383,7 +3956,7 @@ modify date and release tag name. As standard, no automatic
 replacement takes place, but setting up a `update_tag` function
 will allow this to happen.
 ]],
-    index function CT.=(self, k)
+    index function CT:=(k)
       return require("l3build-tag").update_tag
     end,
   },
@@ -2398,13 +3971,13 @@ function CT.runtest_tasks
 ---@param env table
 ---@param k   string
 ---@return any
-local G_index function CT.=(self, k)
-  ---@type VariableEntry
+local G_index function CT:=(k)
+  ---@type VariableEntryX
   local entry = get_entry(k)
   if entry then
     local result
     if entry.index then
-      result = entry.index(self, k)
+      result = entry:index(k)
       if result ~= nil then
         return result
       end
@@ -2455,7 +4028,7 @@ local G_index function CT.=(self, k)
   end
 end
 
-G = bridge({
+env.= bridge({
   index    = G_index,
 function CT.complete(env, k, result)
     local entry = get_entry(k)
@@ -2480,4 +4053,6 @@ function CT.newindex(env, k, v)
 --[=====[
 --]=====]
 
-return ModEnv
+return ModEnv,
+_ENV.during_unit_testing and
+{ entry_by_name = entry_by_name, entry_by_index = entry_by_index}

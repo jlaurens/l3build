@@ -464,10 +464,6 @@ local VariableEntry = Object:make_subclass("VariableEntry")
 ---@class variable_entry_kv: object_kv
 ---@field public name string
 
-function VariableEntry:__initialize(kv)
-  self.name = kv.name
-end
-
 ---@type table<string,VariableEntry>
 local entry_by_name = {}
 ---@type VariableEntry[]
@@ -478,7 +474,10 @@ local entry_by_index = {}
 local function declare(by_name)
   for name, entry in pairs(by_name) do
     assert(not entry_by_name[name], "Duplicate declaration ".. tostring(name))
-    entry = VariableEntry(entry, name)
+    entry.name = name
+    entry = VariableEntry({
+      data = entry,
+    })
     entry_by_name[name] = entry
     push(entry_by_index, entry)
   end
@@ -786,9 +785,6 @@ declare({
     value       = false,
   },
 })
-
-
-
 -- file globs
 declare({
   auxfiles = {
@@ -1061,7 +1057,6 @@ declare({
     value       = "",
   },
 })
-
 declare({
   config = {
     value       = "",
@@ -1631,7 +1626,7 @@ local function biber(name, dir)
   return 0
 end
 
----comment
+---bibtex
 ---@param name string
 ---@param dir string
 ---@return error_level_n
@@ -1662,7 +1657,7 @@ local function bibtex(name, dir)
   return 0
 end
 
----comment
+---makeindex
 ---@param name string
 ---@param dir string
 ---@param in_ext string
@@ -2057,12 +2052,12 @@ local function get_vanilla()
   return vanilla
 end
 
-function VariableEntry.__instance_table.type(self)
+function VariableEntry.__.getter.type(self)
   local result = type(self.vanilla_value)
   rawset(self, "type", result)
   return result
 end
-function VariableEntry.__instance_table.vanilla_value(self)
+function VariableEntry.__.getter.vanilla_value(self)
   local result = get_vanilla()[self.name]
   rawset(self, "vanilla_value", result)
   return result
@@ -2082,7 +2077,7 @@ local level_by_type = {
 ---Get the level of the receiver
 ---@param self VariableEntry
 ---@return integer
-function VariableEntry.__instance_table:level()
+function VariableEntry.__.getter:level()
   local result = level_by_type[self.type]
   rawset(self, "level", result)
   return result

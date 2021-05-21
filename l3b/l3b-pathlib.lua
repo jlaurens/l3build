@@ -85,7 +85,7 @@ local utf8_p = lpeglib.utf8_p
 
 ---Split the given string according to the given separator
 ---@param str string
----@param sep string | lpeg_t | nil @ 
+---@param sep string|lpeg_t|nil @ 
 local function split(str, sep)
   if sep == "" then
     return Ct(C(utf8_p)^0):match(str)
@@ -334,6 +334,7 @@ end
 local path_properties = setmetatable({}, {
   __mode = "k",
   __call = function (self, k)
+    assert(type(k) == "string", "string missing")
     local result = self[k]
     if result then
       return result
@@ -353,12 +354,18 @@ do
   local string_MT = getmetatable("")
 
   function string_MT.__div(a, b)
+    assert(b, "Cannot append a nil path component")
     local path_a = path_properties(a)
     local path_b = path_properties(b)
     local result = path_a / path_b
     local normalized = result.as_string
     path_properties[normalized] = result
     return normalized
+  end
+
+  -- "foo" + "bar" -> "foo bar"
+  function string_MT.__add(a, b)
+    return a .." ".. b
   end
 
 end
@@ -385,6 +392,7 @@ end
 ---@param path string
 ---@return string
 local function dir_name(path)
+  assert(type(path) == "string", "string missing")
   return path_properties(path).dir_name
 end
 
@@ -400,6 +408,67 @@ end
 ---@return string | nil
 local function extension(path)
   return path_properties(path).extension
+end
+
+---Return a new path pointing to the old `path` relatively to `reference`.
+---Both paths must be either absolute or relative.
+---When both paths are relative, they must go up accordingly.
+---@param target    string
+---@param reference string
+---@return string|nil @ nil on error
+---@return nil|string    @ a message on error, nil otherwise
+local function relative(target, reference, resolve)
+  local p_reference =  path_properties(reference)
+  local p_target = path_properties(target)
+  if p_reference.is_absolute ~= p_target.is_absolute then
+    return nil, "Not two absolute or two relative path"
+  end
+  if not p_target.is_absolute then
+    if #p_target.up < #p_reference.up then
+      return nil, "relative paths must not go up too much"
+    end
+    if #p_target.up > 0 then
+      local up = {}
+      for _ = 1, #p_reference.down do
+        push(up, "..")
+      end
+      -- target goes higher
+      for _ = #p_reference.up + 1, #p_target.up do
+        push(up, "..")
+      end
+      -- then goes down
+      local down = shallow_copy(p_target.down)
+      return Path({ data = {
+        up = up,
+        down = down,
+      } }).as_string
+    end
+  end
+  -- both path are absolute or do not go up
+  local common_n = 0
+  for i, component in ipairs(p_reference.down) do
+    if component ~= ""
+    and p_target.down[i] == component
+    then
+      common_n = common_n + 1
+    else
+      break
+    end
+  end
+  local up = {}
+  for i = common_n + 1, #p_reference.down do
+    if p_reference.down[i] ~= "" then
+      push(up, "..")
+    end
+  end
+  local down = {}
+  for i = common_n + 1, #p_target.down do
+    push(down, p_target.down[i])
+  end
+  return Path({ data = {
+    up = up,
+    down = down,
+  } }).as_string
 end
 
 ---Sanitize the path by removing unecessary parts.
@@ -1134,6 +1203,7 @@ end
 ---@field public job_name     fun(path: string): string
 ---@field public core_name    fun(path: string): string
 ---@field public extension    fun(path: string): string
+---@field public relative     fun(path: string, ref: string): string
 ---@field public path_matcher fun(glob: string): glob_match_f
 
 return {
@@ -1145,6 +1215,7 @@ return {
   extension       = extension,
   job_name        = core_name,
   sanitize        = sanitize,
+  relative        = relative,
   glob_to_pattern = glob_to_pattern,
   path_matcher    = path_matcher,
 },

@@ -91,7 +91,7 @@ local test_POC = Test({
 
 local test_Info = function ()
   expect(AD.Info).is.NOT(nil)
-  expect(AD.Info.__Class).is(AD.Info)
+  expect(AD.Info.__.Class).is(AD.Info)
 end
 
 -- unused yet
@@ -1020,7 +1020,7 @@ DB:fill(
 
 local test_Break = Test({
   test = function (self)
-    expect(AD.Break().__Class).equals(AD.Break)
+    expect(AD.Break().__.Class).equals(AD.Break)
     self:do_setup(AD.Break)
     self:do_test_base(DB.BASE())
     self:do_test_DB_x("AD.Break", true)
@@ -1394,7 +1394,7 @@ _G.foo = bar
     self:prepare(s)
     local c_info = self.module:get_class("NAME")
     expect(c_info).is.NOT(nil)
-    expect(c_info.__Class).is(AD.Class)
+    expect(c_info.__.Class).is(AD.Class)
     expect(c_info.__fields).contains({})
     local field_1 = c_info:get_field("FIELD_1")
     expect(field_1).is.NOT(nil)
@@ -1447,7 +1447,7 @@ _G.foo = bar
     self:prepare(s)
     local f_info = self.module:get_fun("NAME")
     expect(f_info).is.NOT(nil)
-    expect(f_info.__Class).is(AD.Function)
+    expect(f_info.__.Class).is(AD.Function)
     expect(f_info.__params).contains({})
     local param_1 = f_info:get_param("PARAM_1")
     expect(param_1).is.NOT(nil)

@@ -157,8 +157,8 @@ function MT:build_init(entry)
     excludes      = {} ,
     files_ordered = {} ,
     descr         = {} ,
-    Nchar_file    = 4  , -- TODO: generalise
-    Nchar_descr   = 11 , -- TODO: generalise
+    Nchar_file    = 4  , -- TODO: generalize
+    Nchar_descr   = 11 , -- TODO: generalize
   }
   -- initialisation for internal data
   for kk, ll in pairs(init) do
@@ -233,7 +233,7 @@ function MT:write_group(fh, entry)
 			end
 			if ii == 1 then
         -- header of table
-        -- TODO: generalise
+        -- TODO: generalize
 				local p = {}
 				for k, v in pairs(param) do p[k] = v end
 				p.count = -1
@@ -291,8 +291,8 @@ function MT:manifest()
     self.ctan_files[f] = true
   end
   self.tds_files = {}
-  for subdir in items("/doc/", "/source/", "/tex/") do
-    for f in all_names(Dir.tds .. subdir .. G.tds_module, "*.*") do
+  for subdir in items("doc", "source", "tex") do
+    for f in all_names(Dir.tds / subdir / G.tds_module, "*.*") do
       self.tds_files[f] = true
     end
   end

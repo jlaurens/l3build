@@ -250,7 +250,7 @@ AD.Content = AD.Info:make_subclass("AD.Content", {
   mask_contents = function (self, t)
     self:do_mask_contents(t)
   end,
-  __class_table = {
+  __getter = {
     key = function (class, k)
       local result = class.__TYPE:get_base_extension().extension:lower()
       class[k] = result
@@ -576,7 +576,7 @@ do
     get_complete_p = function (class)
       -- capture a description
       ---@type AD.At
-      local Super = AD.At.Class.__Super
+      local Super = AD.At.Class.__.Super
       return Cg(
         Cmt( -- expand
           Super.get_complete_p(class),
@@ -712,7 +712,7 @@ do
   local tag_at = {}
   function AD.At.Module.get_complete_p(class)
     ---@type AD.At
-    local Super = AD.At.Module.__Super
+    local Super = AD.At.Module.__.Super
     return
       Cg(
         Cmt( -- necessary because the capture must be evaluated only once
@@ -761,7 +761,7 @@ do
   function AD.At.Global.get_complete_p(class)
     -- capture a description
     ---@type AD.At
-    local Super = AD.At.Global.__Super
+    local Super = AD.At.Global.__.Super
     return Cg(
       Cmt(
         Super.get_complete_p(class),
@@ -1106,7 +1106,7 @@ AD.AtProxy = Object:make_subclass("AD.AtProxy", {
     self._module = kv and kv.module or nil
     self.__at = kv and kv.at or nil
   end,
-  __instance_table = {
+  __getter = {
     source = function (self)
       return self._module.__contents
     end,
@@ -1156,13 +1156,14 @@ AD.Param = AD.AtProxy:make_subclass("AD.Param", {
 
 AD.Vararg = AD.AtProxy:make_subclass("AD.Vararg", {
   __AtClass = AD.At.Vararg,
-  __computed_index = function (self, k)
-    if k == "types" then
-      return self.__at[k] and concat(self.__at[k], "|")
-    end
-    return AD.Vararg.__Super.__computed_index(self, k)
-  end
 })
+
+function AD.Vararg.__:computed(k)
+  if k == "types" then
+    return self.__at[k] and concat(self.__at[k], "|")
+  end
+  return AD.Vararg.__.Super.__.get(self, k)
+end
 
 ---@class AD.Return: AD.AtProxy
 ---@field public  types string[]
@@ -1170,20 +1171,20 @@ AD.Vararg = AD.AtProxy:make_subclass("AD.Vararg", {
 
 AD.Return = AD.AtProxy:make_subclass("AD.Return", {
   __AtClass = AD.At.Return,
-  __computed_index = function (self, k)
-    if k == "types" then
-      return self.__at[k] and concat(self.__at[k], "|")
-    end
-    return AD.Return.__Super.__computed_index(self, k)
-  end
 })
+function AD.Return.__:computed(k)
+  if k == "types" then
+    return self.__at[k] and concat(self.__at[k], "|")
+  end
+  return AD.Return.__.Super.__.get(self, k)
+end
 
 ---@class AD.See: AD.AtProxy
 
 AD.See = AD.AtProxy:make_subclass("AD.See", {
   __AtClass = AD.At.See,
   -- next is not very clean but it works and is simple
-  __instance_table = {
+  __getter = {
     comment = function ()
       return Object.NIL
     end,
@@ -1197,7 +1198,7 @@ AD.See = AD.AtProxy:make_subclass("AD.See", {
 AD.Author = AD.AtProxy:make_subclass("AD.Author", {
   __AtClass = AD.At.Author,
   -- next is not very clean but it works and is simple
-  __instance_table = {
+  __getter = {
     comment = function (self)
       return Object.NIL
     end,
@@ -1227,7 +1228,7 @@ AD.Function = AD.AtProxy:make_subclass("AD.Function", {
     ---@type AD.Return[]
     self.__returns = {}
   end,
-  __instance_table = {
+  __getter = {
     vararg = function (self)
       local result = AD.Vararg({}, self._module, self.__at.vararg)
       self.vararg = result
@@ -1249,7 +1250,7 @@ AD.Function = AD.AtProxy:make_subclass("AD.Function", {
 ---Iterator of the parameter info names
 ---@function AD.Function.all_param_names
 ---@return fun(): string | nil
-function AD.Function.__instance_table:all_param_names()
+function AD.Function.__.getter:all_param_names()
   local i = 0
   return function ()
     i = i + 1
@@ -1279,7 +1280,7 @@ end
 ---Parameter info iterator
 ---@function AD.Function.all_params
 ---@return fun(): string | nil
-function AD.Function.__instance_table:all_params()
+function AD.Function.__.getter:all_params()
   local iterator = self.all_param_names
   return function ()
     local name = iterator()
@@ -1290,7 +1291,7 @@ end
 ---Return info indices iterator
 ---@function AD.Function.all_return_indices
 ---@return fun(): integer | nil
-function AD.Function.__instance_table:all_return_indices()
+function AD.Function.__.getter:all_return_indices()
   local i = 0
   return function ()
     i = i + 1
@@ -1318,7 +1319,7 @@ end
 ---Return info iterator
 ---@function AD.Function.all_params
 ---@return fun(): AD.Return | nil
-function AD.Function.__instance_table:all_returns()
+function AD.Function.__.getter:all_returns()
   local iterator = self.all_return_indices
   return function ()
     local i = iterator()
@@ -1331,7 +1332,7 @@ end
 
 AD.Field = AD.AtProxy:make_subclass("AD.Field", {
   __AtClass = AD.At.Field,
-  __instance_table = {
+  __getter = {
     visibility = function (self)
       return self.__at.visibility
     end,
@@ -1343,7 +1344,7 @@ AD.Field = AD.AtProxy:make_subclass("AD.Field", {
 ---@field public class      AD.Class
 
 AD.Method = AD.Function:make_subclass("AD.Method", {
-  __instance_table = {
+  __getter = {
     base_name = function (self)
       local base, _ = get_base_class(self.name)
       self.base_name = base
@@ -1387,7 +1388,7 @@ AD.Class = AD.AtProxy:make_subclass("AD.Class", {
     ---@type table<string, AD.Method>
     self.__methods = {}
   end,
-  __instance_table = {
+  __getter = {
     author = function (self)
       local at_author = self.__at.author
       if at_author then
@@ -1410,7 +1411,7 @@ AD.Class = AD.AtProxy:make_subclass("AD.Class", {
 ---Field names iterator
 ---@param self AD.Class
 ---@return fun(): string | nil
-function AD.Class.__instance_table:all_field_names()
+function AD.Class.__.getter:all_field_names()
   local i = 0
   return function ()
     i = i + 1
@@ -1424,7 +1425,7 @@ end
 ---comment
 ---@param self AD.Class
 ---@return function
-function AD.Class.__instance_table:all_fields()
+function AD.Class.__.getter:all_fields()
   local iterator = self.all_field_names
   return function ()
     local name = iterator()
@@ -1435,7 +1436,7 @@ end
 ---Method names iterator
 ---@param self AD.Class
 ---@return fun(): string | nil
-function AD.Class.__instance_table:all_method_names()
+function AD.Class.__.getter:all_method_names()
   local p = P(self.name)
     * P(".")
     * C(variable_p)
@@ -1457,7 +1458,7 @@ end
 ---Methods iterator
 ---@param self AD.Class
 ---@return function
-function AD.Class.__instance_table:all_methods()
+function AD.Class.__.getter:all_methods()
   local iterator = self.all_method_names
   return function ()
     local name = iterator()
@@ -1508,7 +1509,7 @@ end
 AD.Type = AD.AtProxy:make_subclass("AD.Type", {
   __AtClass = AD.At.Type,
   GLOBAL_p = white_p^0 * P("_G.") * C(identifier_p),
-  __instance_table = {
+  __getter = {
     types = function (self)
       local at_types = self.__at.types
       return at_types and concat(at_types, "|")
@@ -1523,7 +1524,7 @@ AD.Type = AD.AtProxy:make_subclass("AD.Type", {
 
 AD.Global = AD.AtProxy:make_subclass("AD.Global", {
   __AtClass = AD.At.Global,
-  __instance_table = {
+  __getter = {
     type = function (self)
       return self.__at.type
     end,
@@ -1568,11 +1569,11 @@ do
         end
       end
     end
-    return AD.Global.__Super.__instance_table[k](self, k)
+    return AD.Global.__.Super.__.getter[k](self, k)
   end
-  AD.Global.__instance_table.comment = f
-  AD.Global.__instance_table.short_description = f
-  AD.Global.__instance_table.long_description = f
+  AD.Global.__.getter.comment = f
+  AD.Global.__.getter.short_description = f
+  AD.Global.__.getter.long_description = f
 end
 
 ---@class AD.Module: Object
@@ -1627,7 +1628,7 @@ end
 --]===]
 ---@function AD.Module.all_global_names
 ---@return AD.Global | nil
-function AD.Module.__instance_table:all_global_names()
+function AD.Module.__.getter:all_global_names()
   -- we create 2 iterators:
   -- 1) for ---@global
   -- 2) for ---@type + _G.foo = ...
@@ -1661,7 +1662,7 @@ end
 --]===]
 ---@function AD.Module.all_globals
 ---@return AD.Global | nil
-function AD.Module.__instance_table:all_globals()
+function AD.Module.__.getter:all_globals()
   local iterator = self.all_global_names
   return function ()
     local name = iterator()
@@ -1679,7 +1680,7 @@ end
 --]===]
 ---@function AD.Module.all_class_names
 ---@return AD.Class | nil
-function AD.Module.__instance_table:all_class_names()
+function AD.Module.__.getter:all_class_names()
   local iterator = self.__all_infos
   return function ()
     repeat
@@ -1701,7 +1702,7 @@ end
 --]===]
 ---@function AD.Module.all_classes
 ---@return AD.Class | nil
-function AD.Module.__instance_table:all_classes()
+function AD.Module.__.getter:all_classes()
   local iterator = self.all_class_names
   return function ()
     local name = iterator()
@@ -1719,7 +1720,7 @@ end
 --]===]
 ---@function AD.Module.all_fun_names
 ---@return AD.Class | nil
-function AD.Module.__instance_table:all_fun_names()
+function AD.Module.__.getter:all_fun_names()
   local iterator = self.__all_infos
   return function ()
     repeat
@@ -1742,7 +1743,7 @@ end
 --]===]
 ---@function AD.Module.all_funs
 ---@return AD.Class | nil
-function AD.Module.__instance_table:all_funs()
+function AD.Module.__.getter:all_funs()
   local iterator = self.all_fun_names
   return function ()
     local name = iterator()
@@ -1756,7 +1757,7 @@ end
 ---@param Class T
 ---@param store table<string,T>
 ---@return nil | T
-function AD.Module:__get_instance(name, Class, store)
+function AD.Module.__:get_instance(name, Class, store)
   local result = store[name]
   if result then
     return result
@@ -1798,14 +1799,14 @@ end
 ---@param name string
 ---@return nil | AD.Class
 function AD.Module:get_class(name)
-  return self:__get_instance(name, AD.Class, self.__classes)
+  return self.__:get_instance(name, AD.Class, self.__classes)
 end
 
 ---Get the function info for the given name
 ---@param name string
 ---@return nil | AD.Function
 function AD.Module:get_fun(name)
-  return self:__get_instance(name, AD.Function, self.__functions)
+  return self.__:get_instance(name, AD.Function, self.__functions)
 end
 
 ---@class AD.Module.iterator_options
@@ -1837,7 +1838,7 @@ function AD.Module:iterator(Class, options)
   end
 end
 
-AD.Module.__computed_index = function (self, k)
+AD.Module.__.get = function (self, k)
   -- computed properties
   if k == "__all_infos" then
     local i = 0

@@ -208,7 +208,7 @@ local option_list = {
 ---@class Main: Object
 local Main = Object:make_subclass("Main")
 
-function Main:__initialize()
+function Main.__:initialize()
   self.option_manager = OptionManager()
   self.target_manager = TargetManager()
   self.module = Module(l3build.work_dir)

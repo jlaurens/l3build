@@ -50,7 +50,7 @@ local Module = modlib.Module
 ---@field public Dir            Module.Dir
 ---@field public dir            Module.Dir
 
-function Module.__instance_table:is_main()
+function Module.__.getter:is_main()
   return self.parent == nil
 end
 
@@ -145,11 +145,11 @@ The environment of a module is an object with a dedicated class
 ---@type Module.Dir
 Module.Dir = Object:make_subclass("Module.Dir")
 
-function Module.Dir:__intialize(module)
+function Module.Dir.__:intialize(module)
   self.module = module
 end
 
-function Module.Dir.__instance_table:main()
+function Module.Dir.__.getter:main()
   local main = self.module.main_module
 
   return

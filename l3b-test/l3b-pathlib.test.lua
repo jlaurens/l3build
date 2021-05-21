@@ -347,6 +347,9 @@ local function test_string_forward_slash()
   expect("/" / "").is("/")
   expect("" / "/").is("/")
   expect("/" / "/").is("/")
+  expect("/" / "a").is("/a")
+  expect("/" / "a").is("/a")
+  expect("/" / "./a").is("/a")
   expect("a" / "..").is(".")
   expect("a" / "../").is("./")
   expect("/a" / "..").is("/")
@@ -399,6 +402,85 @@ local function test_sanitize()
   expect(sanitize("a/..")).is(".")
   expect(sanitize("a/./.")).is("./a")
   expect(sanitize("a/./.", true)).is("a")
+end
+
+local function test_relative()
+  local relative = pathlib.relative
+  expect(relative).type("function")
+  local function test(a, b, c)
+    local result = relative(a, b)
+    expect(result).is(c)
+  end
+  test(".", "/", nil)
+  test("..", "/", nil)
+  test("a", "/", nil)
+  test("a", "../b", nil)
+  test("..", "../..", nil)
+  function test(a, b, c)
+    local result = relative(a, b)
+    expect(result).is(c)
+    expect(a / ".").is(b / result / ".")
+  end
+  -- both are relative paths
+  test("", "", ".")
+  test("", ".", ".")
+  test("", "a", "..")
+  test("", "a/", "..")
+  test("..", "", "..")
+  test("../", "", "../")
+  test("..", ".", "..")
+  test("../", ".", "../")
+  test("..", "./", "..")
+  test("../", "./", "../")
+  test("..", "..", ".")
+  test("../", "..", "./")
+  test("../a", "..", "./a")
+  test("../a/", "..", "./a/")
+  test("../a/b", "..", "./a/b")
+  test("../..", "..", "..")
+  test("../../", "..", "../")
+  test("../../a", "..", "../a")
+  test("../..", "../..", ".")
+  test("../..", "../a", "../..")
+  test("../..", "../a/b", "../../..")
+  test("../../c/d/", "../a/b", "../../../c/d/")
+  -- both are absolute paths
+  -- common components = 0
+  test("/", "/", ".")
+  test("/a", "/", "./a")
+  test("/a/", "/", "./a/")
+  test("/a/b", "/", "./a/b")
+  test("/a/b/", "/", "./a/b/")
+  -- common components = 1
+  test("/a", "/a", ".")
+  test("/a", "/a/", ".")
+  test("/a/", "/a", "./")
+  test("/a/b", "/a", "./b")
+  test("/a/b/", "/a", "./b/")
+  test("/a/", "/a/", "./")
+  test("/a/b", "/a/", "./b")
+  test("/a/b/", "/a/", "./b/")
+  test("/a", "/b", "../a")
+  test("/a/", "/b", "../a/")
+  test("/a/b", "/b", "../a/b")
+  test("/a/b/", "/b", "../a/b/")
+  -- common components = 2
+  test("/a/b", "/a/b", ".")
+  test("/a/b/", "/a/b", "./")
+  test("/a", "/a/b", "..")
+  test("/a/", "/a/b", "../")
+  test("/a", "/a/b/c", "../..")
+  test("/a/", "/a/b/c", "../../")
+  test("/a/b", "/a/b/c", "..")
+  test("/a/b/", "/a/b/c", "../")
+  test("/a/b/d", "/a/b/c", "../d")
+  test("/a/b/d/", "/a/b/c", "../d/")
+  test("/a/b/d/e", "/a/b/c", "../d/e")
+  test("/a/b/d/e/", "/a/b/c", "../d/e/")
+  test("/a/b/c", "/a/b", "./c")
+  test("/a/b/c/", "/a/b", "./c/")
+  test("/a/b/c/d", "/a/b", "./c/d")
+  test("/a/b/c/d/", "/a/b", "./c/d/")
 end
 
 local test___grammar = {
@@ -1174,6 +1256,7 @@ return {
   test_core_name            = test_core_name,
   test_extension            = test_extension,
   test_sanitize             = test_sanitize,
+  test_relative             = test_relative,
   test_base_extension       = test_base_extension,
   test_file_path_gmr        = test_file_path_gmr,
   test_Path                 = test_Path,
