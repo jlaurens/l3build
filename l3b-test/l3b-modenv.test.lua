@@ -114,11 +114,11 @@ local function test_other_defaults()
   local dir = _ENV.create_test_module()
   local mod_env = Module({ path = dir }).env
   local n = 0
-  local utillib = require("l3b-utillib")
-  local sorted_pairs = utillib.sorted_pairs
+  local utlib = require("l3b-utillib")
+  local sorted_pairs = utlib.sorted_pairs
 
   for name, value_type in sorted_pairs(default_keys, {
-    compare = utillib.compare_ascending,
+    compare = utlib.compare_ascending,
   }) do
     print(name, value_type)
     if mod_env[name] == nil and not name:match("%.") then
@@ -128,7 +128,7 @@ local function test_other_defaults()
   end
   print("NYI total:", n)
   --[=====[]=====]
-  local entries = utillib.entries
+  local entries = utlib.entries
   local t = {}
   local max_keys = 0
   for entry in entries(__.entry_by_index, {
@@ -170,10 +170,10 @@ local function test_other_defaults()
   --[=====[]=====]
   for _, kv in ipairs(t) do
     if not kv.name:match("%.") then
-      if kv.description:match("\n") then
+      if kv.description and kv.description:match("\n") then
         local filler = (" "):rep(max_keys - #kv.name)
         print(('---@field public %s%s %s'):format(kv.name, filler, kv.value_type))
-        for line in kv.description:gmatch("[^\n]") do
+        for line in kv.description:gmatch("[^\n]+") do
           print(('---%s'):format(line))
         end
         print("")

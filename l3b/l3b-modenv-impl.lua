@@ -69,6 +69,7 @@ local job_name  = pathlib.job_name
 ---@type corelib_t
 local corelib           = require("l3b-corelib")
 local bridge            = corelib.bridge
+local shallow_copy      = corelib.shallow_copy
 
 ---@type utlib_t
 local utlib             = require("l3b-utillib")
@@ -77,6 +78,7 @@ local entries           = utlib.entries
 local compare_ascending = utlib.compare_ascending
 local first_of          = utlib.first_of
 local to_quoted_string  = utlib.to_quoted_string
+local items             = utlib.items
 
 ---@type oslib_t
 local oslib         = require("l3b-oslib")
@@ -255,19 +257,8 @@ local ModEnv = modlib.ModEnv
 ---@field public pdfext string @ Extension of PDF file for checking and saving
 ---@field public psext  string @ Extension of PostScript files
 --ANCHOR: what's net?
----@field public module        string @The name of the module
----@field public bundle        string @The name of the bundle in which the module belongs (where relevant)
----@field public ctanpkg       string @Name of the CTAN package matching this module
----@field public modules       string[] @The list of all modules in a bundle (when not auto-detecting)
----@field public exclmodules   string[] @_ENV.ctoriesdir to be excluded from automatic module detection
 ---@field public tdsroot       string   @Root directory of the TDS structure for the bundle/module to be installed into
 ---@field public ctanupload    boolean  @Only validation is attempted
----@field public ctanzip       string  @Name of the zip file (without extension) created for upload to CTAN
----@field public epoch         integer @Epoch (Unix date) to set for test runs
----@field public flattentds    boolean @Switch to flatten any source structure when creating a TDS structure
----@field public flattenscript boolean @Switch to flatten any script structure when creating a TDS structure
----@field public ctanreadme    string  @Name of the file to send to CTAN as `README.`md
----@field public tdslocations  string[] @For non-standard file installations
 -- doc related
 ---@field public typesetsearch boolean @Switch to search the system `texmf` for during typesetting
 ---@field public glossarystyle string  @MakeIndex style file for glossary/changes creation
@@ -308,9 +299,7 @@ local ModEnv = modlib.ModEnv
 ---@field public unpacksearch    boolean  @Switch to search the system `texmf` for during unpacking
 ---@field public bundleunpack    bundleunpack_f  @bundle unpack overwrite
 ---@field public bundleunpackcmd string  @bundle unpack command overwrite
----@field public flatten         boolean @Switch to flatten any source structure when sending to CTAN
 ---@field public packtdszip      boolean @Switch to build a TDS-style zip file for CTAN
----@field public manifestfile    string @File name to use for the manifest file
 ---@field public curl_debug      boolean
 ---@field public uploadconfig    upload_config_t @Metadata to describe the package for CTAN
 ---@field public texmf_home      string
@@ -349,6 +338,32 @@ local ModEnv = modlib.ModEnv
 ---@field public rm                                 function @ Remove all files matching some glob
 ---@field public run                                function @ Execute a shell command from a directory.
 ---@field public splitpath                          function @ Returns two strings split at the last `/`
+-- Other
+---@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
+---@field public module                             string @ The name of the module,
+---@field public ctanpkg                            string @ Name of the CTAN package matching this module,
+---@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
+---@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
+---@field public epoch                              number @ Epoch (Unix date) to set for test runs,
+---@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
+---@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
+---@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
+---@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
+---@field public install_files                      string @ ,
+---@field public ps2pdfopts                         string @ Options for `ps2pdf`,
+---@field public manifest_extract_filedesc          any @ ,
+---@field public manifest_setup                     fun():table[] @ ,
+---@field public manifest_sort_within_group         fun(files: string[]):string[] @ ,
+---@field public manifest_sort_within_match         fun(files: string[]):string[] @ ,
+---@field public manifest_write_group_file          string @ ,
+---@field public manifest_write_group_file_descr    string @ ,
+---@field public manifest_write_group_heading       string @ ,
+---@field public manifest_write_opening             string @ ,
+---@field public manifest_write_subheading          string @ ,
+---@field public manifestfile                       string @ File name to use for the manifest file,
+---@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
+---@field public options                            table @ nil,
+---@field public tdslocations                       string[] @ For non-standard file installations,
 
 
 -- We populate the ModEnv class table.
@@ -477,116 +492,81 @@ end
 
 -- file globs
 
-function GTR:auxfiles()
-  return { "*.aux", "*.lof", "*.lot", "*.toc" }
-end
-function GTR:bibfiles()
-  return { "*.bib" }
-end
-function GTR:binaryfiles()
-  return { "*.pdf", "*.zip" }
-end
-function GTR:bstfiles()
-  return { "*.bst" }
-end
-
-function GTR:checkfiles(k)
-  local result = {}
-  rawset(self, k, result)
-  return result
+---Make a shallow copy of the argument
+---Different modules must have their own copy.
+---Moreover, we must support both reaffectation
+---and modification
+---@param ra any
+---@return function
+local function array_getter(ra)
+  return function (self, k)
+    local result = ra and shallow_copy(ra) or {}
+    rawset(self, k, result)
+    return result
+  end
 end
 
-function GTR:checksuppfiles(k)
-  local result = {}
-  rawset(self, k, result)
-  return result
-end
-function GTR:cleanfiles()
-  return { "*.log", "*.pdf", "*.zip" }
-end
-function GTR:demofiles(k)
-  local result = {}
-  rawset(self, k, result)
-  return result
-end
-function GTR:docfiles(k)
-  local result = {}
-  rawset(self, k, result)
-  return result
-end
-function GTR:dynamicfiles(k)
-  local result = {}
-  rawset(self, k, result)
-  return result
-end
-function GTR:excludefiles(k)
-  local result = { "*~" }
-  rawset(self, k, result)
-  return result
-end
+GTR.auxfiles        = array_getter({ "*.aux", "*.lof", "*.lot", "*.toc" })
 
-function GTR:installfiles(k)
-  local result = { "*.sty", "*.cls" }
-  rawset(self, k, result)
-  return result
-end
+GTR.bibfiles        = array_getter({ "*.bib" })
 
-function GTR:makeindexfiles()
-  return { "*.ist" }
-end
-function GTR:scriptfiles()
-  return {}
-end
-function GTR:scriptmanfiles()
-  return {}
-end
-function GTR:sourcefiles()
-  return { "*.dtx", "*.ins", "*-????-??-??.sty" }
-end
-function GTR:tagfiles()
-  return { "*.dtx" }
-end
-function GTR:textfiles()
-  return { "*.md", "*.txt" }
-end
-function GTR:typesetdemofiles()
-  return {}
-end
-function GTR:typesetfiles()
-  return { "*.dtx" }
-end
-function GTR:typesetsuppfiles()
-  return {}
-end
-function GTR:typesetsourcefiles()
-  return {}
-end
-function GTR:unpackfiles()
-  return { "*.ins" }
-end
-function GTR:unpacksuppfiles()
-  return {}
-end
+GTR.binaryfiles     = array_getter({ "*.pdf", "*.zip" })
+
+GTR.bstfiles        = array_getter({ "*.bst" })
+
+GTR.checkfiles      = array_getter()
+
+GTR.checksuppfiles  = array_getter()
+
+GTR.cleanfiles      = array_getter({ "*.log", "*.pdf", "*.zip" })
+
+GTR.demofiles       = array_getter()
+
+GTR.docfiles        = array_getter()
+
+GTR.dynamicfiles    = array_getter()
+
+GTR.excludefiles    = array_getter({ "*~" })
+
+GTR.installfiles    = array_getter({ "*.sty", "*.cls" })
+
+GTR.makeindexfiles  = array_getter({ "*.ist" })
+
+GTR.scriptfiles     = array_getter()
+
+GTR.scriptmanfiles  = array_getter()
+
+GTR.sourcefiles     = array_getter({ "*.dtx", "*.ins", "*-????-??-??.sty" })
+
+GTR.tagfiles        = array_getter({ "*.dtx" })
+
+GTR.textfiles       = array_getter({ "*.md", "*.txt" })
+
+GTR.typesetdemofiles    = array_getter()
+
+GTR.typesetfiles        = array_getter({ "*.dtx" })
+
+GTR.typesetsuppfiles    = array_getter()
+
+GTR.typesetsourcefiles  = array_getter()
+
+GTR.unpackfiles     = array_getter({ "*.ins" })
+
+GTR.unpacksuppfiles = array_getter()
 
 -- check
-function GTR:includetests()
-  return { "*" }
-end
-function GTR:excludetests()
-  return {}
-end
-function GTR:checkdeps()
-  return {}
-end
-function GTR:typesetdeps()
-  return {}
-end
-function GTR:unpackdeps()
-  return {}
-end
-function GTR:checkengines()
-  return { "pdftex", "xetex", "luatex" }
-end
+GTR.includetests    = array_getter({ "*" })
+
+GTR.excludetests    = array_getter()
+
+GTR.checkdeps       = array_getter()
+
+GTR.typesetdeps     = array_getter()
+
+GTR.unpackdeps      = array_getter()
+
+GTR.checkengines    = array_getter({ "pdftex", "xetex", "luatex" })
+
 print("ERROR, NEXT should go to module")
 --[[
   checkengines
@@ -648,13 +628,9 @@ function GTR:test_types()
   }
 end
 
-function GTR:test_order()
-  return { "log", "pdf" }
-end
+GTR.test_order    = array_getter({ "log", "pdf" })
 
-function GTR:checkconfigs()
-  return {  "build"  }
-end
+GTR.checkconfigs  = array_getter({ "build" })
 
 print("ERROR: Next should go to module")
 --[[
@@ -716,9 +692,15 @@ end
 function GTR:ps2pdfopt() -- beware of the ending s (long term error)
   return ""
 end
+-- Synonyms: ps2pdfopt and ps2pdfopts
 function GTR:ps2pdfopts()
   return self.ps2pdfopt
 end
+
+function GTR.__.setter:ps2pdfopts(k, v)
+  self.ps2pdfopt = v
+end
+
 --TODO what is the description
 function GTR:config()
   return ""
@@ -879,49 +861,6 @@ end
 function GTR:call()
   return l3b_aux.call
 end
-
----@class BAR
----@field public asciiengines                       table @ Engines which should log as pure ASCII,
----@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
----@field public checkruns                          number @ Number of runs to complete for a test before comparing the log,
----@field public checksearch                        boolean @ Switch to search the system `texmf` for during checking,
----@field public ctanpkg                            string @ Name of the CTAN package matching this module,
----@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
----@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
----@field public epoch                              number @ Epoch (Unix date) to set for test runs,
----@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
----@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
----@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
----@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
----@field public forcecheckepoch                    boolean @ Force epoch when running tests,
----@field public forcedocepoch                      string @ Force epoch when typesetting,
----@field public glossarystyle                      string @ MakeIndex style file for glossary/changes creation,
----@field public indexstyle                         string @ MakeIndex style for index creation,
----@field public install_files                      string @ ,
----@field public manifest_extract_filedesc          string @ ,
----@field public manifest_setup                     string @ ,
----@field public manifest_sort_within_group         string @ ,
----@field public manifest_sort_within_match         string @ ,
----@field public manifest_write_group_file          string @ ,
----@field public manifest_write_group_file_descr    string @ ,
----@field public manifest_write_group_heading       string @ ,
----@field public manifest_write_opening             string @ ,
----@field public manifest_write_subheading          string @ ,
----@field public manifestfile                       string @ File name to use for the manifest file,
----@field public maxprintline                       number @ Length of line to use in log files,
----@field public module                             string @ The name of the module,
----@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
----@field public options                            table @ nil,
----@field public packtdszip                         boolean @ Switch to build a TDS-style zip file for CTAN,
----@field public ps2pdfopts                         string @ Options for `ps2pdf`,
----@field public recordstatus                       boolean @ Switch to include error level from test runs in `.tlg` files,
----@field public specialtypesetting                 table @ Non-standard typesetting combinations,
----@field public tdslocations                       table @ For non-standard file installations,
----@field public typesetcmds                        string @ Instructions to be passed to TeX when doing typesetting,
----@field public typesetruns                        number @ Number of cycles of typesetting to carry out,
----@field public typesetsearch                      boolean @ Switch to search the system `texmf` for during typesetting,
----@field public unpacksearch                       boolean @ Switch to search the system `texmf` for during unpacking,
----@field public uploadconfig                       table @ Metadata to describe the package for CTAN,
 
 --ANCHOR Commands
 
@@ -1161,14 +1100,8 @@ function GTR:runtest_tasks()
 end
 
 -- Other
----@class DONE
----@field public asciiengines                       string[] @ Engines which should log as pure ASCII,
----@field public checkruns                          number @ Number of runs to complete for a test before comparing the log,
----@field public checksearch                        boolean @ Switch to search the system `texmf` for during checking,
 
-function GTR:asciiengines()
-  return { "pdftex" }
-end
+GTR.asciiengines = array_getter({ "pdftex" })
 
 function GTR:checkruns()
   return 3
@@ -1178,12 +1111,145 @@ function GTR:checksearch()
   return true
 end
 
----@class DONE1
----@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
----@field public module                             string @ The name of the module,
----@field public ctanpkg                            string @ Name of the CTAN package matching this module,
----@field public ctanreadme                         string @ Name of the file to send to CTAN as `README`.md,
----@field public ctanzip                            string @ Name of the zip file (without extension) created for upload to CTAN,
+--[[
+---@field public abspath                            function
+---Usage: `abspath("foo.bar")`
+---Returns "/absolute/path/to/foo.bar" on unix like systems
+---and "C:\absolute\path\to\foo.bar" on windows.
+
+---@field public basename                           function
+---Usage: `basename("path/to/foo.bar")`
+---Returns "foo.bar".
+
+---@field public biber                              function
+---Runs Biber on file `name` (i.e a jobname lacking any extension)
+---inside the dir` folder. If there is no `.bcf` file then
+---no action is taken with a return value of `0`.
+
+---@field public bibtex                             function
+---Runs BibTeX on file `name` (i.e a jobname lacking any extension)
+---inside the `dir` folder. If there are no `\citation` lines in
+---the `.aux` file then no action is taken with a return value of `0`.
+
+---@field public call                               function
+---`call(modules, target, options)`.
+---Runs the  `l3build` given `target` (a string) for each directory in the
+---`dirs` list. This will pass command line options from the parent
+---script to the child processes. The `options` table should take the
+---same form as the global `options`, described above. If it is
+---absent then the global list is used.
+---Note that the `target` field in this table is ignored.
+
+---@field public cleandir                           string
+---Usage: `cleandir("path/to/dir")`
+---Removes any content in "path/to/dir" directory.
+---Returns 0 on success, a positive number on error.
+
+---@field public cp                                 function
+---Usage: `cp("*.bar", "path/to/source", "path/to/destination")`
+---Copies files matching the "*.bar" from "path/to/source" directory
+---to the "path/to/destination" directory.
+---Returns 0 on success, a positive number on error.
+
+---@field public direxists                          function
+---`direxists("path/to/dir")`
+---Returns `true` if there is a directory at "path/to/dir",
+---`false` otherwise.
+
+---@field public dirname                            function
+---Usage: `dirname("path/to/foo.bar")`
+---Returns "path/to".
+
+---@field public fileexists                         function
+---`fileexists("path/to/foo.bar")`
+---Returns `true` if there is a file at "path/to/foo.bar",
+---`false` otherwise.
+
+---@field public filelist                           function
+---`filelist("path/to/dir", "*.bar")
+---Returns a regular table of all the files within "path/to/dir"
+---which name matches "*.bar";
+---if no glob is provided, returns a list of
+---all files at "path/to/dir".
+
+---@field public glob_to_pattern                    function
+---`glob_to_pattern("*.bar")`
+---Returns Lua pattern that corresponds to the glob "*.bar".
+
+---@field public jobname                            function
+---`jobname("path/to/dir/foo.bar")`
+---Returns the argument with no extension and no parent directory path,
+---"foo" in the example. 
+
+---@field public makeindex                          function
+---Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
+---inside the `dir` folder. The various extensions and the `style`
+---should normally be given as standard for MakeIndex.
+
+---@field public mkdir                              string
+---`mkdir("path/to/dir")`
+---Create "path/to/dir" with all intermediate levels;
+---returns 0 on success, a positive number on error.
+
+---@field public normalize_path                     function
+---When called on Windows, returns a string comprising the `path` argument with
+---`/` characters replaced by `\\`. In other cases returns the path unchanged.
+
+---@field public path_matcher                       function
+---`f = path_matcher("*.bar")`
+---Returns a function that returns true if its file name argument
+---matches "*.bar", false otherwise. Lua pattern that corresponds to the glob "*.bar".
+---In that example `f("foo.bar")` is true whereas `f("foo.baz")` is false.
+
+---@field public ren                                function
+---`ren("foo.bar", "path/to/source", "path/to/destination")`
+---Renames "path/to/source/foo.bar" into "path/to/destination/foo.bar";
+---returns 0 on success, a positive number on error.
+
+---@field public rm                                 function
+---`rm("path/to/dir", "*.bar")
+---Removes all files in "path/to/dir" matching "*.bar";
+---returns 0 on success, a positive number on error.
+
+---@field public run                                function
+---`run(cmd, dir)`.
+---Executes `cmd`, from the `dir` directory;
+---returns an error level.
+
+---@field public runcmd                             function
+---A generic function which runs the `cmd` in the `dir`, first
+---setting up all of the environmental variables specified to
+---point to the `local` and `working` directories. This function is useful
+---when creating non-standard typesetting steps.
+
+---@field public splitpath                          function
+---Returns two strings split at the last `/`: the `dirname(...)` and
+---the `basename(...)`.
+
+---@field public tag_hook                           function
+---Usage: `function tag_hook(tag_name, date)
+---  ...
+---end`
+---  To allow more complex tasks to take place, a hook `tag_hook()` is also
+---available. It will receive the tag name and date as arguments, and
+---may be used to carry out arbitrary tasks after all files have been updated.
+---For example, this can be used to set a version control tag for an entire repository.
+
+---@field public tex                                function
+---Runs `cmd` (by default `typesetexe` `typesetopts`) on the
+---`name` inside the `dir` folder.
+
+---@field public update_tag                         function
+---Usage: function update_tag(file, content, tag_name, tag_date)
+---  ...
+---  return content
+---end
+---The `tag` target can automatically edit source files to
+---modify date and release tag name. As standard, no automatic
+---replacement takes place, but setting up a `update_tag` function
+---will allow this to happen.
+
+]]
 
 function GTR:module()
   local module = Module.__get_module_of_env(self)
@@ -1208,13 +1274,6 @@ end
 function GTR:ctanzip()
   return self.ctanpkg .. "-ctan"
 end
-
----@class DONE2
----@field public epoch                              number @ Epoch (Unix date) to set for test runs,
----@field public exclmodules                        string[] @ directories to be excluded from automatic module detection,
----@field public flatten                            boolean @ Switch to flatten any source structure when sending to CTAN,
----@field public flattenscript                      boolean @ Switch to flatten any script structure when creating a TDS structure,
----@field public flattentds                         boolean @ Switch to flatten any source structure when creating a TDS structure,
 
 ---Convert the given `epoch` to a number.
 ---@param epoch string
@@ -1254,9 +1313,7 @@ function ModEnv.__.complete:epoch(k, v)
   end
 end
 
-function GTR:exclmodules()
-  return {}
-end
+GTR.exclmodules = array_getter()
 
 function GTR:flatten()
   return true
@@ -1281,12 +1338,6 @@ end
 function ModEnv.__.complete:flattentds(k, v)
   return v ~= nil and v ~= false and v ~= "false"
 end
-
----@class DONE4
----@field public forcecheckepoch                    boolean @ Force epoch when running tests,
----@field public forcedocepoch                      string @ Force epoch when typesetting,
----@field public glossarystyle                      string @ MakeIndex style file for glossary/changes creation,
----@field public indexstyle                         string @ MakeIndex style for index creation,
 
 function GTR:forcecheckepoch()
   return true
@@ -1318,13 +1369,6 @@ function GTR:indexstyle()
   return "gind.ist"
 end
 
----@class DONE5
----@field public install_files                      string @ ,
----@field public maxprintline                       number @ Length of line to use in log files,
----@field public packtdszip                         boolean @ Switch to build a TDS-style zip file for CTAN,
----@field public ps2pdfopts                         string @ Options for `ps2pdf`,
----@field public recordstatus                       boolean @ Switch to include error level from test runs in `.tlg` files,
-
 function GTR:install_files()
   local module = Module.__get_module_of_env(self)
   return module.install_files
@@ -1341,18 +1385,6 @@ end
 function GTR:recordstatus()
   return false
 end
-
----@class DONE6
----@field public manifest_extract_filedesc          any @ ,
----@field public manifest_setup                     fun():table[] @ ,
----@field public manifest_sort_within_group         fun(files: string[]):string[] @ ,
----@field public manifest_sort_within_match         fun(files: string[]):string[] @ ,
----@field public manifest_write_group_file          string @ ,
----@field public manifest_write_group_file_descr    string @ ,
----@field public manifest_write_group_heading       string @ ,
----@field public manifest_write_opening             string @ ,
----@field public manifest_write_subheading          string @ ,
----@field public manifestfile                       string @ File name to use for the manifest file,
 
 function GTR:manifest_extract_filedesc()
   return function ()
@@ -1414,20 +1446,13 @@ function GTR:manifestfile()
   end
 end
 
----@class DONE7
----@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
----@field public options                            table @ nil,
----@field public tdslocations                       string[] @ For non-standard file installations,
----@field public typesetcmds                        string @ Instructions to be passed to TeX when doing typesetting,
----@field public typesetruns                        number @ Number of cycles of typesetting to carry out,
----@field public typesetsearch                      boolean @ Switch to search the system `texmf` for during typesetting,
----@field public unpacksearch                       boolean @ Switch to search the system `texmf` for during unpacking,
----@field public uploadconfig                       table @ Metadata to describe the package for CTAN,
----@field public specialtypesetting                 table @ Non-standard typesetting combinations,
-
 function GTR:modules()
   local module = Module.__get_module_of_env(self)
-  return module.modules
+  local result = {}
+  for m in items(module.child_modules) do
+    push(result, m.name)
+  end
+  return result
 end
 
 function GTR:options()
@@ -1435,7 +1460,7 @@ function GTR:options()
   return module.options
 end
 
-function GTR:tdslocations()
+function GTR:tdslocations(k)
   local result = {}
   rawset(self, k, result)
   return result
