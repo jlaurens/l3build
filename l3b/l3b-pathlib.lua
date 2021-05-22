@@ -480,7 +480,7 @@ local function sanitize(path, is_glob)
   return is_glob and result:match("^%./(.+)$") or result
 end
 
---- Convert a file glob into a pattern for use by e.g. string.gub
+--- Convert a file glob into a pattern for use by e.g. string.gsub
 local function get_glob_to_pattern_gmr()
   return {
     Cs( Cc('^') * V("item")^0 * Cc('$') ),
@@ -1173,10 +1173,12 @@ local function get_path_gmr(opts)
   return gmr
 end
 
+---@alias glob_match_f fun(name: string): boolean
+
 ---Path matcher
 ---@param glob string
 ---@param opts path_matcher_opts_t
----@return function?
+---@return glob_match_f?
 ---@usage local accept = path_matcher(...); if accept(...) then ... end
 local function path_matcher(glob, opts)
   if glob then
@@ -1184,6 +1186,7 @@ local function path_matcher(glob, opts)
     local pattern = P(gmr):match(glob)
     if pattern then
       return function (str)
+        -- debugging information
         if opts and opts.verbose and opts.verbose > 4 then
           print("path_matcher", str, pattern:match(str))
         end
@@ -1192,8 +1195,6 @@ local function path_matcher(glob, opts)
     end
   end
 end
-
----@alias glob_match_f fun(name: string): boolean
 
 ---@class pathlib_t
 ---@field public split        fun(str: string, sep: string|lpeg_t|nil): string[]

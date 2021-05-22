@@ -95,6 +95,7 @@ local Vars = {
   debug = {}
 }
 
+-- functions may return an error level, an error message
 ---@alias error_level_n integer|nil
 ---@alias error_message_s nil|string
 
@@ -168,7 +169,6 @@ end
 local function compare_ascending(a, b)
   return a < b
 end
-
 
 ---@alias compare_f  fun(a: any, b: any): boolean
 

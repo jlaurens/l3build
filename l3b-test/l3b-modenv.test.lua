@@ -117,16 +117,23 @@ local function test_other_defaults()
   local utlib = require("l3b-utillib")
   local sorted_pairs = utlib.sorted_pairs
 
-  for name, value_type in sorted_pairs(default_keys, {
+  for name, _ in sorted_pairs(default_keys, {
     compare = utlib.compare_ascending,
   }) do
-    print(name, value_type)
     if mod_env[name] == nil and not name:match("%.") then
-      print("NYI:", name, value_type)
       n = n + 1
     end
   end
-  print("NYI total:", n)
+  if n > 0 then
+    for name, value_type in sorted_pairs(default_keys, {
+      compare = utlib.compare_ascending,
+    }) do
+      if mod_env[name] == nil and not name:match("%.") then
+        print("MISSING implementation", name, value_type)
+      end
+    end
+  end
+  -- expect(n).is(0)
   --[=====[]=====]
   local entries = utlib.entries
   local t = {}

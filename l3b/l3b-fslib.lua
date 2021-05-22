@@ -471,8 +471,9 @@ local function tree(dir_path, glob, kv)
   return entries(result, kv)
 end
 
----Rename. Whether paths are properly escaped is another story...
+---Move. Whether paths are properly escaped is another story...
 ---Implementation detail: For what reason `os.rename` is not used ?
+---It was improperly named "rename".
 ---@param dir_path string
 ---@param source string @the base name of the source
 ---@param dest string @the base name of the destination

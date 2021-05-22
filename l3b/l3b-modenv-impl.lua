@@ -22,10 +22,16 @@ for those people who are interested.
 
 --]]
 
+---@module modenv
 --[===[
 Define the `ModEnv` class as model to a module environment.
+A module environment, generally referenced by a variable named `mod_env`,
+will have default values for almost 200 parameters.
+These parameters can be read an edited from the various
+`build.lua` and `*-build.lua` of the module.
+
+These parameters are defines as computed properties of the `ModEnv` class.
 --]===]
----@module modenv
 
 local _G = _G
 
@@ -114,6 +120,8 @@ local Module = modlib.Module
 local ModEnv = modlib.ModEnv
 
 
+-- signatures for standard doc related engines
+-- default commands are provided but can be customized
 ---@alias biber_f     fun(name: string, dir: string): error_level_n
 ---@alias bibtex_f    fun(name: string, dir: string): error_level_n
 ---@alias makeindex_f fun(name: string, dir: string, in_ext: string, out_ext: string, log_ext: string, style: string): error_level_n
@@ -269,10 +277,25 @@ local ModEnv = modlib.ModEnv
 ---@field public typesetruns   integer @Number of cycles of typesetting to carry out
 -- functions
 ---@field public runcmd        fun(cmd: string, dir: string, vars: table):boolean?, string?, integer?
+---A generic function which runs the `cmd` in the `dir`, first
+---setting up all of the environmental variables specified to
+---point to the `local` and `working` directories. This function is useful
+---when creating non-standard typesetting steps.
 ---@field public biber         biber_f
+---Runs Biber on file `name` (i.e a jobname lacking any extension)
+---inside the dir` folder. If there is no `.bcf` file then
+---no action is taken with a return value of `0`.
 ---@field public bibtex        bibtex_f
+---Runs BibTeX on file `name` (i.e a jobname lacking any extension)
+---inside the `dir` folder. If there are no `\citation` lines in
+---the `.aux` file then no action is taken with a return value of `0`.
 ---@field public makeindex     makeindex_f
+---Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
+---inside the `dir` folder. The various extensions and the `style`
+---should normally be given as standard for MakeIndex.
 ---@field public tex           tex_f
+---Runs `cmd` (by default `typesetexe` `typesetopts`) on the
+---`name` inside the `dir` folder.
 ---@field public typeset       typeset_f
 ---@field public typeset_demo_tasks  fun(): error_level_n
 ---@field public docinit_hook  fun(): error_level_n
@@ -306,7 +329,22 @@ local ModEnv = modlib.ModEnv
 ---@field public typeset_list    string[]
 -- tag
 ---@field public tag_hook        tag_hook_f
+---Usage: `function tag_hook(tag_name, date)
+---  ...
+---end`
+---  To allow more complex tasks to take place, a hook `tag_hook()` is also
+---available. It will receive the tag name and date as arguments, and
+---may be used to carry out arbitrary tasks after all files have been updated.
+---For example, this can be used to set a version control tag for an entire repository.
 ---@field public update_tag      update_tag_f
+---Usage: function update_tag(file, content, tag_name, tag_date)
+---  ...
+---  return content
+---end
+---The `tag` target can automatically edit source files to
+---modify date and release tag name. As standard, no automatic
+---replacement takes place, but setting up a `update_tag` function
+---will allow this to happen.
 -- OS related
 ---@field public os_ascii                           string @ nil,
 ---@field public os_cmpexe                          string @ nil,
@@ -321,23 +359,80 @@ local ModEnv = modlib.ModEnv
 ---@field public os_yes                             string @ DEPRECATED.,
 -- function tools
 ---@field public abspath                            function  @ The absolute path
+---Usage: `abspath("foo.bar")`
+---Returns "/absolute/path/to/foo.bar" on unix like systems
+---and "C:\absolute\path\to\foo.bar" on windows.
 ---@field public basename                           function  @ The base name of a path
+---Usage: `basename("path/to/foo.bar")`
+---Returns "foo.bar".
 ---@field public call                               function  @ Call targets on modules with options.
+---`call(modules, target, options)`.
+---Runs the  `l3build` given `target` (a string) for each directory in the
+---`dirs` list. This will pass command line options from the parent
+---script to the child processes. The `options` table should take the
+---same form as the global `options`, described above. If it is
+---absent then the global list is used.
+---Note that the `target` field in this table is ignored.
 ---@field public cleandir                           string    @ Clean directory
+---Usage: `cleandir("path/to/dir")`
+---Removes any content in "path/to/dir" directory.
+---Returns 0 on success, a positive number on error.
 ---@field public cp                                 function  @ copy files matching a glob
+---Usage: `cp("*.bar", "path/to/source", "path/to/destination")`
+---Copies files matching the "*.bar" from "path/to/source" directory
+---to the "path/to/destination" directory.
+---Returns 0 on success, a positive number on error.
 ---@field public direxists                          function  @ Whether a directory exists at the given path
+---`direxists("path/to/dir")`
+---Returns `true` if there is a directory at "path/to/dir",
+---`false` otherwise.
 ---@field public dirname                            function @ The directory name of a path
+---Usage: `dirname("path/to/foo.bar")`
+---Returns "path/to".
 ---@field public fileexists                         function @ Whether a file exists at the given path
+---`fileexists("path/to/foo.bar")`
+---Returns `true` if there is a file at "path/to/foo.bar",
+---`false` otherwise.
 ---@field public filelist                           function @ The list of file rooted at some directory matching some glob
+---`filelist("path/to/dir", "*.bar")
+---Returns a regular table of all the files within "path/to/dir"
+---which name matches "*.bar";
+---if no glob is provided, returns a list of
+---all files at "path/to/dir".
 ---@field public glob_to_pattern                    function @ Turn a glob to lua pattern for find
+---`glob_to_pattern("*.bar")`
+---Returns Lua pattern that corresponds to the glob "*.bar".
 ---@field public jobname                            function @ Base name without its extension
+---`jobname("path/to/dir/foo.bar")`
+---Returns the argument with no extension and no parent directory path,
+---"foo" in the example. 
 ---@field public mkdir                              string @ Make a (deep) directory at the given path
+---`mkdir("path/to/dir")`
+---Create "path/to/dir" with all intermediate levels;
+---returns 0 on success, a positive number on error.
 ---@field public normalize_path                     fun(path:string):string @ When called on Windows, returns a properly escaped string
+---When called on Windows, returns a string comprising the `path` argument with
+---`/` characters replaced by `\\`. In other cases returns the path unchanged.
 ---@field public path_matcher                       fun(glob:string):fun(name:string):boolean  @ To obtain a glob matcher
+---`f = path_matcher("*.bar")`
+---Returns a function that returns true if its file name argument
+---matches "*.bar", false otherwise. Lua pattern that corresponds to the glob "*.bar".
+---In that example `f("foo.bar")` is true whereas `f("foo.baz")` is false.
 ---@field public ren                                function @ Move a file
+---`ren("foo.bar", "path/to/source", "path/to/destination")`
+---Renames "path/to/source/foo.bar" into "path/to/destination/foo.bar";
+---returns 0 on success, a positive number on error.
 ---@field public rm                                 function @ Remove all files matching some glob
+---`rm("path/to/dir", "*.bar")
+---Removes all files in "path/to/dir" matching "*.bar";
+---returns 0 on success, a positive number on error.
 ---@field public run                                function @ Execute a shell command from a directory.
+---`run(cmd, dir)`.
+---Executes `cmd`, from the `dir` directory;
+---returns an error level.
 ---@field public splitpath                          function @ Returns two strings split at the last `/`
+---Returns two strings split at the last `/`: the `dirname(...)` and
+---the `basename(...)`.
 -- Other
 ---@field public bundle                             string @ The name of the bundle in which the module belongs (where relevant),
 ---@field public module                             string @ The name of the module,
@@ -377,10 +472,14 @@ local ModEnv = modlib.ModEnv
 -- Alternate design: one can have a phantom module
 -- associate to the class
 
+-- shortcut to help defining computed properties
 local GTR = ModEnv.__.getter
 
 local short_module_dir = "." -- shortcut to the module directory
 
+-- if mod_env is an instance of ModEnv,
+-- defines mod_env.supportdir
+-- mod_env.maindir was already defined in modlib.
 function GTR:supportdir()
   return self.maindir / "support"
 end
@@ -496,7 +595,7 @@ end
 ---Different modules must have their own copy.
 ---Moreover, we must support both reaffectation
 ---and modification
----@param ra any
+---@param ra table
 ---@return function
 local function array_getter(ra)
   return function (self, k)
@@ -1049,7 +1148,7 @@ local function runtest_tasks(test_name, run_number)
   return ""
 end
 
--- typesetting functions
+-- default typesetting functions
 
 function GTR:biber()
   return biber
@@ -1110,146 +1209,6 @@ end
 function GTR:checksearch()
   return true
 end
-
---[[
----@field public abspath                            function
----Usage: `abspath("foo.bar")`
----Returns "/absolute/path/to/foo.bar" on unix like systems
----and "C:\absolute\path\to\foo.bar" on windows.
-
----@field public basename                           function
----Usage: `basename("path/to/foo.bar")`
----Returns "foo.bar".
-
----@field public biber                              function
----Runs Biber on file `name` (i.e a jobname lacking any extension)
----inside the dir` folder. If there is no `.bcf` file then
----no action is taken with a return value of `0`.
-
----@field public bibtex                             function
----Runs BibTeX on file `name` (i.e a jobname lacking any extension)
----inside the `dir` folder. If there are no `\citation` lines in
----the `.aux` file then no action is taken with a return value of `0`.
-
----@field public call                               function
----`call(modules, target, options)`.
----Runs the  `l3build` given `target` (a string) for each directory in the
----`dirs` list. This will pass command line options from the parent
----script to the child processes. The `options` table should take the
----same form as the global `options`, described above. If it is
----absent then the global list is used.
----Note that the `target` field in this table is ignored.
-
----@field public cleandir                           string
----Usage: `cleandir("path/to/dir")`
----Removes any content in "path/to/dir" directory.
----Returns 0 on success, a positive number on error.
-
----@field public cp                                 function
----Usage: `cp("*.bar", "path/to/source", "path/to/destination")`
----Copies files matching the "*.bar" from "path/to/source" directory
----to the "path/to/destination" directory.
----Returns 0 on success, a positive number on error.
-
----@field public direxists                          function
----`direxists("path/to/dir")`
----Returns `true` if there is a directory at "path/to/dir",
----`false` otherwise.
-
----@field public dirname                            function
----Usage: `dirname("path/to/foo.bar")`
----Returns "path/to".
-
----@field public fileexists                         function
----`fileexists("path/to/foo.bar")`
----Returns `true` if there is a file at "path/to/foo.bar",
----`false` otherwise.
-
----@field public filelist                           function
----`filelist("path/to/dir", "*.bar")
----Returns a regular table of all the files within "path/to/dir"
----which name matches "*.bar";
----if no glob is provided, returns a list of
----all files at "path/to/dir".
-
----@field public glob_to_pattern                    function
----`glob_to_pattern("*.bar")`
----Returns Lua pattern that corresponds to the glob "*.bar".
-
----@field public jobname                            function
----`jobname("path/to/dir/foo.bar")`
----Returns the argument with no extension and no parent directory path,
----"foo" in the example. 
-
----@field public makeindex                          function
----Runs MakeIndex on file `name` (i.e a jobname lacking any extension)
----inside the `dir` folder. The various extensions and the `style`
----should normally be given as standard for MakeIndex.
-
----@field public mkdir                              string
----`mkdir("path/to/dir")`
----Create "path/to/dir" with all intermediate levels;
----returns 0 on success, a positive number on error.
-
----@field public normalize_path                     function
----When called on Windows, returns a string comprising the `path` argument with
----`/` characters replaced by `\\`. In other cases returns the path unchanged.
-
----@field public path_matcher                       function
----`f = path_matcher("*.bar")`
----Returns a function that returns true if its file name argument
----matches "*.bar", false otherwise. Lua pattern that corresponds to the glob "*.bar".
----In that example `f("foo.bar")` is true whereas `f("foo.baz")` is false.
-
----@field public ren                                function
----`ren("foo.bar", "path/to/source", "path/to/destination")`
----Renames "path/to/source/foo.bar" into "path/to/destination/foo.bar";
----returns 0 on success, a positive number on error.
-
----@field public rm                                 function
----`rm("path/to/dir", "*.bar")
----Removes all files in "path/to/dir" matching "*.bar";
----returns 0 on success, a positive number on error.
-
----@field public run                                function
----`run(cmd, dir)`.
----Executes `cmd`, from the `dir` directory;
----returns an error level.
-
----@field public runcmd                             function
----A generic function which runs the `cmd` in the `dir`, first
----setting up all of the environmental variables specified to
----point to the `local` and `working` directories. This function is useful
----when creating non-standard typesetting steps.
-
----@field public splitpath                          function
----Returns two strings split at the last `/`: the `dirname(...)` and
----the `basename(...)`.
-
----@field public tag_hook                           function
----Usage: `function tag_hook(tag_name, date)
----  ...
----end`
----  To allow more complex tasks to take place, a hook `tag_hook()` is also
----available. It will receive the tag name and date as arguments, and
----may be used to carry out arbitrary tasks after all files have been updated.
----For example, this can be used to set a version control tag for an entire repository.
-
----@field public tex                                function
----Runs `cmd` (by default `typesetexe` `typesetopts`) on the
----`name` inside the `dir` folder.
-
----@field public update_tag                         function
----Usage: function update_tag(file, content, tag_name, tag_date)
----  ...
----  return content
----end
----The `tag` target can automatically edit source files to
----modify date and release tag name. As standard, no automatic
----replacement takes place, but setting up a `update_tag` function
----will allow this to happen.
-
-]]
 
 function GTR:module()
   local module = Module.__get_module_of_env(self)
