@@ -309,6 +309,7 @@ local Object__ = {
 ---@class Object @ Root class, metatable of other tables
 ---@field public  __TYPE            string
 ---@field public  make_subclass     fun(type: string, t: table): Object
+---@field public  is_object         boolean @ always true, other tables will answer false
 ---@field public  is_instance       boolean
 ---@field public  is_class          boolean
 ---@field private __                Object__ @ collect here methods similar to __index, __newindex...
@@ -318,9 +319,14 @@ Object__.Super = Object
 
 Object.__TYPE   = "Object"
 Object.__ = Object__
-Object.is_instance = false
+Object.is_object    = true
+Object.is_class     = true
+Object.is_instance  = false
 
 Object.__.getter = {
+  is_object = function (self)
+    return true
+  end,
   is_instance = function (self)
     return rawget(self, "__") == nil
   end,
@@ -371,7 +377,7 @@ end
 ---Used by the constructor.
 ---The default implementation does nothing.
 ---@param self Object
----@param kv any
+---@param kv object_kv
 function Object.__:initialize(kv)
   self:lock()
 end
@@ -410,8 +416,14 @@ end
 ---and are inherited by subclassers.
 ---@param class Object
 local function __newindex(class, self, k, v)
-  local set = class.__.setter[k] or class.__.set or rawset
-  set(self, k, v)
+  local set = class.__.setter[k]
+  if set then
+    -- named setter
+    return set(self, k, v)
+  end
+  -- unnamed setter
+  set = class.__.set
+  return set and set(self, k, v) or rawset(self, k, v)
 end
 
 Object.__.MT = {
@@ -494,6 +506,7 @@ function Object.make_subclass(Super, TYPE, static)
   class.__  = setmetatable({
     Super = Super, -- class hierarchy
     Class = class, -- class.__.Class == class
+    -- metatable for instances
     MT = {
       __index = function(me, k)
                   return __index(class, me, k)
@@ -516,7 +529,7 @@ function Object.make_subclass(Super, TYPE, static)
         result = Super.__[k]
         if type(result) == "table" then
           -- Query Class.__.<other>_table
-          local base = static and static["__".. k] or {}
+          local base = static and rawget(static, "__".. k) or {}
           base = setmetatable(base, {
             __index = result,
           })
@@ -542,11 +555,19 @@ end
 
 ---Whether the receiver is an instance of the given class
 ---false when no Class is given
+---@param x any
+---@return boolean
+function Object.is_table(x)
+  return type(x) == "table"
+end
+
+---Whether the receiver is an instance of the given class
+---false when no Class is given
 ---@param Class table|nil
 ---@return boolean
 function Object:is_instance_of(Class)
   if Class and self.is_instance then
-    return self.__.Class == Class or false
+    return self.__.Class == Class
   end
   return false
 end

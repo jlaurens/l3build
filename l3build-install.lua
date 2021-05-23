@@ -164,7 +164,7 @@ local function install_files(root_install_dir, full, dry_run)
 
   -- Collect up all file entries before copying:
   -- ensures no files are lost during clean-up
-  ---@type copy_name_kv_t[]
+  ---@type copy_name_kv[]
   local to_copy = {}
 
   local function feed_to_copy(src_dir, type, file_globs, flatten, module)
@@ -177,7 +177,7 @@ local function install_files(root_install_dir, full, dry_run)
       module = "latex"
     end
     local type_module = type / module
-    ---@type copy_name_kv_t[]
+    ---@type copy_name_kv[]
     local candidates = {}
     -- Generate a candidates list
     -- each candidate is a table

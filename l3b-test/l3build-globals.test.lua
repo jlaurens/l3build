@@ -152,7 +152,7 @@ local Dir = l3b_globals.Dir
 print(("%s%%s%s"):format(Dir.main))
 ]]):format(b,b)
     local maindir = _ENV.make_temporary_dir()
-    local module_path = _ENV.create_test_module(maindir, "module", [[
+    local module_path = _ENV.create_test_module_ds(maindir, "module", [[
 module = "module"
 ]], diagnostic)
     local expected = module_path / "."
@@ -167,11 +167,11 @@ module = "module"
       expect(output).match(expected)
     end
     test(module_path)
-    local submodule_path = _ENV.create_test_module(module_path, "submodule", [[
+    local submodule_path = _ENV.create_test_module_ds(module_path, "submodule", [[
 module = "submodule"
 ]], diagnostic)
     test(submodule_path)
-    local subsubmodule_path = _ENV.create_test_module(submodule_path, "subsubmodule", [[
+    local subsubmodule_path = _ENV.create_test_module_ds(submodule_path, "subsubmodule", [[
 module = "subsubmodule"
 ]], diagnostic)
     -- test(subsubmodule_path)

@@ -162,68 +162,67 @@ local ModEnv = modlib.ModEnv
 ---@field public curlopt_file  string        @The filename containing the options passed to curl
 
 ---@class ModEnv: Env
----@field public _G table @ a readonly _G
+---@field public maindir string
 ---The main directory of a module
 ---In general the path of the topmost module including the receiver.
 ---This is meant to be shared by all the modules in the same bundle.
----@field public maindir string
----_ENV.ctorydir containing general support files
----Defaults to the `support` directory in the main one.
 ---@field public supportdir string
----_ENV.ctorydir containing support files in tree form
----Defaults to the `texmf` directory in the main one.
+---Directory containing general support files
+---Defaults to the `support` directory in the main one.
 ---@field public texmfdir string
----_ENV.ctorydir for building and testing
----Defaults to the `build` directory in the main one.
+---Directory containing support files in tree form
+---Defaults to the `texmf` directory in the main one.
 ---@field public builddir string
----_ENV.ctorydir containing documentation files
----Defaults to the directory of the module.
+---Directory for building and testing
+---Defaults to the `build` directory in the main one.
 ---@field public docfiledir string
----_ENV.ctorydir containing source files
+---Directory containing documentation files
 ---Defaults to the directory of the module.
 ---@field public sourcefiledir string
----_ENV.ctorydir containing test files
----Defaults to the "testfiles" subdirectory of the module.
+---Directory containing source files
+---Defaults to the directory of the module.
 ---@field public testfiledir string
----_ENV.ctorydir containing test-specific support files
+---Directory containing test files
+---Defaults to the "testfiles" subdirectory of the module.
+---@field public testsuppdir string
+---Directory containing test-specific support files
 ---Defaults to the "support" subdirectory of the module.
 ---The contents of this folder will be copied to the testing folder
 ---in the build area.
----@field public testsuppdir string
----_ENV.ctorydir containing plain text files
----Defaults to the directory of the module.
 ---@field public textfiledir string
----_ENV.ctorydir for generating distribution structure
----Defaults to the "distrib" directory in the build folder.
+---Directory containing plain text files
+---Defaults to the directory of the module.
 ---@field public distribdir string
+---Directory for generating distribution structure
+---Defaults to the "distrib" directory in the build folder.
 -- Substructure for CTAN release material
----_ENV.ctorydir for extracted files in 'sandboxed' TeX runs
----Defaults to the "local" directory in the build folder.
 ---@field public localdir string
----_ENV.ctorydir for PDF files when using PDF-based tests
----Defaults to the "result" directory in the build folder.
+---Directory for extracted files in 'sandboxed' TeX runs
+---Defaults to the "local" directory in the build folder.
 ---@field public resultdir string
----_ENV.ctorydir for running tests
+---Directory for PDF files when using PDF-based tests
+---Defaults to the "result" directory in the build folder.
+---@field public testdir string
+---Directory for running tests
 ---Defaults to the directory in the build folder named "test"
 ---with an eventual confiuration suffix.
----@field public testdir string
----_ENV.ctorydir for building documentation
----Defaults to the "doc" directory in the build folder
 ---@field public typesetdir string
----_ENV.ctorydir for unpacking sources
----Defaults to the "unpacked" directory in the build folder.
+---Directory for building documentation
+---Defaults to the "doc" directory in the build folder
 ---@field public unpackdir string
----_ENV.ctorydir for organising files for CTAN
----Defaults to the "ctan" directory in the distribution folder.
+---Directory for unpacking sources
+---Defaults to the "unpacked" directory in the build folder.
 ---@field public ctandir string
----_ENV.ctorydir for organised files into TDS structure
----Defaults to the "tds" directory in the distribution folder.
+---Directory for organising files for CTAN
+---Defaults to the "ctan" directory in the distribution folder.
 ---@field public tdsdir string
----Module directory
----@field public workdir string
----_ENV.ctorydir for organised files into TDS structure
+---Directory for organised files into TDS structure
 ---Defaults to the "tds" directory in the distribution folder.
+---@field public workdir string
+---Module directory
 ---@field public config_suffix string
+---Directory for organised files into TDS structure
+---Defaults to the "tds" directory in the distribution folder.
 -- File types for various operations
 -- Use Unix-style globs
 ---@field public auxfiles           string[] @Secondary files to be saved as part of running tests
@@ -591,10 +590,10 @@ end
 
 -- file globs
 
----Make a shallow copy of the argument
----Different modules must have their own copy.
----Moreover, we must support both reaffectation
----and modification
+---Make a shallow copy of the array argument.
+---In order to support different modules during the same l3build run,
+---different modules must have their own copy or arrays.
+---Moreover, we must support both reaffectation and modification.
 ---@param ra table
 ---@return function
 local function array_getter(ra)
@@ -706,25 +705,141 @@ end
 function GTR:specialformats()
   return specialformats
 end
-function GTR:test_types()
-  ---@type l3b_check_t
-  local l3b_check = require("l3build-check")
-  return {
-    log = {
-      test        = self.lvtext,
-      generated   = self.logext,
-      reference   = self.tlgext,
-      expectation = self.lveext,
-      compare     = l3b_check.compare_tlg,
-      rewrite     = l3b_check.rewrite_log,
-    },
-    pdf = {
-      test      = self.pvtext,
-      generated = self.pdfext,
-      reference = self.tpfext,
-      rewrite   = l3b_check.rewrite_pdf,
-    }
+
+---@class pre_test_type_t
+---@field public test         string
+---@field public generated    string
+---@field public reference    string|nil
+---@field public expectation  string|nil
+---@field public compare      check_compare_f
+---@field public rewrite      check_rewrite_f
+---@class TestType:Object
+---@field public name         string
+---@field public test_types   TestTypes
+---@field public test         string
+---@field public generated    string
+---@field public reference    string|nil
+---@field public expectation  string|nil
+---@field public compare      check_compare_f
+---@field public rewrite      check_rewrite_f
+local TestType = Object:make_subclass("TestType")
+
+---@class test_type_kv: object_kv
+---@field public name       string
+---@field public test_types TestTypes @ The owner
+---@field public data       pre_test_type_t|nil
+
+---Initialize the receiver with a table
+---@param self TestType
+---@param kv test_type_kv
+function TestType.__:initialize(kv)
+  self.test_types = kv.test_types
+  self.name = kv.name
+end
+
+---Missing values lead to errors
+---@param self TestType
+---@param k any
+function TestType.__:get(k)
+  local switcher = {
+    test = 1,
+    generated = 1,
+    reference = 1,
+    expectation = 1,
+    compare = 1,
+    rewrite = 1,
   }
+  if switcher[k] then
+    error("Missing implementation of" + k)
+  end
+end
+
+
+---@class TestTypes
+---@field public mod_env ModEnv @ the owner
+local TestTypes = Object:make_subclass("TestTypes")
+
+---Catch all the standard affectations.
+---Store values as private data such
+---The receiver won't have any property, expect when set with `rawset`.
+---@param self TestTypes
+---@param k any
+---@param v pre_test_type_t
+---@return TestTypes|nil
+function TestTypes.__:set(k, v)
+  if type(v) == "table" and not v.is_object then
+    v = TestType({ data = v })
+    return rawset(self, k, v)
+  end
+end
+
+local MOD_ENV = {}
+
+---givenetter of the `mod_env` property.
+---@param self TestTypes
+---@param k any
+function TestTypes.__.getter:mod_env(k)
+  Object.private_get(self, MOD_ENV)
+end
+
+---Setter of the `mod_env` property.
+---Validation of the argument.
+---@param self TestTypes
+---@param k any
+---@param v ModEnv
+function TestTypes.__.setter:mod_env(k, v)
+  if not Object.is_table(v)
+  or not v:is_descendant_of(ModEnv)
+  then
+    error("mod_env must be an instance of ModEnv")
+  end
+  Object.private_set(self, MOD_ENV, v)
+end
+
+---Returns the private value, if any.
+---@param self TestTypes
+---@param k any
+---@return any
+function TestTypes.__:get(k)
+  return Object.private_get(self, k)
+end
+
+---@class test_types_kv: object_kv
+---@field public test_types table<string,pre_test_type_t>
+---@field public mod_env ModEnv
+
+---Initialize the receiver with a table
+---@param self TestTypes
+---@param kv test_types_kv
+function TestTypes.__:initialize(kv)
+  self.mod_env = kv.mod_env
+  if kv.test_types then
+    for k, v in pairs(kv.test_types) do
+      self[k] = v
+    end
+  end
+end
+
+function GTR:test_types()
+  return TestTypes({
+    mod_env = self,
+    test_types = {
+      log = {
+        test        = self.lvtext,
+        generated   = self.logext,
+        reference   = self.tlgext,
+        expectation = self.lveext,
+        compare     = modlib.compare_tlg,
+        rewrite     = modlib.rewrite_log,
+      },
+      pdf = {
+        test      = self.pvtext,
+        generated = self.pdfext,
+        reference = self.tpfext,
+        rewrite   = modlib.rewrite_pdf,
+      },
+    },
+  })
 end
 
 GTR.test_order    = array_getter({ "log", "pdf" })
@@ -796,7 +911,7 @@ function GTR:ps2pdfopts()
   return self.ps2pdfopt
 end
 
-function GTR.__.setter:ps2pdfopts(k, v)
+function ModEnv.__.setter:ps2pdfopts(k, v)
   self.ps2pdfopt = v
 end
 
@@ -1212,12 +1327,15 @@ end
 
 function GTR:module()
   local module = Module.__get_module_of_env(self)
+  if module.is_main then
+    error("Main modules must be named in the build.lua")
+  end
   return job_name(module.path)
 end
 
 function GTR:bundle()
   local module = Module.__get_module_of_env(self)
-  return module.bundle
+  return module.bundle or ""
 end
 
 function GTR:ctanpkg()
@@ -1657,93 +1775,93 @@ declare({
     end,
   },
   supportdir = {
-    description = "_ENV.ctorydir containing general support files",
+    description = "Directory containing general support files",
     index = function (env, k)
       return env.maindir / "support"
     end,
   },
   texmfdir = {
-    description = "_ENV.ctorydir containing support files in tree form",
+    description = "Directory containing support files in tree form",
     index = function (env, k)
       return env.maindir / "texmf"
     end
   },
   builddir = {
-    description = "_ENV.ctorydir for building and testing",
+    description = "Directory for building and testing",
     index = function (env, k)
       return env.maindir / "build"
     end
   },
   docfiledir = {
-    description = "_ENV.ctorydir containing documentation files",
+    description = "Directory containing documentation files",
     value       = short_module_dir,
   },
   sourcefiledir = {
-    description = "_ENV.ctorydir containing source files",
+    description = "Directory containing source files",
     value       = short_module_dir,
   },
   testfiledir = {
-    description = "_ENV.ctorydir containing test files",
+    description = "Directory containing test files",
     index = function (env, k)
       return short_module_dir / "testfiles"
     end,
   },
   testsuppdir = {
-    description = "_ENV.ctorydir containing test-specific support files",
+    description = "Directory containing test-specific support files",
     index = function (env, k)
       return env.testfiledir / "support"
     end
   },
   -- Structure within a development area
   textfiledir = {
-    description = "_ENV.ctorydir containing plain text files",
+    description = "Directory containing plain text files",
     value       = short_module_dir,
   },
   distribdir = {
-    description = "_ENV.ctorydir for generating distribution structure",
+    description = "Directory for generating distribution structure",
     index = function (env, k)
       return env.builddir / "distrib"
     end
   },
   -- Substructure for CTAN release material
   localdir = {
-    description = "_ENV.ctorydir for extracted files in 'sandboxed' TeX runs",
+    description = "Directory for extracted files in 'sandboxed' TeX runs",
     index = function (env, k)
       return env.builddir / "local"
     end
   },
   resultdir = {
-    description = "_ENV.ctorydir for PDF files when using PDF-based tests",
+    description = "Directory for PDF files when using PDF-based tests",
     index = function (env, k)
       return env.builddir / "result"
     end
   },
   testdir = {
-    description = "_ENV.ctorydir for running tests",
+    description = "Directory for running tests",
     index = function (env, k)
       return env.builddir / "test" .. env.config_suffix
     end
   },
   typesetdir = {
-    description = "_ENV.ctorydir for building documentation",
+    description = "Directory for building documentation",
     index = function (env, k)
       return env.builddir / "doc"
     end
   },
   unpackdir = {
-    description = "_ENV.ctorydir for unpacking sources",
+    description = "Directory for unpacking sources",
     index = function (env, k)
       return env.builddir / "unpacked"
     end
   },
   ctandir = {
-    description = "_ENV.ctorydir for organising files for CTAN",
+    description = "Directory for organising files for CTAN",
     index = function (env, k)
       return env.distribdir / "ctan"
     end
   },
   tdsdir = {
-    description = "_ENV.ctorydir for organised files into TDS structure",
+    description = "Directory for organised files into TDS structure",
     index = function (env, k)
       return env.distribdir / "tds"
     end
@@ -4039,4 +4157,9 @@ function CT.newindex(env, k, v)
 
 return ModEnv,
 _ENV.during_unit_testing and
-{ entry_by_name = entry_by_name, entry_by_index = entry_by_index}
+{
+  entry_by_name   = entry_by_name,
+  entry_by_index  = entry_by_index,
+  TestType        = TestType,
+  TestTypes       = TestTypes,
+}

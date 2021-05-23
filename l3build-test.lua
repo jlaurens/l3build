@@ -150,6 +150,22 @@ function Expect:__index(k)
     self.__items = true
     return self
   end
+  if k == "keys" then
+    self.op = self.op or "=="
+    self.__keys = true
+    if self.__values then
+      expect("incompatible keys and values modifiers").is("")
+    end
+    return self
+  end
+  if k == "values" then
+    self.op = self.op or "=="
+    self.__values = true
+    if self.__keys then
+      expect("incompatible keys and values modifiers").is("")
+    end
+    return self
+  end
   if k == "equal" or k == "equals" then
     self.op = "=="
     return self
@@ -200,6 +216,10 @@ function Expect:__index(k)
     self.op = "⊇"
     return self
   end
+  if k == "includes" then
+    self.op = "∋"
+    return self
+  end
   if k == "starts_with" then
     self.op = "^"
     return self
@@ -227,6 +247,21 @@ function Expect.__call(self, expected, options)
     self.actual = self.modifier(self.actual)
   end
   if self.op == "==" then
+    if self.__keys then
+      self.__items = true
+      local actual = {}
+      for k, _ in pairs(self.actual) do
+        push(actual, k)
+      end
+      self.actual = actual
+    elseif self.__values then
+      self.__items = true
+      local actual = {}
+      for _, v in pairs(self.actual) do
+        push(actual, v)
+      end
+      self.actual = actual
+    end
     if self.__NOT then
       if self.__almost then
         LU.assertNotAlmostEquals(self.actual, expected)
@@ -269,12 +304,60 @@ function Expect.__call(self, expected, options)
       LU.assertTrue(self.actual < expected)
     end
   end
+  if self.op == "∋" then
+    local success = "table includes element"
+    local failure = "table does not include element"
+    expect(self.actual).type("table")
+    local found = failure
+    if self.__keys then
+      if self.__values then
+        expect("incompatible keys and values modifiers").is("")
+      end
+      for k, _ in pairs(self.actual) do
+        if k == expected then
+          found = success
+          break
+        end
+      end
+    else
+      for _, v in pairs(self.actual) do
+        if v == expected then
+          found = success
+          break
+        end
+      end
+    end
+    expect(found).is(self.__NOT and failure or success)
+  end
   if self.op == "⊇" then
     if  type(self.actual) == "table"
     and type(expected) == "table"
     then
+      if self.__keys then
+        local actual = {}
+        for k, _ in pairs(self.actual) do
+          actual[k] = true
+        end
+        for _, v in pairs(expected) do
+          expect(actual[v]).is(true)
+        end
+        return
+      elseif self.__values then
+        local actual = {}
+        for _, v in pairs(self.actual) do
+          actual[v] = true
+        end
+        for _, v in pairs(expected) do
+          expect(actual[v]).is(true)
+        end
+        return
+      end
       if self.__NOT then
         print("NOT is not supported for contains verb")
+        LU.assertNotIs(self.actual, expected)
+      end
+      if self.__items then
+        print("items is not supported for contains verb")
         LU.assertNotIs(self.actual, expected)
       end
       for k, v in pairs(expected) do
@@ -504,17 +587,18 @@ from all test files run only test containing either "foo" or "bar".
     end
     return true
   end
-  ---@class create_test_module_kv
+  ---@class create_test_module_ds_kv
   ---comment
   ---@field public dir string    @ directory must exist
   ---@field public name string   @ name of the module
   ---@field public build_content string  @ content of `build.lua`
   ---@field public test_content string  @ content of `l3b_test_diagnostic.lua`
   
-  ---@param kv|nil create_test_module_kv
+  ---Create a module directory structure for testing
+  ---@param kv|nil create_test_module_ds_kv
   ---@return string|nil   @ path of the module, nil on error
-  ---@return nil|error_level_n @ positive number on error, nil otherwise
-  function ENV.create_test_module(kv)
+  ---@return nil|error_level_n @ positive number on error, nil or 0 otherwise
+  function ENV.create_test_module_ds(kv)
     kv = kv or {}
     local result = (kv.dir or ENV.make_temporary_dir())
       .."/".. (kv.name or ENV.random_string())

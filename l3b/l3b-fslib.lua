@@ -316,7 +316,6 @@ end
 ---or all names if absent. The return value includes files,
 ---directories and whatever `lfs.dir` returns.
 ---Returns an empty list if there is no directory at the given path.
----@function file_list
 ---@param dir_path  string
 ---@param glob      string|nil
 ---@return string[]
@@ -325,9 +324,10 @@ local function file_list(dir_path, glob)
   if directory_exists(dir_path) then
     local matcher = path_matcher(glob)
     if matcher then
+      -- DEBUG: first do nothing try
       local ok, msg = pcall(function () get_directory_content(dir_path) end)
       if not ok then
-        print(debug.traceback())
+        print(msg, debug.traceback())
       end
       for entry in get_directory_content(dir_path) do
         if matcher(entry) then
@@ -347,7 +347,7 @@ end
 
 ---@alias string_iterator_f fun(): string|nil
 
----@class glob_exclude_kv_t
+---@class glob_exclude_kv
 ---@field public glob string
 ---@field public exclude exclude_f
 
@@ -385,7 +385,7 @@ end
 ---Tree entry enumerator.
 ---@param dir_path  string
 ---@param glob      string
----@param kv        iterator_kv_t
+---@param kv        iterator_kv
 ---@return fun(): tree_entry_t|nil
 local function tree(dir_path, glob, kv)
   if Vars.debug.tree then
@@ -531,20 +531,20 @@ local function copy_core(dest, p_src, p_wrk)
   return execute(cmd)
 end
 
----@class copy_name_kv_t @copy_file key/value arguments
+---@class copy_name_kv @copy_file key/value arguments
 ---@field public name    string
 ---@field public source  string
 ---@field public dest    string
 
 ---Copy files 'quietly'.
 ---@function copy_file
----@param name copy_name_kv_t|string @base name of kv arguments
+---@param name copy_name_kv|string @base name of kv arguments
 ---@param source? string @path of the source directory, required when name is not a table
 ---@param dest? string @path of the destination directory, required when name is not a table
 ---@return error_level_n
 local function copy_file(name, source, dest)
   if type(name) == "table" then
-    ---@type copy_name_kv_t
+    ---@type copy_name_kv
     local kv = name
     name, source, dest = kv.name, kv.source, kv.dest
   end

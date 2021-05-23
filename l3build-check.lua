@@ -684,18 +684,18 @@ end
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels error_level_n[]
-local function rewrite_log(path_in, path_out, engine, err_levels)
-  rewrite(path_in, path_out, normalize_log, engine, err_levels)
+---@param error_levels error_level_n[]
+local function rewrite_log(path_in, path_out, engine, error_levels)
+  rewrite(path_in, path_out, normalize_log, engine, error_levels)
 end
 
 ---Rewrite the pdf
 ---@param path_in string
 ---@param path_out string
 ---@param engine string
----@param err_levels error_level_n[]
-local function rewrite_pdf(path_in, path_out, engine, err_levels)
-  rewrite(path_in, path_out, normalize_pdf, engine, err_levels)
+---@param error_levels error_level_n[]
+local function rewrite_pdf(path_in, path_out, engine, error_levels)
+  rewrite(path_in, path_out, normalize_pdf, engine, error_levels)
 end
 
 -- Look for a test: could be in the Dir.testfile or the Dir.unpack
@@ -839,13 +839,13 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
   -- Ensure there is no stray .log file
   remove_name(Dir.test, name .. Xtn.log)
   ---@type error_level_n[]
-  local err_levels = {}
+  local error_levels = {}
   local localtexmf = ""
   if Dir.texmf and Dir.texmf ~= "" and directory_exists(Dir.texmf) then
     localtexmf = OS.pathsep .. quoted_absolute_path(Dir.texmf) .. "//"
   end
   for run_number = 1, G.checkruns do
-    err_levels[run_number] = run(
+    error_levels[run_number] = run(
       Dir.test, cmd_concat(
         -- No use of Dir.local here as the files get copied to Dir.test:
         -- avoids any paths in the logs
@@ -874,7 +874,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
           dvi2pdf(name, Dir.test, engine, hide)
         end
       end
-      test_type.rewrite(gen_file, new_file, engine, err_levels)
+      test_type.rewrite(gen_file, new_file, engine, error_levels)
       if base_compare(test_type, name, engine, true) == 0 then
         break
       end
@@ -887,7 +887,7 @@ local function run_test(name, engine, hide, ext, test_type, breakout)
     copy_tree(name .. Xtn.pdf, Dir.test, Dir.result)
     rename(Dir.result, name .. Xtn.pdf, name .. "." .. engine .. Xtn.pdf)
   end
-  test_type.rewrite(gen_file, new_file, engine, err_levels)
+  test_type.rewrite(gen_file, new_file, engine, error_levels)
   -- Store secondary files for this engine
   for filetype in entries(Files.aux) do
     for file in all_names(Dir.test, filetype) do
@@ -1284,18 +1284,18 @@ local function configure_check(options)
   return 0
 end
 
+---@type modlib_t
+local modlib = require("l3b-modlib")
+modlib.rewrite_pdf = rewrite_pdf
+modlib.rewrite_log = rewrite_log
+modlib.compare_tlg = compare_tlg
+
 ---@class l3b_check_t
----@field public rewrite_pdf        function
----@field public rewrite_log        function
----@field public compare_tlg        function
 ---@field public check_impl         target_impl_t
 ---@field public module_check_impl  target_impl_t
 ---@field public save_impl          target_impl_t
 
 return {
-  rewrite_pdf = rewrite_pdf,
-  rewrite_log = rewrite_log,
-  compare_tlg = compare_tlg,
   check_impl  = {
     run_high    = check_high,
     configure   = configure_check,

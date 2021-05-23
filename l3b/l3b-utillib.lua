@@ -174,7 +174,7 @@ end
 
 ---@alias exclude_f  fun(value: any): boolean
 
----@class iterator_kv_t
+---@class iterator_kv
 ---@field public unique boolean
 ---@field public compare compare_f
 ---@field public exclude exclude_f
@@ -187,7 +187,7 @@ end
 ---more control.
 ---@generic T
 ---@param table T[]
----@param kv    iterator_kv_t
+---@param kv    iterator_kv
 ---@return fun(): T|nil
 local function entries(table, kv)
   local function raw_iterator(t)
@@ -258,7 +258,7 @@ local function keys(table, compare)
   return entries(kk, { compare = compare })
 end
 
----@class sorted_kv_t
+---@class sorted_kv
 ---@field public compare compare_f
 ---@field public exclude exclude_f
 
@@ -267,7 +267,7 @@ end
 ---Values are filtered out by the excluder.
 ---@generic K, V
 ---@param table table<K,V>
----@param kv? sorted_kv_t
+---@param kv? sorted_kv
 ---@return fun(): K|nil, V|nil
 local function sorted_pairs(table, kv)
   kv = kv or {}
@@ -291,7 +291,7 @@ end
 ---Values are filtered.
 ---@generic K, V
 ---@param table table<K,V>
----@param kv? sorted_kv_t
+---@param kv? sorted_kv
 ---@return fun(): V|nil
 local function values(table, kv)
   local iterator = sorted_pairs(table, kv)
@@ -404,12 +404,12 @@ local flags = {}
 ---@field public indices            fun(table: table, reverse: boolean): fun(): integer
 ---@field public compare_ascending  compare_f
 ---@field public compare_descending compare_f
----@field public entries            fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public entries            fun(table: table, kv: sorted_kv): iterator_f
 ---@field public items              fun(...): iterator_f
 ---@field public unique_items       fun(...): iterator_f
 ---@field public keys               fun(table: table, compare: compare_f): iterator_f
----@field public sorted_pairs       fun(table: table, kv: sorted_kv_t): fun(): any, any
----@field public values             fun(table: table, kv: sorted_kv_t): iterator_f
+---@field public sorted_pairs       fun(table: table, kv: sorted_kv): fun(): any, any
+---@field public values             fun(table: table, kv: sorted_kv): iterator_f
 ---@field public first_of           fun(...): any
 ---@field public second_of          fun(...): any
 ---@field public trim               fun(in: string): string

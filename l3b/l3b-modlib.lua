@@ -119,18 +119,22 @@ function GTR:env()
 end
 
 function GTR:parent_module()
-  if self.is_main then
+  if rawget(self, "is_main") then
     return Object.NIL
   end
   local up = find_container_up(self.path / "..",  "build.lua")
   if up then
-    self.is_main = false
+    rawset(self, "is_main", false)
     local parent = Module({ path = up })
     rawset(self, "parent_module", parent)
     return parent
   end
-  self.is_main = true
+  rawset(self, "is_main", true)
   return Object.NIL
+end
+
+function GTR:is_main()
+  return self.parent_module == nil
 end
 
 function GTR:main_module(k)
@@ -447,12 +451,26 @@ local default_keys = {
   zipopts                            = "string",
 }
 
+---@alias check_rewrite_f fun(path_in:   string, path_out: string, engine:   string, error_levels: error_level_n[]): error_level_n
+---@alias check_compare_f fun(diff_file: string, tlg_file: string, log_file: string, cleanup: boolean, name: string, engine: string): error_level_n
+
 ---@class modlib_t
 ---@field public Module       Module
 ---@field public ModEnv       ModEnv
 ---@field public default_keys table<string,string|string[]>
+---@field public rewrite_log  check_rewrite_f
+-- At this stage, we are just preparing the definition the API of the module environment.
+-- Both `rewrite_log`, `rewrite_pdf` and `compare_tlg` must exist
+-- but we do not want to run these functions during testing
+-- and we do not care about the real implementation.
+-- This real implementation will be made while requiring the check module.
+---@field public rewrite_pdf  check_rewrite_f
+---@field public compare_tlg  check_compare_f
 return {
   Module        = Module,
   ModEnv        = ModEnv,
   default_keys  = default_keys,
+  rewrite_log   = function () error("rewrite_log is not implemented, require the check module") end, -- do nothing yet, will be implemented by the check module
+  rewrite_pdf   = function () error("rewrite_pdf is not implemented, require the check module") end, -- same
+  compare_tlg   = function () error("compare_tlg is not implemented, require the check module") end, -- sample
 }

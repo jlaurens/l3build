@@ -86,7 +86,7 @@ Some proxy of both primary and secondary tables,
 with supplemental computed properties given by index.
 --]==]
 
----@class bridge_kv_t
+---@class bridge_kv
 ---@field public prefix    string
 ---@field public suffix    string
 ---@field public index     fun(t: table, k: any): any
@@ -97,7 +97,7 @@ with supplemental computed properties given by index.
 ---@field public secondary table @the secondary object
 
 ---Return a bridge to "global" variables
----@param kv bridge_kv_t
+---@param kv bridge_kv
 ---@return table
 local function bridge(kv)
   local MT = {}
@@ -168,7 +168,7 @@ local GET_MAIN_VARIABLE = "get_main_variable"
 ---@class corelib_t
 ---@field public GET_MAIN_VARIABLE  string
 ---@field public get_line_number    fun(s: string, i: integer): integer
----@field public bridge             fun(kv: bridge_kv_t): table
+---@field public bridge             fun(kv: bridge_kv): table
 ---@field public shallow_copy       fun(original: any|nil): any
 
 return {

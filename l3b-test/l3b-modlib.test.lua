@@ -30,7 +30,7 @@ end
 
 local function test_instance()
   ---@type Module
-  local dir = _ENV.create_test_module()
+  local dir = _ENV.create_test_module_ds()
   local module = Module({ path = dir })
   expect(module).NOT(nil)
   expect(module.path).ends_with(dir / ".")
@@ -44,7 +44,7 @@ end
 
 local function test_static()
   ---@type Module
-  local dir = _ENV.create_test_module()
+  local dir = _ENV.create_test_module_ds()
   local module = Module({ path = dir })
   expect(function ()
     module.__:get_module_of_env()
@@ -65,17 +65,17 @@ local test_main_parent_module = {
   test_instance = function (self)
     -- create a bundle A at path_A
     -- with embedded modules A/AA, A/AA/AAA
-    local path_A = _ENV.create_test_module({
+    local path_A = _ENV.create_test_module_ds({
       name = "A",
     })
     local module_A = Module({ path = path_A })
     expect(module_A.path).contains(path_A)
-    local path_AA = _ENV.create_test_module({
+    local path_AA = _ENV.create_test_module_ds({
       dir = path_A,
       name = "AA",
     })
     local module_AA = Module({ path = path_AA })
-    local path_AAA = _ENV.create_test_module({
+    local path_AAA = _ENV.create_test_module_ds({
       dir = path_AA,
       name = "AAA",
     })
@@ -83,7 +83,7 @@ local test_main_parent_module = {
     -- special case: the "l3b-test-alt" is a barrier
     local path_AAB = path_AA / "l3b-test-alt"
     expect(_ENV.mkdir(path_AAB)).is(true)
-    path_AAB = _ENV.create_test_module({
+    path_AAB = _ENV.create_test_module_ds({
       dir = path_AAB ,
       name = "AAB",
     })
@@ -101,23 +101,23 @@ local test_main_parent_module = {
 
 local test_child_modules = {
   test_no_children = function (self)
-    local path_A = _ENV.create_test_module({
+    local path_A = _ENV.create_test_module_ds({
       name = "A",
     })
     local module_A = Module({ path = path_A })
     expect(#module_A.child_modules).is(0)
   end,
   test_children_just_below = function (self)
-    local path_A = _ENV.create_test_module({
+    local path_A = _ENV.create_test_module_ds({
       name = "A",
     })
     local module_A = Module({ path = path_A })
-    local path_AA = _ENV.create_test_module({
+    local path_AA = _ENV.create_test_module_ds({
       dir = path_A,
       name = "AA",
     })
     local module_AA = Module({ path = path_AA })
-    local path_AB = _ENV.create_test_module({
+    local path_AB = _ENV.create_test_module_ds({
       dir = path_A,
       name = "AB",
     })
@@ -125,17 +125,17 @@ local test_child_modules = {
     expect(module_A.child_modules).items({ module_AA, module_AB})
   end,
   test_deep_children = function (self)
-    local path_A = _ENV.create_test_module({
+    local path_A = _ENV.create_test_module_ds({
       name = "A",
     })
     local module_A = Module({ path = path_A })
-    local path_AA = _ENV.create_test_module({
+    local path_AA = _ENV.create_test_module_ds({
       dir = path_A / _ENV.random_string(),
       name = "A_A",
     })
     expect(path_AA).NOT(nil)
     local module_AA = Module({ path = path_AA })
-    local path_AB = _ENV.create_test_module({
+    local path_AB = _ENV.create_test_module_ds({
       dir = path_A / _ENV.random_string(),
       name = "A_B",
     })
@@ -161,16 +161,16 @@ local test_child_modules = {
   test_grand_children = function (self)
     -- grand children are not children
     -- but are children of children
-    local path_A = _ENV.create_test_module({
+    local path_A = _ENV.create_test_module_ds({
       name = "A",
     })
     local module_A = Module({ path = path_A })
-    local path_AA = _ENV.create_test_module({
+    local path_AA = _ENV.create_test_module_ds({
       dir = path_A,
       name = "AA",
     })
     local module_AA = Module({ path = path_AA })
-    local path_AAA = _ENV.create_test_module({
+    local path_AAA = _ENV.create_test_module_ds({
       dir = path_AA,
       name = "AAA",
     })
@@ -180,10 +180,17 @@ local test_child_modules = {
   end,
 }
 
+local function test_rewrite_compare()
+  expect(modlib.rewrite_log).error()
+  expect(modlib.rewrite_pdf).error()
+  expect(modlib.compare_tlg).error()
+end
+
 return {
   test_basic              = test_basic,
   test_instance           = test_instance,
   test_static             = test_static,
   test_main_parent_module = test_main_parent_module,
   test_child_modules      = test_child_modules,
+  test_rewrite_compare    = test_rewrite_compare,
 }

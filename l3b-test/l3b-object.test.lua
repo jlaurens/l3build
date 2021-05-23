@@ -117,6 +117,14 @@ local function test_is_instance()
   expect(foo.is_instance).is(true)
 end
 
+local function test_is_object()
+  expect(Object.is_object).is(true)
+  local Foo = Object:make_subclass("Foo")
+  expect(Foo.is_object).is(true)
+  local foo = Foo()
+  expect(foo.is_object).is(true)
+end
+
 local function test_is_instance_of()
   expect(Object.is_instance_of).type("function")
   local Foo = Object:make_subclass("Foo")
@@ -912,7 +920,48 @@ local test_newindex = {
     aa.bar = _ENV.random_string()
     expect(track).equals({ "AA", "AA", "bar",})
   end,
-}
+  test_setter_precedence = function (self)
+    -- computed properties are defined in order:
+    -- named > unnamed > raw
+    local A = Object:make_subclass("A")
+    local a = A()
+    local k, v = _ENV.random_k_v()
+    local track = {}
+    A.__.setter[k] = function (this, kk, vv)
+      push(track, "named")
+      push(track, kk)
+      push(track, vv)
+    end
+    a[k] = v
+    expect(track).equals({ "named", k, v })
+    expect(rawget(a, k)).is(nil)
+    track = {}
+    -- named setters take precedence
+    A.__.set = function (this, kk, vv)
+      if kk == k then
+        push(track, "unnamed")
+        push(track, kk)
+        push(track, vv)
+        return this
+      end
+    end
+    a[k] = v
+    expect(track).equals({ "named", k, v })
+    expect(rawget(a, k)).is(nil)
+    -- remove the named setter
+    A.__.setter[k] = nil
+    track = {}
+    a[k] = v
+    expect(track).equals({ "unnamed", k, v })
+    expect(rawget(a, k)).is(nil)
+    A.__.set = nil
+    track = {}
+    a[k] = v
+    expect(track).equals({})
+    expect(rawget(a, k)).is(v)
+  end
+  
+  }
 
 return {
   test_POC                    = test_POC,
@@ -925,6 +974,7 @@ return {
   test_hook                   = test_hook,
   test_initialize             = test_initialize,
   test_init_data              = test_init_data,
+  test_is_object              = test_is_object,
   test_is_instance            = test_is_instance,
   test_is_instance_of         = test_is_instance_of,
   test_is_descendant_of       = test_is_descendant_of,
