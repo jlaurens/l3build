@@ -235,13 +235,22 @@ local function module_unpack()
   return G.bundleunpack()
 end
 
+---@alias bundleunpack_f fun(source_dirs: string[]|nil, sources: string[]|nil): error_level_n
+---@alias bundleunpackcmd_f fun(name: string): string
+
 ---@class l3b_unpk_t
----@field public deps_install     fun(deps: table): number
----@field public unpack           unpack_f
----@field public bundleunpack     fun(source_dirs: string[]|nil, sources: string[]|nil): error_level_n
----@field public bundleunpackcmd  fun(name: string): string
----@field public unpack_impl      target_impl_t
+---@field public deps_install       fun(deps: table): number
+---@field public unpack             unpack_f
+---@field public bundleunpack       bundleunpack_f
+---@field public bundleunpackcmd    bundleunpackcmd_f
+---@field public unpack_impl        target_impl_t
 ---@field public module_unpack_impl target_impl_t
+
+-- implement bundleunpack and bundleunpackcmd
+---@type modlib_t
+local modlib = require("l3b-modlib")
+modlib.bundleunpack     = bundleunpack
+modlib.bundleunpackcmd  = bundleunpackcmd
 
 return {
   deps_install    = deps_install,

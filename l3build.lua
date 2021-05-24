@@ -86,9 +86,8 @@ A bundle does not contain other bundles as direct descendants.
 --]=]
 
 local is_l3build     -- Whether the script is called first
+
 ---@alias dir_path_s string -- path ending with a '/'
----@type dir_path_s
-local work_dir    -- the directory containing the closest "build.lua" and friends
 
 ---@class l3build_debug_t
 ---@field public run              boolean
@@ -118,6 +117,7 @@ local the_debug = {}
 ---@field public main         Main
 ---@field public banner       string[]
 ---@field public find_container_up fun(dir: string, base: string): dir_path_s|nil
+---@field public module       Module             @ The module currently processed
 
 local l3build = { -- global data available as package.
   debug         = the_debug, -- storage for special debug flags (private UI)

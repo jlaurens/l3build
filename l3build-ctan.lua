@@ -119,11 +119,11 @@ local function ctan()
   -- Always run tests for all engines
   l3build.options.engine = nil
   local error_level
-  local is_embedded = G.is_embedded
-  if is_embedded then
-    error_level = call(G.modules, "module_check")
-  else
+  local is_main = G.is_main
+  if is_main then
     error_level = call({ "." }, "check")
+  else
+    error_level = call(G.modules, "module_check")
   end
   if is_error(error_level) then
     print("\n====================")
@@ -135,13 +135,7 @@ local function ctan()
   make_directory(Dir.ctan / G.ctanpkg)
   remove_directory(Dir.tds)
   make_directory(Dir.tds)
-  if is_embedded then
-    error_level = install_files(Dir.tds, true)
-    if is_error(error_level) then
-      return error_level
-    end
-    copy_ctan()
-  else
+  if is_main then
     error_level = call(G.modules, "module_ctan")
     if is_error(error_level) then
       print("\n====================")
@@ -149,6 +143,12 @@ local function ctan()
       print("====================\n")
       return error_level
     end
+  else
+    error_level = install_files(Dir.tds, true)
+    if is_error(error_level) then
+      return error_level
+    end
+    copy_ctan()
   end
   for src_dir in items(Dir.unpack, Dir.textfile) do
     copy_tree(Files.text, src_dir,

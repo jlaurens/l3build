@@ -213,7 +213,7 @@ function MT:write_group(fh, entry)
     writer = Hook.write_group_file_descr
     for ii, file in ipairs(entry.files_ordered) do
       local descr = entry.descr[file] or ""
-      ---@type manifest_param_t
+      ---@type manifest_kv
       local param = {
         dir         = entry.dir         ,
         count       = ii                ,
@@ -247,7 +247,7 @@ function MT:write_group(fh, entry)
   else
     writer = Hook.write_group_file
     for ii, file in ipairs(entry.files_ordered) do
-      ---@type manifest_param_t
+      ---@type manifest_kv
       local param = {
         dir         = entry.dir         ,
       	count       = ii                ,

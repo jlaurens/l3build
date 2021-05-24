@@ -439,14 +439,14 @@ local test__G = {
   teardown = function (self)
     _G.module = nil
   end,
-  test_texmf_home = function (self)
-    expect(self.G.texmf_home:match("texmf")).is("texmf")
+  test_texmfhome = function (self)
+    expect(self.G.texmfhome:match("texmf")).is("texmf")
     require("l3build").options.texmfhome = "FOO"
-    expect(self.G.texmf_home).is("FOO")
+    expect(self.G.texmfhome).is("FOO")
   end,
   test_is = function (self)
     _G.module = "MY SUPER MODULE"
-    expect(self.G.is_embedded).type("boolean")
+    expect(self.G.is_main).type("boolean")
     expect(self.G.is_standalone).type("boolean")
     expect(self.G.at_bundle_top).type("boolean")
   end,

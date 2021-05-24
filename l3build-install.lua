@@ -89,7 +89,7 @@ local function uninstall()
       local p_src = p.src
       -- Man files should have a single-digit extension: the type
       local man = "man" .. p_src:match(".$")
-      local install_dir = G.texmf_home .. "/doc/man/"  .. man
+      local install_dir = G.texmfhome .. "/doc/man/"  .. man
       if file_exists(install_dir / p_src) then
         if dry_run then
           push(man_files, man / base_name(p_src))
@@ -100,14 +100,14 @@ local function uninstall()
     end
   end
   if not_empty(man_files) then
-    print("\n" .. "For removal from " .. G.texmf_home .. "/doc/man:")
+    print("\n" .. "For removal from " .. G.texmfhome .. "/doc/man:")
     for v in entries(man_files) do
       print("- " .. v)
     end
   end
   local zap_dir = dry_run
     and function (dir)
-      local install_dir = G.texmf_home / dir
+      local install_dir = G.texmfhome / dir
       local files = file_list(install_dir)
       if not_empty(files) then
         print("\n" .. "For removal from " .. install_dir .. ":")
@@ -118,7 +118,7 @@ local function uninstall()
       return 0
     end
     or function (dir)
-      local install_dir = G.texmf_home / dir
+      local install_dir = G.texmfhome / dir
       if directory_exists(install_dir) then
         return remove_directory(install_dir)
       end
@@ -400,7 +400,7 @@ end
 
 local function install()
   local options = l3build.options
-  return install_files(G.texmf_home, options.full, options["dry-run"])
+  return install_files(G.texmfhome, options.full, options["dry-run"])
 end
 
 do

@@ -204,7 +204,7 @@ local GET_MAIN_VARIABLE = corelib.GET_MAIN_VARIABLE
 ---@field public manifestfile    string @File name to use for the manifest file
 ---@field public curl_debug      boolean
 ---@field public uploadconfig    upload_config_t @Metadata to describe the package for CTAN
----@field public texmf_home      string
+---@field public texmfhome      string
 ---@field public typeset_list    string[]
 -- tag
 ---@field public tag_hook        tag_hook_f
@@ -1859,7 +1859,7 @@ local G_index = function (env, k)
   if k == "typeset_list" then
     error("Documentation is not installed")
   end
-  if k == "texmf_home" then
+  if k == "texmfhome" then
     local result = l3build.options.texmfhome
     if not result then
       set_program("latex")

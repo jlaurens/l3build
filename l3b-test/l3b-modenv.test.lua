@@ -9,8 +9,12 @@ local concat  = table.concat
 local push    = table.insert
 
 ---@type pathlib_t
-local pathlib = require("l3b-pathlib")
-local job_name = pathlib.job_name
+local pathlib   = require("l3b-pathlib")
+local job_name  = pathlib.job_name
+
+---@type oslib_t
+local oslib         = require("l3b-oslib")
+local write_content = oslib.write_content
 
 ---@type modlib_t
 local modlib = require("l3b-modlib")
@@ -85,28 +89,42 @@ local test_POC = {
     expect(track).equals({ -v })
   end,
   test_deep_load = function (self)
-    -- load a file that loads a file that changes the environment
+    -- load a script that loads a script that changes the environment
     -- the deeper load is a noop
-    local primary_script = [[
-  return ... -- just return what was given in argument
-  ]]
-  local mod_env = Module({ path = _ENV.create_test_module_ds({}) }).env
-  local loader = load(primary_script, "primary",  "t", mod_env)
+    local repeat_script = [[
+return ... -- just return what was given in argument
+]]
+    local loader = load(repeat_script)
     expect(loader).NOT(nil)
     expect(loader(421)).is(421)
-    local secondary_script = [[
-  local primary_script_path, x = ...
-  -- loading is disabled
-  local loader = loadfile(primary_script_path, "t", _G)
-  if loader then
-    return loader(x) -- expected x
-  else
-    return loader -- nil actually
-  end
-  ]]
-    loader = load(secondary_script, "secondary",  "t", mod_env)
+    local load_repeat_script = [[
+local repeat_script, x = ...
+-- loading is disabled
+return load(repeat_script)(x)
+]]
+    loader = load(load_repeat_script)
     expect(loader).NOT(nil)
-    expect(loader(secondary_script, 421)).is.NOT(421)
+    expect(loader(repeat_script, 421)).is(421)
+  end,
+  test_deep_dofile = function (self)
+    -- load a file that loads a file that changes the environment
+    -- the deeper load is a noop
+    local dir = _ENV.make_temporary_dir()
+    local secondary_path = dir / "secondary.lua"
+    local k = _ENV.random_string()
+    local v = _ENV.random_number()
+    write_content(secondary_path, ([[
+%s = %s
+]]):format(k, v))
+    dofile(secondary_path)
+    expect(_G[k]).is(v)
+    _G[k] = nil
+    local primary_path = dir / "primary.lua"
+    write_content(primary_path, ([[
+dofile("%s")
+]]):format(secondary_path))
+    dofile(primary_path)
+    expect(_G[k]).is(v)
   end,
 }
 
@@ -715,10 +733,10 @@ local test__G = {
   teardown = function (self)
     _G.module = nil
   end,
-  test_texmf_home = function (self)
-    expect(self.G.texmf_home:match("texmf")).is("texmf")
+  test_texmfhome = function (self)
+    expect(self.G.texmfhome:match("texmf")).is("texmf")
     require("l3build").options.texmfhome = "FOO"
-    expect(self.G.texmf_home).is("FOO")
+    expect(self.G.texmfhome).is("FOO")
   end,
   test_is = function (self)
     _G.module = "MY SUPER MODULE"

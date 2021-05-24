@@ -47,12 +47,16 @@ local Module = modlib.Module
 ---@field public is_main        boolean
 ---@field public parent_module  Module|nil
 ---@field public main_module    Module    @ may be self is the module is main
+---@field public typeset_list   string[]  @ the list of files being typeset
 ---@field public Dir            Module.Dir
 ---@field public dir            Module.Dir
 
-function Module.__.getter:is_main()
-  return self.parent == nil
+local GTR = Module.__.getter
+
+function GTR:typeset_list(k)
+  error("Documentation is not installed")
 end
+
 
 ---Load and run the `build.lua` file
 ---Static method when `dir` is provided,
@@ -145,7 +149,7 @@ The environment of a module is an object with a dedicated class
 ---@type Module.Dir
 Module.Dir = Object:make_subclass("Module.Dir")
 
-function Module.Dir.__:intialize(module)
+function Module.Dir.__:initialize(module)
   self.module = module
 end
 
@@ -154,127 +158,5 @@ function Module.Dir.__.getter:main()
 
   return
 end
-
-local declare = function (x) end
-declare({
-  maindir = {
-    description = "Top level directory for the module/bundle",
-    index = function (env, k)
-      if env.is_embedded then
-        -- retrieve the maindir from the main build.lua
-        local s = get_main_variable(k)
-        if s then
-          return s / "."
-        end
-      end
-
-      return l3build.main_dir / "."
-    end,
-  },
-  supportdir = {
-    description = "Directory containing general support files",
-    index = function (env, k)
-      return env.maindir / "support"
-    end,
-  },
-  texmfdir = {
-    description = "Directory containing support files in tree form",
-    index = function (env, k)
-      return env.maindir / "texmf"
-    end
-  },
-  builddir = {
-    description = "Directory for building and testing",
-    index = function (env, k)
-      return env.maindir / "build"
-    end
-  },
-  docfiledir = {
-    description = "Directory containing documentation files",
-    value       = dot_dir,
-  },
-  sourcefiledir = {
-    description = "Directory containing source files",
-    value       = dot_dir,
-  },
-  testfiledir = {
-    description = "Directory containing test files",
-    index = function (env, k)
-      return dot_dir / "testfiles"
-    end,
-  },
-  testsuppdir = {
-    description = "Directory containing test-specific support files",
-    index = function (env, k)
-      return env.testfiledir / "support"
-    end
-  },
-  -- Structure within a development area
-  textfiledir = {
-    description = "Directory containing plain text files",
-    value       = dot_dir,
-  },
-  distribdir = {
-    description = "Directory for generating distribution structure",
-    index = function (env, k)
-      return env.builddir / "distrib"
-    end
-  },
-  -- Substructure for CTAN release material
-  localdir = {
-    description = "Directory for extracted files in 'sandboxed' TeX runs",
-    index = function (env, k)
-      return env.builddir / "local"
-    end
-  },
-  resultdir = {
-    description = "Directory for PDF files when using PDF-based tests",
-    index = function (env, k)
-      return env.builddir / "result"
-    end
-  },
-  testdir = {
-    description = "Directory for running tests",
-    index = function (env, k)
-      return env.builddir / "test" .. env.config_suffix
-    end
-  },
-  typesetdir = {
-    description = "Directory for building documentation",
-    index = function (env, k)
-      return env.builddir / "doc"
-    end
-  },
-  unpackdir = {
-    description = "Directory for unpacking sources",
-    index = function (env, k)
-      return env.builddir / "unpacked"
-    end
-  },
-  ctandir = {
-    description = "Directory for organising files for CTAN",
-    index = function (env, k)
-      return env.distribdir / "ctan"
-    end
-  },
-  tdsdir = {
-    description = "Directory for organised files into TDS structure",
-    index = function (env, k)
-      return env.distribdir / "tds"
-    end
-  },
-  workdir = {
-    description = "Working directory",
-    index = function (env, k)
-      return l3build.work_dir:sub(1, -2) -- no trailing "/"
-    end
-  },
-  config_suffix = {
-    -- overwritten after load_unique_config call
-    index = function (env, k)
-      return ""
-    end,
-  },
-})
 
 return Module

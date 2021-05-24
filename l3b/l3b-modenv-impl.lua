@@ -136,8 +136,6 @@ local ModEnv = modlib.ModEnv
 ---@field public log table<string,string|function>
 ---@field public pdf table<string,string|function>
 
----@alias bundleunpack_f fun(source_dirs: string[], sources: string[]): error_level_n
-
 ---@class upload_config_t
 ---@field public announcement  string        @Announcement text
 ---@field public author        string        @Author name (semicolon-separated for multiple)
@@ -320,11 +318,11 @@ local ModEnv = modlib.ModEnv
 ---@field public ps2pdfopt       string  @Options for `ps2pdf`
 ---@field public unpacksearch    boolean  @Switch to search the system `texmf` for during unpacking
 ---@field public bundleunpack    bundleunpack_f  @bundle unpack overwrite
----@field public bundleunpackcmd string  @bundle unpack command overwrite
+---@field public bundleunpackcmd bundleunpackcmd_f  @bundle unpack command overwrite
 ---@field public packtdszip      boolean @Switch to build a TDS-style zip file for CTAN
 ---@field public curl_debug      boolean
 ---@field public uploadconfig    upload_config_t @Metadata to describe the package for CTAN
----@field public texmf_home      string
+---@field public texmfhome      string
 ---@field public typeset_list    string[]
 -- tag
 ---@field public tag_hook        tag_hook_f
@@ -458,6 +456,11 @@ local ModEnv = modlib.ModEnv
 ---@field public modules                            string[] @ The list of all modules in a bundle (when not auto-detecting),
 ---@field public options                            table @ nil,
 ---@field public tdslocations                       string[] @ For non-standard file installations,
+-- Next are readonly computed properties
+---@field public is_main        boolean @ forwarded to the module
+---@field public is_standalone  boolean @ forwarded to the module
+---@field public tds_module     string
+---@field public tds_main       string  @ env.tdsroot / env.bundle or env.module
 
 
 -- We populate the ModEnv class table.
@@ -543,16 +546,22 @@ function GTR:tdsdir()
   return self.distribdir / "tds"
 end
 
-function GTR:workdir()
-  local module = Module.__get_module_of_env(self)
-  return module.path
+---Creates a getter in ModEnv with given `key`.
+---The return value is the eponym property of the module
+---or the property name `alt`.
+---@param key any
+---@param alt any
+local function forward_to_module(key, alt)
+  GTR[key] = function (self)
+    local module = Module.__get_module_of_env(self)
+    return module[alt or key]
+  end
 end
 
--- overwritten after load_unique_config call
-function GTR:config_suffix()
-  local module = Module.__get_module_of_env(self)
-  return module.config_suffix
-end
+forward_to_module("workdir", "path")
+
+-- may be overwritten after load_unique_config call
+forward_to_module("config_suffix")
 
 function GTR:tdsroot()
   return "latex"
@@ -829,14 +838,14 @@ function GTR:test_types()
         generated   = self.logext,
         reference   = self.tlgext,
         expectation = self.lveext,
-        compare     = modlib.compare_tlg,
-        rewrite     = modlib.rewrite_log,
+        compare     = modlib.check_compare_tlg,
+        rewrite     = modlib.check_rewrite_log,
       },
       pdf = {
         test      = self.pvtext,
         generated = self.pdfext,
         reference = self.tpfext,
-        rewrite   = modlib.rewrite_pdf,
+        rewrite   = modlib.check_rewrite_pdf,
       },
     },
   })
@@ -1446,10 +1455,7 @@ function GTR:indexstyle()
   return "gind.ist"
 end
 
-function GTR:install_files()
-  local module = Module.__get_module_of_env(self)
-  return module.install_files
-end
+forward_to_module("install_files")
 
 function GTR:maxprintline()
   return 79
@@ -1532,10 +1538,7 @@ function GTR:modules()
   return result
 end
 
-function GTR:options()
-  local module = Module.__get_module_of_env(self)
-  return module.options
-end
+forward_to_module("options")
 
 function GTR:tdslocations(k)
   local result = {}
@@ -1574,6 +1577,67 @@ function GTR:specialtypesetting(k)
   rawset(self, k, result)
   return result
 end
+
+function GTR:texmfhome(k)
+  local result = l3build.options.texmfhome
+  if not result then
+    set_program("latex")
+    result = var_value("TEXMFHOME")
+  end
+  return result
+end
+
+--ANCHOR Readony dynamic properties
+---@class FOOBAR
+---@field public tds_main      string  @env.tdsroot / env.bundle or env.module
+---@field public tds_module    string
+
+forward_to_module("is_main")
+forward_to_module("is_standalone")
+
+function GTR:tds_main(k)
+  return self.is_standalone
+    and self.tdsroot / self.module
+    or  self.tdsroot / self.bundle
+end
+
+function GTR:tds_module(k)
+  return self.is_standalone
+    and self.module
+    or  self.bundle / self.module
+end
+
+for _, key in ipairs({
+  "is_main",
+  "is_standalone",
+  "tds_main",
+  "tds_module",
+  "bundleunpack",
+  "bundleunpackcmd",
+}) do
+  ModEnv.__.setter[key] = function()
+    error(key + "is readonly in module environment")
+  end
+end
+
+--[[
+if k == "is_standalone" then
+  return self.bundle == ""
+end
+if k == "at_top" then
+  return l3build.main_dir == l3build.work_dir
+end
+if k == "at_bundle_top" then
+  return self.at_top and not self.is_standalone
+end
+if k == "bundleunpack" then
+  return require("l3build-unpack").bundleunpack
+end
+if k == "bundleunpackcmd" then
+  return require("l3build-unpack").bundleunpackcmd
+end
+]]
+
 
 --ANCHOR ---@field
 
@@ -2793,7 +2857,7 @@ will allow this to happen.
 ---@field public manifestfile    string @File name to use for the manifest file
 ---@field public curl_debug      boolean
 ---@field public uploadconfig    upload_config_t @Metadata to describe the package for CTAN
----@field public texmf_home      string
+---@field public texmfhome      string
 ---@field public typeset_list    string[]
 -- tag
 ---@field public tag_hook        tag_hook_f
@@ -4092,7 +4156,7 @@ local G_index function CT:=(k)
   if k == "typeset_list" then
     error("Documentation is not installed")
   end
-  if k == "texmf_home" then
+  if k == "texmfhome" then
     local result = l3build.options.texmfhome
     if not result then
       set_program("latex")

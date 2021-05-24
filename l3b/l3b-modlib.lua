@@ -203,6 +203,15 @@ function GTR:config_suffix()
   return cfg and "-".. cfg or ""
 end
 
+function GTR:bundleunpack()
+  error("Missing bundleunpack implementation")
+end
+
+function GTR:bundleunpackcmd()
+  error("Missing bundleunpackcmd implementation")
+end
+
+
 function GTR:bundle()
   local main_module = self.main_module
   if main_module ~= self then
@@ -458,19 +467,31 @@ local default_keys = {
 ---@field public Module       Module
 ---@field public ModEnv       ModEnv
 ---@field public default_keys table<string,string|string[]>
----@field public rewrite_log  check_rewrite_f
+---@field public check_rewrite_log  check_rewrite_f
 -- At this stage, we are just preparing the definition the API of the module environment.
 -- Both `rewrite_log`, `rewrite_pdf` and `compare_tlg` must exist
 -- but we do not want to run these functions during testing
 -- and we do not care about the real implementation.
 -- This real implementation will be made while requiring the check module.
----@field public rewrite_pdf  check_rewrite_f
----@field public compare_tlg  check_compare_f
+---@field public check_rewrite_pdf  check_rewrite_f
+---@field public check_compare_tlg  check_compare_f
+-- The same for the manifest related functions
+---@field public manifest_extract_filedesc manifest_extract_filedesc_f
 return {
   Module        = Module,
   ModEnv        = ModEnv,
   default_keys  = default_keys,
-  rewrite_log   = function () error("rewrite_log is not implemented, require the check module") end, -- do nothing yet, will be implemented by the check module
-  rewrite_pdf   = function () error("rewrite_pdf is not implemented, require the check module") end, -- same
-  compare_tlg   = function () error("compare_tlg is not implemented, require the check module") end, -- sample
+  check_rewrite_log = function () error("rewrite_log is not implemented, require the check module") end,
+  check_rewrite_pdf = function () error("rewrite_pdf is not implemented, require the check module") end,
+  check_compare_tlg = function () error("compare_tlg is not implemented, require the check module") end,
+  manifest_extract_filedesc       = function () error("manifest_extract_filedesc is not implemented, require the manifest implementation module") end,
+  manifest_setup                  = function () error("manifest_setup is not implemented, require the manifest implementation module") end,
+  manifest_sort_within_group      = function () error("manifest_sort_within_group is not implemented, require the manifest implementation module") end,
+  manifest_sort_within_match      = function () error("manifest_sort_within_match is not implemented, require the manifest implementation module") end,
+  manifest_write_group_file       = function () error("manifest_write_group_file is not implemented, require the manifest implementation module") end,
+  manifest_write_group_file_descr = function () error("manifest_write_group_file_descr is not implemented, require the manifest implementation module") end,
+  manifest_write_group_heading    = function () error("manifest_write_group_heading is not implemented, require the manifest implementation module") end,
+  manifest_write_opening          = function () error("manifest_write_opening is not implemented, require the manifest implementation module") end,
+  manifest_write_subheading       = function () error("manifest_write_subheading is not implemented, require the manifest implementation module") end,
+  manifestfile                    = function () error("manifestfile is not implemented, require the manifest implementation module") end,
 }
