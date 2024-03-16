@@ -1,13 +1,13 @@
 --[[
 
-File l3build-manifest-setup.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-manifest-setup.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -54,7 +54,7 @@ for those people who are interested.
 --]]
 
 
-manifest_setup = manifest_setup or function()
+function manifest_setup()
   local groups = {
     {
        subheading = "Repository manifest",
@@ -221,18 +221,16 @@ end
 --]]
 
 manifest_sort_within_match = manifest_sort_within_match or function(files)
-  local f = files
-  table.sort(f)
-  return f
+  table.sort(files)
+  return files
 end
 
 manifest_sort_within_group = manifest_sort_within_group or function(files)
-  local f = files
   --[[
       -- no-op by default; make your own definition to customise. E.g.:
-      table.sort(f)
+      table.sort(files)
   --]]
-  return f
+  return files
 end
 
 --[[
@@ -240,17 +238,17 @@ end
       ---------------
 --]]
 
-manifest_write_opening = manifest_write_opening or function(filehandle)
+function manifest_write_opening(filehandle)
 
   filehandle:write("# Manifest for " .. module .. "\n\n")
   filehandle:write([[
 This file is a listing of all files considered to be part of this package.
-It is automatically generated with `texlua build.lua manifest`.
+It is automatically generated with `l3build manifest`.
 ]])
 
 end
 
-manifest_write_subheading = manifest_write_subheading or function(filehandle,heading,description)
+function manifest_write_subheading(filehandle,heading,description)
 
   filehandle:write("\n\n## " .. heading .. "\n\n")
 
@@ -260,7 +258,7 @@ manifest_write_subheading = manifest_write_subheading or function(filehandle,hea
 
 end
 
-manifest_write_group_heading = manifest_write_group_heading or function (filehandle,heading,description)
+function manifest_write_group_heading(filehandle,heading,description)
 
   filehandle:write("\n### " .. heading .. "\n\n")
 
@@ -270,7 +268,7 @@ manifest_write_group_heading = manifest_write_group_heading or function (filehan
 
 end
 
-manifest_write_group_file = manifest_write_group_file or function(filehandle,filename,param)
+function manifest_write_group_file(filehandle,filename,param)
   --[[
         filehandle        : write file object
         filename          : the count of the filename to be written
@@ -296,7 +294,7 @@ manifest_write_group_file = manifest_write_group_file or function(filehandle,fil
 
 end
 
-manifest_write_group_file_descr = manifest_write_group_file_descr or function(filehandle,filename,descr,param)
+function manifest_write_group_file_descr(filehandle,filename,descr,param)
   --[[
         filehandle        : write file object
         filename          : the name of the file to write
@@ -326,7 +324,7 @@ end
       -------------------------------------------
 --]]
 
-manifest_extract_filedesc = manifest_extract_filedesc or function(filehandle)
+function manifest_extract_filedesc(filehandle)
 
   -- no-op by default; two examples below
 

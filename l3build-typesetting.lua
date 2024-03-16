@@ -1,13 +1,13 @@
 --[[
 
-File l3build-typesetting.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-typesetting.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -31,44 +31,19 @@ local pairs  = pairs
 local print  = print
 
 local gsub  = string.gsub
-local match = string.match
 
 local os_type = os.type
 
 function dvitopdf(name, dir, engine, hide)
-  run(
-    dir,
-    (forcecheckepoch and set_epoch_cmd(epoch) or "") ..
+  runcmd(
+    set_epoch_cmd(epoch, forcecheckepoch) ..
     "dvips " .. name .. dviext
       .. (hide and (" > " .. os_null) or "")
       .. os_concat ..
-   "ps2pdf " .. ps2pdfopt .. name .. psext
-      .. (hide and (" > " .. os_null) or "")
+    "ps2pdf " .. ps2pdfopts .. " " .. name .. psext
+      .. (hide and (" > " .. os_null) or ""),
+    dir
   )
-end
-
--- An auxiliary used to set up the environmental variables
-function runcmd(cmd,dir,vars)
-  local dir = dir or "."
-  local dir = abspath(dir)
-  local vars = vars or {}
-  -- Allow for local texmf files
-  local env = os_setenv .. " TEXMFCNF=." .. os_pathsep
-  local localtexmf = ""
-  if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
-    localtexmf = os_pathsep .. abspath(texmfdir) .. "//"
-  end
-  local envpaths = "." .. localtexmf .. os_pathsep
-    .. abspath(localdir) .. os_pathsep
-    .. dir .. (typesetsearch and os_pathsep or "")
-  -- Deal with spaces in paths
-  if os_type == "windows" and match(envpaths," ") then
-    envpaths = gsub(envpaths,'"','')
-  end
-  for _,var in pairs(vars) do
-    env = env .. os_concat .. os_setenv .. " " .. var .. "=" .. envpaths
-  end
-  return run(dir,(forcedocepoch and set_epoch_cmd(epoch) or "") .. env .. os_concat .. cmd)
 end
 
 function biber(name,dir)
@@ -80,7 +55,7 @@ function biber(name,dir)
 end
 
 function bibtex(name,dir)
-  local dir = dir or "."
+  dir = dir or "."
   if fileexists(dir .. "/" .. name .. ".aux") then
     -- LaTeX always generates an .aux file, so there is a need to
     -- look inside it for a \citation line
@@ -88,7 +63,7 @@ function bibtex(name,dir)
     if os_type == "windows" then
       grep = "\\\\"
     else
-     grep = "\\\\\\\\"
+      grep = "\\\\\\\\"
     end
     if run(dir,
         os_grepexe .. " \"^" .. grep .. "citation{\" " .. name .. ".aux > "
@@ -97,15 +72,17 @@ function bibtex(name,dir)
         os_grepexe .. " \"^" .. grep .. "bibdata{\" " .. name .. ".aux > "
           .. os_null
       ) == 0 then
-      return runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name,dir,
-        {"BIBINPUTS","BSTINPUTS"})
+      local errorlevel = runcmd(bibtexexe .. " " .. bibtexopts .. " " .. name,
+        dir,{"BIBINPUTS","BSTINPUTS"})
+      -- BibTeX(8) signals warnings with errorlevel 1
+      if errorlevel > 1 then return errorlevel else return 0 end
     end
   end
   return 0
 end
 
 function makeindex(name,dir,inext,outext,logext,style)
-  local dir = dir or "."
+  dir = dir or "."
   if fileexists(dir .. "/" .. name .. inext) then
     if style == "" then style = nil end
     return runcmd(makeindexexe .. " " .. makeindexopts
@@ -119,15 +96,15 @@ function makeindex(name,dir,inext,outext,logext,style)
 end
 
 function tex(file,dir,cmd)
-  local dir = dir or "."
-  local cmd = cmd or typesetexe .. typesetopts
+  dir = dir or "."
+  cmd = cmd or typesetexe .. " " .. typesetopts
   return runcmd(cmd .. " \"" .. typesetcmds
     .. "\\input " .. file .. "\"",
     dir,{"TEXINPUTS","LUAINPUTS"})
 end
 
 local function typesetpdf(file,dir)
-  local dir = dir or "."
+  dir = dir or "."
   local name = jobname(file)
   print("Typesetting " .. name)
   local fn = typeset
@@ -141,12 +118,10 @@ local function typesetpdf(file,dir)
     print(" ! Compilation failed")
     return errorlevel
   end
-  pdfname = name .. pdfext
-  rm(docfiledir,pdfname)
-  return cp(pdfname,dir,docfiledir)
+  return 0
 end
 
-typeset = typeset or function(file,dir,exe)
+function typeset(file,dir,exe)
   dir = dir or "."
   local errorlevel = tex(file,dir,exe)
   if errorlevel ~= 0 then
@@ -168,13 +143,18 @@ typeset = typeset or function(file,dir,exe)
 end
 
 -- A hook to allow additional typesetting of demos
-typeset_demo_tasks = typeset_demo_tasks or function()
+function typeset_demo_tasks()
   return 0
 end
 
 local function docinit()
   -- Set up
+  dep_install(typesetdeps)
+  unpack({sourcefiles, typesetsourcefiles}, {sourcefiledir, docfiledir})
   cleandir(typesetdir)
+  for _,file in pairs(typesetfiles) do
+    cp(file, unpackdir, typesetdir)
+  end
   for _,filetype in pairs(
       {bibfiles, docfiles, typesetfiles, typesetdemofiles}
     ) do
@@ -188,8 +168,6 @@ local function docinit()
   for _,file in pairs(typesetsuppfiles) do
     cp(file, supportdir, typesetdir)
   end
-  dep_install(typesetdeps)
-  unpack({sourcefiles, typesetsourcefiles}, {sourcefiledir, docfiledir})
   -- Main loop for doc creation
   local errorlevel = typeset_demo_tasks()
   if errorlevel ~= 0 then
@@ -198,7 +176,7 @@ local function docinit()
   return docinit_hook()
 end
 
-docinit_hook = docinit_hook or function() return 0 end
+function docinit_hook() return 0 end
 
 -- Typeset all required documents
 -- Uses a set of dedicated auxiliaries that need to be available to others
@@ -206,38 +184,53 @@ function doc(files)
   local errorlevel = docinit()
   if errorlevel ~= 0 then return errorlevel end
   local done = {}
+  local files_unknown = {}
+  if files and next(files) then
+    for _, file in pairs(files) do
+      files_unknown[file] = true
+    end
+  end
   for _,typesetfiles in ipairs({typesetdemofiles,typesetfiles}) do
     for _,glob in pairs(typesetfiles) do
-      for _,dir in ipairs({typesetdir,unpackdir}) do
-        for _,file in pairs(tree(dir,glob)) do
-          local path,srcname = splitpath(file)
-          local name = jobname(srcname)
-          if not done[name] then
-            local typeset = true
-            -- Allow for command line selection of files
-            if files and next(files) then
-              typeset = false
-              for _,file in pairs(files) do
-                if name == file then
-                  typeset = true
-                  break
-                end
+      local destpath,globstub = splitpath(glob)
+      destpath = docfiledir .. gsub(gsub(destpath,"^./",""),"^.","")
+      for _,p in ipairs(tree(typesetdir,globstub)) do
+        local path,srcname = splitpath(p.cwd)
+        local name = jobname(srcname)
+        if not done[name] then
+          local typeset = true
+          -- Allow for command line selection of files
+          if files and next(files) then
+            typeset = false
+            for _,file in pairs(files) do
+              if name == file then
+                files_unknown[file] = nil
+                typeset = true
+                break
               end
             end
-            -- Now know if we should typeset this source
-            if typeset then
-              local errorlevel = typesetpdf(srcname,path)
-              if errorlevel ~= 0 then
-                return errorlevel
-              else
-                done[name] = true
-              end
+          end
+          -- Now know if we should typeset this source
+          if typeset then
+            errorlevel = typesetpdf(srcname,path)
+            if errorlevel ~= 0 then
+              return errorlevel
+            else
+              done[name] = true
+              local pdfname = jobname(srcname) .. pdfext
+              rm(pdfname,destpath)
+              cp(pdfname,path,destpath)
             end
           end
         end
       end
     end
   end
+  if next(files_unknown) then
+    for file, _ in pairs(files_unknown) do
+      print("Unknown doc name \"" .. file .. "\"")
+    end
+    return 1
+  end
   return 0
 end
-

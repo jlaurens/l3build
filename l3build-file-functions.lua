@@ -1,13 +1,13 @@
 --[[
 
-File l3build-file-functions.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-file-functions.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -22,7 +22,6 @@ for those people who are interested.
 
 --]]
 
-local pairs            = pairs
 local print            = print
 
 local open             = io.open
@@ -36,7 +35,6 @@ local execute          = os.execute
 local exit             = os.exit
 local getenv           = os.getenv
 local remove           = os.remove
-local os_time          = os.time
 local os_type          = os.type
 
 local luatex_revision  = status.luatex_revision
@@ -44,7 +42,6 @@ local luatex_version   = status.luatex_version
 
 local match            = string.match
 local sub              = string.sub
-local gmatch           = string.gmatch
 local gsub             = string.gsub
 
 local insert           = table.insert
@@ -131,8 +128,6 @@ os_setenv  = "export"
 os_yes     = "printf 'y\\n%.0s' {1..300}"
 
 os_ascii   = "echo \"\""
-os_cmpexe  = getenv("cmpexe") or "cmp"
-os_cmpext  = getenv("cmpext") or ".cmp"
 os_diffext = getenv("diffext") or ".diff"
 os_diffexe = getenv("diffexe") or "diff -c --strip-trailing-cr"
 os_grepexe = "grep"
@@ -140,8 +135,6 @@ os_newline = "\n"
 
 if os_type == "windows" then
   os_ascii   = "@echo."
-  os_cmpexe  = getenv("cmpexe") or "fc /b"
-  os_cmpext  = getenv("cmpext") or ".cmp"
   os_concat  = "&"
   os_diffext = getenv("diffext") or ".fc"
   os_diffexe = getenv("diffexe") or "fc /n"
@@ -158,9 +151,15 @@ if os_type == "windows" then
   os_yes     = "for /l %I in (1,1,300) do @echo y"
 end
 
+-- Deal with codepage hell on Windows
+local function fixname(f) return f end 
+if chgstrcp then
+  fixname = chgstrcp.utf8tosyscp
+end
+
 -- Deal with the fact that Windows and Unix use different path separators
 local function unix_to_win(path)
-  return gsub(path, "/", "\\")
+  return fixname(gsub(path, "/", "\\"))
 end
 
 function normalize_path(path)
@@ -178,11 +177,12 @@ function abspath(path)
   if ok then
     local result = currentdir()
     chdir(oldpwd)
-    return escapepath(gsub(result, "\\", "/"))
+    return escapepath(gsub(gsub(result,"^\\\\%?\\",""), "\\", "/"))
   end
   error(msg)
 end
 
+-- TODO: Fix the cross platform problem
 function escapepath(path)
   if os_type == "windows" then
     local path,count = gsub(path,'"','')
@@ -198,7 +198,7 @@ function escapepath(path)
   else
     path = gsub(path,"\\ ","[PATH-SPACE]")
     path = gsub(path," ","\\ ")
-    return gsub(path,"%[PATH-SPACE%]","\\ ")
+    return gsub(path,"%[PATH%-SPACE%]","\\ ")
   end
 end
 
@@ -211,46 +211,8 @@ function cleandir(dir)
   return rm(dir, "**")
 end
 
--- Copy files 'quietly'
-function cp(glob, source, dest)
-  local errorlevel
-  for i,_ in pairs(tree(source, glob)) do
-    local source = source .. "/" .. i
-    if os_type == "windows" then
-      if attributes(source)["mode"] == "directory" then
-        errorlevel = execute(
-          'xcopy /y /e /i "' .. unix_to_win(source) .. '" "'
-             .. unix_to_win(dest .. '/' .. i) .. '" > nul'
-        )
-      else
-        errorlevel = execute(
-          'xcopy /y "' .. unix_to_win(source) .. '" "'
-             .. unix_to_win(dest .. '/') .. '" > nul'
-        )
-      end
-    else
-      errorlevel = execute("cp -RLf '" .. source .. "' '" .. dest .. "'")
-    end
-    if errorlevel ~=0 then
-      return errorlevel
-    end
-  end
-  return 0
-end
-
--- OS-dependent test for a directory
 function direxists(dir)
-  local errorlevel
-  if os_type == "windows" then
-    errorlevel =
-      execute("if not exist \"" .. unix_to_win(dir) .. "\" exit 1")
-  else
-    errorlevel = execute("[ -d '" .. dir .. "' ]")
-  end
-  if errorlevel ~= 0 then
-    return false
-  end
-  return true
+  return attributes(dir, "mode") == "directory"
 end
 
 function fileexists(file)
@@ -261,6 +223,41 @@ function fileexists(file)
   else
     return false -- also file exits and is not readable
   end
+end
+
+-- Copy files 'quietly'
+function cp(glob, source, dest)
+  local errorlevel
+  for _,p in ipairs(tree(source, glob)) do
+    -- p_src is a path relative to `source` whereas
+    -- p_cwd is the counterpart relative to the current working directory
+    if os_type == "windows" then
+      if direxists(p.cwd) then
+        errorlevel = execute(
+          'xcopy /y /e /i "' .. unix_to_win(p.cwd) .. '" '
+             .. unix_to_win(dest .. '/' .. escapepath(p.src)) .. ' > nul'
+        ) and 0 or 1
+      else
+        errorlevel = execute(
+          'xcopy /y "' .. unix_to_win(p.cwd) .. '" '
+             .. unix_to_win(dest .. '/') .. ' > nul'
+        ) and 0 or 1
+      end
+    else
+      -- Ensure we get similar behavior on all platforms
+      if not direxists(dirname(dest)) then
+        errorlevel = mkdir(dirname(dest))
+        if errorlevel ~=0 then return errorlevel end
+      end
+      errorlevel = execute(
+        "cp -RLf '" .. p.cwd .. "' " .. dest
+      ) and 0 or 1
+    end
+    if errorlevel ~=0 then
+      return errorlevel
+    end
+  end
+  return 0
 end
 
 -- Generate a table containing all file names of the given glob or all files
@@ -286,55 +283,76 @@ function filelist(path, glob)
   end
   return files
 end
+function ordered_filelist(...)
+  local files = filelist(...)
+  table.sort(files)
+  return files
+end
 
--- Does what filelist does, but can also glob subdirectories. In the returned
--- table, the keys are paths relative to the given starting path, the values
--- are their counterparts relative to the current working directory.
-function tree(path, glob)
+---@class tree_entry_t
+---@field src string path relative to the source directory
+---@field cwd string path counterpart relative to the current working directory
+
+---Does what filelist does, but can also glob subdirectories.
+---In the returned table, the keys are paths relative to the given source path,
+---the values are their counterparts relative to the current working directory.
+---@param src_path string
+---@param glob string
+---@return table<integer,tree_entry_t>
+function tree(src_path, glob)
   local function cropdots(path)
-    return gsub(gsub(path, "^%./", ""), "/%./", "/")
+    return path:gsub( "^%./", ""):gsub("/%./", "/")
   end
+  src_path = cropdots(src_path)
+  glob = cropdots(glob)
   local function always_true()
     return true
   end
-  local function is_dir(file)
-    return attributes(file)["mode"] == "directory"
-  end
-  local dirs = {["."] = cropdots(path)}
-  for pattern, criterion in gmatch(cropdots(glob), "([^/]+)(/?)") do
-    local criterion = criterion == "/" and is_dir or always_true
-    local function fill(path, dir, table)
-      for _, file in ipairs(filelist(dir, pattern)) do
-        local fullpath = path .. "/" .. file
-        if file ~= "." and file ~= ".." and
-          fullpath ~= builddir
-        then
-          local fulldir = dir .. "/" .. file
-          if criterion(fulldir) then
-            table[fullpath] = fulldir
+  ---@type table<integer,tree_entry_t>
+  local result = { {
+    src = ".",
+    cwd = src_path,
+  } }
+  for glob_part, sep in glob:gmatch("([^/]+)(/?)/*") do
+    local accept = sep == "/" and direxists or always_true
+    ---Feeds the given table according to `glob_part`
+    ---@param p tree_entry_t path counterpart relative to the current working directory
+    ---@param table table
+    local function fill(p, table)
+      for _,file in ipairs(filelist(p.cwd, glob_part)) do
+        if file ~= "." and file ~= ".." then
+          local pp = {
+            src = p.src .. "/" .. file,
+            cwd = p.cwd .. "/" .. file,
+          }
+          if pp.cwd ~= builddir -- TODO: ensure that `builddir` is properly formatted
+          and accept(pp.cwd)
+          then
+            insert(table, pp)
           end
         end
       end
     end
-    local newdirs = {}
-    if pattern == "**" then
+    local new_result = {}
+    if glob_part == "**" then
+      local i = 1
       while true do
-        local path, dir = next(dirs)
-        if not path then
+        local p = result[i]
+        i = i + 1
+        if not p then
           break
         end
-        dirs[path] = nil
-        newdirs[path] = dir
-        fill(path, dir, dirs)
+        insert(new_result, p) -- shorter path
+        fill(p, result)       -- after longer
       end
     else
-      for path, dir in pairs(dirs) do
-        fill(path, dir, newdirs)
+      for _,p in ipairs(result) do
+        fill(p, new_result)
       end
     end
-    dirs = newdirs
+    result = new_result
   end
-  return dirs
+  return result
 end
 
 function remove_duplicates(a)
@@ -354,10 +372,11 @@ function remove_duplicates(a)
 end
 
 function mkdir(dir)
+  dir = escapepath(dir)
   if os_type == "windows" then
     -- Windows (with the extensions) will automatically make directory trees
     -- but issues a warning if the dir already exists: avoid by including a test
-    local dir = unix_to_win(dir)
+    dir = unix_to_win(dir)
     return execute(
       "if not exist "  .. dir .. "\\nul " .. "mkdir " .. dir
     )
@@ -368,10 +387,10 @@ end
 
 -- Rename
 function ren(dir, source, dest)
-  local dir = dir .. "/"
+  dir = dir .. "/"
   if os_type == "windows" then
-    local source = gsub(source, "^%.+/", "")
-    local dest = gsub(dest, "^%.+/", "")
+    source = gsub(source, "^%.+/", "")
+    dest = gsub(dest, "^%.+/", "")
     return execute("ren " .. unix_to_win(dir) .. source .. " " .. dest)
   else
     return execute("mv " .. dir .. source .. " " .. dir .. dest)
@@ -380,8 +399,8 @@ end
 
 -- Remove file(s) based on a glob
 function rm(source, glob)
-  for i,_ in pairs(tree(source, glob)) do
-    rmfile(source,i)
+  for _,p in ipairs(tree(source, glob)) do
+    rmfile(source,p.src)
   end
   -- os.remove doesn't give a sensible errorlevel
   return 0

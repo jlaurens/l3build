@@ -1,0 +1,37 @@
+# The test framework itself
+# (A dependency below but explicitly listed)
+luatex
+#
+# Required to build formats
+#
+context
+latex-bin
+tex
+uplatex
+xetex
+# Requirements for the tests
+etex-pkg
+#
+# Support for typesetting the docs
+#
+alphalph
+amsmath
+booktabs
+ec
+colortbl
+csquotes
+enumitem
+fancyvrb
+hologo
+hypdoc
+hyperref
+infwarerr
+iftex
+kvoptions
+listings
+makeindex
+needspace
+pdftexcmds
+psnfss
+tools
+underscore

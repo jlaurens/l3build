@@ -1,13 +1,13 @@
 --[[
 
-File l3build-arguments.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-arguments.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -49,17 +49,17 @@ option_list =
       },
     debug =
       {
-        desc = "Runs target in debug mode (not supported by all targets)",
+        desc = "Runs target in debug mode",
         type = "boolean"
       },
     dirty =
       {
-        desc = "Skip cleaning up the test area",
+        desc = "Skips cleaning up the test area",
         type = "boolean"
       },
     ["dry-run"] =
       {
-        desc = "Dry run for install",
+        desc = "Dry run for install or upload",
         type = "boolean"
       },
     email =
@@ -80,7 +80,7 @@ option_list =
       },
     file =
       {
-        desc  = "Take the upload announcement from the given file",
+        desc  = "Takes the upload announcement from the given file",
         short = "F",
         type  = "string"
       },
@@ -89,15 +89,9 @@ option_list =
         desc  = "Name of first test to run",
         type  = "string"
       },
-    force =
-      {
-        desc  = "Force tests to run if engine is not set up",
-        short = "f",
-        type  = "boolean"
-      },
     full =
       {
-        desc = "Install all files",
+        desc = "Installs all files",
         type = "boolean"
       },
     ["halt-on-error"] =
@@ -108,7 +102,7 @@ option_list =
       },
     help =
       {
-        desc  = "Print this message and exit",
+        desc  = "Prints this message and exits",
         short = "h",
         type  = "boolean"
       },
@@ -131,17 +125,29 @@ option_list =
       },
     rerun =
       {
-        desc  = "Skip setup: simply rerun tests",
+        desc  = "Skips setup: simply reruns tests",
         type  = "boolean"
       },
     ["show-log-on-error"] =
       {
-        desc  = "If 'halt-on-error' stops, show the full log of the failure",
+        desc  = "Shows the full log of the failure with 'halt-on-error'",
+        type  = "boolean"
+      },
+    ["show-saves"] =
+      {
+        desc  = "Shows the invocation to update failing .tlg files",
+        short = "S",
         type  = "boolean"
       },
     shuffle =
       {
-        desc  = "Shuffle order of tests",
+        desc  = "Shuffles order of tests",
+        type  = "boolean"
+      },
+    stdengine =
+      {
+        desc  = "Run tests with the std engine (config dependent)",
+        short = "s",
         type  = "boolean"
       },
     texmfhome =
@@ -151,7 +157,7 @@ option_list =
       },
     version =
       {
-        desc = "Print version information and exit",
+        desc = "Prints version information and exits",
         type = "boolean"
       }
   }
@@ -242,14 +248,14 @@ local function argparse()
             return { target = "help" }
           end
         else
-         if not optarg then
-          optarg = arg[i + 1]
           if not optarg then
-            stderr:write("Missing value for option " .. a .."\n")
-            return { target = "help" }
+            optarg = arg[i + 1]
+            if not optarg then
+              stderr:write("Missing value for option " .. a .."\n")
+              return { target = "help" }
+            end
+            i = i + 1
           end
-          i = i + 1
-         end
         end
       else
         stderr:write("Unknown option " .. a .."\n")
@@ -277,7 +283,7 @@ local function argparse()
     end
   end
   if next(names) then
-   result["names"] = names
+    result["names"] = names
   end
   return result
 end
@@ -285,23 +291,24 @@ end
 options = argparse()
 
 -- Sanity check
-function check_engines()
-  if options["engine"] and not options["force"] then
-     -- Make a lookup table
-     local t = { }
+function check_engines(config)
+  if options["engine"] then
+    -- Make a lookup table
+    local t = { }
     for _, engine in pairs(checkengines) do
       t[engine] = true
     end
-    for _, engine in pairs(options["engine"]) do
-      if not t[engine] then
-        print("\n! Error: Engine \"" .. engine .. "\" not set up for testing!")
-        print("\n  Valid values are:")
-        for _, engine in ipairs(checkengines) do
-          print("  - " .. engine)
-        end
-        print("")
-        exit(1)
+    checkengines = {}
+    for _,engine in ipairs(options["engine"]) do
+      if t[engine] then
+          insert(checkengines,engine)
+      else
+        print("Skipping unknown engine " .. engine)
       end
     end
+  end
+  if not next(checkengines) then
+    print("No applicable engine requested, config ignored")
+    exit(0)
   end
 end

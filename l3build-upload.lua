@@ -1,13 +1,13 @@
 --[[
 
-File l3build-upload.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-upload.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -33,8 +33,6 @@ local output = io.output
 local popen = io.popen
 local read  = io.read
 local write = io.write
-
-local os_type = os.type
 
 local len   = string.len
 local lower = string.lower
@@ -69,7 +67,7 @@ local match = string.match
 local curl_debug = curl_debug or false -- to disable posting
 -- For now, this is undocumented.
 
-local ctanupload = ctanupload or "ask"
+
 if options["dry-run"] then
   ctanupload = false
 end
@@ -77,6 +75,12 @@ end
 -- if ctanupload is true the ctan upload URL will be used after validation
 -- if upload is anything else, the user will be prompted whether to upload.
 -- For now, this is undocumented. I think I would prefer to keep it always set to ask for the time being.
+
+local ctan_post -- this is private to the module
+
+-- TODO: next is a public global method,
+-- but following functions are semantically local
+-- despite they are declared globally.
 
 function upload(tagnames)
 
@@ -100,7 +104,7 @@ function upload(tagnames)
 
   uploadconfig.note =   uploadconfig.note  or file_contents(uploadconfig.note_file)
 
-  local tagnames = tagnames or { }
+  tagnames = tagnames or { }
   uploadconfig.version = tagnames[1] or uploadconfig.version
 
   local override_update_check = false
@@ -110,11 +114,24 @@ function upload(tagnames)
   end
 
   -- avoid lower level error from post command if zip file missing
-  local zip=open(trim_space(tostring(uploadfile)),"r")
-  if zip~=nil then
-    close(zip)
-  else
-    error("Missing zip file '" .. tostring(uploadfile) .. "'")
+  local ziptime = lfs.attributes(trim_space(tostring(uploadfile)), 'modification')
+  if not ziptime then
+    error("Missing zip file '" .. tostring(uploadfile) .. "'. \z
+       Maybe you forgot to run 'l3build ctan' first?")
+  end
+  local age = os.time() - ziptime
+  if age >= 86400 then
+    print(string.format("------------------------------------------\n\z
+           | The local archive is older than %3i days.            |\n\z
+           | Are you sure that you executed 'l3build ctan' first? |\n\z
+           --------------------------------------------------------",
+      age // 86400))
+    print("Are you sure you want to continue? [y/n]" )
+    io.stdout:write("> "):flush()
+    if lower(read(),1,1) ~= "y" then
+      print'Aborting'
+      return 1
+    end
   end
 
   ctan_post = construct_ctan_post(uploadfile,options["debug"])
@@ -126,9 +143,9 @@ function upload(tagnames)
   output(curlopt)
   write(ctan_post)
   close(curlopt)
-  
+
   ctan_post=curlexe .. " --config " .. curloptfile
-  
+
 
 if options["debug"] then
     ctan_post = ctan_post ..  ' https://httpbin.org/post'
@@ -168,12 +185,23 @@ end
   end
 
   -- if upload requested and validation succeeded repost to the upload URL
-    if (exit_status==0 or exit_status==nil) then
+  if (exit_status==0 or exit_status==nil) then
     if (ctanupload ~=nil and ctanupload ~=false and ctanupload ~= true) then
       if (match(fp_return,"WARNING")) then
-       print("Warnings from CTAN package validation:" .. fp_return:gsub("%[","\n["):gsub("%]%]","]\n]"))
+        print("Warnings from CTAN package validation:" .. fp_return:gsub("%[","\n["):gsub("%]%]","]\n]"))
       else
-       print("Validation successful." )
+        print("Validation successful." )
+      end
+      print("" )
+      if age < 86400 and age >= 60 then
+        if age >= 3600 then
+          print("----------------------------------------------------" )
+          print(string.format("| The local archive is older than %2i hours.        |", age//3600 ))
+          print("| Have you executed l3build ctan first?  If so ... |" )
+          print("----------------------------------------------------" )
+        else
+          print(string.format("The local archive is %i minutes old.", age//60 ))
+        end
       end
       print("Do you want to upload to CTAN? [y/n]" )
       local answer=""
@@ -214,9 +242,13 @@ end
 
 function shell(s)
   local h = assert(popen(s, 'r'))
-  t = assert(h:read('*a'))
-  h:close()
-  return t
+  local t = assert(h:read('*a'))
+  local success = h:close()
+  if (success) then
+    return t
+  else
+    error("\nError from shell command:\n" .. s .. "\n" .. t .. "\n")
+  end
 end
 
 function construct_ctan_post(uploadfile,debug)
@@ -224,7 +256,7 @@ function construct_ctan_post(uploadfile,debug)
   -- start building the curl command:
 -- commandline  ctan_post = curlexe .. " "
   ctan_post=""
-  
+
   -- build up the curl command field-by-field:
 
   --         field                                   max  desc                                 mandatory  multi
@@ -248,12 +280,6 @@ function construct_ctan_post(uploadfile,debug)
   ctan_field("uploader",     uploadconfig.uploader,      255, "Name of uploader",                    true,  false )
   ctan_field("version",      uploadconfig.version,        32, "Package version",                     true,  false )
 
-  -- finish constructing the curl command:
-  local qq = '"'
-  if os_type == "windows" then
-    qq = '\"'
-  end
--- commandline   ctan_post = ctan_post .. ' --form ' .. qq .. 'file=@' .. tostring(uploadfile) .. ';filename=' .. tostring(uploadfile) .. qq
   ctan_post = ctan_post .. '\nform="file=@' .. tostring(uploadfile) .. ';filename=' .. tostring(uploadfile) .. '"'
 
   return ctan_post
@@ -295,11 +321,12 @@ function ctan_single_field(fname,fvalue,max,desc,mandatory)
       if (max > 0 and len(vs) > max) then
         error("The field " .. fname .. " is longer than " .. max)
       end
+      vs = vs:gsub('\\','\\\\')
       vs = vs:gsub('"','\\"')
       vs = vs:gsub('`','\\`')
       vs = vs:gsub('\n','\\n')
 -- for strings on commandline version      ctan_post=ctan_post .. ' --form "' .. fname .. "=" .. vs .. '"'
-      ctan_post=ctan_post .. '\nform="' .. fname .. '=' .. vs .. '"'
+      ctan_post=ctan_post .. '\nform-string="' .. fname .. '=' .. vs .. '"'
     end
   else
     error("The value of the field '" .. fname .."' must be a scalar not a table")
@@ -329,7 +356,7 @@ function input_multi_line_field (name)
       if answer_line~=nil then
         field = field .. "\n" .. answer_line
       end
-     end
+    end
   until (return_count==3 or answer_line==nil or answer_line=='\004')
   return field
 end
@@ -352,7 +379,7 @@ function file_contents (filename)
     local f= open(filename,"r")
     if f==nil then
       return nil
-    else 
+    else
       local s = f:read("*all")
       close(f)
       return s

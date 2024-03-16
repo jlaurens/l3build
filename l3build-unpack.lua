@@ -1,13 +1,13 @@
 --[[
 
-File l3build-unpack.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-unpack.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -21,8 +21,6 @@ The development version of the bundle can be found at
 for those people who are interested.
 
 --]]
-
-local execute          = os.execute
 
 -- Unpack the package files using an 'isolated' system: this requires
 -- a copy of the 'basic' DocStrip program, which is used then removed
@@ -46,7 +44,7 @@ end
 
 -- Split off from the main unpack so it can be used on a bundle and not
 -- leave only one modules files
-bundleunpack = bundleunpack or function(sourcedirs, sources)
+function bundleunpack(sourcedirs, sources)
   local errorlevel = mkdir(localdir)
   if errorlevel ~=0 then
     return errorlevel
@@ -72,8 +70,8 @@ bundleunpack = bundleunpack or function(sourcedirs, sources)
     end
   end
   for _,i in ipairs(unpackfiles) do
-    for j,_ in pairs(tree(unpackdir, i)) do
-      local path, name = splitpath(j)
+    for _,p in ipairs(tree(unpackdir, i)) do
+      local path, name = splitpath(p.src)
       local localdir = abspath(localdir)
       local success = io.popen(
         "cd " .. unpackdir .. "/" .. path .. os_concat ..

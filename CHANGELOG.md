@@ -7,9 +7,312 @@ this project uses date-based 'snapshot' version identifiers.
 
 ## [Unreleased]
 
-### Changed
+### Fixed
+- Skip unknown engines correctly in `l3build save`
 
-- Normal Lua function calls (issue #127)
+## [2024-02-08]
+
+### Changed
+- Extend normalization of line numbers to include those wrapped by LaTeX in
+  text `on line ...`
+- Suppress `l3msg` message wrapping
+
+## [2024-01-18]
+
+### Added
+- Switch `-s|--stdengine` to run a set of tests only with the standard engine
+  even where this varies between configs (issue \#343)
+
+### Removed
+- Switch `--force|-f`
+
+## [2024-01-09]
+
+### Fixed
+- Type of return value of `runtest_tasks()` in doc
+- Print failures correctly when these occur in multiple configurations
+  including the core (`build`) one
+
+## [2024-01-04]
+
+### Changed
+- Throw warnings on unknown doc name(s)
+- Always execute `runtest_tasks()` if set (issue \#327)
+- Print failures correctly when these occur in multiple configurations
+
+## [2023-12-15]
+
+### Fixed
+- Test for blank `runtest_tasks()` (issue \#327)
+
+## [2023-12-13-2]
+
+- Correct setup for script running in TeX Live
+
+## [2023-12-13]
+
+### Fixed
+- Syntax warning on Windows with some test setups
+
+## [2023-12-12]
+
+### Changed
+- Document default value of `ctanpkg` as a valid lua expression
+- Improve log for failed checks with no diff files
+- Document full syntaxes of `\SHOWFILE` and `\ASSERT(STR)`
+
+### Fixed
+- Short-circuit `check --rerun` if `testdir` doesn't exist
+- Retain errorlevel on Windows during `check` target
+
+## [2023-11-01]
+
+### Changed
+- Drop duplicate backslashes in doc
+
+### Fixed
+- Support non-ASCII filenames that fall within the system codepage on Windows
+  (see \#122)
+
+## [2023-09-13]
+
+### Added
+- Document ConTeXt as supported `checkformat`
+
+### Changed
+- Extend version string normalisation during checks
+  (see issue \#96)
+
+- Extend excludefiles to cover `build.lua` (see \#286)
+### Fixed
+- Return passing errorlevel if BibTeX issues warnings
+  (see \#260)
+- Respect `excludefiles` when doing (local) installation
+
+## [2023-09-07]
+
+### Changed
+- Refine `-utc` support
+- Apply `checkopts` in addition to engine-specific options
+
+## [2023-09-05]
+
+### Changed
+- Initialise the random seed with the current time so `--shuffle` produces different orders each run.
+- Normalise more `luaotfload` cache lines
+- Apply `-utc` switch for LuaTeX when using a fixed epoch value
+
+## [2023-07-20]
+
+- Set `-kanji-internal=euc` when building pLaTeX
+
+## [2023-07-17]
+
+### Changed
+- Improve stdout "Running l3build with target ..."
+- Quote configuration name used in stdout
+- Update one leftover outdated doc for `unpackexe`: defaults to `pdftex`
+- Building pLaTeX format now uses e-upTeX engine
+- Normalize more `luaotfload` path data (see issue \#301)
+- Update ConTeXt settings to allow for LuaTeX and LuaMetaTeX runs
+- Improve doc for default `stdengine`
+
+### Fixed
+- Avoid setting `TEMXFCNF` for ConTeXt (issue \#232)
+
+## [2023-03-27]
+
+### Fixed
+- All LuaTeX `.tlg` files were wrongly considered not engine-specific.
+  Introduced in #292 which tried to fix #291.
+
+## [2023-03-22]
+
+### Changed
+- Default value of `maxprintline` is now `9999`
+  (may require `.tlg` updates: see docs)
+
+### Fixed
+- Apply needed luatex-specific log normalization, even when `--rerun` is used
+  (issue \#291)
+
+## [2023-03-08]
+
+### Changed
+- Generalize normalization of ghostscript version in PDF-based tests
+- Include UNIX timestamps in generated ZIP files
+- Normalize pdfTeX `.enc` file loading
+
+### Fixed
+- Ensure when used, value of `ps2pdfopts` is surrounded by a space on both sides
+
+## [2023-02-26]
+
+### Changed
+- Run engine sanity check per config
+
+### Fixed
+- Restore epoch settings for `dvitopdf()`
+- Use plural form of variable `ps2pdfopts` consistently in code and doc, and
+  retain compatibility with singular form `ps2pdfopt` (issue \#275)
+- Remove the last trace of dropped variable `stdconfig`
+
+## [2023-02-20]
+
+### Changed
+- Unify `testdir` by dropping possibly trailing `.lua` passed to `--config`
+
+### Fixed
+- Ensure directories `testdir` and `resultdir` exist when `--dirty` is set
+- epoch settings with xetex
+
+## [2023-02-16]
+
+### Changed
+- Drop a redundant setup line for upTeX
+- Normalise more Lua stack trace data (may require `.tlg` rebuild)
+
+### Fixed
+- Ensure `texmf.cnf` work correctly for `dvips`
+
+## [2022-11-10]
+
+### Changed
+- Suppress (new) LaTeX version data at end of `.log`
+
+### Fixed
+- Allow for local override of `ctanupload` variable
+
+## [2022-09-15]
+
+### Fixed
+- Copying of nested directories
+
+## [2022-04-19]
+
+### Changed
+- Normalise GhostScript version in PDF-based tests
+- Sort list of names of difference files for failing tests.
+
+## [2022-04-12]
+
+### Added
+- Basic support for `make4ht`
+
+### Changed
+- Support `bidi` version string in `\special` lines (closes \#226)
+
+## [2022-03-15]
+
+### Changed
+- When `\pdfmeta_set_regression_data:` is defined it is used
+  to set metadata
+- Support multiple configurations in bundles
+
+### Fixed
+- Correctly normalize luaotfload font cache path
+
+## [2022-02-24]
+
+### Fixed
+- Creation of subdirectories in TDS structures on Unix-like systems
+
+- use `form-string` rather than `form` for all curl fields to avoid
+  misinterpreting leading `@` or `<` eg a description starting `<p>`
+
+- Check the boolean value returned by executing shell commands in
+  `l3build-upload` and throw an error if this is false. This fixes
+  the issue that previously "validation successful" was reported
+  if `curl` failed.
+
+### Changed
+- Documentation of how to validate an upload
+
+## [2021-12-14]
+
+### Fixed
+- Use correct name for `options` table in multi configuration management code
+
+## [2021-12-09]
+
+### Added
+- Support for pre-constructed TDS-style sources (variable `tdsdirs`)
+- Support for injection of tokens using `specialformats`
+
+### Changed
+- If multiple configurations are present, let `l3build clean` run
+  on all of them by default. (issue \#214)
+
+## [2021-12-06]
+
+### Fixed
+- Place PDF files inside `docfiledir` in all cases
+
+## [2021-11-29]
+
+### Changed
+- Documentation improvements
+- Use `checkengines[1]` as the default for `stdengine`
+- Add sanity check for `TEXMFHOME` value
+- Double \ when writing the curl options, so that \
+  does not need to be doubled in note and announcement texts.
+
+### Fixed
+- Installation of files when using MiKTeX (see #125)
+- Incorrect line in `manifest` target (see #195)
+- Placement of PDF files in subdirectory locations (issue \#209)
+- Detection of engine-specific tlg files for non-standard LuaTeX based engines (issues #214)
+
+## [2021-11-24]
+
+- Always typeset in `typesetdir` (fixes #210)
+
+## [2021-11-12]
+
+### Changed
+- Documentation improvements
+
+### Fixed
+- Allow config names ending with 'lua', as long as they don't end with '.lua'
+- All documentation files are build in a consistent environment with support
+  files visible.
+
+## [2021-08-28]
+
+### Fixed
+- Creation of zip files on Windows
+- Only match filename and not full path for `exefiles`
+
+## [2021-08-27]
+
+### Added
+- Add the `--show-saves` flag for `l3build check` to generate a list of
+  `l3build save` commands to regenerate all failing tests
+
+### Changed
+- No longer call an external program to generate `zip` files and generate
+  them directly instead. This disables the options `zipexe` and `zipopts`.
+- Copy TDS-style zip files to main dir
+
+## [2021-05-06]
+
+### Fixed
+- Issue when running PDF-based tests
+
+## [2021-05-05]
+
+### Changed
+- Normalise Lua function calls (issue \#127) - may require `.tlg` update
+- LuaTeX from TL'21 is no longer 'off by one' in log files - may require
+  `.tlg` update
+
+### Fixed
+- Installation now supports deeper directory levels (issue \#182)
+- The `texmfhome` directory is now created before use if required
+- Crash caused by yyyy-mm-dd epoch format
+
+### Removed
+- Support for use as `texlua build.lua <target>`
 
 ## [2020-06-04]
 
@@ -68,7 +371,7 @@ this project uses date-based 'snapshot' version identifiers.
 
 ### Fixed
 - When `checkruns` > 1 and `recordstatus=true`, testing code would crash
-  (issue #90)
+  (issue \#90)
 
 ## [2020-02-03]
 
@@ -99,7 +402,7 @@ this project uses date-based 'snapshot' version identifiers.
 
 ### Added
 
-- New `\ASSERT` and `\ASSERTSTR` functions (issue #102)
+- New `\ASSERT` and `\ASSERTSTR` functions (issue \#102)
 
 ### Changed
 
@@ -476,7 +779,43 @@ this project uses date-based 'snapshot' version identifiers.
 - Rationalise short option names: removed `-d`, `-E`, `-r`
 - Target `cmdcheck`: specific to LaTeX kernel work
 
-[Unreleased]: https://github.com/latex3/l3build/compare/2020-06-04...HEAD
+[Unreleased]: https://github.com/latex3/l3build/compare/2024-02-08...HEAD
+[2024-02-08]: https://github.com/latex3/l3build/compare/2024-01-18...2024-02-08
+[2024-01-18]: https://github.com/latex3/l3build/compare/2024-01-09...2024-01-18
+[2024-01-09]: https://github.com/latex3/l3build/compare/2024-01-04...2024-01-09
+[2024-01-04]: https://github.com/latex3/l3build/compare/2023-12-15...2024-01-04
+[2023-12-15]: https://github.com/latex3/l3build/compare/2023-12-13-2...2023-12-15
+[2023-12-13-2]: https://github.com/latex3/l3build/compare/2023-12-13...2023-12-13-2
+[2023-12-13]: https://github.com/latex3/l3build/compare/2023-12-12...2023-12-13
+[2023-12-12]: https://github.com/latex3/l3build/compare/2023-11-01...2023-12-12
+[2023-11-01]: https://github.com/latex3/l3build/compare/2023-09-13...2023-11-01
+[2023-09-13]: https://github.com/latex3/l3build/compare/2023-09-07...2023-09-13
+[2023-09-07]: https://github.com/latex3/l3build/compare/2023-09-05...2023-09-07
+[2023-09-05]: https://github.com/latex3/l3build/compare/2023-07-20...2023-09-05
+[2023-07-20]: https://github.com/latex3/l3build/compare/2023-07-17...2023-07-20
+[2023-07-17]: https://github.com/latex3/l3build/compare/2023-03-27...2023-07-17
+[2023-03-27]: https://github.com/latex3/l3build/compare/2023-03-22...2023-03-27
+[2023-03-22]: https://github.com/latex3/l3build/compare/2023-03-08...2023-03-22
+[2023-03-08]: https://github.com/latex3/l3build/compare/2023-02-26...2023-03-08
+[2023-02-26]: https://github.com/latex3/l3build/compare/2023-02-20...2023-02-26
+[2023-02-20]: https://github.com/latex3/l3build/compare/2023-02-16...2023-02-20
+[2023-02-16]: https://github.com/latex3/l3build/compare/2022-11-10...2023-02-16
+[2022-11-10]: https://github.com/latex3/l3build/compare/2022-09-15...2022-11-10
+[2022-09-15]: https://github.com/latex3/l3build/compare/2022-04-19...2022-09-15
+[2022-04-19]: https://github.com/latex3/l3build/compare/2022-04-12...2022-04-19
+[2022-04-12]: https://github.com/latex3/l3build/compare/2022-03-15...2022-04-12
+[2022-03-15]: https://github.com/latex3/l3build/compare/2022-02-24...2022-03-15
+[2022-02-24]: https://github.com/latex3/l3build/compare/2021-12-14...2022-02-24
+[2021-12-14]: https://github.com/latex3/l3build/compare/2021-12-09...2021-12-14
+[2021-12-09]: https://github.com/latex3/l3build/compare/2021-12-06...2021-12-09
+[2021-12-06]: https://github.com/latex3/l3build/compare/2021-11-29...2021-12-06
+[2021-11-29]: https://github.com/latex3/l3build/compare/2021-11-24...2021-11-29
+[2021-11-24]: https://github.com/latex3/l3build/compare/2021-11-12...2021-11-24
+[2021-11-12]: https://github.com/latex3/l3build/compare/2021-08-28...2021-11-12
+[2021-08-28]: https://github.com/latex3/l3build/compare/2021-08-27...2021-08-28
+[2021-08-27]: https://github.com/latex3/l3build/compare/2021-05-06...2021-08-27
+[2021-05-06]: https://github.com/latex3/l3build/compare/2021-05-05...2021-05-06
+[2021-05-05]: https://github.com/latex3/l3build/compare/2020-06-04...2021-05-05
 [2020-06-04]: https://github.com/latex3/l3build/compare/2020-03-25...2020-06-04
 [2020-03-25]: https://github.com/latex3/l3build/compare/2020-03-16...2020-03-25
 [2020-03-16]: https://github.com/latex3/l3build/compare/2020-03-13...2020-03-16

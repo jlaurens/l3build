@@ -1,13 +1,13 @@
 --[[
 
-File l3build-aux.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-aux.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -25,13 +25,16 @@ for those people who are interested.
 -- local safety guards and shortcuts
 
 local match = string.match
+local gsub  = string.gsub
 
 local pairs = pairs
 local print = print
 
 local lookup = kpse.lookup
 
-local os_time = os_time
+local os_time = os.time
+local os_type = os.type
+
 --
 -- Auxiliary functions which are used by more than one main function
 --
@@ -60,19 +63,23 @@ function normalise_epoch(epoch)
   end
 end
 
----CLI command to set the epoch, will be run while checking or typesetting
+---Returns the CLI command (ending with `os_concat`) to set the epoch
+---when forcecheckepoch is true, a void string otherwise.
+---Will be run while checking or typesetting
 ---@param epoch string
+---@param force boolean
 ---@return string
 ---@see check, typesetting
 ---@usage private?
-function set_epoch_cmd(epoch)
-  return
+function set_epoch_cmd(epoch, force)
+  return force and (
     os_setenv .. " SOURCE_DATE_EPOCH=" .. epoch
       .. os_concat ..
     os_setenv .. " SOURCE_DATE_EPOCH_TEX_PRIMITIVES=1"
       .. os_concat ..
     os_setenv .. " FORCE_SOURCE_DATE=1"
       .. os_concat
+  ) or ""
 end
 
 ---Returns the script name depending on the calling sequence.
@@ -129,9 +136,9 @@ function call(modules, target, opts)
   for _, module in ipairs(modules) do
     local text
     if module == "." and opts["config"] and #opts["config"]>0 then
-      text = " with configuration " .. opts["config"][1]
+      text = " and configuration \"" .. opts["config"][1] .. "\""
     else
-      text = " for module " .. module
+      text = " for module \"" .. module .. "\""
     end
     print("Running l3build with target \"" .. target .. "\"" .. text )
     local error_level = run(
@@ -161,4 +168,44 @@ function dep_install(deps)
     end
   end
   return 0
+end
+
+-- Construct a localtexmf including any tdsdirs
+-- Needed for checking and typesetting, hence global
+function localtexmf()
+  local paths = ""
+  for src,_ in pairs(tdsdirs) do
+    paths = paths .. os_pathsep .. abspath(src) .. "//"
+  end
+  if texmfdir and texmfdir ~= "" and direxists(texmfdir) then
+    paths = paths .. os_pathsep .. abspath(texmfdir) .. "//"
+  end
+  return paths
+end
+
+-- Run a command after setting up the environmental variables
+function runcmd(cmd,dir,vars)
+  dir = dir or "."
+  dir = abspath(dir)
+  vars = vars or {}
+  -- Allow for local texmf files
+  local env = ""
+  if not match(checkformat,"^context$")  then
+    env = os_setenv .. " TEXMFCNF=." .. os_pathsep .. os_concat
+  end
+  local envpaths = "." .. localtexmf() .. os_pathsep
+    .. abspath(localdir) .. os_pathsep
+    .. dir .. (typesetsearch and os_pathsep or "")
+  -- Deal with spaces in paths
+  if os_type == "windows" and match(envpaths," ") then
+    envpaths = gsub(envpaths,'"','')
+  end
+  for _,var in pairs(vars) do
+    if env ~= "" then
+      env = env .. os_setenv .. " " .. var .. "=" .. envpaths .. os_concat
+    else
+      env = os_setenv .. " " .. var .. "=" .. envpaths
+    end
+  end
+  return run(dir,set_epoch_cmd(epoch, forcedocepoch) .. env .. cmd)
 end

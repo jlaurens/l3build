@@ -1,13 +1,13 @@
 --[[
 
-File l3build-variables.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-variables.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -83,7 +83,8 @@ cleanfiles         = cleanfiles         or {"*.log", "*.pdf", "*.zip"}
 demofiles          = demofiles          or { }
 docfiles           = docfiles           or { }
 dynamicfiles       = dynamicfiles       or { }
-excludefiles       = excludefiles       or {"*~"}
+excludefiles       = excludefiles       or {"*~","build.lua","config-*.lua"}
+exefiles           = exefiles           or { }
 installfiles       = installfiles       or {"*.sty","*.cls"}
 makeindexfiles     = makeindexfiles     or {"*.ist"}
 scriptfiles        = scriptfiles        or { }
@@ -106,35 +107,38 @@ unpackdeps  = unpackdeps  or { }
 -- Executable names plus following options
 typesetexe = typesetexe or "pdflatex"
 unpackexe  = unpackexe  or "pdftex"
-zipexe     = zipexe     or "zip"
 
 checkopts   = checkopts   or "-interaction=nonstopmode"
 typesetopts = typesetopts or "-interaction=nonstopmode"
 unpackopts  = unpackopts  or ""
-zipopts     = zipopts     or "-v -r -X"
 
 -- Engines for testing
 checkengines = checkengines or {"pdftex", "xetex", "luatex"}
 checkformat  = checkformat  or "latex"
 specialformats = specialformats or { }
 specialformats.context = specialformats.context or {
-    luatex = {binary = "context", format = ""},
-    pdftex = {binary = "texexec", format = ""},
-    xetex  = {binary = "texexec", format = "", options = "--xetex"}
+    luametatex = {binary = "context", format = ""},
+    luatex     = {binary = "context", format = "", options = "--luatex"},
+    pdftex     = {binary = "texexec", format = ""},
+    xetex      = {binary = "texexec", format = "", options = "--xetex"}
   }
-specialformats.latex = specialformats.latex or {
-    etex  = {format = "latex"},
-    ptex  = {binary = "eptex"},
-    uptex = {binary = "euptex"}
-  }
+specialformats.latex = specialformats.latex or { }
+specialformats.latex.etex = specialformats.latex.etex or
+  {format = "latex"}
+specialformats.latex.ptex = specialformats.latex.ptex or
+   {binary = "euptex", options = "-kanji-internal=euc"}
+specialformats.latex.uptex = specialformats.latex.uptex or
+  {binary = "euptex"}
 if not string.find(status.banner,"2019") then
   specialformats.latex.luatex = specialformats.latex.luatex or
     {binary = "luahbtex",format = "lualatex"}
   specialformats["latex-dev"] = specialformats["latex-dev"] or
     {luatex = {binary="luahbtex",format = "lualatex-dev"}}
 end
+specialformats.latex["make4ht"] = specialformats.latex["make4ht"] or
+  {binary = "make4ht"}
 
-stdengine    = stdengine    or "pdftex"
+stdengine = stdengine or checkengines[1] or "pdftex"
 
 -- The tests themselves
 includetests = includetests or {"*"}
@@ -188,9 +192,10 @@ end
 if flattentds == nil then
   flattentds = true
 end
-maxprintline = maxprintline or 79
+maxprintline = maxprintline or 9999
 packtdszip   = packtdszip   or false
-ps2pdfopt    = ps2pdfopt    or ""
+-- support "ps2pdfopt" for backward compatibility, gh issue #275
+ps2pdfopts   = ps2pdfopts   or ps2pdfopt or ""
 typesetcmds  = typesetcmds  or ""
 typesetruns  = typesetruns  or 3
 recordstatus = recordstatus or false
@@ -207,12 +212,32 @@ pvtext = pvtext or ".pvt"
 tlgext = tlgext or ".tlg"
 tpfext = tpfext or ".tpf"
 
+test_types = test_types or { }
+test_types.log = test_types.log or {
+  test = lvtext,
+  generated = logext,
+  reference = tlgext,
+  expectation = lveext,
+  compare = compare_tlg,
+  rewrite = rewrite_log,
+}
+test_types.pdf = test_types.pdf or {
+  test = pvtext,
+  generated = pdfext,
+  reference = tpfext,
+  rewrite = rewrite_pdf,
+}
+
+test_order = test_order or {"log", "pdf"}
+
 -- Manifest options
 manifestfile = manifestfile or "MANIFEST.md"
 
 -- Non-standard installation locations
 tdslocations = tdslocations or { }
+tdsdirs = tdsdirs or {}
 
 -- Upload settings
 curlexe  = curlexe  or "curl"
 uploadconfig = uploadconfig or {}
+ctanupload   = ctanupload   or "ask"

@@ -1,13 +1,13 @@
 --[[
 
-File l3build-stdmain.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-stdmain.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -21,6 +21,8 @@ The development version of the bundle can be found at
 for those people who are interested.
 
 --]]
+
+local lfs = require("lfs")
 
 local exit   = os.exit
 local insert = table.insert
@@ -71,19 +73,19 @@ target_list =
     check =
       {
         bundle_target = true,
-        desc = "Run all automated tests",
+        desc = "Runs all automated tests",
         func = check,
       },
     clean =
       {
         bundle_func = bundleclean,
-        desc = "Clean out directory tree",
+        desc = "Cleans out directory tree",
         func = clean
       },
     ctan =
       {
         bundle_func = ctan,
-        desc = "Create CTAN-ready archive",
+        desc = "Creates CTAN-ready archive",
         func = ctan
       },
     doc =
@@ -120,12 +122,12 @@ target_list =
         desc = "Updates release tags in files",
         func = tag,
         pre  = function(names)
-           if names and #names > 1 then
-             print("Too many tags specified; exactly one required")
-             exit(1)
-           end
-           return 0
-         end
+            if names and #names > 1 then
+              print("Too many tags specified; exactly one required")
+              exit(1)
+            end
+            return 0
+          end
       },
     uninstall =
       {
@@ -140,7 +142,7 @@ target_list =
       },
     upload =
       {
-        desc = "Send archive to CTAN for public release",
+        desc = "Sends archive to CTAN for public release",
         func = upload
       },
   }
@@ -149,7 +151,7 @@ target_list =
 -- The overall main function
 --
 
-function stdmain(target,names)
+function main(target,names)
   -- Deal with unknown targets up-front
   if not target_list[target] then
     help()
@@ -169,10 +171,10 @@ function stdmain(target,names)
     end
   else
     if target_list[target].pre then
-     errorlevel = target_list[target].pre(names)
-     if errorlevel ~= 0 then
-       exit(1)
-     end
+      errorlevel = target_list[target].pre(names)
+      if errorlevel ~= 0 then
+        exit(1)
+      end
     end
     errorlevel = target_list[target].func(names)
   end

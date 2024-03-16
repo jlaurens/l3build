@@ -1,13 +1,13 @@
 --[[
 
-File l3build-install.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-install.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -37,7 +37,13 @@ local insert = table.insert
 
 local function gethome()
   set_program("latex")
-  return abspath(options["texmfhome"] or var_value("TEXMFHOME"))
+  local result = options["texmfhome"] or var_value("TEXMFHOME")
+  if not result or result == "" or match(result, os_pathsep) then
+    print("Ambiguous TEXMFHOME setting: please use the --texmfhome option")
+    os.exit(1)
+  end
+  mkdir(result)
+  return abspath(result)
 end
 
 function uninstall()
@@ -45,9 +51,9 @@ function uninstall()
     local installdir = gethome() .. "/" .. dir
     if options["dry-run"] then
       local files = filelist(installdir)
-      if next(files) then
+      if files[1] then
         print("\n" .. "For removal from " .. installdir .. ":")
-        for _,file in pairs(filelist(installdir)) do
+        for _,file in ipairs(ordered_filelist(installdir)) do
           print("- " .. file)
         end
       end
@@ -68,15 +74,15 @@ function uninstall()
   -- Any script man files need special handling
   local manfiles = { }
   for _,glob in pairs(scriptmanfiles) do
-    for file,_ in pairs(tree(docfiledir,glob)) do
+    for _,p in ipairs(tree(docfiledir,glob)) do
       -- Man files should have a single-digit extension: the type
-      local installdir = gethome() .. "/doc/man/man"  .. match(file,".$")
-      if fileexists(installdir .. "/" .. file) then
+      local installdir = gethome() .. "/doc/man/man"  .. match(p.src,".$")
+      if fileexists(installdir .. "/" .. p.src) then
         if options["dry-run"] then
-          insert(manfiles,"man" .. match(file,".$") .. "/" ..
-           select(2,splitpath(file)))
+          insert(manfiles,"man" .. match(p.src,".$") .. "/" ..
+           select(2,splitpath(p.src)))
         else
-          errorlevel = errorlevel + rm(installdir,file)
+          errorlevel = errorlevel + rm(installdir,p.src)
         end
       end
     end
@@ -97,9 +103,26 @@ function uninstall()
   if errorlevel ~= 0 then return errorlevel end
   -- Finally, clean up special locations
   for _,location in ipairs(tdslocations) do
-    local path,glob = splitpath(location)
+    local path = dirname(location)
     errorlevel = zapdir(path)
     if errorlevel ~= 0 then return errorlevel end
+  end
+  -- We remove all directories which contain at least one ordinary file in the source tree
+  for src, dest in pairs(tdsdirs) do
+    dest = dest .. '/'
+    local skipdir
+    for _, p in ipairs(tree(src, '**')) do
+      local src = p.src:sub(2) -- Skip the first '.'
+      if skipdir and src:sub(1, #skipdir) ~= skipdir then
+        skipdir = nil
+      end
+      if (not skipdir) and (not direxists(p.cwd)) then
+        skipdir = dirname(src)
+        errorlevel = zapdir(dest .. skipdir)
+        if errorlevel ~= 0 then return errorlevel end
+        skipdir = skipdir .. '/'
+      end
+    end
   end
   return 0
 end
@@ -127,9 +150,9 @@ function install_files(target,full,dry_run)
     -- Generate a file list and include the directory
     for _,glob_table in pairs(files) do
       for _,glob in pairs(glob_table) do
-        for file,_ in pairs(tree(source,glob)) do
+        for _,p in ipairs(tree(source,glob)) do
           -- Just want the name
-          local path,filename = splitpath(file)
+          local path,filename = splitpath(p.src)
           local sourcepath = "/"
           if path == "." then
             sourcepaths[filename] = source
@@ -140,11 +163,11 @@ function install_files(target,full,dry_run)
           end
           local matched = false
           for _,location in ipairs(tdslocations) do
-            local path,glob = splitpath(location)
-            local pattern = glob_to_pattern(glob)
+            local l_dir,l_glob = splitpath(location)
+            local pattern = glob_to_pattern(l_glob)
             if match(filename,pattern) then
-              insert(paths,path)
-              insert(filenames,path .. sourcepath .. filename)
+              insert(paths,l_dir)
+              insert(filenames,l_dir .. sourcepath .. filename)
               matched = true
               break
             end
@@ -161,20 +184,20 @@ function install_files(target,full,dry_run)
     -- The target is only created if there are actual files to install
     if next(filenames) then
       if not dry_run then
-        for _,path in pairs(paths) do
-          local dir = target .. "/" .. path
-          if not cleanpaths[dir] then
-            errorlevel = cleandir(dir)
+        for _,path in ipairs(paths) do
+          local target_path = target .. "/" .. path
+          if not cleanpaths[target_path] then
+            errorlevel = cleandir(target_path)
             if errorlevel ~= 0 then return errorlevel end
           end
-          cleanpaths[dir] = true
+          cleanpaths[target_path] = true
         end
       end
-      for _,file in ipairs(filenames) do
+      for _,name in ipairs(filenames) do
         if dry_run then
-          print("- " .. file)
+          print("- " .. name)
         else
-          local path,file = splitpath(file)
+          local path,file = splitpath(name)
           insert(installmap,
             {file = file, source = sourcepaths[file], dest = target .. "/" .. path})
         end
@@ -187,30 +210,31 @@ function install_files(target,full,dry_run)
   if errorlevel ~= 0 then return errorlevel end
 
     -- Creates a 'controlled' list of files
-    local function excludelist(dir,include,exclude)
+    local function create_file_list(dir,include,exclude)
+      dir = dir or currentdir
       include = include or { }
       exclude = exclude or { }
-      dir = dir or currentdir
-      local includelist = { }
+      insert(exclude,excludefiles)
       local excludelist = { }
       for _,glob_table in pairs(exclude) do
         for _,glob in pairs(glob_table) do
-          for file,_ in pairs(tree(dir,glob)) do
-            excludelist[file] = true
+          for _,p in ipairs(tree(dir,glob)) do
+            excludelist[p.src] = true
           end
         end
       end
+      local result = { }
       for _,glob in pairs(include) do
-        for file,_ in pairs(tree(dir,glob)) do
-          if not excludelist[file] then
-            insert(includelist, file)
+        for _,p in ipairs(tree(dir,glob)) do
+          if not excludelist[p.src] then
+            insert(result, p.src)
           end
         end
       end
-      return includelist
+      return result
     end
 
-  local installlist = excludelist(unpackdir,installfiles,{scriptfiles})
+  local installlist = create_file_list(unpackdir,installfiles,{scriptfiles})
 
   if full then
     errorlevel = doc()
@@ -229,14 +253,14 @@ function install_files(target,full,dry_run)
     end
 
     -- Set up lists: global as they are also needed to do CTAN releases
-    typesetlist = excludelist(docfiledir,typesetfiles,{sourcefiles})
-    sourcelist = excludelist(sourcefiledir,sourcefiles,
+    typesetlist = create_file_list(docfiledir,typesetfiles,{sourcefiles})
+    sourcelist = create_file_list(sourcefiledir,sourcefiles,
       {bstfiles,installfiles,makeindexfiles,scriptfiles})
- 
+
   if dry_run then
     print("\nFor installation inside " .. target .. ":")
-  end 
-    
+  end
+
     errorlevel = create_install_map(sourcefiledir,"source",{sourcelist})
       + create_install_map(docfiledir,"doc",
           {bibfiles,demofiles,docfiles,pdffiles,textfiles,typesetlist})
@@ -255,15 +279,15 @@ function install_files(target,full,dry_run)
     -- Any script man files need special handling
     local manfiles = { }
     for _,glob in pairs(scriptmanfiles) do
-      for file,_ in pairs(tree(docfiledir,glob)) do
+      for _,p in ipairs(tree(docfiledir,glob)) do
         if dry_run then
-          insert(manfiles,"man" .. match(file,".$") .. "/" ..
-            select(2,splitpath(file)))
+          insert(manfiles,"man" .. match(p.src,".$") .. "/" ..
+            select(2,splitpath(p.src)))
         else
           -- Man files should have a single-digit extension: the type
-          local installdir = target .. "/doc/man/man"  .. match(file,".$")
+          local installdir = target .. "/doc/man/man"  .. match(p.src,".$")
           errorlevel = errorlevel + mkdir(installdir)
-          errorlevel = errorlevel + cp(file,docfiledir,installdir)
+          errorlevel = errorlevel + cp(p.src,docfiledir,installdir)
         end
       end
     end
@@ -281,15 +305,43 @@ function install_files(target,full,dry_run)
     + create_install_map(unpackdir,"makeindex",{makeindexfiles},module)
     + create_install_map(unpackdir,"scripts",{scriptfiles},module)
 
+  for src, dest in pairs(tdsdirs) do
+    dest = target .. '/' .. dest
+    insert(installmap,
+      {file = '*', source = src, dest = dest})
+    dest = dest .. '/'
+    local skipdir
+    for _, p in ipairs(tree(src, '**')) do
+      local src = p.src:sub(2) -- Skip the first '.'
+      if skipdir and src:sub(1, #skipdir) ~= skipdir then
+        skipdir = nil
+      end
+      if (not skipdir) and (not direxists(p.cwd)) then
+        skipdir = dirname(src)
+        errorlevel = cleandir(dest .. skipdir)
+        if errorlevel ~= 0 then return errorlevel end
+        skipdir = skipdir .. '/'
+      end
+    end
+  end
+
   if errorlevel ~= 0 then return errorlevel end
+
+  -- Track created destination directories to avoid overhead from
+  -- repeatedly creating them
+  local destination_dirs = {}
 
   -- Files are all copied in one shot: this ensures that cleandir()
   -- can't be an issue even if there are complex set-ups
   for _,v in ipairs(installmap) do
+    if not destination_dirs[v.dest] then
+      mkdir(v.dest)
+      destination_dirs[v.dest] = true
+    end
     errorlevel = cp(v.file,v.source,v.dest)
     if errorlevel ~= 0  then return errorlevel end
-  end 
-  
+  end
+
   return 0
 end
 

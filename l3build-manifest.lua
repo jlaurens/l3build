@@ -1,13 +1,13 @@
 --[[
 
-File l3build-manifest.lua Copyright (C) 2018,2020 The LaTeX Project
+File l3build-manifest.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -33,7 +33,7 @@ for those people who are interested.
       `l3build-manifest-setup.lua`.
 --]]
 
-manifest = manifest or function()
+function manifest()
 
   -- build list of ctan files
   ctanfiles = {}
@@ -57,6 +57,8 @@ manifest = manifest or function()
 
   printline = "Manifest written to " .. manifestfile
   print((printline:gsub(".","*")))  print(printline)  print((printline:gsub(".","*")))
+
+  return 0
 
 end
 
@@ -126,7 +128,7 @@ manifest_build_init = function(entry)
     Nchar_descr   = 11 , -- TODO: generalise
   }
 
-   -- copy default options to each group if necessary
+  -- copy default options to each group if necessary
   for kk,ll in pairs(manifest_group_defaults) do
     if entry[kk] == nil then
       entry[kk] = ll
@@ -134,7 +136,7 @@ manifest_build_init = function(entry)
     -- can't use "entry[kk] = entry[kk] or ll" because false/nil are indistinguishable!
   end
 
-  -- initialisation for internal data
+  -- initialization for internal data
   for kk,ll in pairs(manifest_group_init) do
     entry[kk] = ll
   end
@@ -277,4 +279,3 @@ manifest_write_group = function(f,entry)
   end
 
 end
-

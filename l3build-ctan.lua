@@ -1,13 +1,13 @@
 --[[
 
-File l3build-ctan.lua Copyright (C) 2018-2020 The LaTeX Project
+File l3build-ctan.lua Copyright (C) 2018-2024 The LaTeX Project
 
 It may be distributed and/or modified under the conditions of the
 LaTeX Project Public License (LPPL), either version 1.3c of this
 license or (at your option) any later version.  The latest version
 of this license is in the file
 
-   http://www.latex-project.org/lppl.txt
+   https://www.latex-project.org/lppl.txt
 
 This file is part of the "l3build bundle" (The Work in LPPL)
 and all files in that bundle must be distributed together.
@@ -25,25 +25,39 @@ for those people who are interested.
 local pairs = pairs
 local print = print
 
+local attributes = lfs.attributes
 local lower = string.lower
 local match = string.match
 
+local newzip = require"l3build-zip"
+
 -- Copy files to the main CTAN release directory
 function copyctan()
-  mkdir(ctandir .. "/" .. ctanpkg)
+  local pkgdir = ctandir .. "/" .. ctanpkg
+  mkdir(pkgdir)
+
+  -- Handle pre-formed sources: do two passes to avoid any cleandir() issues
+  for _,dest in pairs(tdsdirs) do
+    mkdir(pkgdir .. "/" .. dest)
+  end
+  for src,dest in pairs(tdsdirs) do
+    cp("*",src,pkgdir .. "/" .. dest)
+  end
+
+  -- Now deal with the one-at-a-time files
   local function copyfiles(files,source)
     if source == currentdir or flatten then
       for _,filetype in pairs(files) do
-        cp(filetype,source,ctandir .. "/" .. ctanpkg)
+        cp(filetype,source,pkgdir)
       end
     else
       for _,filetype in pairs(files) do
-        for file,_ in pairs(tree(source,filetype)) do
-          local path = splitpath(file)
-          local ctantarget = ctandir .. "/" .. ctanpkg .. "/"
+        for _,p in ipairs(tree(source,filetype)) do
+          local path = dirname(p.src)
+          local ctantarget = pkgdir .. "/"
             .. source .. "/" .. path
           mkdir(ctantarget)
-          cp(file,source,ctantarget)
+          cp(p.src,source,ctantarget)
         end
       end
     end
@@ -54,8 +68,9 @@ function copyctan()
   end
   copyfiles(sourcefiles,sourcefiledir)
   for _,file in pairs(textfiles) do
-    cp(file, textfiledir, ctandir .. "/" .. ctanpkg)
+    cp(file, textfiledir, pkgdir)
   end
+
 end
 
 function bundlectan()
@@ -68,33 +83,33 @@ end
 function ctan()
   -- Always run tests for all engines
   options["engine"] = nil
-  local function dirzip(dir, name)
-    local zipname = name .. ".zip"
-    local function tab_to_str(table)
-      local string = ""
-      for _,i in ipairs(table) do
-        string = string .. " " .. "\"" .. i .. "\""
+  local function dirzip(dir, zipname)
+    zipname = zipname .. ".zip"
+    local zip = newzip(dir .. '/' .. zipname)
+    local function tab_to_check(table)
+      local patterns = {}
+      for n,i in ipairs(table) do
+        patterns[n] = glob_to_pattern(i)
       end
-      return string
+      return function(name)
+        for n, patt in ipairs(patterns) do
+          if name:match"([^/]*)$":match(patt) then return true end
+        end
+        return false
+      end
     end
     -- Convert the tables of files to quoted strings
-    local binfiles = tab_to_str(binaryfiles)
-    local exclude = tab_to_str(excludefiles)
+    local binfile = tab_to_check(binaryfiles)
+    local exclude = tab_to_check(excludefiles)
+    local exefile = tab_to_check(exefiles)
     -- First, zip up all of the text files
-    run(
-      dir,
-      zipexe .. " " .. zipopts .. " -ll ".. zipname .. " " .. "."
-        .. (
-          (binfiles or exclude) and (" -x" .. binfiles .. " " .. exclude)
-          or ""
-        )
-    )
-    -- Then add the binary ones
-    run(
-      dir,
-      zipexe .. " " .. zipopts .. " -g ".. zipname .. " " .. ". -i" ..
-        binfiles .. (exclude and (" -x" .. exclude) or "")
-    )
+    for _, p in ipairs(tree(dir, "**")) do
+      local src = p.src:sub(3) -- Strip ./
+      if not (attributes(p.cwd, "mode") == "directory" or exclude(src) or src == zipname) then
+        zip:add(p.cwd, src, binfile(src), exefile(src))
+      end
+    end
+    return zip:close()
   end
   local errorlevel
   local standalone = false
@@ -146,6 +161,7 @@ function ctan()
     dirzip(tdsdir, ctanpkg .. ".tds")
     if packtdszip then
       cp(ctanpkg .. ".tds.zip", tdsdir, ctandir)
+      cp(ctanpkg .. ".tds.zip", tdsdir, currentdir)
     end
     dirzip(ctandir, ctanzip)
     cp(ctanzip .. ".zip", ctandir, currentdir)
@@ -156,4 +172,3 @@ function ctan()
   end
   return errorlevel
 end
-
