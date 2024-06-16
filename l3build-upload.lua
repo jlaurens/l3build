@@ -38,6 +38,9 @@ local len   = string.len
 local lower = string.lower
 local match = string.match
 
+---@diagnostic disable-next-line: undefined-global
+local attributes = lfs.attributes
+
 -- UPLOAD()
 --
 -- takes a package configuration table and an optional boolean
@@ -64,11 +67,13 @@ local match = string.match
 -- with a configuration table `uploadconfig`
 
 
+---@diagnostic disable-next-line: undefined-global
 local curl_debug = curl_debug or false -- to disable posting
 -- For now, this is undocumented.
 
 
 if options["dry-run"] then
+---@diagnostic disable-next-line: lowercase-global
   ctanupload = false
 end
 -- if ctanupload is nil or false, only validation is attempted
@@ -78,16 +83,19 @@ end
 
 local ctan_post -- this is private to the module
 
--- TODO: next is a public global method,
--- but following functions are semantically local
--- despite they are declared globally.
+local file_contents -- forward
+local trim_space -- forward
+local shell -- forward
+local construct_ctan_post -- forward
 
+---@diagnostic disable-next-line: lowercase-global
 function upload(tagnames)
 
   local uploadfile = ctanzip..".zip"
 
-  -- Keep data local
+  -- Keep data access local
   local uploadconfig = uploadconfig
+  local options = options
 
   -- try a sensible default for the package name:
   uploadconfig.pkg = uploadconfig.pkg or ctanpkg or nil
@@ -95,6 +103,7 @@ function upload(tagnames)
   -- Get data from command line if appropriate
   if options["file"] then
     local f = open(options["file"],"r")
+    assert(f)
     uploadconfig.announcement = assert(f:read('*a'))
     close(f)
   end
@@ -104,8 +113,7 @@ function upload(tagnames)
 
   uploadconfig.note =   uploadconfig.note  or file_contents(uploadconfig.note_file)
 
-  tagnames = tagnames or { }
-  uploadconfig.version = tagnames[1] or uploadconfig.version
+  uploadconfig.version = tagnames and tagnames[1] or uploadconfig.version
 
   local override_update_check = false
   if uploadconfig.update == nil then
@@ -114,9 +122,9 @@ function upload(tagnames)
   end
 
   -- avoid lower level error from post command if zip file missing
-  local ziptime = lfs.attributes(trim_space(tostring(uploadfile)), 'modification')
+  local ziptime = attributes(trim_space(uploadfile), 'modification')
   if not ziptime then
-    error("Missing zip file '" .. tostring(uploadfile) .. "'. \z
+    error("Missing zip file '" .. uploadfile .. "'. \z
        Maybe you forgot to run 'l3build ctan' first?")
   end
   local age = os.time() - ziptime
@@ -126,9 +134,8 @@ function upload(tagnames)
            | Are you sure that you executed 'l3build ctan' first? |\n\z
            --------------------------------------------------------",
       age // 86400))
-    print("Are you sure you want to continue? [y/n]" )
-    io.stdout:write("> "):flush()
-    if lower(read(),1,1) ~= "y" then
+    local ans = ask("Are you sure you want to continue? [y/n]", 1)
+    if not ans or lower(ans) ~= "y" then
       print'Aborting'
       return 1
     end
@@ -140,14 +147,16 @@ function upload(tagnames)
 -- curl file version
   local curloptfile = uploadconfig.curlopt_file or (ctanzip .. ".curlopt")
   local curlopt=open(curloptfile,"w")
+  assert(curlopt)
   output(curlopt)
   write(ctan_post)
   close(curlopt)
 
   ctan_post=curlexe .. " --config " .. curloptfile
 
+  local fp_return=""
 
-if options["debug"] then
+  if options["debug"] then
     ctan_post = ctan_post ..  ' https://httpbin.org/post'
     fp_return = shell(ctan_post)
     print('\n\nCURL COMMAND:')
@@ -155,13 +164,12 @@ if options["debug"] then
     print("\n\nHTTP RESPONSE:")
     print(fp_return)
     return 1
-else
+  else
     ctan_post = ctan_post ..  ' https://ctan.org/submit/'
-end
+  end
 
   -- call post command to validate the upload at CTAN's validate URL
   local exit_status=0
-  local fp_return=""
 
   -- use popen not execute so get the return body local exit_status=os.execute(ctan_post .. "validate")
   if (curl_debug==false) then
@@ -185,8 +193,8 @@ end
   end
 
   -- if upload requested and validation succeeded repost to the upload URL
-  if (exit_status==0 or exit_status==nil) then
-    if (ctanupload ~=nil and ctanupload ~=false and ctanupload ~= true) then
+  if (exit_status == 0 or exit_status == nil) then
+    if (ctanupload ~= nil and ctanupload ~= false and ctanupload ~= true) then
       if (match(fp_return,"WARNING")) then
         print("Warnings from CTAN package validation:" .. fp_return:gsub("%[","\n["):gsub("%]%]","]\n]"))
       else
@@ -195,20 +203,21 @@ end
       print("" )
       if age < 86400 and age >= 60 then
         if age >= 3600 then
-          print("----------------------------------------------------" )
-          print(string.format("| The local archive is older than %2i hours.        |", age//3600 ))
-          print("| Have you executed l3build ctan first?  If so ... |" )
-          print("----------------------------------------------------" )
+          print(string.format(
+            "------------------------------------------------------\n\z
+             | The local archive is older than %2i hours.          |\n\z
+             | Have you executed 'l3build ctan' first?  If so ... |\n\z
+             ------------------------------------------------------",
+            age//3600
+          ))
         else
           print(string.format("The local archive is %i minutes old.", age//60 ))
         end
       end
       print("Do you want to upload to CTAN? [y/n]" )
-      local answer=""
       io.stdout:write("> ")
       io.stdout:flush()
-      answer=read()
-      if(lower(answer,1,1)=="y") then
+      if(lower(read(1))=="y") then
         ctanupload=true
       end
     end
@@ -235,12 +244,12 @@ end
 end
 
 
-function trim_space(s)
+trim_space = function(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
 
-function shell(s)
+shell = function(s)
   local h = assert(popen(s, 'r'))
   local t = assert(h:read('*a'))
   local success = h:close()
@@ -251,7 +260,9 @@ function shell(s)
   end
 end
 
-function construct_ctan_post(uploadfile,debug)
+local ctan_field -- forward
+
+construct_ctan_post = function(uploadfile,debug)
 
   -- start building the curl command:
 -- commandline  ctan_post = curlexe .. " "
@@ -286,7 +297,9 @@ function construct_ctan_post(uploadfile,debug)
 
 end
 
-function ctan_field(fname,fvalue,max,desc,mandatory,multi)
+local ctan_single_field -- forward
+
+ctan_field = function(fname,fvalue,max,desc,mandatory,multi)
   if (type(fvalue)=="table" and multi==true) then
     for i, v in pairs(fvalue) do
       ctan_single_field(fname,v,max,desc,mandatory and i==1)
@@ -297,7 +310,10 @@ function ctan_field(fname,fvalue,max,desc,mandatory,multi)
 end
 
 
-function ctan_single_field(fname,fvalue,max,desc,mandatory)
+local input_single_line_field -- forward
+local input_multi_line_field -- forward
+
+ctan_single_field = function(fname,fvalue,max,desc,mandatory)
   local fvalueprint = fvalue
   if fvalue == nil then fvalueprint = '??' end
   print('ctan-upload | ' .. fname .. ': ' ..tostring(fvalueprint))
@@ -335,7 +351,7 @@ end
 
 
 -- function for interactive multiline fields
-function input_multi_line_field (name)
+input_multi_line_field = function(name)
   print("Enter " .. name .. "  three <return> or ctrl-D to stop")
 
   local field=""
@@ -361,7 +377,7 @@ function input_multi_line_field (name)
   return field
 end
 
-function input_single_line_field(name)
+input_single_line_field = function(name)
   print("Enter " .. name )
 
   local field=""
@@ -374,7 +390,7 @@ end
 
 
 -- if filename is non nil and file readable return contents otherwise nil
-function file_contents (filename)
+file_contents = function(filename)
   if filename ~= nil then
     local f= open(filename,"r")
     if f==nil then
