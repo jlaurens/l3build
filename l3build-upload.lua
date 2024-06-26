@@ -88,6 +88,18 @@ local trim_space -- forward
 local shell -- forward
 local construct_ctan_post -- forward
 
+local function ask(banner, n)
+  if banner then
+    print(banner)
+  end
+  write("> ")
+  flush()
+  if type(n) == "number" then
+    return read(n) or ""
+  end
+  return read() or ""
+end
+
 ---@diagnostic disable-next-line: lowercase-global
 function upload(tagnames)
 
@@ -134,8 +146,7 @@ function upload(tagnames)
            | Are you sure that you executed 'l3build ctan' first? |\n\z
            --------------------------------------------------------",
       age // 86400))
-    local ans = ask("Are you sure you want to continue? [y/n]", 1)
-    if not ans or lower(ans) ~= "y" then
+    if ask("Are you sure you want to continue? [y/n]", 1):lower() ~= "y" then
       print'Aborting'
       return 1
     end
@@ -214,10 +225,7 @@ function upload(tagnames)
           print(string.format("The local archive is %i minutes old.", age//60 ))
         end
       end
-      print("Do you want to upload to CTAN? [y/n]" )
-      io.stdout:write("> ")
-      io.stdout:flush()
-      if(lower(read(1))=="y") then
+      if(ask("Do you want to upload to CTAN? [y/n]", 1):lower()=="y") then
         ctanupload=true
       end
     end
@@ -378,14 +386,7 @@ input_multi_line_field = function(name)
 end
 
 input_single_line_field = function(name)
-  print("Enter " .. name )
-
-  local field=""
-
-  write("> ")
-  flush()
-  field=read()
-  return field
+  return ask("Enter " .. name)
 end
 
 
