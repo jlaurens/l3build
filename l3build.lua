@@ -34,7 +34,6 @@ local lfs = require("lfs")
 
 local ipairs           = ipairs
 local insert           = table.insert
-local lookup           = kpse.lookup
 local match            = string.match
 local gsub             = string.gsub
 local next             = next
@@ -42,30 +41,26 @@ local print            = print
 local exit             = os.exit
 local open             = io.open
 
--- l3build setup and functions
+-- Activate kpse lookup in `require`
 kpse.set_program_name("kpsewhich")
-build_kpse_path = match(lookup("l3build.lua"),"(.*[/])")
-local function build_require(s)
-  require(lookup("l3build-"..s..".lua", { path = build_kpse_path } ) )
-end
 
 -- Minimal code to do basic checks
-build_require("arguments")
-build_require("help")
+require"l3build-arguments"
+require"l3build-help"
 
-build_require("file-functions")
-build_require("typesetting")
-build_require("aux")
-build_require("clean")
-build_require("check")
-build_require("ctan")
-build_require("install")
-build_require("unpack")
-build_require("manifest")
-build_require("manifest-setup")
-build_require("tagging")
-build_require("upload")
-build_require("stdmain")
+require"l3build-file-functions"
+require"l3build-typesetting"
+require"l3build-aux"
+require"l3build-clean"
+require"l3build-check"
+require"l3build-ctan"
+require"l3build-install"
+require"l3build-unpack"
+require"l3build-manifest"
+require"l3build-manifest-setup"
+require"l3build-tagging"
+require"l3build-upload"
+require"l3build-stdmain"
 
 -- This has to come after stdmain(),
 -- and that has to come after the functions are defined
@@ -87,7 +82,7 @@ end
 
 -- Load standard settings for variables:
 -- comes after any user versions
-build_require("variables")
+require"l3build-variables"
 
 -- Ensure that directories are 'space safe'
 maindir       = escapepath(maindir)
