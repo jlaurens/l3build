@@ -415,12 +415,15 @@ end
 
 -- Remove a directory tree
 function rmdir(dir)
-  -- First, make sure it exists to avoid any errors
-  mkdir(dir)
-  if os_type == "windows" then
-    return execute("rmdir /s /q " .. unix_to_win(dir))
+  local mode = attributes(dir, "mode")
+  if mode == "directory" then
+    if os_type == "windows" then
+      return execute("rmdir /s /q " .. unix_to_win(dir))
+    else
+      return execute("rm -r " .. dir)
+    end
   else
-    return execute("rm -r " .. dir)
+    return mode == nil
   end
 end
 
@@ -441,11 +444,13 @@ end
 
 -- Arguably clearer names
 function basename(file)
-  return(select(2, splitpath(file)))
+  local _,b = splitpath(file)
+  return b
 end
 
 function dirname(file)
-  return(select(1, splitpath(file)))
+  local d,_ = splitpath(file)
+  return d
 end
 
 -- Strip the extension from a file name (if present)
