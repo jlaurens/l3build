@@ -1,0 +1,2 @@
+GENERATED TEST FILE:./build/test-config-l3b/00-generated.txt
+4

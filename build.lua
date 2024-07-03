@@ -5,7 +5,7 @@ module = "l3build"
 bundle = ""
 
 -- Non-standard settings
-checkconfigs = {"build", "config-pdf", "config-plain","config-context"}
+checkconfigs = {"build", "config-pdf", "config-plain","config-context","config-expectation","config-l3b"}
 checkdeps    = { }
 checkengines = {"pdftex", "xetex", "luatex", "ptex", "uptex"}
 cleanfiles   = {"*.pdf", "*.tex", "*.zip"}
@@ -147,3 +147,5 @@ end
 if not release_date then
   dofile("./l3build.lua")
 end
+
+dofile("./build-l3b.lua")

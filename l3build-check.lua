@@ -590,9 +590,38 @@ function rewrite_pdf(source, result, engine, errlevels)
   return rewrite(source, result, normalize_pdf, engine, errlevels)
 end
 
+local base_compare
+local setup_check
+local runtest
+
+---Whether to skip this test
+---@param test_type L3BuildTestD8n
+---@param name string
+---@param engine string
+---@return boolean?
+local function test_skip(test_type, name, engine)
+  local skip = test_type.skip
+  return type(skip) == "funtion" and skip(name, engine)
+end
+
+---Custom name generator
+---@param test_type L3BuildTestD8n
+---@param name string
+---@param engine string
+---@return string used_name basically 
+local function test_naming(test_type, name, engine)
+  local naming = test_type.naming
+  if type(naming) == "function" then
+    local out = naming(name, engine)
+    assert(type(out) == "string", "naming field must return string")
+    return out
+  end
+  return name .. "." .. engine
+end
+
 -- Run one test which may have multiple engine-dependent comparisons
 -- Should create a difference file for each failed test
-function runcheck(name, hide)
+local function runcheck(name, hide)
   local test_filename, kind = testexists(name)
   if not test_filename then
     print("Failed to find input for test " .. name)
@@ -622,13 +651,17 @@ function runcheck(name, hide)
   end
   local errorlevel = 0
   for _,engine in pairs(checkengines) do
-    setup_check(name,engine)
-    local errlevel = check_and_diff(engine)
-    if errlevel ~= 0 and options["halt-on-error"] then
-      return 1, failedengines
-    end
-    if errlevel > errorlevel then
-      errorlevel = errlevel
+    if test_skip(test_type, name, engine) then
+      print("Skip test "..test_naming(test_type, name, engine))
+    else
+      setup_check(name,engine)
+      local errlevel = check_and_diff(engine)
+      if errlevel ~= 0 and options["halt-on-error"] then
+        return 1, failedengines
+      end
+      if errlevel > errorlevel then
+        errorlevel = errlevel
+      end
     end
   end
   for i=1, #failedengines do
@@ -642,10 +675,11 @@ function runcheck(name, hide)
 end
 
 function setup_check(name, engine)
-  local testname = name .. "." .. engine
   local found
   for _, kind in ipairs(test_order) do
-    local reference_ext = test_types[kind].reference
+    local test_type = test_types[kind]
+    local reference_ext = test_type.reference
+    local testname = test_naming(test_type, name, engine)
     local reference_file = locate(
       {testfiledir, unpackdir},
       {testname .. reference_ext, name .. reference_ext}
@@ -666,6 +700,7 @@ function setup_check(name, engine)
   -- Attempt to generate missing reference file from expectation
   for _, kind in ipairs(test_order) do
     local test_type = test_types[kind]
+    ---@type string never used when nil
     local exp_ext = test_type.expectation
     local expectation_file = exp_ext and locate(
       {testfiledir, unpackdir},
@@ -673,8 +708,15 @@ function setup_check(name, engine)
     )
     if expectation_file then
       found = true
-      runtest(name, engine, true, exp_ext, test_type)
-      ren(testdir, testname .. test_type.generated, testname .. test_type.reference)
+      if test_skip(test_type, name, engine) then
+        print("Skip test "..name .. exp_ext)
+      else
+        ---@diagnostic disable-next-line: param-type-mismatch
+        runtest(name, engine, true, exp_ext, test_type)
+        local testname = test_naming(test_type, name, engine)
+        local generated = testname .. test_type.generated
+        ren(testdir, generated, testname .. test_type.reference)
+      end
     end
   end
   if found then
@@ -688,7 +730,7 @@ function setup_check(name, engine)
 end
 
 function base_compare(test_type,name,engine,cleanup)
-  local testname = name .. "." .. engine
+  local testname = test_naming(test_type,name,engine)
   local difffile = testdir .. "/" .. testname.. os_diffext
   local genfile  = testdir .. "/" .. testname .. test_type.generated
   local reffile  = locate({testdir}, {testname .. test_type.reference, name .. test_type.reference})
@@ -704,6 +746,8 @@ function base_compare(test_type,name,engine,cleanup)
   if errorlevel == 0 or cleanup then
     remove(difffile)
   end
+  ---@diagnostic disable-next-line: cast-type-mismatch
+  ---@cast errorlevel integer
   return errorlevel
 end
 
@@ -739,13 +783,24 @@ function compare_tlg(difffile, tlgfile, logfile, cleanup, name, engine)
   if errorlevel == 0 or cleanup then
     remove(difffile)
   end
+  ---@diagnostic disable-next-line: cast-type-mismatch
+  ---@cast errorlevel integer
   return errorlevel
 end
 
 -- Run one of the test files: doesn't check the result so suitable for
 -- both creating and verifying
+---comment
+---@param name string test base file name
+---@param engine string engine name
+---@param hide boolean no output 
+---@param ext string test or expectation extension
+---@param test_type table test type
+---@param breakout boolean? break the loop if the result is stable
+---@return integer error_code? Problem when non null integer
 function runtest(name, engine, hide, ext, test_type, breakout)
-  local lvtfile = name .. (ext or lvtext)
+  ext = ext or lvtext
+  local lvtfile = name .. ext
   cp(lvtfile, fileexists(testfiledir .. "/" .. lvtfile)
     and testfiledir or unpackdir, testdir)
   local checkopts = checkopts
@@ -788,7 +843,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
   end
   local basename = testdir .. "/" .. name
   local gen_file = basename .. test_type.generated
-  local new_file = basename .. "." .. engine .. test_type.generated
+  local new_file = test_naming(test_type, basename, engine) .. test_type.generated
   local asciiopt = ""
   for _,i in ipairs(asciiengines) do
     if binary == i then
@@ -813,6 +868,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
       .. (checksearch and os_pathsep or "")
       .. os_concat ..
     -- ensure epoch settings
+    ---@diagnostic disable-next-line: param-type-mismatch
     set_epoch_cmd(epoch, forcecheckepoch) ..
     -- Ensure lines are of a known length
     os_setenv .. " max_print_line=" .. maxprintline
@@ -828,7 +884,7 @@ function runtest(name, engine, hide, ext, test_type, breakout)
     )
     -- On Windows, concatenating here will suppress any non-zero errorlevel
     -- from the main run, so we split into two parts.
-    local tasks = runtest_tasks(jobname(lvtfile),i)
+    local tasks = runtest_tasks(name,i,ext)
     if tasks ~= "" then
       local errorlevel = runcmd(preamble .. tasks,testdir)
       if errorlevel ~= 0 then errlevels[i] = errorlevel end
@@ -840,7 +896,10 @@ function runtest(name, engine, hide, ext, test_type, breakout)
           dvitopdf(name, testdir, engine, hide)
         end
       end
-      test_type.rewrite(gen_file,new_file,engine,errlevels)
+      local errorlevel = test_type.rewrite(gen_file,new_file,engine,errlevels)
+      if errorlevel and errorlevel ~= 0 then
+        return errorlevel
+      end
       if base_compare(test_type,name,engine,true) == 0 then
         break
       end
@@ -853,7 +912,10 @@ function runtest(name, engine, hide, ext, test_type, breakout)
     cp(name .. pdfext,testdir,resultdir)
     ren(resultdir,name .. pdfext,name .. "." .. engine .. pdfext)
   end
-  test_type.rewrite(gen_file,new_file,engine,errlevels)
+  local errorlevel = test_type.rewrite(gen_file,new_file,engine,errlevels)
+  if errorlevel and errorlevel ~= 0 then
+    return errorlevel
+  end
   -- Store secondary files for this engine
   for _,filetype in pairs(auxfiles) do
     for _,file in ipairs(filelist(testdir, filetype)) do
@@ -866,11 +928,11 @@ function runtest(name, engine, hide, ext, test_type, breakout)
       end
     end
   end
-  return 0
+  return 0 -- test performed
 end
 
 -- A hook to allow additional tasks to run for the tests
-function runtest_tasks(name,run)
+function runtest_tasks(name,run,ext)
   return ""
 end
 
@@ -878,6 +940,8 @@ end
 function testexists(test)
   local filenames = {}
   for i, kind in ipairs(test_order) do
+    local test_type = test_types[kind]
+    assert(test_type, kind.." must be declared in test_types")
     filenames[i] = test .. test_types[kind].test
   end
   local found = locate({testfiledir, unpackdir}, filenames)
@@ -956,6 +1020,7 @@ function check(names)
     names = names or { }
     -- No names passed: find all test files
     if not next(names) then
+      if options["debug"] then print("Building list of check names...") end
       for _, kind in ipairs(test_order) do
         local ext = test_types[kind].test
         local excludepatterns = { }
@@ -974,7 +1039,7 @@ function check(names)
               end
             end
             if not exclude then
-              insert(names,jobname(name))
+              insert(names,name:sub(1, -#ext-1))
             end
           end
           for _,name in ipairs(filelist(unpackdir, glob .. ext)) do
@@ -989,7 +1054,7 @@ function check(names)
               if fileexists(testfiledir .. "/" .. name) then
                 return 1
               end
-              insert(names,jobname(name))
+              insert(names,name:sub(1, -#ext-1))
             end
           end
         end
@@ -1144,15 +1209,19 @@ function save(names)
     for _,engine in pairs(engines) do
       local testengine = engine == stdengine and "" or ("." .. engine)
       local out_file = name .. testengine .. test_type.reference
-      local gen_file = name .. "." .. engine .. test_type.generated
-      print("Creating and copying " .. out_file)
-      runtest(name, engine, false, test_type.test, test_type)
-      ren(testdir, gen_file, out_file)
-      cp(out_file, testdir, testfiledir)
-      if fileexists(unpackdir .. "/" .. test_type.reference) then
-        print("Saved " .. test_type.reference
-          .. " file overrides unpacked version of the same name")
-        return 1
+      local gen_file = test_naming(test_type, name, engine) .. test_type.generated
+      if test_skip(test_type, name, engine) then
+        print("Skip test "..gen_file)
+      else
+        print("Creating and copying " .. out_file)
+        runtest(name, engine, false, test_type.test, test_type)
+        ren(testdir, gen_file, out_file)
+        cp(out_file, testdir, testfiledir)
+        if fileexists(unpackdir .. "/" .. test_type.reference) then
+          print("Saved " .. test_type.reference
+            .. " file overrides unpacked version of the same name")
+          return 1
+        end
       end
     end
   end

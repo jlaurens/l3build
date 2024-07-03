@@ -1,0 +1,6 @@
+\input regression -test.tex\relax
+\START
+\TEST{counter -math}{
+\typeout{5}
+}
+\END

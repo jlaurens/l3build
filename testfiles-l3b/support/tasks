@@ -1,0 +1,6 @@
+-- call `texlua ./task <name>`
+print("THIS IS TASKS")
+for i,v in ipairs(arg) do
+  print(("%i->%s"):format(i,v))
+end
+os.execute(arg[0].." "..arg[1].." "..arg[2])

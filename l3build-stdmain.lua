@@ -147,6 +147,47 @@ target_list =
       },
   }
 
+---Declare a custom command line target
+---
+---To be used in `build.lua`
+---@param name string name of the target
+---@param kvargs table named arguments including target data
+function declaretarget(name, kvargs)
+  if type(name) ~= "string" then
+    error("name must be a string", 2)
+  end
+  if type(kvargs) ~= "table" then
+    error("kvargs must be a table", 2)
+  end
+  local entry = {}
+  if target_list[name] then
+    if kvargs.already == "override" then
+      -- start with a shallow copy with no metatable consideration
+      for k,v in pairs(target_list[name]) do
+        entry[k] = v
+      end
+    elseif kvargs.already ~= "replace" then
+      error(name.." is already a target", 2)      
+    end
+  end
+  if type(kvargs.func) ~= "function" then
+    error("func must be a function", 2)
+  end
+  entry.func = kvargs.func
+  local function feed(k, tp)
+    local v = kvargs[k]
+    if type(v) == tp then
+      entry[k] = v
+    elseif v ~= nil then
+      error(k.." must be a "..tp, 3)
+    end
+  end
+  feed("bundle_func", "function")
+  feed("bundle_target", "boolean")
+  feed("pre", "function")
+  target_list[name] = entry
+end
+
 --
 -- The overall main function
 --
