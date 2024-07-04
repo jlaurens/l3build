@@ -1,3 +1,2 @@
-local f = assert(io.popen("ls"))
-print(f:read("a"))
-generate(2+2)
+l3btest:write("2+2==4")
+l3btest:write("2+2==3")

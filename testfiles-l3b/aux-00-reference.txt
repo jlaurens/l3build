@@ -1,5 +1,0 @@
-GENERATED TEST FILE:./build/test-config-l3b/aux-00-generated.txt
-GENERATE: test-00
-normalise_epoch()
-status=false
-./l3build-aux.lua:48: normalize_epoch argument must not be nil

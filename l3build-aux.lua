@@ -57,6 +57,7 @@ function normalise_epoch(epoch)
         hour = 0, sec = 0, isdst = nil
       })
   elseif match(epoch, "^%d+$") then
+    ---@diagnostic disable-next-line: return-type-mismatch
     return tonumber(epoch)
   else
     return 0
@@ -206,4 +207,15 @@ function runcmd(cmd,dir,vars)
   end
   return run(dir,set_epoch_cmd(epoch, forcedocepoch)
     .. (env and (env .. os_concat) or "") .. cmd)
+end
+
+return require("l3buildlib").exposed_for_test("./l3btest-aux.lua")
+do
+  local function pack(done,...)
+    return done, {...}
+  end
+  local done, list = pack(pcall(function()
+    return dofile("./l3btest-aux.lua")
+  end))
+  if done then return table.unpack(list) end
 end

@@ -1,1 +1,5 @@
-generate(2+2)
+l3btest:write("2+2=", 2+2)
+local status = pcall(function()
+  l3btest:on_os_type(function()end)
+end)
+l3btest:write("on_os_type unavailable", not status)

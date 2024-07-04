@@ -34,7 +34,8 @@ function runtest_tasks(name,n,ext)
   -- launch 
   local cmd = "cd \""..lfs.currentdir().."\""..os_concat..
     "texlua "..arg[0].." custom-target-l3b"..
-    (options["debug"] and " --debug" or "").." \""..
+    (options["debug"] and " --debug" or "").." "..
+    options["target"].." \""..
     escapepath(name).."\" "..
     ext
   return cmd

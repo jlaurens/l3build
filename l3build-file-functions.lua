@@ -172,10 +172,10 @@ end
 -- Return an absolute path from a relative one
 -- Due to chdir, path must exist and be accessible.
 function abspath(path)
-  local oldpwd = currentdir()
+  local oldpwd = assert(currentdir())
   local ok, msg = chdir(path)
   if ok then
-    local result = currentdir()
+    local result = assert(currentdir())
     chdir(oldpwd)
     return escapepath(gsub(gsub(result,"^\\\\%?\\",""), "\\", "/"))
   end
@@ -196,9 +196,10 @@ function escapepath(path)
       return path
     end
   else
-    path = gsub(path,"\\ ","[PATH-SPACE]")
+    path = gsub(path,"\\ ","\2PATH_SPACE\3")
     path = gsub(path," ","\\ ")
-    return gsub(path,"%[PATH%-SPACE%]","\\ ")
+    local out = gsub(path,"\2PATH_SPACE\3","\\ ")
+    return out
   end
 end
 

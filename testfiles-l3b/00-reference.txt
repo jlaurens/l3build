@@ -1,2 +1,4 @@
-GENERATED TEST FILE:./build/test-config-l3b/00-generated.txt
+Test: 2+2=
 4
+Test: on_os_type unavailable
+PASS

@@ -20,6 +20,7 @@
 ---@field name string "windows", "msdos", "macosx", "linux"...
 ---@field uname oslib_uname
 ---@field tmpdir fun(template: string?): string
+---@version 5.3
 
 
 ---@class kpselib

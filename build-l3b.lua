@@ -32,17 +32,155 @@ l3b_test_type = {
   end
 }
 
-if options["target"] == "custom-target-l3b" then
+---@class L3BTestGenerator
+---@field PASS true convenient alias
+---@field FAIL false convenient alias
+---@field generated string[]
+---@field new fun(): L3BTestGenerator 
+L3BTestGenerator = {
+  PASS = true,
+  FAIL = false
+}
+
+---Designated creator
+---@return L3BTestGenerator
+function L3BTestGenerator.new()
+  return setmetatable({
+    generated = {}
+  }, {
+    __index = L3BTestGenerator
+  })
+end
+
+local function ordered_keys(t)
+  local keys = {}
+  for k,_ in pairs(t) do
+    insert(keys,k)
+  end
+  sort(keys)
+  return keys
+end
+
+---Generate output for testing
+---@param self L3BTestGenerator
+---@param label string
+---@param x any
+function L3BTestGenerator:write(label, x) -- write the argument, including tables
+  insert(self.generated, "Test: "..label)
+  if type(x)=="table" then
+    local stack = {}
+    local keys = ordered_keys(x)
+    local prefix = ""
+    while true do
+      if keys.next() then
+        local k = remove(keys, 0)
+        local v = x[k]
+        if type(v) == "table" then
+          insert(self.generated, prefix..tostring(k))
+          insert(stack,{
+            x = x,
+            keys = keys,
+            prefix = prefix,
+          })
+          x = v
+          keys = ordered_keys(x)
+          prefix = prefix.."  "
+        else
+          insert(self.generated, prefix..tostring(x))
+        end
+      else
+        local top = remove(stack)
+        if top then
+          x = top.x
+          keys = top.keys
+          prefix = top.prefix
+        else
+          break
+        end
+      end
+    end
+  elseif type(x) == "boolean" then
+    insert(self.generated, (x and "PASS" or "FAIL"))
+  elseif x then
+    insert(self.generated, x)
+  else
+    local f = load("return "..label)
+    if f then
+      insert(self.generated, (f() and "PASS" or "FAIL"))
+    end
+  end
+end
+
+local os_type = os.type
+
+---comment
+---@param type "windows"|"msdos"|"unix"
+---@param f fun(...):...
+---@param ... unknown
+function L3BTestGenerator:on_os_type(type, f, ...)
+  if type == os_type then
+    f(...)
+  end
+end
+
+---Disable `on_os_type`
+---@param message string error message
+function L3BTestGenerator:disable_on_os_type(message)
+  self.on_os_type = function(type, f, ...)
+    error(message)
+  end
+end
+
+---Save to file the written strings
+---@param self L3BTestGenerator
+---@param path string
+---@return boolean? status true on success, false on failure
+---@return string? message error message on failure, nil otherwise
+function L3BTestGenerator:save(path)
+  local f, msg = io.open(path, "w")
+  if not f then
+    return f, msg
+  end
+  insert(self.generated,"")
+  f:write(concat(self.generated, "\n"))
+  f:close()
+  if options["debug"] then
+    print("L3BTestGenerator.save: "..path.." "..tostring(fileexists(path)))
+    print(concat(self.generated, "\n"))
+  end
+  return true
+end
+
+---@class L3BTestGenerator
+---@field import fun(self: L3BTestGenerator, env: table) Import symbols to the given environment
+
+---Import symbols to the given environment
+---@param env table
+function L3BTestGenerator:export_symbols(env)
+  env.PASS = self.PASS
+  env.FAIL = self.FAIL
+  env.write = function(...) self:write(...) end
+  env.on_os_type = function(...) self:on_os_type(...) end
+end
+
+---Export the symbols to the current environment
+---The default implementation does nothing
+function L3BTestGenerator:export()
+end
+
+local custom_target = "custom-target-l3b"
+if options["target"] == custom_target then
   -- only declare this target when needed.
   -- It will not appear in the help because it is purey internal
   -- hence the leading "_"
-  declaretarget("custom-target-l3b", {
+  declaretarget(custom_target, {
     func = function(names)
       if options["debug"] then
-        print("target: custom-target-l3b")
+        print("target: "..custom_target)
       end
-      local name = names[1]
-      local ext = names[2]
+      local target = names[1]
+      local name = names[2]
+      local ext = names[3]
       local savedtestfiledir = testfiledir
       dofile("./config-l3b.lua")
       testdir = testdir .. "-config-l3b"
@@ -58,6 +196,7 @@ if options["target"] == "custom-target-l3b" then
       if not fileexists(testname..l3b_test_type.test) then
         cp(name..l3b_test_type.test, testfiledir, testdir)
       end
+      local in_expectation = fileexists(testfiledir.."/"..name..l3b_test_type.expectation)
       ---@type file*?
       local saved_input = nil -- saved output
       local input_name = testname.."-input.txt"
@@ -68,75 +207,45 @@ if options["target"] == "custom-target-l3b" then
       if options["debug"] then
         print("Generating: "..name_generated)
       end
-      local generated = {}
       do
-        local _ENV = setmetatable({}, {
-          __index = _ENV
-        })
-        local function ordered_keys(t)
-          local keys = {}
-          for k,_ in pairs(x) do
-            insert(keys,k)
-          end
-          sort(keys)
-          return keys
-        end
         testname = testname..ext
         if fileexists(testname) then
-          _ENV.list = {}
-          _ENV.generate = function(x, check) -- write the argument, including tables
-            if type(x)=="table" then
-              local stack = {}
-              local keys = ordered_keys(x)
-              local prefix = ""
-              while true do
-                if keys.next() then
-                  local k = remove(keys, 0)
-                  local v = x[k]
-                  if type(v) == "table" then
-                    insert(_ENV.list, prefix..tostring(k))
-                    insert(stack,{
-                      x = x,
-                      keys = keys,
-                      prefix = prefix,
-                    })
-                    x = v
-                    keys = ordered_keys(x)
-                    prefix = prefix.."  "
-                  else
-                    insert(_ENV.list, prefix..tostring(x))
-                  end
-                else
-                  local top = remove(stack)
-                  if top then
-                    x = top.x
-                    keys = top.keys
-                    prefix = top.prefix
-                  else
-                    break
-                  end
-                end
-              end
-            else
-              insert(_ENV.list, tostring(x))
-            end
+          local l3btest = L3BTestGenerator.new()
+          if target == "save" or not in_expectation then
+            l3btest:disable_on_os_type("on_os_type is only available in expectations."..testname)
           end
-          local f, msg = loadfile(testname, "t", _ENV)
-          assert(f, msg)
+          local _ENV = setmetatable(
+            {l3btest = l3btest},
+            {__index = _ENV}
+          )
+          -- allow to import symbols
+          function l3btest:export()
+            l3btest:export_symbols(_ENV)
+          end
+          local f = assert(loadfile(testname,"t",_ENV))
           f()
-          generated = _ENV.list
+          if saved_input then input(saved_input) end
+          l3btest:save(name_generated)
         else
           print("NO "..testname)
         end
       end
-      if saved_input then input(saved_input) end
-      local f = assert(io.open(name_generated, "w"))
-      f:write(concat(generated, "\n"))
-      f:close()
+    end
+  })
+end
+
+-- This target is used to retrieve information
+custom_target = "l3b-check-load"
+if options["target"] == custom_target then
+  declaretarget(custom_target, {
+    func = function(names)
       if options["debug"] then
-        print("Generated: "..name_generated.." "..tostring(fileexists(name_generated)))
-        print(concat(generated, "\n"))
+        print("target: "..custom_target)
       end
+      local chunk = assert("return "..names[1])
+      local f = assert(load(chunk))
+      print("<l3b-check-load>"..f().."</l3b-check-load>")
+      return 0
     end
   })
 end

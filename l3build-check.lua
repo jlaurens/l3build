@@ -595,7 +595,7 @@ local setup_check
 local runtest
 
 ---Whether to skip this test
----@param test_type L3BuildTestD8n
+---@param test_type L3BTestType
 ---@param name string
 ---@param engine string
 ---@return boolean?
@@ -605,7 +605,7 @@ local function test_skip(test_type, name, engine)
 end
 
 ---Custom name generator
----@param test_type L3BuildTestD8n
+---@param test_type L3BTestType
 ---@param name string
 ---@param engine string
 ---@return string used_name basically 
@@ -936,7 +936,7 @@ function runtest_tasks(name,run,ext)
   return ""
 end
 
--- Look for a test: could be in the testfiledir or the unpackdir
+-- Look for a l3btest: could be in the testfiledir or the unpackdir
 function testexists(test)
   local filenames = {}
   for i, kind in ipairs(test_order) do

@@ -151,7 +151,8 @@ target_list =
 ---
 ---To be used in `build.lua`
 ---@param name string name of the target
----@param kvargs table named arguments including target data
+---@param kvargs declaretarget_kvargs named arguments including target data
+---@return L3BTargetType
 function declaretarget(name, kvargs)
   if type(name) ~= "string" then
     error("name must be a string", 2)
@@ -167,7 +168,7 @@ function declaretarget(name, kvargs)
         entry[k] = v
       end
     elseif kvargs.already ~= "replace" then
-      error(name.." is already a target", 2)      
+      error(name.." is already a target", 2)
     end
   end
   if type(kvargs.func) ~= "function" then
@@ -186,6 +187,7 @@ function declaretarget(name, kvargs)
   feed("bundle_target", "boolean")
   feed("pre", "function")
   target_list[name] = entry
+  return entry
 end
 
 --
